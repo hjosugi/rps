@@ -8,7 +8,8 @@ The aim is to run `.ps1` scripts exactly as `pwsh` does, cover what `pwsh`
 ships, run Linux commands the way a shell should, and find out by measurement
 how much faster that is without a .NET runtime to start. The design is
 [DESIGN.md](DESIGN.md); the work is tracked in the
-[issues](https://github.com/hjosugi/rps/issues).
+[issues](https://github.com/hjosugi/rps/issues), starting from the
+[roadmap](https://github.com/hjosugi/rps/issues/182).
 
 ## Status
 
