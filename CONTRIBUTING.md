@@ -24,9 +24,12 @@ It runs `cargo fmt --all -- --check`,
 ## Adding behaviour
 
 1. Write the conformance case first: a script under
-   `tests/conformance/cases/<area>/`. Keep its output deterministic.
+   `tests/conformance/cases/<area>/`. Keep its output deterministic: no
+   string-keyed hashtable order, time, `$PID`, temporary path or unseeded
+   random number (docs/01_compat_contract.md).
 2. Record what pwsh does: `cargo harness conform record` (needs the pinned
-   pwsh, `scripts/fetch-pwsh.sh`). Read the golden; pwsh is often surprising.
+   pwsh, `scripts/fetch-pwsh.sh`). It runs each case three times and refuses
+   a case whose runs disagree. Read the golden; pwsh is often surprising.
 3. Implement until `cargo harness conform check` passes, then lock the case in
    with `cargo harness conform check --bless`.
 4. Set the `status` of what you finished in `inventory/*.tsv`.

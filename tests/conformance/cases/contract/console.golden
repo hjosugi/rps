@@ -1,0 +1,5 @@
+exit=0
+window=80x40
+redirected=True console-width=0
+rendering=PlainText error-view=ConciseView
+encoding=utf-8 output-encoding=utf-8

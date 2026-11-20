@@ -5,6 +5,11 @@
 //! `<name>.golden`. `check` runs it under rpsh and compares, without needing
 //! pwsh, so it runs anywhere the workspace builds.
 //!
+//! A case whose output differs between two pwsh runs cannot have a golden:
+//! `record` runs every case several times and refuses such a case instead of
+//! recording one of its answers (docs/01_compat_contract.md, "What does not
+//! repeat").
+//!
 //! `tests/conformance/passing.txt` lists the cases rpsh passes. `check` fails
 //! when the list and reality disagree in either direction: a listed case that
 //! no longer passes is a regression, and a case that newly passes has to be
@@ -57,6 +62,7 @@ fn decode_golden(bytes: &[u8]) -> Option<Reference> {
 fn record(root: &Path, mut args: Args) -> Result<bool, String> {
     let filter = args.value("--filter")?;
     let pwsh_path = args.value("--pwsh")?;
+    let repeat = args.number("--repeat")?.unwrap_or(3).max(2);
     args.finish()?;
 
     let pwsh = engines::locate_pwsh(root, pwsh_path)?;
@@ -70,15 +76,24 @@ fn record(root: &Path, mut args: Args) -> Result<bool, String> {
 
     let cases = cases::collect(&cases_directory(root), filter.as_deref())?;
     let mut changed = 0;
+    let mut unstable = Vec::new();
     for case in &cases {
-        let run = pwsh.run_file(&case.path)?;
-        let Some(exit_code) = run.exit_code else {
-            return Err(format!("{}: pwsh was killed by a signal", case.id));
-        };
-        let golden = encode_golden(&Reference {
-            stdout: run.stdout,
-            exit_code,
-        });
+        let mut answers = Vec::with_capacity(repeat);
+        for _ in 0..repeat {
+            let run = pwsh.run_file(&case.path)?;
+            let Some(exit_code) = run.exit_code else {
+                return Err(format!("{}: pwsh was killed by a signal", case.id));
+            };
+            answers.push(encode_golden(&Reference {
+                stdout: run.stdout,
+                exit_code,
+            }));
+        }
+        if let Some(why) = disagreement(&answers) {
+            unstable.push(format!("{}: {why}", case.id));
+            continue;
+        }
+        let golden = answers.swap_remove(0);
         let path = golden_path(case);
         if fs::read(&path).ok().as_deref() != Some(golden.as_slice()) {
             fs::write(&path, golden)
@@ -87,11 +102,52 @@ fn record(root: &Path, mut args: Args) -> Result<bool, String> {
             changed += 1;
         }
     }
-    println!(
-        "{} cases recorded from pwsh {version}, {changed} changed",
-        cases.len()
+
+    let reference = engines::pwsh_reference(&pwsh)?;
+    let reference_path = root.join("tests/conformance/reference.txt");
+    let text = format!(
+        "# The environment the goldens were recorded in. Written by \
+         `cargo harness conform record`.\n{reference}"
     );
-    Ok(true)
+    if fs::read_to_string(&reference_path).ok().as_deref() != Some(text.as_str()) {
+        fs::write(&reference_path, text)
+            .map_err(|error| format!("cannot write {}: {error}", reference_path.display()))?;
+        println!("reference.txt updated:\n{reference}");
+    }
+
+    println!(
+        "{} cases recorded from pwsh {version} ({repeat} runs each), {changed} changed",
+        cases.len() - unstable.len()
+    );
+    for case in &unstable {
+        println!("UNSTABLE {case}");
+    }
+    if !unstable.is_empty() {
+        println!(
+            "pwsh's own answer to these cases changes from run to run, so no golden was \
+             written. Make the script deterministic (docs/01_compat_contract.md)."
+        );
+    }
+    Ok(unstable.is_empty())
+}
+
+/// Why repeated runs of one case do not agree, if they do not.
+fn disagreement(answers: &[Vec<u8>]) -> Option<String> {
+    let first = answers.first()?;
+    let (index, other) = answers
+        .iter()
+        .enumerate()
+        .skip(1)
+        .find(|(_, answer)| *answer != first)?;
+    let at = first
+        .iter()
+        .zip(other)
+        .position(|(a, b)| a != b)
+        .unwrap_or_else(|| first.len().min(other.len()));
+    Some(format!(
+        "run 1 and run {} differ at byte {at} of exit line and stdout",
+        index + 1
+    ))
 }
 
 fn check(root: &Path, mut args: Args) -> Result<bool, String> {
@@ -217,6 +273,21 @@ mod tests {
     fn an_empty_stdout_is_distinct_from_a_blank_line() {
         assert_eq!(decode_golden(b"exit=0\n").unwrap().stdout, b"");
         assert_eq!(decode_golden(b"exit=0\n\n").unwrap().stdout, b"\n");
+    }
+
+    #[test]
+    fn repeated_runs_must_agree() {
+        let same = vec![b"exit=0\na\n".to_vec(), b"exit=0\na\n".to_vec()];
+        assert_eq!(disagreement(&same), None);
+        let order = vec![
+            b"exit=0\nalpha,beta\n".to_vec(),
+            b"exit=0\nalpha,beta\n".to_vec(),
+            b"exit=0\nbeta,alpha\n".to_vec(),
+        ];
+        assert_eq!(
+            disagreement(&order).as_deref(),
+            Some("run 1 and run 3 differ at byte 7 of exit line and stdout")
+        );
     }
 
     #[test]
