@@ -9,6 +9,7 @@ cli	Clear-Item	(session)	todo
 clp	Clear-ItemProperty	(session)	todo
 cls	Clear-Host	(session)	todo
 clv	Clear-Variable	(session)	todo
+cmres	Compress-PSResource	Microsoft.PowerShell.PSResourceGet	todo
 copy	Copy-Item	(session)	todo
 cpi	Copy-Item	(session)	todo
 cvpa	Convert-Path	(session)	todo
@@ -23,7 +24,9 @@ erase	Remove-Item	(session)	todo
 etsn	Enter-PSSession	(session)	todo
 exsn	Exit-PSSession	(session)	todo
 fc	Format-Custom	(session)	todo
+fdres	Find-PSResource	Microsoft.PowerShell.PSResourceGet	todo
 fhx	Format-Hex	Microsoft.PowerShell.Utility	todo
+fimo	Find-Module	PowerShellGet	todo
 fl	Format-List	(session)	todo
 foreach	ForEach-Object	(session)	todo
 ft	Format-Table	(session)	todo
@@ -37,6 +40,7 @@ gcm	Get-Command	(session)	todo
 gcs	Get-PSCallStack	(session)	todo
 gdr	Get-PSDrive	(session)	todo
 gerr	Get-Error	(session)	todo
+Get-PSResource	Get-InstalledPSResource	Microsoft.PowerShell.PSResourceGet	todo
 ghy	Get-History	(session)	todo
 gi	Get-Item	(session)	todo
 gjb	Get-Job	(session)	todo
@@ -46,6 +50,7 @@ gmo	Get-Module	(session)	todo
 gp	Get-ItemProperty	(session)	todo
 gps	Get-Process	(session)	todo
 gpv	Get-ItemPropertyValue	(session)	todo
+gres	Get-InstalledPSResource	Microsoft.PowerShell.PSResourceGet	todo
 group	Group-Object	(session)	todo
 gsn	Get-PSSession	(session)	todo
 gtz	Get-TimeZone	Microsoft.PowerShell.Management	todo
@@ -57,10 +62,12 @@ icm	Invoke-Command	(session)	todo
 iex	Invoke-Expression	(session)	todo
 ihy	Invoke-History	(session)	todo
 ii	Invoke-Item	(session)	todo
+inmo	Install-Module	PowerShellGet	todo
 ipal	Import-Alias	(session)	todo
 ipcsv	Import-Csv	(session)	todo
 ipmo	Import-Module	(session)	todo
 irm	Invoke-RestMethod	(session)	todo
+isres	Install-PSResource	Microsoft.PowerShell.PSResourceGet	todo
 iwr	Invoke-WebRequest	(session)	todo
 md	mkdir	(session)	todo
 measure	Measure-Object	(session)	todo
@@ -74,7 +81,9 @@ nmo	New-Module	(session)	todo
 nsn	New-PSSession	(session)	todo
 nv	New-Variable	(session)	todo
 oh	Out-Host	(session)	todo
+pbres	Publish-PSResource	Microsoft.PowerShell.PSResourceGet	todo
 popd	Pop-Location	(session)	todo
+pumo	Publish-Module	PowerShellGet	todo
 pushd	Push-Location	(session)	todo
 pwd	Get-Location	(session)	todo
 r	Invoke-History	(session)	todo
@@ -107,6 +116,10 @@ sp	Set-ItemProperty	(session)	todo
 spjb	Stop-Job	(session)	todo
 spps	Stop-Process	(session)	todo
 sv	Set-Variable	(session)	todo
+svres	Save-PSResource	Microsoft.PowerShell.PSResourceGet	todo
 type	Get-Content	(session)	todo
+udres	Update-PSResource	Microsoft.PowerShell.PSResourceGet	todo
+upmo	Update-Module	PowerShellGet	todo
+usres	Uninstall-PSResource	Microsoft.PowerShell.PSResourceGet	todo
 where	Where-Object	(session)	todo
 wjb	Wait-Job	(session)	todo

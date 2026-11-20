@@ -24,7 +24,6 @@ MaximumHistoryCount	System.Int32	None	todo
 MyInvocation	System.Management.Automation.InvocationInfo	None	todo
 NestedPromptLevel	System.Int32	None	todo
 null		None	todo
-OutDir	System.String	None	todo
 OutputEncoding	System.Text.UTF8Encoding+UTF8EncodingSealed	None	todo
 PID	System.Int32	Constant, AllScope	todo
 PROFILE	System.String	None	todo

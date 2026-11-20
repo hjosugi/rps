@@ -49,13 +49,18 @@ function Write-Inventory {
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 
 # Variables first: later steps import modules, which adds to the session.
-$variables = Get-Variable | Sort-Object Name | ForEach-Object {
+# $OutDir is this script's own parameter, not part of a session.
+$variables = Get-Variable | Where-Object Name -NE 'OutDir' | Sort-Object Name | ForEach-Object {
     $type = if ($null -eq $_.Value) { '' } else { $_.Value.GetType().FullName }
     , @($_.Name, $type, $_.Options)
 }
 Write-Inventory variables @('name', 'type', 'options') 1 $variables
 
+# A command reports its parameters only once its module is loaded.
+Get-Module -ListAvailable | Import-Module -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+
 $commands = Get-Command -CommandType Cmdlet, Function |
+    Where-Object Name -NE 'Write-Inventory' |
     Sort-Object { if ($_.Source) { $_.Source } else { '(session)' } }, Name
 $rows = $commands | ForEach-Object {
     $module = if ($_.Source) { $_.Source } else { '(session)' }

@@ -31,7 +31,7 @@ What is complete is the machinery around it:
   reports a speedup only where both print the same thing;
 * a differential test suite whose expected output is recorded from the real
   `pwsh` 7.7.0;
-* an inventory of upstream's surface on Linux — 299 commands, 1,568
+* an inventory of upstream's surface on Linux — 298 commands, 2,076
   parameters, 157 token kinds, 74 AST node types and more — generated from
   `pwsh` itself, with a status column.
 

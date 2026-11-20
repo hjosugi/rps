@@ -39,7 +39,7 @@ Progress is counted three ways:
 | Yardstick | Where | Size today |
 |---|---|---|
 | Conformance cases with recorded pwsh output | `tests/conformance` | grows with every feature |
-| Upstream surface: commands, parameters, aliases, AST nodes, tokens, format views, ... | `inventory/*.tsv` | 299 commands, 1,568 parameters |
+| Upstream surface: commands, parameters, aliases, AST nodes, tokens, format views, ... | `inventory/*.tsv` | 298 commands, 2,076 parameters |
 | Upstream's own Pester suite | `test/powershell` upstream | 409 files, about 6,650 `It` blocks |
 
 Compatibility is layered, because PowerShell is defined on top of .NET and a

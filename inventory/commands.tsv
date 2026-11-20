@@ -9,7 +9,6 @@ module	name	kind	status
 (session)	Pause	Function	todo
 (session)	prompt	Function	todo
 (session)	TabExpansion2	Function	todo
-(session)	Write-Inventory	Function	todo
 Microsoft.PowerShell.Archive	Compress-Archive	Function	todo
 Microsoft.PowerShell.Archive	Expand-Archive	Function	todo
 Microsoft.PowerShell.Core	Add-History	Cmdlet	todo
@@ -267,7 +266,7 @@ PackageManagement	Set-PackageSource	Cmdlet	todo
 PackageManagement	Uninstall-Package	Cmdlet	todo
 PackageManagement	Unregister-PackageSource	Cmdlet	todo
 PowerShellGet	Find-Command	Function	todo
-PowerShellGet	Find-DSCResource	Function	todo
+PowerShellGet	Find-DscResource	Function	todo
 PowerShellGet	Find-Module	Function	todo
 PowerShellGet	Find-RoleCapability	Function	todo
 PowerShellGet	Find-Script	Function	todo
