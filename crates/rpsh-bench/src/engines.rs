@@ -1,6 +1,7 @@
 //! Running a script under pwsh or rpsh, and judging rpsh's result.
 
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -9,7 +10,15 @@ use rpsh_host::{EXIT_NOT_IMPLEMENTED, NOT_IMPLEMENTED_MARKER, TARGET_PWSH_VERSIO
 
 pub(crate) struct Engine {
     pub(crate) program: PathBuf,
+    /// `$HOME` for every run: `.cache/home` in the checkout, never the
+    /// user's own. pwsh reads modules, `powershell.config.json` and its
+    /// startup JIT profile from below `$HOME`.
+    home: PathBuf,
 }
+
+/// `PATH` for every run, so that a case names the same programs on every
+/// machine (docs/01_compat_contract.md, "Reference environment").
+const REFERENCE_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
 
 pub(crate) struct Run {
     pub(crate) stdout: Vec<u8>,
@@ -20,8 +29,15 @@ pub(crate) struct Run {
 }
 
 impl Engine {
+    fn new(root: &Path, program: PathBuf) -> Result<Self, String> {
+        let home = root.join(".cache/home");
+        fs::create_dir_all(&home)
+            .map_err(|error| format!("cannot create {}: {error}", home.display()))?;
+        Ok(Self { program, home })
+    }
+
     /// Runs `script` the same way under either engine: no profile, no
-    /// prompts, a fixed locale and time zone, the script's directory as the
+    /// prompts, the reference environment, the script's directory as the
     /// working directory.
     pub(crate) fn run_file(&self, script: &Path) -> Result<Run, String> {
         let mut command = self.command();
@@ -33,10 +49,17 @@ impl Engine {
         self.run(command)
     }
 
+    /// The reference environment of docs/01_compat_contract.md. Nothing is
+    /// inherited from the caller: `TERM` alone changes `$Host.UI.RawUI` and
+    /// `[Console]::WindowWidth`, and `PSModulePath` or `XDG_*` change what
+    /// pwsh loads.
     fn command(&self) -> Command {
         let mut command = Command::new(&self.program);
         command
             .stdin(Stdio::null())
+            .env_clear()
+            .env("HOME", &self.home)
+            .env("PATH", REFERENCE_PATH)
             .env("LANG", "en_US.UTF-8")
             .env("LC_ALL", "en_US.UTF-8")
             .env("TZ", "UTC")
@@ -131,7 +154,7 @@ pub(crate) fn locate_pwsh(root: &Path, explicit: Option<String>) -> Result<Engin
             )
         })?,
     };
-    Ok(Engine { program })
+    Engine::new(root, program)
 }
 
 /// The version pwsh reports for itself.
@@ -154,6 +177,37 @@ pub(crate) fn pwsh_version(pwsh: &Engine) -> Result<String, String> {
     Ok(version)
 }
 
+/// What the goldens depend on besides the pwsh version: the runtime, the
+/// system ICU that supplies culture data, and the host's idea of the
+/// console. Written to `tests/conformance/reference.txt` by `record`.
+pub(crate) fn pwsh_reference(pwsh: &Engine) -> Result<String, String> {
+    const PROBE: &str = r#"
+$icu = Get-Content "/proc/$PID/maps" -ErrorAction Ignore |
+    ForEach-Object { if ($_ -match 'libicuuc\.so\.([0-9.]+)') { $Matches[1] } } |
+    Select-Object -First 1
+$size = $Host.UI.RawUI.WindowSize
+"powershell: $($PSVersionTable.PSVersion)"
+"dotnet: $([Environment]::Version)"
+"os: $($PSVersionTable.OS)"
+"architecture: $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
+"icu: $(if ($icu) { $icu } else { 'not loaded' })"
+"culture: $((Get-Culture).Name) / $((Get-UICulture).Name)"
+"time zone: $([TimeZoneInfo]::Local.Id)"
+"window: $($size.Width)x$($size.Height)"
+"#;
+    let mut command = pwsh.command();
+    command.args(["-NoProfile", "-NonInteractive", "-Command", PROBE]);
+    let run = pwsh.run(command)?;
+    if run.exit_code != Some(0) {
+        return Err(format!(
+            "{} failed to describe its environment: {}",
+            pwsh.program.display(),
+            String::from_utf8_lossy(&run.stderr)
+        ));
+    }
+    String::from_utf8(run.stdout).map_err(|_| "pwsh described its environment in non-UTF-8".into())
+}
+
 /// Builds the release `rpsh` and returns it.
 pub(crate) fn build_rpsh(root: &Path) -> Result<Engine, String> {
     let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
@@ -168,17 +222,13 @@ pub(crate) fn build_rpsh(root: &Path) -> Result<Engine, String> {
     let target = env::var_os("CARGO_TARGET_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("target"));
-    Ok(Engine {
-        program: target.join("release").join("rpsh"),
-    })
+    Engine::new(root, target.join("release").join("rpsh"))
 }
 
 /// `--rpsh PATH` if given, otherwise a fresh release build.
 pub(crate) fn rpsh(root: &Path, explicit: Option<String>) -> Result<Engine, String> {
     match explicit {
-        Some(path) => Ok(Engine {
-            program: PathBuf::from(path),
-        }),
+        Some(path) => Engine::new(root, PathBuf::from(path)),
         None => build_rpsh(root),
     }
 }

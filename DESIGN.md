@@ -25,14 +25,32 @@ In priority order. A later goal never justifies breaking an earlier one.
 ## 2. What "a complete port" means
 
 The reference is the pinned pwsh binary, not documentation and not memory.
-`scripts/fetch-pwsh.sh` installs it, verified by SHA-256.
+`scripts/fetch-pwsh.sh` installs it, verified by SHA-256. The full contract is
+[docs/01_compat_contract.md](docs/01_compat_contract.md); in short:
+
+* **One environment.** Both engines run every case in an environment built
+  from nothing: own `HOME`, fixed `PATH`, en-US, UTC, no `TERM`. What the
+  answers still depend on (.NET 11.0.0, the system ICU) is recorded in
+  `tests/conformance/reference.txt`.
+* **What is compared** grows in levels: exit code and stdout today, then
+  stderr, the stream of every record, and every `ErrorRecord` field.
+  Messages match exactly: PowerShell's own (English only — the Linux release
+  ships no translations) and .NET's.
+* **Identity.** `$PSVersionTable`, `$PSEdition` and `$Host` read as pwsh
+  7.7.0's. A script that needs to know it runs under rpsh asks for the type
+  `[Rpsh.EngineInfo]`.
+* **Determinism.** A golden is recorded only if three pwsh runs agree. What
+  pwsh randomizes (string hash order) rpsh may fix; what pwsh repeats
+  (integer-key order, seeded random numbers) rpsh reproduces.
+* **Quirks are the specification.** Changing one is a §9 improvement.
 
 **The never-guess rule.** rpsh parses a script in full before running any of
 it. Anything it does not implement — syntax, an operator on some pair of
 types, a parameter — ends the run with exit code 99 and
 `rpsh: not implemented: <feature>` on stderr. It never produces an
 approximate answer. This is what makes the measurements in §7 meaningful: a
-result is either pwsh's result or an explicit refusal.
+result is either pwsh's result or an explicit refusal. A refusal is not an
+exception: no `catch`, `trap` or error preference can intercept it.
 
 Progress is counted three ways:
 

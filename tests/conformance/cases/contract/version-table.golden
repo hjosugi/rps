@@ -1,0 +1,13 @@
+exit=0
+System.Management.Automation.PSVersionHashTable
+PSVersion,PSEdition,GitCommitId,OS,Platform,PSCompatibleVersions,PSRemotingProtocolVersion,SerializationVersion,WSManStackVersion
+PSVersion = 7.7.0 [SemanticVersion]
+PSEdition = Core [String]
+GitCommitId = 7.7.0 [String]
+Platform = Unix [String]
+PSCompatibleVersions = 1.0 2.0 3.0 4.0 5.0 5.1 6.0 7.0 [Version[]]
+PSRemotingProtocolVersion = 2.4 [Version]
+SerializationVersion = 1.1.0.1 [Version]
+WSManStackVersion = 3.0 [Version]
+PSEdition=Core IsCoreCLR=True IsLinux=True IsMacOS=False IsWindows=False
+Host=ConsoleHost 7.7.0

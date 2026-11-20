@@ -1,0 +1,38 @@
+exit=0
+RuntimeException
+  NotSpecified: (:) [], RuntimeException
+  System.Management.Automation.RuntimeException
+  Attempted to divide by zero.
+FormatException
+  NotSpecified: (:) [], MethodInvocationException
+  System.Management.Automation.MethodInvocationException
+  Exception calling "Parse" with "1" argument(s): "The input string 'x' was not in a correct format."
+CommandNotFoundException
+  ObjectNotFound: (Get-NoSuchThing:String) [], CommandNotFoundException
+  System.Management.Automation.CommandNotFoundException
+  The term 'Get-NoSuchThing' is not recognized as a name of a cmdlet, function, script file, or executable program.
+Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
+boom
+  OperationStopped: (boom:String) [], RuntimeException
+  System.Management.Automation.RuntimeException
+  boom
+InvalidCastFromStringToInteger
+  InvalidArgument: (:) [], RuntimeException
+  System.Management.Automation.RuntimeException
+  Cannot convert value "abc" to type "System.Int32". Error: "The input string 'abc' was not in a correct format."
+InvokeMethodOnNull
+  InvalidOperation: (:) [], RuntimeException
+  System.Management.Automation.RuntimeException
+  You cannot call a method on a null-valued expression.
+PathNotFound,Microsoft.PowerShell.Commands.GetItemCommand
+  ObjectNotFound: (/no/such/path:String) [Get-Item], ItemNotFoundException
+  System.Management.Automation.ItemNotFoundException
+  Cannot find path '/no/such/path' because it does not exist.
+DirectoryNotFoundException
+  NotSpecified: (:) [], MethodInvocationException
+  System.Management.Automation.MethodInvocationException
+  Exception calling "ReadAllText" with "1" argument(s): "Could not find a part of the path '/no/such/file'."
+ArgumentOutOfRangeException
+  NotSpecified: (:) [], MethodInvocationException
+  System.Management.Automation.MethodInvocationException
+  Exception calling "Substring" with "1" argument(s): "startIndex cannot be larger than length of string. (Parameter 'startIndex')"

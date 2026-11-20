@@ -1,0 +1,9 @@
+# The environment the goldens were recorded in. Written by `cargo harness conform record`.
+powershell: 7.7.0
+dotnet: 11.0.0
+os: CachyOS
+architecture: X64
+icu: 78.3
+culture: en-US / en-US
+time zone: UTC
+window: 80x40
