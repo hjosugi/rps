@@ -1,0 +1,1569 @@
+command	parameter	type	parameter_sets	aliases	status
+Add-History	InputObject	System.Management.Automation.PSObject[]	*		todo
+Add-History	Passthru	System.Management.Automation.SwitchParameter	*		todo
+Clear-History	CommandLine	System.String[]	CommandLineParameter		todo
+Clear-History	Count	System.Int32	*		todo
+Clear-History	Id	System.Int32[]	IDParameter		todo
+Clear-History	Newest	System.Management.Automation.SwitchParameter	*		todo
+Debug-Job	BreakAll	System.Management.Automation.SwitchParameter	*		todo
+Debug-Job	Id	System.Int32	JobIdParameterSet		todo
+Debug-Job	InstanceId	System.Guid	JobInstanceIdParameterSet		todo
+Debug-Job	Job	System.Management.Automation.Job	JobParameterSet		todo
+Debug-Job	Name	System.String	JobNameParameterSet		todo
+Disable-ExperimentalFeature	Name	System.String[]	*		todo
+Disable-ExperimentalFeature	Scope	System.Management.Automation.Configuration.ConfigScope	*		todo
+Enable-ExperimentalFeature	Name	System.String[]	*		todo
+Enable-ExperimentalFeature	Scope	System.Management.Automation.Configuration.ConfigScope	*		todo
+Enter-PSHostProcess	AppDomainName	System.String	ProcessIdParameterSet,ProcessNameParameterSet,ProcessParameterSet,PSHostProcessInfoParameterSet		todo
+Enter-PSHostProcess	CustomPipeName	System.String	PipeNameParameterSet		todo
+Enter-PSHostProcess	HostProcessInfo	Microsoft.PowerShell.Commands.PSHostProcessInfo	PSHostProcessInfoParameterSet		todo
+Enter-PSHostProcess	Id	System.Int32	ProcessIdParameterSet		todo
+Enter-PSHostProcess	Name	System.String	ProcessNameParameterSet		todo
+Enter-PSHostProcess	Process	System.Diagnostics.Process	ProcessParameterSet		todo
+Enter-PSSession	AllowRedirection	System.Management.Automation.SwitchParameter	Uri		todo
+Enter-PSSession	ApplicationName	System.String	ComputerName		todo
+Enter-PSSession	Authentication	System.Management.Automation.Runspaces.AuthenticationMechanism	ComputerName,Uri		todo
+Enter-PSSession	CertificateThumbprint	System.String	ComputerName,Uri		todo
+Enter-PSSession	ComputerName	System.String	ComputerName	Cn	todo
+Enter-PSSession	ConfigurationName	System.String	ComputerName,ContainerId,Uri,VMId,VMName		todo
+Enter-PSSession	ConnectingTimeout	System.Int32	SSHHost		todo
+Enter-PSSession	ConnectionUri	System.Uri	Uri	URI,CU	todo
+Enter-PSSession	ContainerId	System.String	ContainerId		todo
+Enter-PSSession	Credential	System.Management.Automation.PSCredential	ComputerName,Uri,VMId,VMName		todo
+Enter-PSSession	EnableNetworkAccess	System.Management.Automation.SwitchParameter	ComputerName,Uri		todo
+Enter-PSSession	HostName	System.String	SSHHost		todo
+Enter-PSSession	Id	System.Int32	Id		todo
+Enter-PSSession	InstanceId	System.Guid	InstanceId		todo
+Enter-PSSession	KeyFilePath	System.String	SSHHost	IdentityFilePath	todo
+Enter-PSSession	Name	System.String	Name		todo
+Enter-PSSession	Options	System.Collections.Hashtable	SSHHost		todo
+Enter-PSSession	Port	System.Int32	ComputerName,SSHHost		todo
+Enter-PSSession	RunAsAdministrator	System.Management.Automation.SwitchParameter	ContainerId		todo
+Enter-PSSession	Session	System.Management.Automation.Runspaces.PSSession	Session		todo
+Enter-PSSession	SessionOption	System.Management.Automation.Remoting.PSSessionOption	ComputerName,Uri		todo
+Enter-PSSession	SSHTransport	System.Management.Automation.SwitchParameter	SSHHost		todo
+Enter-PSSession	Subsystem	System.String	SSHHost		todo
+Enter-PSSession	UserName	System.String	SSHHost		todo
+Enter-PSSession	UseSSL	System.Management.Automation.SwitchParameter	ComputerName		todo
+Enter-PSSession	VMId	System.Guid	VMId	VMGuid	todo
+Enter-PSSession	VMName	System.String	VMName		todo
+Export-ModuleMember	Alias	System.String[]	*		todo
+Export-ModuleMember	Cmdlet	System.String[]	*		todo
+Export-ModuleMember	Function	System.String[]	*		todo
+Export-ModuleMember	Variable	System.String[]	*		todo
+ForEach-Object	ArgumentList	System.Object[]	PropertyAndMethodSet	Args	todo
+ForEach-Object	AsJob	System.Management.Automation.SwitchParameter	ParallelParameterSet		todo
+ForEach-Object	Begin	System.Management.Automation.ScriptBlock	ScriptBlockSet		todo
+ForEach-Object	End	System.Management.Automation.ScriptBlock	ScriptBlockSet		todo
+ForEach-Object	InputObject	System.Management.Automation.PSObject	ParallelParameterSet,PropertyAndMethodSet,ScriptBlockSet		todo
+ForEach-Object	MemberName	System.String	PropertyAndMethodSet		todo
+ForEach-Object	Parallel	System.Management.Automation.ScriptBlock	ParallelParameterSet		todo
+ForEach-Object	Process	System.Management.Automation.ScriptBlock[]	ScriptBlockSet		todo
+ForEach-Object	RemainingScripts	System.Management.Automation.ScriptBlock[]	ScriptBlockSet		todo
+ForEach-Object	ThrottleLimit	System.Int32	ParallelParameterSet		todo
+ForEach-Object	TimeoutSeconds	System.Int32	ParallelParameterSet		todo
+ForEach-Object	UseNewRunspace	System.Management.Automation.SwitchParameter	ParallelParameterSet		todo
+Get-Command	All	System.Management.Automation.SwitchParameter	*		todo
+Get-Command	ArgumentList	System.Object[]	*	Args	todo
+Get-Command	CommandType	System.Management.Automation.CommandTypes	AllCommandSet	Type	todo
+Get-Command	ExcludeModule	System.String[]	*		todo
+Get-Command	FullyQualifiedModule	Microsoft.PowerShell.Commands.ModuleSpecification[]	*		todo
+Get-Command	FuzzyMinimumDistance	System.UInt32	AllCommandSet		todo
+Get-Command	ListImported	System.Management.Automation.SwitchParameter	*		todo
+Get-Command	Module	System.String[]	*	PSSnapin	todo
+Get-Command	Name	System.String[]	AllCommandSet		todo
+Get-Command	Noun	System.String[]	CmdletSet		todo
+Get-Command	ParameterName	System.String[]	*		todo
+Get-Command	ParameterType	System.Management.Automation.PSTypeName[]	*		todo
+Get-Command	ShowCommandInfo	System.Management.Automation.SwitchParameter	*		todo
+Get-Command	Syntax	System.Management.Automation.SwitchParameter	*		todo
+Get-Command	TotalCount	System.Int32	*		todo
+Get-Command	UseAbbreviationExpansion	System.Management.Automation.SwitchParameter	AllCommandSet		todo
+Get-Command	UseFuzzyMatching	System.Management.Automation.SwitchParameter	AllCommandSet		todo
+Get-Command	Verb	System.String[]	CmdletSet		todo
+Get-ExperimentalFeature	Name	System.String[]	*		todo
+Get-Help	Category	System.String[]	*		todo
+Get-Help	Component	System.String[]	*		todo
+Get-Help	Detailed	System.Management.Automation.SwitchParameter	DetailedView		todo
+Get-Help	Examples	System.Management.Automation.SwitchParameter	Examples		todo
+Get-Help	Full	System.Management.Automation.SwitchParameter	AllUsersView		todo
+Get-Help	Functionality	System.String[]	*		todo
+Get-Help	Name	System.String	*		todo
+Get-Help	Online	System.Management.Automation.SwitchParameter	Online		todo
+Get-Help	Parameter	System.String[]	Parameters		todo
+Get-Help	Path	System.String	*		todo
+Get-Help	Role	System.String[]	*		todo
+Get-History	Count	System.Int32	*		todo
+Get-History	Id	System.Int64[]	*		todo
+Get-Job	After	System.DateTime	CommandParameterSet,InstanceIdParameterSet,NameParameterSet,SessionIdParameterSet,StateParameterSet		todo
+Get-Job	Before	System.DateTime	CommandParameterSet,InstanceIdParameterSet,NameParameterSet,SessionIdParameterSet,StateParameterSet		todo
+Get-Job	ChildJobState	System.Management.Automation.JobState	CommandParameterSet,InstanceIdParameterSet,NameParameterSet,SessionIdParameterSet,StateParameterSet		todo
+Get-Job	Command	System.String[]	CommandParameterSet		todo
+Get-Job	Filter	System.Collections.Hashtable	FilterParameterSet		todo
+Get-Job	HasMoreData	System.Boolean	CommandParameterSet,InstanceIdParameterSet,NameParameterSet,SessionIdParameterSet,StateParameterSet		todo
+Get-Job	Id	System.Int32[]	SessionIdParameterSet		todo
+Get-Job	IncludeChildJob	System.Management.Automation.SwitchParameter	CommandParameterSet,InstanceIdParameterSet,NameParameterSet,SessionIdParameterSet,StateParameterSet		todo
+Get-Job	InstanceId	System.Guid[]	InstanceIdParameterSet		todo
+Get-Job	Name	System.String[]	NameParameterSet		todo
+Get-Job	Newest	System.Int32	CommandParameterSet,InstanceIdParameterSet,NameParameterSet,SessionIdParameterSet,StateParameterSet		todo
+Get-Job	State	System.Management.Automation.JobState	StateParameterSet		todo
+Get-Module	All	System.Management.Automation.SwitchParameter	Available,Loaded		todo
+Get-Module	CimNamespace	System.String	CimSession		todo
+Get-Module	CimResourceUri	System.Uri	CimSession		todo
+Get-Module	CimSession	Microsoft.Management.Infrastructure.CimSession	CimSession		todo
+Get-Module	FullyQualifiedName	Microsoft.PowerShell.Commands.ModuleSpecification[]	Available,CimSession,Loaded,PsSession		todo
+Get-Module	ListAvailable	System.Management.Automation.SwitchParameter	Available,CimSession,PsSession		todo
+Get-Module	Name	System.String[]	Available,CimSession,Loaded,PsSession		todo
+Get-Module	PSEdition	System.String	Available,PsSession		todo
+Get-Module	PSSession	System.Management.Automation.Runspaces.PSSession	PsSession		todo
+Get-Module	Refresh	System.Management.Automation.SwitchParameter	Available,CimSession,PsSession		todo
+Get-Module	SkipEditionCheck	System.Management.Automation.SwitchParameter	Available,CimSession,PsSession		todo
+Get-PSHostProcessInfo	Id	System.Int32[]	ProcessIdParameterSet		todo
+Get-PSHostProcessInfo	Name	System.String[]	ProcessNameParameterSet		todo
+Get-PSHostProcessInfo	Process	System.Diagnostics.Process[]	ProcessParameterSet		todo
+Get-PSSession	AllowRedirection	System.Management.Automation.SwitchParameter	ConnectionUri,ConnectionUriInstanceId		todo
+Get-PSSession	ApplicationName	System.String	ComputerInstanceId,ComputerName		todo
+Get-PSSession	Authentication	System.Management.Automation.Runspaces.AuthenticationMechanism	ComputerInstanceId,ComputerName,ConnectionUri,ConnectionUriInstanceId		todo
+Get-PSSession	CertificateThumbprint	System.String	ComputerInstanceId,ComputerName,ConnectionUri,ConnectionUriInstanceId		todo
+Get-PSSession	ComputerName	System.String[]	ComputerInstanceId,ComputerName	Cn	todo
+Get-PSSession	ConfigurationName	System.String	ComputerInstanceId,ComputerName,ConnectionUri,ConnectionUriInstanceId,ContainerId,ContainerIdInstanceId,VMId,VMIdInstanceId,VMName,VMNameInstanceId		todo
+Get-PSSession	ConnectionUri	System.Uri[]	ConnectionUri,ConnectionUriInstanceId	URI,CU	todo
+Get-PSSession	ContainerId	System.String[]	ContainerId,ContainerIdInstanceId		todo
+Get-PSSession	Credential	System.Management.Automation.PSCredential	ComputerInstanceId,ComputerName,ConnectionUri,ConnectionUriInstanceId		todo
+Get-PSSession	Id	System.Int32[]	Id		todo
+Get-PSSession	InstanceId	System.Guid[]	ComputerInstanceId,ConnectionUriInstanceId,ContainerIdInstanceId,InstanceId,VMIdInstanceId,VMNameInstanceId		todo
+Get-PSSession	Name	System.String[]	ComputerName,ConnectionUri,ContainerId,Name,VMId,VMName		todo
+Get-PSSession	Port	System.Int32	ComputerInstanceId,ComputerName		todo
+Get-PSSession	SessionOption	System.Management.Automation.Remoting.PSSessionOption	ComputerInstanceId,ComputerName,ConnectionUri,ConnectionUriInstanceId		todo
+Get-PSSession	State	Microsoft.PowerShell.Commands.SessionFilterState	ComputerInstanceId,ComputerName,ConnectionUri,ConnectionUriInstanceId,ContainerId,ContainerIdInstanceId,VMId,VMIdInstanceId,VMName,VMNameInstanceId		todo
+Get-PSSession	ThrottleLimit	System.Int32	ComputerInstanceId,ComputerName,ConnectionUri,ConnectionUriInstanceId		todo
+Get-PSSession	UseSSL	System.Management.Automation.SwitchParameter	ComputerInstanceId,ComputerName		todo
+Get-PSSession	VMId	System.Guid[]	VMId,VMIdInstanceId	VMGuid	todo
+Get-PSSession	VMName	System.String[]	VMName,VMNameInstanceId		todo
+Get-PSSubsystem	Kind	System.Management.Automation.Subsystem.SubsystemKind	GetByKindSet		todo
+Get-PSSubsystem	SubsystemType	System.Type	GetByTypeSet		todo
+Import-Module	Alias	System.String[]	*		todo
+Import-Module	ArgumentList	System.Object[]	*	Args	todo
+Import-Module	AsCustomObject	System.Management.Automation.SwitchParameter	*		todo
+Import-Module	Assembly	System.Reflection.Assembly[]	Assembly		todo
+Import-Module	CimNamespace	System.String	CimSession		todo
+Import-Module	CimResourceUri	System.Uri	CimSession		todo
+Import-Module	CimSession	Microsoft.Management.Infrastructure.CimSession	CimSession		todo
+Import-Module	Cmdlet	System.String[]	*		todo
+Import-Module	DisableNameChecking	System.Management.Automation.SwitchParameter	*		todo
+Import-Module	Force	System.Management.Automation.SwitchParameter	*		todo
+Import-Module	FullyQualifiedName	Microsoft.PowerShell.Commands.ModuleSpecification[]	FullyQualifiedName,FullyQualifiedNameAndPSSession,FullyQualifiedNameAndWinCompat		todo
+Import-Module	Function	System.String[]	*		todo
+Import-Module	Global	System.Management.Automation.SwitchParameter	*		todo
+Import-Module	MaximumVersion	System.String	CimSession,Name,PSSession,WinCompat		todo
+Import-Module	MinimumVersion	System.Version	CimSession,Name,PSSession,WinCompat	Version	todo
+Import-Module	ModuleInfo	System.Management.Automation.PSModuleInfo[]	ModuleInfo		todo
+Import-Module	Name	System.String[]	CimSession,Name,PSSession,WinCompat		todo
+Import-Module	NoClobber	System.Management.Automation.SwitchParameter	*	NoOverwrite	todo
+Import-Module	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Import-Module	Prefix	System.String	*		todo
+Import-Module	PSSession	System.Management.Automation.Runspaces.PSSession	FullyQualifiedNameAndPSSession,PSSession		todo
+Import-Module	RequiredVersion	System.Version	CimSession,Name,PSSession,WinCompat		todo
+Import-Module	Scope	System.String	*		todo
+Import-Module	SkipEditionCheck	System.Management.Automation.SwitchParameter	Assembly,CimSession,FullyQualifiedName,FullyQualifiedNameAndPSSession,ModuleInfo,Name,PSSession		todo
+Import-Module	UseWindowsPowerShell	System.Management.Automation.SwitchParameter	FullyQualifiedNameAndWinCompat,WinCompat	UseWinPS	todo
+Import-Module	Variable	System.String[]	*		todo
+Invoke-Command	AllowRedirection	System.Management.Automation.SwitchParameter	FilePathUri,Uri		todo
+Invoke-Command	ApplicationName	System.String	ComputerName,FilePathComputerName		todo
+Invoke-Command	ArgumentList	System.Object[]	*	Args	todo
+Invoke-Command	AsJob	System.Management.Automation.SwitchParameter	ComputerName,ContainerId,FilePathComputerName,FilePathContainerId,FilePathRunspace,FilePathSSHHost,FilePathSSHHostHash,FilePathUri,FilePathVMId,FilePathVMName,Session,SSHHost,SSHHostHashParam,Uri,VMId,VMName		todo
+Invoke-Command	Authentication	System.Management.Automation.Runspaces.AuthenticationMechanism	ComputerName,FilePathComputerName,FilePathUri,Uri		todo
+Invoke-Command	CertificateThumbprint	System.String	ComputerName,Uri		todo
+Invoke-Command	ComputerName	System.String[]	ComputerName,FilePathComputerName	Cn	todo
+Invoke-Command	ConfigurationName	System.String	ComputerName,ContainerId,FilePathComputerName,FilePathContainerId,FilePathUri,FilePathVMId,FilePathVMName,Uri,VMId,VMName		todo
+Invoke-Command	ConnectingTimeout	System.Int32	FilePathSSHHost,SSHHost		todo
+Invoke-Command	ConnectionUri	System.Uri[]	FilePathUri,Uri	URI,CU	todo
+Invoke-Command	ContainerId	System.String[]	ContainerId,FilePathContainerId		todo
+Invoke-Command	Credential	System.Management.Automation.PSCredential	ComputerName,FilePathComputerName,FilePathUri,FilePathVMId,FilePathVMName,Uri,VMId,VMName		todo
+Invoke-Command	EnableNetworkAccess	System.Management.Automation.SwitchParameter	ComputerName,FilePathComputerName,FilePathUri,Uri		todo
+Invoke-Command	FilePath	System.String	FilePathComputerName,FilePathContainerId,FilePathRunspace,FilePathSSHHost,FilePathSSHHostHash,FilePathUri,FilePathVMId,FilePathVMName	PSPath	todo
+Invoke-Command	HideComputerName	System.Management.Automation.SwitchParameter	ComputerName,ContainerId,FilePathComputerName,FilePathContainerId,FilePathRunspace,FilePathSSHHost,FilePathSSHHostHash,FilePathUri,FilePathVMId,FilePathVMName,Session,SSHHost,SSHHostHashParam,Uri,VMId,VMName	HCN	todo
+Invoke-Command	HostName	System.String[]	FilePathSSHHost,SSHHost		todo
+Invoke-Command	InDisconnectedSession	System.Management.Automation.SwitchParameter	ComputerName,FilePathComputerName,FilePathUri,Uri	Disconnected	todo
+Invoke-Command	InputObject	System.Management.Automation.PSObject	*		todo
+Invoke-Command	JobName	System.String	ComputerName,ContainerId,FilePathComputerName,FilePathContainerId,FilePathRunspace,FilePathUri,Session,SSHHost,SSHHostHashParam,Uri		todo
+Invoke-Command	KeyFilePath	System.String	FilePathSSHHost,SSHHost	IdentityFilePath	todo
+Invoke-Command	NoNewScope	System.Management.Automation.SwitchParameter	InProcess		todo
+Invoke-Command	Options	System.Collections.Hashtable	FilePathSSHHost,SSHHost		todo
+Invoke-Command	Port	System.Int32	ComputerName,FilePathComputerName,SSHHost		todo
+Invoke-Command	RemoteDebug	System.Management.Automation.SwitchParameter	ComputerName,ContainerId,FilePathComputerName,FilePathContainerId,FilePathRunspace,FilePathSSHHost,FilePathSSHHostHash,FilePathUri,FilePathVMId,FilePathVMName,Session,SSHHost,SSHHostHashParam,Uri,VMId,VMName		todo
+Invoke-Command	RunAsAdministrator	System.Management.Automation.SwitchParameter	ContainerId,FilePathContainerId		todo
+Invoke-Command	ScriptBlock	System.Management.Automation.ScriptBlock	ComputerName,ContainerId,InProcess,Session,SSHHost,SSHHostHashParam,Uri,VMId,VMName	Command	todo
+Invoke-Command	Session	System.Management.Automation.Runspaces.PSSession[]	FilePathRunspace,Session		todo
+Invoke-Command	SessionName	System.String[]	ComputerName,FilePathComputerName		todo
+Invoke-Command	SessionOption	System.Management.Automation.Remoting.PSSessionOption	ComputerName,FilePathComputerName,FilePathUri,Uri		todo
+Invoke-Command	SSHConnection	System.Collections.Hashtable[]	FilePathSSHHostHash,SSHHostHashParam		todo
+Invoke-Command	SSHTransport	System.Management.Automation.SwitchParameter	FilePathSSHHost,SSHHost		todo
+Invoke-Command	Subsystem	System.String	FilePathSSHHost,SSHHost		todo
+Invoke-Command	ThrottleLimit	System.Int32	ComputerName,ContainerId,FilePathComputerName,FilePathContainerId,FilePathRunspace,FilePathUri,FilePathVMId,FilePathVMName,Session,Uri,VMId,VMName		todo
+Invoke-Command	UserName	System.String	FilePathSSHHost,SSHHost		todo
+Invoke-Command	UseSSL	System.Management.Automation.SwitchParameter	ComputerName,FilePathComputerName		todo
+Invoke-Command	VMId	System.Guid[]	FilePathVMId,VMId	VMGuid	todo
+Invoke-Command	VMName	System.String[]	FilePathVMName,VMName		todo
+Invoke-History	Id	System.String	*		todo
+New-Module	ArgumentList	System.Object[]	*	Args	todo
+New-Module	AsCustomObject	System.Management.Automation.SwitchParameter	*		todo
+New-Module	Cmdlet	System.String[]	*		todo
+New-Module	Function	System.String[]	*		todo
+New-Module	Name	System.String	Name		todo
+New-Module	ReturnResult	System.Management.Automation.SwitchParameter	*		todo
+New-Module	ScriptBlock	System.Management.Automation.ScriptBlock	Name,ScriptBlock		todo
+New-ModuleManifest	AliasesToExport	System.String[]	*		todo
+New-ModuleManifest	Author	System.String	*		todo
+New-ModuleManifest	ClrVersion	System.Version	*		todo
+New-ModuleManifest	CmdletsToExport	System.String[]	*		todo
+New-ModuleManifest	CompanyName	System.String	*		todo
+New-ModuleManifest	CompatiblePSEditions	System.String[]	*		todo
+New-ModuleManifest	Copyright	System.String	*		todo
+New-ModuleManifest	DefaultCommandPrefix	System.String	*		todo
+New-ModuleManifest	Description	System.String	*		todo
+New-ModuleManifest	DotNetFrameworkVersion	System.Version	*		todo
+New-ModuleManifest	DscResourcesToExport	System.String[]	*		todo
+New-ModuleManifest	ExternalModuleDependencies	System.String[]	*		todo
+New-ModuleManifest	FileList	System.String[]	*		todo
+New-ModuleManifest	FormatsToProcess	System.String[]	*		todo
+New-ModuleManifest	FunctionsToExport	System.String[]	*		todo
+New-ModuleManifest	Guid	System.Guid	*		todo
+New-ModuleManifest	HelpInfoUri	System.String	*		todo
+New-ModuleManifest	IconUri	System.Uri	*		todo
+New-ModuleManifest	LicenseUri	System.Uri	*		todo
+New-ModuleManifest	ModuleList	System.Object[]	*		todo
+New-ModuleManifest	ModuleVersion	System.Version	*		todo
+New-ModuleManifest	NestedModules	System.Object[]	*		todo
+New-ModuleManifest	PassThru	System.Management.Automation.SwitchParameter	*		todo
+New-ModuleManifest	Path	System.String	*		todo
+New-ModuleManifest	PowerShellHostName	System.String	*		todo
+New-ModuleManifest	PowerShellHostVersion	System.Version	*		todo
+New-ModuleManifest	PowerShellVersion	System.Version	*		todo
+New-ModuleManifest	Prerelease	System.String	*		todo
+New-ModuleManifest	PrivateData	System.Object	*		todo
+New-ModuleManifest	ProcessorArchitecture	System.Reflection.ProcessorArchitecture	*		todo
+New-ModuleManifest	ProjectUri	System.Uri	*		todo
+New-ModuleManifest	ReleaseNotes	System.String	*		todo
+New-ModuleManifest	RequiredAssemblies	System.String[]	*		todo
+New-ModuleManifest	RequiredModules	System.Object[]	*		todo
+New-ModuleManifest	RequireLicenseAcceptance	System.Management.Automation.SwitchParameter	*		todo
+New-ModuleManifest	RootModule	System.String	*	ModuleToProcess	todo
+New-ModuleManifest	ScriptsToProcess	System.String[]	*		todo
+New-ModuleManifest	Tags	System.String[]	*		todo
+New-ModuleManifest	TypesToProcess	System.String[]	*		todo
+New-ModuleManifest	VariablesToExport	System.String[]	*		todo
+New-PSRoleCapabilityFile	AliasDefinitions	System.Collections.IDictionary[]	*		todo
+New-PSRoleCapabilityFile	AssembliesToLoad	System.String[]	*		todo
+New-PSRoleCapabilityFile	Author	System.String	*		todo
+New-PSRoleCapabilityFile	CompanyName	System.String	*		todo
+New-PSRoleCapabilityFile	Copyright	System.String	*		todo
+New-PSRoleCapabilityFile	Description	System.String	*		todo
+New-PSRoleCapabilityFile	EnvironmentVariables	System.Collections.IDictionary	*		todo
+New-PSRoleCapabilityFile	FormatsToProcess	System.String[]	*		todo
+New-PSRoleCapabilityFile	FunctionDefinitions	System.Collections.IDictionary[]	*		todo
+New-PSRoleCapabilityFile	Guid	System.Guid	*		todo
+New-PSRoleCapabilityFile	ModulesToImport	System.Object[]	*		todo
+New-PSRoleCapabilityFile	Path	System.String	*		todo
+New-PSRoleCapabilityFile	ScriptsToProcess	System.String[]	*		todo
+New-PSRoleCapabilityFile	TypesToProcess	System.String[]	*		todo
+New-PSRoleCapabilityFile	VariableDefinitions	System.Object	*		todo
+New-PSRoleCapabilityFile	VisibleAliases	System.String[]	*		todo
+New-PSRoleCapabilityFile	VisibleCmdlets	System.Object[]	*		todo
+New-PSRoleCapabilityFile	VisibleExternalCommands	System.String[]	*		todo
+New-PSRoleCapabilityFile	VisibleFunctions	System.Object[]	*		todo
+New-PSRoleCapabilityFile	VisibleProviders	System.String[]	*		todo
+New-PSSession	AllowRedirection	System.Management.Automation.SwitchParameter	Uri		todo
+New-PSSession	ApplicationName	System.String	ComputerName		todo
+New-PSSession	Authentication	System.Management.Automation.Runspaces.AuthenticationMechanism	ComputerName,Uri		todo
+New-PSSession	CertificateThumbprint	System.String	ComputerName,Uri		todo
+New-PSSession	ComputerName	System.String[]	ComputerName	Cn	todo
+New-PSSession	ConfigurationName	System.String	ComputerName,ContainerId,Uri,VMId,VMName		todo
+New-PSSession	ConnectingTimeout	System.Int32	SSHHost		todo
+New-PSSession	ConnectionUri	System.Uri[]	Uri	URI,CU	todo
+New-PSSession	ContainerId	System.String[]	ContainerId		todo
+New-PSSession	Credential	System.Management.Automation.PSCredential	ComputerName,Uri,VMId,VMName		todo
+New-PSSession	EnableNetworkAccess	System.Management.Automation.SwitchParameter	ComputerName,Session,Uri		todo
+New-PSSession	HostName	System.String[]	SSHHost		todo
+New-PSSession	KeyFilePath	System.String	SSHHost	IdentityFilePath	todo
+New-PSSession	Name	System.String[]	*		todo
+New-PSSession	Options	System.Collections.Hashtable	SSHHost		todo
+New-PSSession	Port	System.Int32	ComputerName,SSHHost		todo
+New-PSSession	RunAsAdministrator	System.Management.Automation.SwitchParameter	ContainerId		todo
+New-PSSession	Session	System.Management.Automation.Runspaces.PSSession[]	Session		todo
+New-PSSession	SessionOption	System.Management.Automation.Remoting.PSSessionOption	ComputerName,Uri		todo
+New-PSSession	SSHConnection	System.Collections.Hashtable[]	SSHHostHashParam		todo
+New-PSSession	SSHTransport	System.Management.Automation.SwitchParameter	SSHHost		todo
+New-PSSession	Subsystem	System.String	SSHHost		todo
+New-PSSession	ThrottleLimit	System.Int32	ComputerName,ContainerId,Session,Uri,VMId,VMName		todo
+New-PSSession	UserName	System.String	SSHHost		todo
+New-PSSession	UseSSL	System.Management.Automation.SwitchParameter	ComputerName		todo
+New-PSSession	UseWindowsPowerShell	System.Management.Automation.SwitchParameter	UseWindowsPowerShellParameterSet		todo
+New-PSSession	VMId	System.Guid[]	VMId	VMGuid	todo
+New-PSSession	VMName	System.String[]	VMName		todo
+New-PSSessionConfigurationFile	AliasDefinitions	System.Collections.IDictionary[]	*		todo
+New-PSSessionConfigurationFile	AssembliesToLoad	System.String[]	*		todo
+New-PSSessionConfigurationFile	Author	System.String	*		todo
+New-PSSessionConfigurationFile	CompanyName	System.String	*		todo
+New-PSSessionConfigurationFile	Copyright	System.String	*		todo
+New-PSSessionConfigurationFile	Description	System.String	*		todo
+New-PSSessionConfigurationFile	EnvironmentVariables	System.Collections.IDictionary	*		todo
+New-PSSessionConfigurationFile	ExecutionPolicy	Microsoft.PowerShell.ExecutionPolicy	*		todo
+New-PSSessionConfigurationFile	FormatsToProcess	System.String[]	*		todo
+New-PSSessionConfigurationFile	Full	System.Management.Automation.SwitchParameter	*		todo
+New-PSSessionConfigurationFile	FunctionDefinitions	System.Collections.IDictionary[]	*		todo
+New-PSSessionConfigurationFile	GroupManagedServiceAccount	System.String	*		todo
+New-PSSessionConfigurationFile	Guid	System.Guid	*		todo
+New-PSSessionConfigurationFile	LanguageMode	System.Management.Automation.PSLanguageMode	*		todo
+New-PSSessionConfigurationFile	ModulesToImport	System.Object[]	*		todo
+New-PSSessionConfigurationFile	MountUserDrive	System.Management.Automation.SwitchParameter	*		todo
+New-PSSessionConfigurationFile	Path	System.String	*		todo
+New-PSSessionConfigurationFile	PowerShellVersion	System.Version	*		todo
+New-PSSessionConfigurationFile	RequiredGroups	System.Collections.IDictionary	*		todo
+New-PSSessionConfigurationFile	RoleDefinitions	System.Collections.IDictionary	*		todo
+New-PSSessionConfigurationFile	RunAsVirtualAccount	System.Management.Automation.SwitchParameter	*		todo
+New-PSSessionConfigurationFile	RunAsVirtualAccountGroups	System.String[]	*		todo
+New-PSSessionConfigurationFile	SchemaVersion	System.Version	*		todo
+New-PSSessionConfigurationFile	ScriptsToProcess	System.String[]	*		todo
+New-PSSessionConfigurationFile	SessionType	System.Management.Automation.Remoting.SessionType	*		todo
+New-PSSessionConfigurationFile	TranscriptDirectory	System.String	*		todo
+New-PSSessionConfigurationFile	TypesToProcess	System.String[]	*		todo
+New-PSSessionConfigurationFile	UserDriveMaximumSize	System.Int64	*		todo
+New-PSSessionConfigurationFile	VariableDefinitions	System.Object	*		todo
+New-PSSessionConfigurationFile	VisibleAliases	System.String[]	*		todo
+New-PSSessionConfigurationFile	VisibleCmdlets	System.Object[]	*		todo
+New-PSSessionConfigurationFile	VisibleExternalCommands	System.String[]	*		todo
+New-PSSessionConfigurationFile	VisibleFunctions	System.Object[]	*		todo
+New-PSSessionConfigurationFile	VisibleProviders	System.String[]	*		todo
+New-PSSessionOption	SkipCACheck	System.Management.Automation.SwitchParameter	*		todo
+New-PSSessionOption	SkipCNCheck	System.Management.Automation.SwitchParameter	*		todo
+New-PSTransportOption	IdleTimeoutSec	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+New-PSTransportOption	MaxConcurrentCommandsPerSession	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+New-PSTransportOption	MaxConcurrentUsers	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+New-PSTransportOption	MaxIdleTimeoutSec	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+New-PSTransportOption	MaxMemoryPerSessionMB	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+New-PSTransportOption	MaxProcessesPerSession	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+New-PSTransportOption	MaxSessions	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+New-PSTransportOption	MaxSessionsPerUser	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+New-PSTransportOption	OutputBufferingMode	System.Nullable`1[[System.Management.Automation.Runspaces.OutputBufferingMode, System.Management.Automation, Version=7.7.0.500, Culture=neutral, PublicKeyToken=31bf3856ad364e35]]	*		todo
+New-PSTransportOption	ProcessIdleTimeoutSec	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+Out-Default	InputObject	System.Management.Automation.PSObject	*		todo
+Out-Default	Transcript	System.Management.Automation.SwitchParameter	*		todo
+Out-Host	InputObject	System.Management.Automation.PSObject	*		todo
+Out-Host	Paging	System.Management.Automation.SwitchParameter	*		todo
+Out-Null	InputObject	System.Management.Automation.PSObject	*		todo
+Receive-Job	AutoRemoveJob	System.Management.Automation.SwitchParameter	*		todo
+Receive-Job	ComputerName	System.String[]	ComputerName	Cn	todo
+Receive-Job	Force	System.Management.Automation.SwitchParameter	*		todo
+Receive-Job	Id	System.Int32[]	SessionIdParameterSet		todo
+Receive-Job	InstanceId	System.Guid[]	InstanceIdParameterSet		todo
+Receive-Job	Job	System.Management.Automation.Job[]	ComputerName,Location,Session		todo
+Receive-Job	Keep	System.Management.Automation.SwitchParameter	*		todo
+Receive-Job	Location	System.String[]	Location		todo
+Receive-Job	Name	System.String[]	NameParameterSet		todo
+Receive-Job	NoRecurse	System.Management.Automation.SwitchParameter	*		todo
+Receive-Job	Session	System.Management.Automation.Runspaces.PSSession[]	Session		todo
+Receive-Job	Wait	System.Management.Automation.SwitchParameter	*		todo
+Receive-Job	WriteEvents	System.Management.Automation.SwitchParameter	*		todo
+Receive-Job	WriteJobInResults	System.Management.Automation.SwitchParameter	*		todo
+Register-ArgumentCompleter	CommandName	System.String[]	NativeCommandSet,PowerShellSet		todo
+Register-ArgumentCompleter	Native	System.Management.Automation.SwitchParameter	NativeCommandSet		todo
+Register-ArgumentCompleter	NativeFallback	System.Management.Automation.SwitchParameter	NativeFallbackSet		todo
+Register-ArgumentCompleter	ParameterName	System.String	PowerShellSet		todo
+Register-ArgumentCompleter	ScriptBlock	System.Management.Automation.ScriptBlock	*		todo
+Remove-Job	Command	System.String[]	CommandParameterSet		todo
+Remove-Job	Filter	System.Collections.Hashtable	FilterParameterSet		todo
+Remove-Job	Force	System.Management.Automation.SwitchParameter	FilterParameterSet,InstanceIdParameterSet,JobParameterSet,NameParameterSet,SessionIdParameterSet	F	todo
+Remove-Job	Id	System.Int32[]	SessionIdParameterSet		todo
+Remove-Job	InstanceId	System.Guid[]	InstanceIdParameterSet		todo
+Remove-Job	Job	System.Management.Automation.Job[]	JobParameterSet		todo
+Remove-Job	Name	System.String[]	NameParameterSet		todo
+Remove-Job	State	System.Management.Automation.JobState	StateParameterSet		todo
+Remove-Module	Force	System.Management.Automation.SwitchParameter	*		todo
+Remove-Module	FullyQualifiedName	Microsoft.PowerShell.Commands.ModuleSpecification[]	FullyQualifiedName		todo
+Remove-Module	ModuleInfo	System.Management.Automation.PSModuleInfo[]	ModuleInfo		todo
+Remove-Module	Name	System.String[]	name		todo
+Remove-PSSession	ComputerName	System.String[]	ComputerName	Cn	todo
+Remove-PSSession	ContainerId	System.String[]	ContainerId		todo
+Remove-PSSession	Id	System.Int32[]	Id		todo
+Remove-PSSession	InstanceId	System.Guid[]	InstanceId		todo
+Remove-PSSession	Name	System.String[]	Name		todo
+Remove-PSSession	Session	System.Management.Automation.Runspaces.PSSession[]	Session		todo
+Remove-PSSession	VMId	System.Guid[]	VMId	VMGuid	todo
+Remove-PSSession	VMName	System.String[]	VMName		todo
+Save-Help	Credential	System.Management.Automation.PSCredential	*		todo
+Save-Help	DestinationPath	System.String[]	Path	Path	todo
+Save-Help	Force	System.Management.Automation.SwitchParameter	*		todo
+Save-Help	FullyQualifiedModule	Microsoft.PowerShell.Commands.ModuleSpecification[]	LiteralPath,Path		todo
+Save-Help	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Save-Help	Module	System.Management.Automation.PSModuleInfo[]	LiteralPath,Path	Name	todo
+Save-Help	Scope	Microsoft.PowerShell.Commands.UpdateHelpScope	*		todo
+Save-Help	UICulture	System.Globalization.CultureInfo[]	*		todo
+Save-Help	UseDefaultCredentials	System.Management.Automation.SwitchParameter	*		todo
+Set-PSDebug	Off	System.Management.Automation.SwitchParameter	off		todo
+Set-PSDebug	Step	System.Management.Automation.SwitchParameter	on		todo
+Set-PSDebug	Strict	System.Management.Automation.SwitchParameter	on		todo
+Set-PSDebug	Trace	System.Int32	on		todo
+Set-StrictMode	Off	System.Management.Automation.SwitchParameter	Off		todo
+Set-StrictMode	Version	System.Version	Version	v	todo
+Start-Job	ArgumentList	System.Object[]	ComputerName,FilePathComputerName,LiteralFilePathComputerName	Args	todo
+Start-Job	Authentication	System.Management.Automation.Runspaces.AuthenticationMechanism	ComputerName,FilePathComputerName,LiteralFilePathComputerName		todo
+Start-Job	ConnectingTimeout	System.Int32	SSHHost		todo
+Start-Job	Credential	System.Management.Automation.PSCredential	ComputerName,FilePathComputerName,LiteralFilePathComputerName		todo
+Start-Job	DefinitionName	System.String	DefinitionName		todo
+Start-Job	DefinitionPath	System.String	DefinitionName		todo
+Start-Job	FilePath	System.String	FilePathComputerName		todo
+Start-Job	InitializationScript	System.Management.Automation.ScriptBlock	ComputerName,FilePathComputerName,LiteralFilePathComputerName		todo
+Start-Job	InputObject	System.Management.Automation.PSObject	ComputerName,FilePathComputerName,LiteralFilePathComputerName		todo
+Start-Job	LiteralPath	System.String	LiteralFilePathComputerName	PSPath,LP	todo
+Start-Job	Name	System.String	ComputerName,FilePathComputerName,LiteralFilePathComputerName		todo
+Start-Job	Options	System.Collections.Hashtable	SSHHost		todo
+Start-Job	PSVersion	System.Version	ComputerName,FilePathComputerName,LiteralFilePathComputerName		todo
+Start-Job	RunAs32	System.Management.Automation.SwitchParameter	ComputerName,FilePathComputerName,LiteralFilePathComputerName		todo
+Start-Job	ScriptBlock	System.Management.Automation.ScriptBlock	ComputerName	Command	todo
+Start-Job	Type	System.String	DefinitionName		todo
+Start-Job	WorkingDirectory	System.String	*		todo
+Stop-Job	Filter	System.Collections.Hashtable	FilterParameterSet		todo
+Stop-Job	Id	System.Int32[]	SessionIdParameterSet		todo
+Stop-Job	InstanceId	System.Guid[]	InstanceIdParameterSet		todo
+Stop-Job	Job	System.Management.Automation.Job[]	JobParameterSet		todo
+Stop-Job	Name	System.String[]	NameParameterSet		todo
+Stop-Job	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Stop-Job	State	System.Management.Automation.JobState	StateParameterSet		todo
+Switch-Process	WithCommand	System.String[]	*		todo
+Test-ModuleManifest	Path	System.String	*		todo
+Update-Help	Credential	System.Management.Automation.PSCredential	*		todo
+Update-Help	Force	System.Management.Automation.SwitchParameter	*		todo
+Update-Help	FullyQualifiedModule	Microsoft.PowerShell.Commands.ModuleSpecification[]	LiteralPath,Path		todo
+Update-Help	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Update-Help	Module	System.String[]	LiteralPath,Path	Name	todo
+Update-Help	Recurse	System.Management.Automation.SwitchParameter	*		todo
+Update-Help	Scope	Microsoft.PowerShell.Commands.UpdateHelpScope	*		todo
+Update-Help	SourcePath	System.String[]	Path	Path	todo
+Update-Help	UICulture	System.Globalization.CultureInfo[]	*		todo
+Update-Help	UseDefaultCredentials	System.Management.Automation.SwitchParameter	*		todo
+Wait-Job	Any	System.Management.Automation.SwitchParameter	*		todo
+Wait-Job	Filter	System.Collections.Hashtable	FilterParameterSet		todo
+Wait-Job	Force	System.Management.Automation.SwitchParameter	*		todo
+Wait-Job	Id	System.Int32[]	SessionIdParameterSet		todo
+Wait-Job	InstanceId	System.Guid[]	InstanceIdParameterSet		todo
+Wait-Job	Job	System.Management.Automation.Job[]	JobParameterSet		todo
+Wait-Job	Name	System.String[]	NameParameterSet		todo
+Wait-Job	State	System.Management.Automation.JobState	StateParameterSet		todo
+Wait-Job	Timeout	System.Int32	*	TimeoutSec	todo
+Where-Object	CContains	System.Management.Automation.SwitchParameter	CaseSensitiveContainsSet		todo
+Where-Object	CEQ	System.Management.Automation.SwitchParameter	CaseSensitiveEqualSet		todo
+Where-Object	CGE	System.Management.Automation.SwitchParameter	CaseSensitiveGreaterOrEqualSet		todo
+Where-Object	CGT	System.Management.Automation.SwitchParameter	CaseSensitiveGreaterThanSet		todo
+Where-Object	CIn	System.Management.Automation.SwitchParameter	CaseSensitiveInSet		todo
+Where-Object	CLE	System.Management.Automation.SwitchParameter	CaseSensitiveLessOrEqualSet		todo
+Where-Object	CLike	System.Management.Automation.SwitchParameter	CaseSensitiveLikeSet		todo
+Where-Object	CLT	System.Management.Automation.SwitchParameter	CaseSensitiveLessThanSet		todo
+Where-Object	CMatch	System.Management.Automation.SwitchParameter	CaseSensitiveMatchSet		todo
+Where-Object	CNE	System.Management.Automation.SwitchParameter	CaseSensitiveNotEqualSet		todo
+Where-Object	CNotContains	System.Management.Automation.SwitchParameter	CaseSensitiveNotContainsSet		todo
+Where-Object	CNotIn	System.Management.Automation.SwitchParameter	CaseSensitiveNotInSet		todo
+Where-Object	CNotLike	System.Management.Automation.SwitchParameter	CaseSensitiveNotLikeSet		todo
+Where-Object	CNotMatch	System.Management.Automation.SwitchParameter	CaseSensitiveNotMatchSet		todo
+Where-Object	Contains	System.Management.Automation.SwitchParameter	ContainsSet	IContains	todo
+Where-Object	EQ	System.Management.Automation.SwitchParameter	EqualSet	IEQ	todo
+Where-Object	FilterScript	System.Management.Automation.ScriptBlock	ScriptBlockSet		todo
+Where-Object	GE	System.Management.Automation.SwitchParameter	GreaterOrEqualSet	IGE	todo
+Where-Object	GT	System.Management.Automation.SwitchParameter	GreaterThanSet	IGT	todo
+Where-Object	In	System.Management.Automation.SwitchParameter	InSet	IIn	todo
+Where-Object	InputObject	System.Management.Automation.PSObject	*		todo
+Where-Object	Is	System.Management.Automation.SwitchParameter	IsSet		todo
+Where-Object	IsNot	System.Management.Automation.SwitchParameter	IsNotSet		todo
+Where-Object	LE	System.Management.Automation.SwitchParameter	LessOrEqualSet	ILE	todo
+Where-Object	Like	System.Management.Automation.SwitchParameter	LikeSet	ILike	todo
+Where-Object	LT	System.Management.Automation.SwitchParameter	LessThanSet	ILT	todo
+Where-Object	Match	System.Management.Automation.SwitchParameter	MatchSet	IMatch	todo
+Where-Object	NE	System.Management.Automation.SwitchParameter	NotEqualSet	INE	todo
+Where-Object	Not	System.Management.Automation.SwitchParameter	Not		todo
+Where-Object	NotContains	System.Management.Automation.SwitchParameter	NotContainsSet	INotContains	todo
+Where-Object	NotIn	System.Management.Automation.SwitchParameter	NotInSet	INotIn	todo
+Where-Object	NotLike	System.Management.Automation.SwitchParameter	NotLikeSet	INotLike	todo
+Where-Object	NotMatch	System.Management.Automation.SwitchParameter	NotMatchSet	INotMatch	todo
+Where-Object	Property	System.String	CaseSensitiveContainsSet,CaseSensitiveEqualSet,CaseSensitiveGreaterOrEqualSet,CaseSensitiveGreaterThanSet,CaseSensitiveInSet,CaseSensitiveLessOrEqualSet,CaseSensitiveLessThanSet,CaseSensitiveLikeSet,CaseSensitiveMatchSet,CaseSensitiveNotContainsSet,CaseSensitiveNotEqualSet,CaseSensitiveNotInSet,CaseSensitiveNotLikeSet,CaseSensitiveNotMatchSet,ContainsSet,EqualSet,GreaterOrEqualSet,GreaterThanSet,InSet,IsNotSet,IsSet,LessOrEqualSet,LessThanSet,LikeSet,MatchSet,Not,NotContainsSet,NotEqualSet,NotInSet,NotLikeSet,NotMatchSet		todo
+Where-Object	Value	System.Object	CaseSensitiveContainsSet,CaseSensitiveEqualSet,CaseSensitiveGreaterOrEqualSet,CaseSensitiveGreaterThanSet,CaseSensitiveInSet,CaseSensitiveLessOrEqualSet,CaseSensitiveLessThanSet,CaseSensitiveLikeSet,CaseSensitiveMatchSet,CaseSensitiveNotContainsSet,CaseSensitiveNotEqualSet,CaseSensitiveNotInSet,CaseSensitiveNotLikeSet,CaseSensitiveNotMatchSet,ContainsSet,EqualSet,GreaterOrEqualSet,GreaterThanSet,InSet,IsNotSet,IsSet,LessOrEqualSet,LessThanSet,LikeSet,MatchSet,NotContainsSet,NotEqualSet,NotInSet,NotLikeSet,NotMatchSet		todo
+Add-Content	AsByteStream	System.Management.Automation.SwitchParameter	*		todo
+Add-Content	Credential	System.Management.Automation.PSCredential	*		todo
+Add-Content	Encoding	System.Text.Encoding	*		todo
+Add-Content	Exclude	System.String[]	*		todo
+Add-Content	Filter	System.String	*		todo
+Add-Content	Force	System.Management.Automation.SwitchParameter	*		todo
+Add-Content	Include	System.String[]	*		todo
+Add-Content	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Add-Content	NoNewline	System.Management.Automation.SwitchParameter	*		todo
+Add-Content	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Add-Content	Path	System.String[]	Path		todo
+Add-Content	Value	System.Object[]	*		todo
+Clear-Content	Credential	System.Management.Automation.PSCredential	*		todo
+Clear-Content	Exclude	System.String[]	*		todo
+Clear-Content	Filter	System.String	*		todo
+Clear-Content	Force	System.Management.Automation.SwitchParameter	*		todo
+Clear-Content	Include	System.String[]	*		todo
+Clear-Content	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Clear-Content	Path	System.String[]	Path		todo
+Clear-Item	Credential	System.Management.Automation.PSCredential	*		todo
+Clear-Item	Exclude	System.String[]	*		todo
+Clear-Item	Filter	System.String	*		todo
+Clear-Item	Force	System.Management.Automation.SwitchParameter	*		todo
+Clear-Item	Include	System.String[]	*		todo
+Clear-Item	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Clear-Item	Path	System.String[]	Path		todo
+Clear-ItemProperty	Credential	System.Management.Automation.PSCredential	*		todo
+Clear-ItemProperty	Exclude	System.String[]	*		todo
+Clear-ItemProperty	Filter	System.String	*		todo
+Clear-ItemProperty	Force	System.Management.Automation.SwitchParameter	*		todo
+Clear-ItemProperty	Include	System.String[]	*		todo
+Clear-ItemProperty	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Clear-ItemProperty	Name	System.String	*		todo
+Clear-ItemProperty	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Clear-ItemProperty	Path	System.String[]	Path		todo
+Convert-Path	Force	System.Management.Automation.SwitchParameter	*		todo
+Convert-Path	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Convert-Path	Path	System.String[]	Path		todo
+Copy-Item	Container	System.Management.Automation.SwitchParameter	*		todo
+Copy-Item	Credential	System.Management.Automation.PSCredential	*		todo
+Copy-Item	Destination	System.String	*		todo
+Copy-Item	Exclude	System.String[]	*		todo
+Copy-Item	Filter	System.String	*		todo
+Copy-Item	Force	System.Management.Automation.SwitchParameter	*		todo
+Copy-Item	FromSession	System.Management.Automation.Runspaces.PSSession	*		todo
+Copy-Item	Include	System.String[]	*		todo
+Copy-Item	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Copy-Item	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Copy-Item	Path	System.String[]	Path		todo
+Copy-Item	Recurse	System.Management.Automation.SwitchParameter	*		todo
+Copy-Item	ToSession	System.Management.Automation.Runspaces.PSSession	*		todo
+Copy-ItemProperty	Credential	System.Management.Automation.PSCredential	*		todo
+Copy-ItemProperty	Destination	System.String	*		todo
+Copy-ItemProperty	Exclude	System.String[]	*		todo
+Copy-ItemProperty	Filter	System.String	*		todo
+Copy-ItemProperty	Force	System.Management.Automation.SwitchParameter	*		todo
+Copy-ItemProperty	Include	System.String[]	*		todo
+Copy-ItemProperty	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Copy-ItemProperty	Name	System.String	*	PSProperty	todo
+Copy-ItemProperty	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Copy-ItemProperty	Path	System.String[]	Path		todo
+Debug-Process	Id	System.Int32[]	Id	PID,ProcessId	todo
+Debug-Process	InputObject	System.Diagnostics.Process[]	InputObject		todo
+Debug-Process	Name	System.String[]	Name	ProcessName	todo
+Get-ChildItem	Attributes	System.Management.Automation.FlagsExpression`1[[System.IO.FileAttributes, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+Get-ChildItem	Depth	System.UInt32	*		todo
+Get-ChildItem	Directory	System.Management.Automation.SwitchParameter	*	ad	todo
+Get-ChildItem	Exclude	System.String[]	*		todo
+Get-ChildItem	File	System.Management.Automation.SwitchParameter	*	af	todo
+Get-ChildItem	Filter	System.String	*		todo
+Get-ChildItem	FollowSymlink	System.Management.Automation.SwitchParameter	*		todo
+Get-ChildItem	Force	System.Management.Automation.SwitchParameter	*		todo
+Get-ChildItem	Hidden	System.Management.Automation.SwitchParameter	*	ah,h	todo
+Get-ChildItem	Include	System.String[]	*		todo
+Get-ChildItem	LiteralPath	System.String[]	LiteralItems	PSPath,LP	todo
+Get-ChildItem	Name	System.Management.Automation.SwitchParameter	*		todo
+Get-ChildItem	Path	System.String[]	Items		todo
+Get-ChildItem	ReadOnly	System.Management.Automation.SwitchParameter	*	ar	todo
+Get-ChildItem	Recurse	System.Management.Automation.SwitchParameter	*	s,r	todo
+Get-ChildItem	System	System.Management.Automation.SwitchParameter	*	as	todo
+Get-Clipboard	Delimiter	System.String[]	*		todo
+Get-Clipboard	Raw	System.Management.Automation.SwitchParameter	*		todo
+Get-Content	AsByteStream	System.Management.Automation.SwitchParameter	*		todo
+Get-Content	Credential	System.Management.Automation.PSCredential	*		todo
+Get-Content	Delimiter	System.String	*		todo
+Get-Content	Encoding	System.Text.Encoding	*		todo
+Get-Content	Exclude	System.String[]	*		todo
+Get-Content	Filter	System.String	*		todo
+Get-Content	Force	System.Management.Automation.SwitchParameter	*		todo
+Get-Content	Include	System.String[]	*		todo
+Get-Content	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Get-Content	Path	System.String[]	Path		todo
+Get-Content	Raw	System.Management.Automation.SwitchParameter	*		todo
+Get-Content	ReadCount	System.Int64	*		todo
+Get-Content	Tail	System.Int32	*	Last	todo
+Get-Content	TotalCount	System.Int64	*	First,Head	todo
+Get-Content	Wait	System.Management.Automation.SwitchParameter	*		todo
+Get-Item	Credential	System.Management.Automation.PSCredential	*		todo
+Get-Item	Exclude	System.String[]	*		todo
+Get-Item	Filter	System.String	*		todo
+Get-Item	Force	System.Management.Automation.SwitchParameter	*		todo
+Get-Item	Include	System.String[]	*		todo
+Get-Item	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Get-Item	Path	System.String[]	Path		todo
+Get-ItemProperty	Credential	System.Management.Automation.PSCredential	*		todo
+Get-ItemProperty	Exclude	System.String[]	*		todo
+Get-ItemProperty	Filter	System.String	*		todo
+Get-ItemProperty	Include	System.String[]	*		todo
+Get-ItemProperty	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Get-ItemProperty	Name	System.String[]	*	PSProperty	todo
+Get-ItemProperty	Path	System.String[]	Path		todo
+Get-ItemPropertyValue	Credential	System.Management.Automation.PSCredential	*		todo
+Get-ItemPropertyValue	Exclude	System.String[]	*		todo
+Get-ItemPropertyValue	Filter	System.String	*		todo
+Get-ItemPropertyValue	Include	System.String[]	*		todo
+Get-ItemPropertyValue	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Get-ItemPropertyValue	Name	System.String[]	*	PSProperty	todo
+Get-ItemPropertyValue	Path	System.String[]	Path		todo
+Get-Location	PSDrive	System.String[]	Location		todo
+Get-Location	PSProvider	System.String[]	Location		todo
+Get-Location	Stack	System.Management.Automation.SwitchParameter	Stack		todo
+Get-Location	StackName	System.String[]	Stack		todo
+Get-Process	FileVersionInfo	System.Management.Automation.SwitchParameter	Id,InputObject,Name	FV,FVI	todo
+Get-Process	Id	System.Int32[]	Id,IdWithUserName	PID	todo
+Get-Process	IncludeUserName	System.Management.Automation.SwitchParameter	IdWithUserName,InputObjectWithUserName,NameWithUserName		todo
+Get-Process	InputObject	System.Diagnostics.Process[]	InputObject,InputObjectWithUserName		todo
+Get-Process	Module	System.Management.Automation.SwitchParameter	Id,InputObject,Name		todo
+Get-Process	Name	System.String[]	Name,NameWithUserName	ProcessName	todo
+Get-PSDrive	LiteralName	System.String[]	LiteralName		todo
+Get-PSDrive	Name	System.String[]	Name		todo
+Get-PSDrive	PSProvider	System.String[]	*		todo
+Get-PSDrive	Scope	System.String	*		todo
+Get-PSProvider	PSProvider	System.String[]	*		todo
+Get-TimeZone	Id	System.String[]	Id		todo
+Get-TimeZone	ListAvailable	System.Management.Automation.SwitchParameter	ListAvailable		todo
+Get-TimeZone	Name	System.String[]	Name		todo
+Invoke-Item	Credential	System.Management.Automation.PSCredential	*		todo
+Invoke-Item	Exclude	System.String[]	*		todo
+Invoke-Item	Filter	System.String	*		todo
+Invoke-Item	Include	System.String[]	*		todo
+Invoke-Item	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Invoke-Item	Path	System.String[]	Path		todo
+Join-Path	AdditionalChildPath	System.String[]	*		todo
+Join-Path	ChildPath	System.String[]	*		todo
+Join-Path	Credential	System.Management.Automation.PSCredential	*		todo
+Join-Path	Extension	System.String	*		todo
+Join-Path	Path	System.String[]	*	PSPath	todo
+Join-Path	Resolve	System.Management.Automation.SwitchParameter	*		todo
+Move-Item	Credential	System.Management.Automation.PSCredential	*		todo
+Move-Item	Destination	System.String	*		todo
+Move-Item	Exclude	System.String[]	*		todo
+Move-Item	Filter	System.String	*		todo
+Move-Item	Force	System.Management.Automation.SwitchParameter	*		todo
+Move-Item	Include	System.String[]	*		todo
+Move-Item	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Move-Item	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Move-Item	Path	System.String[]	Path		todo
+Move-ItemProperty	Credential	System.Management.Automation.PSCredential	*		todo
+Move-ItemProperty	Destination	System.String	*		todo
+Move-ItemProperty	Exclude	System.String[]	*		todo
+Move-ItemProperty	Filter	System.String	*		todo
+Move-ItemProperty	Force	System.Management.Automation.SwitchParameter	*		todo
+Move-ItemProperty	Include	System.String[]	*		todo
+Move-ItemProperty	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Move-ItemProperty	Name	System.String[]	*	PSProperty	todo
+Move-ItemProperty	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Move-ItemProperty	Path	System.String[]	Path		todo
+New-Item	Credential	System.Management.Automation.PSCredential	*		todo
+New-Item	Force	System.Management.Automation.SwitchParameter	*		todo
+New-Item	ItemType	System.String	*	Type	todo
+New-Item	Name	System.String	nameSet		todo
+New-Item	Path	System.String[]	nameSet,pathSet		todo
+New-Item	Value	System.Object	*	Target	todo
+New-ItemProperty	Credential	System.Management.Automation.PSCredential	*		todo
+New-ItemProperty	Exclude	System.String[]	*		todo
+New-ItemProperty	Filter	System.String	*		todo
+New-ItemProperty	Force	System.Management.Automation.SwitchParameter	*		todo
+New-ItemProperty	Include	System.String[]	*		todo
+New-ItemProperty	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+New-ItemProperty	Name	System.String	*	PSProperty	todo
+New-ItemProperty	Path	System.String[]	Path		todo
+New-ItemProperty	PropertyType	System.String	*	Type	todo
+New-ItemProperty	Value	System.Object	*		todo
+New-PSDrive	Credential	System.Management.Automation.PSCredential	*		todo
+New-PSDrive	Description	System.String	*		todo
+New-PSDrive	Name	System.String	*		todo
+New-PSDrive	PSProvider	System.String	*		todo
+New-PSDrive	Root	System.String	*		todo
+New-PSDrive	Scope	System.String	*		todo
+Pop-Location	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Pop-Location	StackName	System.String	*		todo
+Push-Location	LiteralPath	System.String	LiteralPath	PSPath,LP	todo
+Push-Location	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Push-Location	Path	System.String	Path		todo
+Push-Location	StackName	System.String	*		todo
+Remove-Item	Credential	System.Management.Automation.PSCredential	*		todo
+Remove-Item	Exclude	System.String[]	*		todo
+Remove-Item	Filter	System.String	*		todo
+Remove-Item	Force	System.Management.Automation.SwitchParameter	*		todo
+Remove-Item	Include	System.String[]	*		todo
+Remove-Item	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Remove-Item	Path	System.String[]	Path		todo
+Remove-Item	Recurse	System.Management.Automation.SwitchParameter	*		todo
+Remove-ItemProperty	Credential	System.Management.Automation.PSCredential	*		todo
+Remove-ItemProperty	Exclude	System.String[]	*		todo
+Remove-ItemProperty	Filter	System.String	*		todo
+Remove-ItemProperty	Force	System.Management.Automation.SwitchParameter	*		todo
+Remove-ItemProperty	Include	System.String[]	*		todo
+Remove-ItemProperty	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Remove-ItemProperty	Name	System.String[]	*	PSProperty	todo
+Remove-ItemProperty	Path	System.String[]	Path		todo
+Remove-PSDrive	Force	System.Management.Automation.SwitchParameter	*		todo
+Remove-PSDrive	LiteralName	System.String[]	LiteralName		todo
+Remove-PSDrive	Name	System.String[]	Name		todo
+Remove-PSDrive	PSProvider	System.String[]	*		todo
+Remove-PSDrive	Scope	System.String	*		todo
+Rename-Item	Credential	System.Management.Automation.PSCredential	*		todo
+Rename-Item	Force	System.Management.Automation.SwitchParameter	*		todo
+Rename-Item	LiteralPath	System.String	ByLiteralPath	PSPath,LP	todo
+Rename-Item	NewName	System.String	*		todo
+Rename-Item	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Rename-Item	Path	System.String	ByPath		todo
+Rename-ItemProperty	Credential	System.Management.Automation.PSCredential	*		todo
+Rename-ItemProperty	Exclude	System.String[]	*		todo
+Rename-ItemProperty	Filter	System.String	*		todo
+Rename-ItemProperty	Force	System.Management.Automation.SwitchParameter	*		todo
+Rename-ItemProperty	Include	System.String[]	*		todo
+Rename-ItemProperty	LiteralPath	System.String	LiteralPath	PSPath,LP	todo
+Rename-ItemProperty	Name	System.String	*	PSProperty	todo
+Rename-ItemProperty	NewName	System.String	*		todo
+Rename-ItemProperty	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Rename-ItemProperty	Path	System.String	Path		todo
+Resolve-Path	Credential	System.Management.Automation.PSCredential	*		todo
+Resolve-Path	Force	System.Management.Automation.SwitchParameter	*		todo
+Resolve-Path	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Resolve-Path	Path	System.String[]	Path		todo
+Resolve-Path	Relative	System.Management.Automation.SwitchParameter	LiteralPath,Path		todo
+Resolve-Path	RelativeBasePath	System.String	*		todo
+Set-Clipboard	Append	System.Management.Automation.SwitchParameter	*		todo
+Set-Clipboard	AsOSC52	System.Management.Automation.SwitchParameter	*	ToLocalhost	todo
+Set-Clipboard	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Set-Clipboard	Value	System.String[]	*		todo
+Set-Content	AsByteStream	System.Management.Automation.SwitchParameter	*		todo
+Set-Content	Credential	System.Management.Automation.PSCredential	*		todo
+Set-Content	Encoding	System.Text.Encoding	*		todo
+Set-Content	Exclude	System.String[]	*		todo
+Set-Content	Filter	System.String	*		todo
+Set-Content	Force	System.Management.Automation.SwitchParameter	*		todo
+Set-Content	Include	System.String[]	*		todo
+Set-Content	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Set-Content	NoNewline	System.Management.Automation.SwitchParameter	*		todo
+Set-Content	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Set-Content	Path	System.String[]	Path		todo
+Set-Content	Value	System.Object[]	*		todo
+Set-Item	Credential	System.Management.Automation.PSCredential	*		todo
+Set-Item	Exclude	System.String[]	*		todo
+Set-Item	Filter	System.String	*		todo
+Set-Item	Force	System.Management.Automation.SwitchParameter	*		todo
+Set-Item	Include	System.String[]	*		todo
+Set-Item	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Set-Item	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Set-Item	Path	System.String[]	Path		todo
+Set-Item	Value	System.Object	*		todo
+Set-ItemProperty	Credential	System.Management.Automation.PSCredential	*		todo
+Set-ItemProperty	Exclude	System.String[]	*		todo
+Set-ItemProperty	Filter	System.String	*		todo
+Set-ItemProperty	Force	System.Management.Automation.SwitchParameter	*		todo
+Set-ItemProperty	Include	System.String[]	*		todo
+Set-ItemProperty	InputObject	System.Management.Automation.PSObject	propertyPSObjectLiteralPathSet,propertyPSObjectPathSet		todo
+Set-ItemProperty	LiteralPath	System.String[]	propertyPSObjectLiteralPathSet,propertyValueLiteralPathSet	PSPath,LP	todo
+Set-ItemProperty	Name	System.String	propertyValueLiteralPathSet,propertyValuePathSet	PSProperty	todo
+Set-ItemProperty	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Set-ItemProperty	Path	System.String[]	propertyPSObjectPathSet,propertyValuePathSet		todo
+Set-ItemProperty	Value	System.Object	propertyValueLiteralPathSet,propertyValuePathSet		todo
+Set-Location	LiteralPath	System.String	LiteralPath	PSPath,LP	todo
+Set-Location	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Set-Location	Path	System.String	Path		todo
+Set-Location	StackName	System.String	Stack		todo
+Split-Path	Credential	System.Management.Automation.PSCredential	*		todo
+Split-Path	Extension	System.Management.Automation.SwitchParameter	ExtensionSet		todo
+Split-Path	IsAbsolute	System.Management.Automation.SwitchParameter	IsAbsoluteSet		todo
+Split-Path	Leaf	System.Management.Automation.SwitchParameter	LeafSet		todo
+Split-Path	LeafBase	System.Management.Automation.SwitchParameter	LeafBaseSet		todo
+Split-Path	LiteralPath	System.String[]	LiteralPathSet	PSPath,LP	todo
+Split-Path	NoQualifier	System.Management.Automation.SwitchParameter	NoQualifierSet		todo
+Split-Path	Parent	System.Management.Automation.SwitchParameter	ParentSet		todo
+Split-Path	Path	System.String[]	ExtensionSet,IsAbsoluteSet,LeafBaseSet,LeafSet,NoQualifierSet,ParentSet,QualifierSet		todo
+Split-Path	Qualifier	System.Management.Automation.SwitchParameter	QualifierSet		todo
+Split-Path	Resolve	System.Management.Automation.SwitchParameter	*		todo
+Start-Process	ArgumentList	System.String[]	*	Args	todo
+Start-Process	Credential	System.Management.Automation.PSCredential	Default	RunAs	todo
+Start-Process	Environment	System.Collections.Hashtable	*		todo
+Start-Process	FilePath	System.String	*	PSPath,Path	todo
+Start-Process	LoadUserProfile	System.Management.Automation.SwitchParameter	Default	Lup	todo
+Start-Process	NoNewWindow	System.Management.Automation.SwitchParameter	Default	nnw	todo
+Start-Process	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Start-Process	RedirectStandardError	System.String	Default	RSE	todo
+Start-Process	RedirectStandardInput	System.String	Default	RSI	todo
+Start-Process	RedirectStandardOutput	System.String	Default	RSO	todo
+Start-Process	UseNewEnvironment	System.Management.Automation.SwitchParameter	Default		todo
+Start-Process	Verb	System.String	UseShellExecute		todo
+Start-Process	Wait	System.Management.Automation.SwitchParameter	*		todo
+Start-Process	WindowStyle	System.Diagnostics.ProcessWindowStyle	*		todo
+Start-Process	WorkingDirectory	System.String	*		todo
+Stop-Process	Force	System.Management.Automation.SwitchParameter	*		todo
+Stop-Process	Id	System.Int32[]	Id		todo
+Stop-Process	InputObject	System.Diagnostics.Process[]	InputObject		todo
+Stop-Process	Name	System.String[]	Name	ProcessName	todo
+Stop-Process	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Test-Connection	BufferSize	System.Int32	DefaultPing,RepeatPing	Size,Bytes,BS	todo
+Test-Connection	Count	System.Int32	DefaultPing,TcpPort		todo
+Test-Connection	Delay	System.Int32	DefaultPing,RepeatPing,TcpPort		todo
+Test-Connection	Detailed	System.Management.Automation.SwitchParameter	TcpPort		todo
+Test-Connection	DontFragment	System.Management.Automation.SwitchParameter	DefaultPing,RepeatPing		todo
+Test-Connection	IPv4	System.Management.Automation.SwitchParameter	DefaultPing,MtuSizeDetect,RepeatPing,TcpPort,TraceRoute		todo
+Test-Connection	IPv6	System.Management.Automation.SwitchParameter	DefaultPing,MtuSizeDetect,RepeatPing,TcpPort,TraceRoute		todo
+Test-Connection	MaxHops	System.Int32	DefaultPing,RepeatPing,TraceRoute	Ttl,TimeToLive,Hops	todo
+Test-Connection	MtuSize	System.Management.Automation.SwitchParameter	MtuSizeDetect	MtuSizeDetect	todo
+Test-Connection	Ping	System.Management.Automation.SwitchParameter	DefaultPing,RepeatPing		todo
+Test-Connection	Quiet	System.Management.Automation.SwitchParameter	*		todo
+Test-Connection	Repeat	System.Management.Automation.SwitchParameter	RepeatPing,TcpPort	Continuous	todo
+Test-Connection	ResolveDestination	System.Management.Automation.SwitchParameter	DefaultPing,MtuSizeDetect,RepeatPing,TcpPort,TraceRoute		todo
+Test-Connection	Source	System.String	DefaultPing,RepeatPing,TcpPort,TraceRoute		todo
+Test-Connection	TargetName	System.String[]	*	ComputerName	todo
+Test-Connection	TcpPort	System.Int32	TcpPort		todo
+Test-Connection	TimeoutSeconds	System.Int32	*		todo
+Test-Connection	Traceroute	System.Management.Automation.SwitchParameter	TraceRoute		todo
+Test-Path	Credential	System.Management.Automation.PSCredential	*		todo
+Test-Path	Exclude	System.String[]	*		todo
+Test-Path	Filter	System.String	*		todo
+Test-Path	Include	System.String[]	*		todo
+Test-Path	IsValid	System.Management.Automation.SwitchParameter	*		todo
+Test-Path	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Test-Path	NewerThan	System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+Test-Path	OlderThan	System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+Test-Path	Path	System.String[]	Path		todo
+Test-Path	PathType	Microsoft.PowerShell.Commands.TestPathType	*	Type	todo
+Wait-Process	Any	System.Management.Automation.SwitchParameter	*		todo
+Wait-Process	Id	System.Int32[]	Id	PID,ProcessId	todo
+Wait-Process	InputObject	System.Diagnostics.Process[]	InputObject		todo
+Wait-Process	Name	System.String[]	Name	ProcessName	todo
+Wait-Process	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Wait-Process	Timeout	System.Int32	*	TimeoutSec	todo
+Add-Member	Force	System.Management.Automation.SwitchParameter	MemberSet,NotePropertyMultiMemberSet,NotePropertySingleMemberSet		todo
+Add-Member	InputObject	System.Management.Automation.PSObject	MemberSet,NotePropertyMultiMemberSet,NotePropertySingleMemberSet,TypeNameSet		todo
+Add-Member	MemberType	System.Management.Automation.PSMemberTypes	MemberSet	Type	todo
+Add-Member	Name	System.String	MemberSet		todo
+Add-Member	NotePropertyMembers	System.Collections.IDictionary	NotePropertyMultiMemberSet		todo
+Add-Member	NotePropertyName	System.String	NotePropertySingleMemberSet		todo
+Add-Member	NotePropertyValue	System.Object	NotePropertySingleMemberSet		todo
+Add-Member	PassThru	System.Management.Automation.SwitchParameter	MemberSet,NotePropertyMultiMemberSet,NotePropertySingleMemberSet,TypeNameSet		todo
+Add-Member	SecondValue	System.Object	MemberSet		todo
+Add-Member	TypeName	System.String	MemberSet,NotePropertyMultiMemberSet,NotePropertySingleMemberSet,TypeNameSet		todo
+Add-Member	Value	System.Object	MemberSet		todo
+Add-Type	AssemblyName	System.String[]	FromAssemblyName	AN	todo
+Add-Type	CompilerOptions	System.String[]	FromLiteralPath,FromMember,FromPath,FromSource		todo
+Add-Type	IgnoreWarnings	System.Management.Automation.SwitchParameter	FromLiteralPath,FromMember,FromPath,FromSource		todo
+Add-Type	Language	Microsoft.PowerShell.Commands.Language	FromMember,FromSource		todo
+Add-Type	LiteralPath	System.String[]	FromLiteralPath	PSPath,LP	todo
+Add-Type	MemberDefinition	System.String[]	FromMember		todo
+Add-Type	Name	System.String	FromMember		todo
+Add-Type	Namespace	System.String	FromMember	NS	todo
+Add-Type	OutputAssembly	System.String	FromLiteralPath,FromMember,FromPath,FromSource	OA	todo
+Add-Type	OutputType	Microsoft.PowerShell.Commands.OutputAssemblyType	FromLiteralPath,FromMember,FromPath,FromSource	OT	todo
+Add-Type	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Add-Type	Path	System.String[]	FromPath		todo
+Add-Type	ReferencedAssemblies	System.String[]	FromLiteralPath,FromMember,FromPath,FromSource	RA	todo
+Add-Type	TypeDefinition	System.String	FromSource		todo
+Add-Type	UsingNamespace	System.String[]	FromMember	Using	todo
+Clear-Variable	Exclude	System.String[]	*		todo
+Clear-Variable	Force	System.Management.Automation.SwitchParameter	*		todo
+Clear-Variable	Include	System.String[]	*		todo
+Clear-Variable	Name	System.String[]	*		todo
+Clear-Variable	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Clear-Variable	Scope	System.String	*		todo
+Compare-Object	CaseSensitive	System.Management.Automation.SwitchParameter	*		todo
+Compare-Object	Culture	System.String	*		todo
+Compare-Object	DifferenceObject	System.Management.Automation.PSObject[]	*		todo
+Compare-Object	ExcludeDifferent	System.Management.Automation.SwitchParameter	*		todo
+Compare-Object	IncludeEqual	System.Management.Automation.SwitchParameter	*		todo
+Compare-Object	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Compare-Object	Property	System.Object[]	*		todo
+Compare-Object	ReferenceObject	System.Management.Automation.PSObject[]	*		todo
+Compare-Object	SyncWindow	System.Int32	*		todo
+ConvertFrom-CliXml	InputObject	System.String	*		todo
+ConvertFrom-Csv	Delimiter	System.Char	Delimiter		todo
+ConvertFrom-Csv	Header	System.String[]	*		todo
+ConvertFrom-Csv	InputObject	System.Management.Automation.PSObject[]	*		todo
+ConvertFrom-Csv	UseCulture	System.Management.Automation.SwitchParameter	UseCulture		todo
+ConvertFrom-Json	AsHashtable	System.Management.Automation.SwitchParameter	*		todo
+ConvertFrom-Json	DateKind	Microsoft.PowerShell.Commands.JsonDateKind	*		todo
+ConvertFrom-Json	Depth	System.Int32	*		todo
+ConvertFrom-Json	InputObject	System.String	*		todo
+ConvertFrom-Json	NoEnumerate	System.Management.Automation.SwitchParameter	*		todo
+ConvertFrom-Markdown	AsVT100EncodedString	System.Management.Automation.SwitchParameter	*		todo
+ConvertFrom-Markdown	InputObject	System.Management.Automation.PSObject	InputObjParamSet		todo
+ConvertFrom-Markdown	LiteralPath	System.String[]	LiteralParamSet	PSPath,LP	todo
+ConvertFrom-Markdown	Path	System.String[]	PathParamSet		todo
+ConvertFrom-StringData	Delimiter	System.Char	*		todo
+ConvertFrom-StringData	StringData	System.String	*		todo
+ConvertTo-CliXml	Depth	System.Int32	*		todo
+ConvertTo-CliXml	InputObject	System.Management.Automation.PSObject	*		todo
+ConvertTo-Csv	Delimiter	System.Char	Delimiter		todo
+ConvertTo-Csv	IncludeTypeInformation	System.Management.Automation.SwitchParameter	*	ITI	todo
+ConvertTo-Csv	InputObject	System.Management.Automation.PSObject	*		todo
+ConvertTo-Csv	NoHeader	System.Management.Automation.SwitchParameter	*		todo
+ConvertTo-Csv	NoTypeInformation	System.Management.Automation.SwitchParameter	*	NTI	todo
+ConvertTo-Csv	QuoteFields	System.String[]	*	QF	todo
+ConvertTo-Csv	UseCulture	System.Management.Automation.SwitchParameter	UseCulture		todo
+ConvertTo-Csv	UseQuotes	Microsoft.PowerShell.Commands.BaseCsvWritingCommand+QuoteKind	*	UQ	todo
+ConvertTo-Html	As	System.String	*		todo
+ConvertTo-Html	Body	System.String[]	Page		todo
+ConvertTo-Html	Charset	System.String	Page		todo
+ConvertTo-Html	CssUri	System.Uri	Page	cu,uri	todo
+ConvertTo-Html	Fragment	System.Management.Automation.SwitchParameter	Fragment		todo
+ConvertTo-Html	Head	System.String[]	Page		todo
+ConvertTo-Html	InputObject	System.Management.Automation.PSObject	*		todo
+ConvertTo-Html	Meta	System.Collections.Hashtable	Page		todo
+ConvertTo-Html	PostContent	System.String[]	*		todo
+ConvertTo-Html	PreContent	System.String[]	*		todo
+ConvertTo-Html	Property	System.Object[]	*		todo
+ConvertTo-Html	Title	System.String	Page		todo
+ConvertTo-Html	Transitional	System.Management.Automation.SwitchParameter	Page		todo
+ConvertTo-Json	AsArray	System.Management.Automation.SwitchParameter	*		todo
+ConvertTo-Json	Compress	System.Management.Automation.SwitchParameter	*		todo
+ConvertTo-Json	Depth	System.Int32	*		todo
+ConvertTo-Json	EnumsAsStrings	System.Management.Automation.SwitchParameter	*		todo
+ConvertTo-Json	EscapeHandling	Newtonsoft.Json.StringEscapeHandling	*		todo
+ConvertTo-Json	InputObject	System.Object	*		todo
+ConvertTo-Xml	As	System.String	*		todo
+ConvertTo-Xml	Depth	System.Int32	*		todo
+ConvertTo-Xml	InputObject	System.Management.Automation.PSObject	*		todo
+ConvertTo-Xml	NoTypeInformation	System.Management.Automation.SwitchParameter	*		todo
+Debug-Runspace	BreakAll	System.Management.Automation.SwitchParameter	*		todo
+Debug-Runspace	Id	System.Int32	IdParameterSet		todo
+Debug-Runspace	InstanceId	System.Guid	InstanceIdParameterSet		todo
+Debug-Runspace	Name	System.String	NameParameterSet		todo
+Debug-Runspace	Runspace	System.Management.Automation.Runspaces.Runspace	RunspaceParameterSet		todo
+Disable-PSBreakpoint	Breakpoint	System.Management.Automation.Breakpoint[]	Breakpoint		todo
+Disable-PSBreakpoint	Id	System.Int32[]	Id		todo
+Disable-PSBreakpoint	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Disable-PSBreakpoint	Runspace	System.Management.Automation.Runspaces.Runspace	Id	RunspaceId	todo
+Disable-RunspaceDebug	AppDomainName	System.String[]	ProcessNameParameterSet		todo
+Disable-RunspaceDebug	ProcessName	System.String	ProcessNameParameterSet		todo
+Disable-RunspaceDebug	Runspace	System.Management.Automation.Runspaces.Runspace[]	RunspaceParameterSet		todo
+Disable-RunspaceDebug	RunspaceId	System.Int32[]	RunspaceIdParameterSet		todo
+Disable-RunspaceDebug	RunspaceInstanceId	System.Guid[]	RunspaceInstanceIdParameterSet		todo
+Disable-RunspaceDebug	RunspaceName	System.String[]	RunspaceNameParameterSet		todo
+Enable-PSBreakpoint	Breakpoint	System.Management.Automation.Breakpoint[]	Breakpoint		todo
+Enable-PSBreakpoint	Id	System.Int32[]	Id		todo
+Enable-PSBreakpoint	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Enable-PSBreakpoint	Runspace	System.Management.Automation.Runspaces.Runspace	Id	RunspaceId	todo
+Enable-RunspaceDebug	AppDomainName	System.String[]	ProcessNameParameterSet		todo
+Enable-RunspaceDebug	BreakAll	System.Management.Automation.SwitchParameter	RunspaceIdParameterSet,RunspaceNameParameterSet,RunspaceParameterSet		todo
+Enable-RunspaceDebug	ProcessName	System.String	ProcessNameParameterSet		todo
+Enable-RunspaceDebug	Runspace	System.Management.Automation.Runspaces.Runspace[]	RunspaceParameterSet		todo
+Enable-RunspaceDebug	RunspaceId	System.Int32[]	RunspaceIdParameterSet		todo
+Enable-RunspaceDebug	RunspaceInstanceId	System.Guid[]	RunspaceInstanceIdParameterSet		todo
+Enable-RunspaceDebug	RunspaceName	System.String[]	RunspaceNameParameterSet		todo
+Export-Alias	Append	System.Management.Automation.SwitchParameter	*		todo
+Export-Alias	As	Microsoft.PowerShell.Commands.ExportAliasFormat	*		todo
+Export-Alias	Description	System.String	*		todo
+Export-Alias	Force	System.Management.Automation.SwitchParameter	*		todo
+Export-Alias	LiteralPath	System.String	ByLiteralPath	PSPath,LP	todo
+Export-Alias	Name	System.String[]	*		todo
+Export-Alias	NoClobber	System.Management.Automation.SwitchParameter	*	NoOverwrite	todo
+Export-Alias	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Export-Alias	Path	System.String	ByPath		todo
+Export-Alias	Scope	System.String	*		todo
+Export-Clixml	Depth	System.Int32	*		todo
+Export-Clixml	Encoding	System.Text.Encoding	*		todo
+Export-Clixml	Force	System.Management.Automation.SwitchParameter	*		todo
+Export-Clixml	InputObject	System.Management.Automation.PSObject	*		todo
+Export-Clixml	LiteralPath	System.String	ByLiteralPath	PSPath,LP	todo
+Export-Clixml	NoClobber	System.Management.Automation.SwitchParameter	*	NoOverwrite	todo
+Export-Clixml	Path	System.String	ByPath		todo
+Export-Csv	Append	System.Management.Automation.SwitchParameter	*		todo
+Export-Csv	Delimiter	System.Char	Delimiter		todo
+Export-Csv	Encoding	System.Text.Encoding	*		todo
+Export-Csv	Force	System.Management.Automation.SwitchParameter	*		todo
+Export-Csv	IncludeTypeInformation	System.Management.Automation.SwitchParameter	*	ITI	todo
+Export-Csv	InputObject	System.Management.Automation.PSObject	*		todo
+Export-Csv	LiteralPath	System.String	*	PSPath,LP	todo
+Export-Csv	NoClobber	System.Management.Automation.SwitchParameter	*	NoOverwrite	todo
+Export-Csv	NoHeader	System.Management.Automation.SwitchParameter	*		todo
+Export-Csv	NoTypeInformation	System.Management.Automation.SwitchParameter	*	NTI	todo
+Export-Csv	Path	System.String	*		todo
+Export-Csv	QuoteFields	System.String[]	*	QF	todo
+Export-Csv	UseCulture	System.Management.Automation.SwitchParameter	UseCulture		todo
+Export-Csv	UseQuotes	Microsoft.PowerShell.Commands.BaseCsvWritingCommand+QuoteKind	*	UQ	todo
+Export-FormatData	Force	System.Management.Automation.SwitchParameter	*		todo
+Export-FormatData	IncludeScriptBlock	System.Management.Automation.SwitchParameter	*		todo
+Export-FormatData	InputObject	System.Management.Automation.ExtendedTypeDefinition[]	*		todo
+Export-FormatData	LiteralPath	System.String	ByLiteralPath	PSPath,LP	todo
+Export-FormatData	NoClobber	System.Management.Automation.SwitchParameter	*	NoOverwrite	todo
+Export-FormatData	Path	System.String	ByPath	FilePath	todo
+Export-PSSession	AllowClobber	System.Management.Automation.SwitchParameter	*		todo
+Export-PSSession	ArgumentList	System.Object[]	*	Args	todo
+Export-PSSession	Certificate	System.Security.Cryptography.X509Certificates.X509Certificate2	*		todo
+Export-PSSession	CommandName	System.String[]	*	Name	todo
+Export-PSSession	CommandType	System.Management.Automation.CommandTypes	*	Type	todo
+Export-PSSession	Encoding	System.Text.Encoding	*		todo
+Export-PSSession	Force	System.Management.Automation.SwitchParameter	*		todo
+Export-PSSession	FormatTypeName	System.String[]	*		todo
+Export-PSSession	FullyQualifiedModule	Microsoft.PowerShell.Commands.ModuleSpecification[]	*		todo
+Export-PSSession	Module	System.String[]	*	PSSnapin	todo
+Export-PSSession	OutputModule	System.String	*	PSPath,ModuleName	todo
+Export-PSSession	Session	System.Management.Automation.Runspaces.PSSession	*		todo
+Format-Custom	Depth	System.Int32	*		todo
+Format-Custom	DisplayError	System.Management.Automation.SwitchParameter	*		todo
+Format-Custom	ExcludeProperty	System.String[]	*		todo
+Format-Custom	Expand	System.String	*		todo
+Format-Custom	Force	System.Management.Automation.SwitchParameter	*		todo
+Format-Custom	GroupBy	System.Object	*		todo
+Format-Custom	InputObject	System.Management.Automation.PSObject	*		todo
+Format-Custom	Property	System.Object[]	*		todo
+Format-Custom	ShowError	System.Management.Automation.SwitchParameter	*		todo
+Format-Custom	View	System.String	*		todo
+Format-Hex	Count	System.Int64	*		todo
+Format-Hex	Encoding	System.Text.Encoding	ByInputObject		todo
+Format-Hex	InputObject	System.Management.Automation.PSObject	ByInputObject		todo
+Format-Hex	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Format-Hex	Offset	System.Int64	*		todo
+Format-Hex	Path	System.String[]	Path		todo
+Format-Hex	Raw	System.Management.Automation.SwitchParameter	ByInputObject		todo
+Format-List	DisplayError	System.Management.Automation.SwitchParameter	*		todo
+Format-List	ExcludeProperty	System.String[]	*		todo
+Format-List	Expand	System.String	*		todo
+Format-List	Force	System.Management.Automation.SwitchParameter	*		todo
+Format-List	GroupBy	System.Object	*		todo
+Format-List	InputObject	System.Management.Automation.PSObject	*		todo
+Format-List	Property	System.Object[]	*		todo
+Format-List	ShowError	System.Management.Automation.SwitchParameter	*		todo
+Format-List	View	System.String	*		todo
+Format-Table	AutoSize	System.Management.Automation.SwitchParameter	*		todo
+Format-Table	DisplayError	System.Management.Automation.SwitchParameter	*		todo
+Format-Table	ExcludeProperty	System.String[]	*		todo
+Format-Table	Expand	System.String	*		todo
+Format-Table	Force	System.Management.Automation.SwitchParameter	*		todo
+Format-Table	GroupBy	System.Object	*		todo
+Format-Table	HideTableHeaders	System.Management.Automation.SwitchParameter	*		todo
+Format-Table	InputObject	System.Management.Automation.PSObject	*		todo
+Format-Table	Property	System.Object[]	*		todo
+Format-Table	RepeatHeader	System.Management.Automation.SwitchParameter	*		todo
+Format-Table	ShowError	System.Management.Automation.SwitchParameter	*		todo
+Format-Table	View	System.String	*		todo
+Format-Table	Wrap	System.Management.Automation.SwitchParameter	*		todo
+Format-Wide	AutoSize	System.Management.Automation.SwitchParameter	*		todo
+Format-Wide	Column	System.Int32	*		todo
+Format-Wide	DisplayError	System.Management.Automation.SwitchParameter	*		todo
+Format-Wide	ExcludeProperty	System.String[]	*		todo
+Format-Wide	Expand	System.String	*		todo
+Format-Wide	Force	System.Management.Automation.SwitchParameter	*		todo
+Format-Wide	GroupBy	System.Object	*		todo
+Format-Wide	InputObject	System.Management.Automation.PSObject	*		todo
+Format-Wide	Property	System.Object	*		todo
+Format-Wide	ShowError	System.Management.Automation.SwitchParameter	*		todo
+Format-Wide	View	System.String	*		todo
+Get-Alias	Definition	System.String[]	Definition		todo
+Get-Alias	Exclude	System.String[]	*		todo
+Get-Alias	Name	System.String[]	Default		todo
+Get-Alias	Scope	System.String	*		todo
+Get-Culture	ListAvailable	System.Management.Automation.SwitchParameter	ListAvailable		todo
+Get-Culture	Name	System.String[]	Name		todo
+Get-Culture	NoUserOverrides	System.Management.Automation.SwitchParameter	CurrentCulture,Name		todo
+Get-Date	AsUTC	System.Management.Automation.SwitchParameter	*		todo
+Get-Date	Date	System.DateTime	DateAndFormat,DateAndUFormat	LastWriteTime	todo
+Get-Date	Day	System.Int32	*		todo
+Get-Date	DisplayHint	Microsoft.PowerShell.Commands.DisplayHintType	*		todo
+Get-Date	Format	System.String	DateAndFormat,UnixTimeSecondsAndFormat		todo
+Get-Date	Hour	System.Int32	*		todo
+Get-Date	Millisecond	System.Int32	*		todo
+Get-Date	Minute	System.Int32	*		todo
+Get-Date	Month	System.Int32	*		todo
+Get-Date	Second	System.Int32	*		todo
+Get-Date	UFormat	System.String	DateAndUFormat,UnixTimeSecondsAndUFormat		todo
+Get-Date	UnixTimeSeconds	System.Int64	UnixTimeSecondsAndFormat,UnixTimeSecondsAndUFormat	UnixTime	todo
+Get-Date	Year	System.Int32	*		todo
+Get-Error	InputObject	System.Management.Automation.PSObject	Error		todo
+Get-Error	Newest	System.Int32	Newest	Last	todo
+Get-Event	EventIdentifier	System.Int32	ById	Id	todo
+Get-Event	SourceIdentifier	System.String	BySource		todo
+Get-EventSubscriber	Force	System.Management.Automation.SwitchParameter	*		todo
+Get-EventSubscriber	SourceIdentifier	System.String	BySource		todo
+Get-EventSubscriber	SubscriptionId	System.Int32	ById	Id	todo
+Get-FileHash	Algorithm	System.String	*		todo
+Get-FileHash	InputStream	System.IO.Stream	StreamParameterSet		todo
+Get-FileHash	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Get-FileHash	Path	System.String[]	Path		todo
+Get-FormatData	PowerShellVersion	System.Version	*		todo
+Get-FormatData	TypeName	System.String[]	*		todo
+Get-Member	Force	System.Management.Automation.SwitchParameter	*		todo
+Get-Member	InputObject	System.Management.Automation.PSObject	*		todo
+Get-Member	MemberType	System.Management.Automation.PSMemberTypes	*	Type	todo
+Get-Member	Name	System.String[]	*		todo
+Get-Member	Static	System.Management.Automation.SwitchParameter	*		todo
+Get-Member	View	System.Management.Automation.PSMemberViewTypes	*		todo
+Get-PSBreakpoint	Command	System.String[]	Command		todo
+Get-PSBreakpoint	Id	System.Int32[]	Id		todo
+Get-PSBreakpoint	Runspace	System.Management.Automation.Runspaces.Runspace	*		todo
+Get-PSBreakpoint	Script	System.String[]	Command,Line,Type,Variable		todo
+Get-PSBreakpoint	Type	Microsoft.PowerShell.Commands.BreakpointType[]	Type		todo
+Get-PSBreakpoint	Variable	System.String[]	Variable		todo
+Get-Random	Count	System.Int32	RandomListItemParameterSet,RandomNumberParameterSet		todo
+Get-Random	InputObject	System.Object[]	RandomListItemParameterSet,ShuffleParameterSet		todo
+Get-Random	Maximum	System.Object	RandomNumberParameterSet		todo
+Get-Random	Minimum	System.Object	RandomNumberParameterSet		todo
+Get-Random	SetSeed	System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	*		todo
+Get-Random	Shuffle	System.Management.Automation.SwitchParameter	ShuffleParameterSet		todo
+Get-Runspace	Id	System.Int32[]	IdParameterSet		todo
+Get-Runspace	InstanceId	System.Guid[]	InstanceIdParameterSet		todo
+Get-Runspace	Name	System.String[]	NameParameterSet		todo
+Get-RunspaceDebug	AppDomainName	System.String[]	ProcessNameParameterSet		todo
+Get-RunspaceDebug	ProcessName	System.String	ProcessNameParameterSet		todo
+Get-RunspaceDebug	Runspace	System.Management.Automation.Runspaces.Runspace[]	RunspaceParameterSet		todo
+Get-RunspaceDebug	RunspaceId	System.Int32[]	RunspaceIdParameterSet		todo
+Get-RunspaceDebug	RunspaceInstanceId	System.Guid[]	RunspaceInstanceIdParameterSet		todo
+Get-RunspaceDebug	RunspaceName	System.String[]	RunspaceNameParameterSet		todo
+Get-SecureRandom	Count	System.Int32	RandomListItemParameterSet,RandomNumberParameterSet		todo
+Get-SecureRandom	InputObject	System.Object[]	RandomListItemParameterSet,ShuffleParameterSet		todo
+Get-SecureRandom	Maximum	System.Object	RandomNumberParameterSet		todo
+Get-SecureRandom	Minimum	System.Object	RandomNumberParameterSet		todo
+Get-SecureRandom	Shuffle	System.Management.Automation.SwitchParameter	ShuffleParameterSet		todo
+Get-TraceSource	Name	System.String[]	*		todo
+Get-TypeData	TypeName	System.String[]	*		todo
+Get-Unique	AsString	System.Management.Automation.SwitchParameter	AsString		todo
+Get-Unique	CaseInsensitive	System.Management.Automation.SwitchParameter	*		todo
+Get-Unique	InputObject	System.Management.Automation.PSObject	*		todo
+Get-Unique	OnType	System.Management.Automation.SwitchParameter	UniqueByType		todo
+Get-Uptime	Since	System.Management.Automation.SwitchParameter	Since		todo
+Get-Variable	Exclude	System.String[]	*		todo
+Get-Variable	Include	System.String[]	*		todo
+Get-Variable	Name	System.String[]	*		todo
+Get-Variable	Scope	System.String	*		todo
+Get-Variable	ValueOnly	System.Management.Automation.SwitchParameter	*		todo
+Get-Verb	Group	System.String[]	*		todo
+Get-Verb	Verb	System.String[]	*		todo
+Group-Object	AsHashTable	System.Management.Automation.SwitchParameter	HashTable	AHT	todo
+Group-Object	AsString	System.Management.Automation.SwitchParameter	HashTable		todo
+Group-Object	CaseSensitive	System.Management.Automation.SwitchParameter	*		todo
+Group-Object	Culture	System.String	*		todo
+Group-Object	InputObject	System.Management.Automation.PSObject	*		todo
+Group-Object	NoElement	System.Management.Automation.SwitchParameter	*		todo
+Group-Object	Property	System.Object[]	*		todo
+Import-Alias	Force	System.Management.Automation.SwitchParameter	*		todo
+Import-Alias	LiteralPath	System.String	ByLiteralPath	PSPath,LP	todo
+Import-Alias	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Import-Alias	Path	System.String	ByPath		todo
+Import-Alias	Scope	System.String	*		todo
+Import-Clixml	First	System.UInt64	*		todo
+Import-Clixml	IncludeTotalCount	System.Management.Automation.SwitchParameter	*		todo
+Import-Clixml	LiteralPath	System.String[]	ByLiteralPath	PSPath,LP	todo
+Import-Clixml	Path	System.String[]	ByPath		todo
+Import-Clixml	Skip	System.UInt64	*		todo
+Import-Csv	Delimiter	System.Char	DelimiterLiteralPath,DelimiterPath		todo
+Import-Csv	Encoding	System.Text.Encoding	*		todo
+Import-Csv	Header	System.String[]	*		todo
+Import-Csv	LiteralPath	System.String[]	CultureLiteralPath,DelimiterLiteralPath	PSPath,LP	todo
+Import-Csv	Path	System.String[]	CulturePath,DelimiterPath		todo
+Import-Csv	UseCulture	System.Management.Automation.SwitchParameter	CultureLiteralPath,CulturePath		todo
+Import-LocalizedData	BaseDirectory	System.String	*		todo
+Import-LocalizedData	BindingVariable	System.String	*	Variable	todo
+Import-LocalizedData	FileName	System.String	*		todo
+Import-LocalizedData	SupportedCommand	System.String[]	*		todo
+Import-LocalizedData	UICulture	System.String	*		todo
+Import-PowerShellDataFile	LiteralPath	System.String[]	ByLiteralPath	PSPath,LP	todo
+Import-PowerShellDataFile	Path	System.String[]	ByPath		todo
+Import-PowerShellDataFile	SkipLimitCheck	System.Management.Automation.SwitchParameter	*		todo
+Import-PSSession	AllowClobber	System.Management.Automation.SwitchParameter	*		todo
+Import-PSSession	ArgumentList	System.Object[]	*	Args	todo
+Import-PSSession	Certificate	System.Security.Cryptography.X509Certificates.X509Certificate2	*		todo
+Import-PSSession	CommandName	System.String[]	*	Name	todo
+Import-PSSession	CommandType	System.Management.Automation.CommandTypes	*	Type	todo
+Import-PSSession	DisableNameChecking	System.Management.Automation.SwitchParameter	*		todo
+Import-PSSession	FormatTypeName	System.String[]	*		todo
+Import-PSSession	FullyQualifiedModule	Microsoft.PowerShell.Commands.ModuleSpecification[]	*		todo
+Import-PSSession	Module	System.String[]	*	PSSnapin	todo
+Import-PSSession	Prefix	System.String	*		todo
+Import-PSSession	Session	System.Management.Automation.Runspaces.PSSession	*		todo
+Invoke-Expression	Command	System.String	*		todo
+Invoke-RestMethod	AllowInsecureRedirect	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	AllowUnencryptedAuthentication	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	Authentication	Microsoft.PowerShell.Commands.WebAuthenticationType	*		todo
+Invoke-RestMethod	Body	System.Object	*		todo
+Invoke-RestMethod	Certificate	System.Security.Cryptography.X509Certificates.X509Certificate	*		todo
+Invoke-RestMethod	CertificateThumbprint	System.String	*		todo
+Invoke-RestMethod	ConnectionTimeoutSeconds	System.Int32	*	TimeoutSec	todo
+Invoke-RestMethod	ContentType	System.String	*		todo
+Invoke-RestMethod	Credential	System.Management.Automation.PSCredential	*		todo
+Invoke-RestMethod	CustomMethod	System.String	CustomMethod,CustomMethodNoProxy	CM	todo
+Invoke-RestMethod	DisableKeepAlive	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	FollowRelLink	System.Management.Automation.SwitchParameter	*	FL	todo
+Invoke-RestMethod	Form	System.Collections.IDictionary	*		todo
+Invoke-RestMethod	Headers	System.Collections.IDictionary	*		todo
+Invoke-RestMethod	HttpVersion	System.Version	*		todo
+Invoke-RestMethod	InFile	System.String	*		todo
+Invoke-RestMethod	MaximumFollowRelLink	System.Int32	*	ML	todo
+Invoke-RestMethod	MaximumRedirection	System.Int32	*		todo
+Invoke-RestMethod	MaximumRetryCount	System.Int32	*		todo
+Invoke-RestMethod	Method	Microsoft.PowerShell.Commands.WebRequestMethod	StandardMethod,StandardMethodNoProxy		todo
+Invoke-RestMethod	NoProxy	System.Management.Automation.SwitchParameter	CustomMethodNoProxy,StandardMethodNoProxy		todo
+Invoke-RestMethod	OperationTimeoutSeconds	System.Int32	*		todo
+Invoke-RestMethod	OutFile	System.String	*		todo
+Invoke-RestMethod	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	PreserveAuthorizationOnRedirect	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	PreserveHttpMethodOnRedirect	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	Proxy	System.Uri	CustomMethod,StandardMethod		todo
+Invoke-RestMethod	ProxyCredential	System.Management.Automation.PSCredential	CustomMethod,StandardMethod		todo
+Invoke-RestMethod	ProxyUseDefaultCredentials	System.Management.Automation.SwitchParameter	CustomMethod,StandardMethod		todo
+Invoke-RestMethod	ResponseHeadersVariable	System.String	*	RHV	todo
+Invoke-RestMethod	Resume	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	RetryIntervalSec	System.Int32	*		todo
+Invoke-RestMethod	SessionVariable	System.String	*	SV	todo
+Invoke-RestMethod	SkipCertificateCheck	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	SkipHeaderValidation	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	SkipHttpErrorCheck	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	SslProtocol	Microsoft.PowerShell.Commands.WebSslProtocol	*		todo
+Invoke-RestMethod	StatusCodeVariable	System.String	*		todo
+Invoke-RestMethod	Token	System.Security.SecureString	*		todo
+Invoke-RestMethod	TransferEncoding	System.String	*		todo
+Invoke-RestMethod	UnixSocket	System.Net.Sockets.UnixDomainSocketEndPoint	*		todo
+Invoke-RestMethod	Uri	System.Uri	*		todo
+Invoke-RestMethod	UseBasicParsing	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	UseDefaultCredentials	System.Management.Automation.SwitchParameter	*		todo
+Invoke-RestMethod	UserAgent	System.String	*		todo
+Invoke-RestMethod	WebSession	Microsoft.PowerShell.Commands.WebRequestSession	*		todo
+Invoke-WebRequest	AllowInsecureRedirect	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	AllowUnencryptedAuthentication	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	Authentication	Microsoft.PowerShell.Commands.WebAuthenticationType	*		todo
+Invoke-WebRequest	Body	System.Object	*		todo
+Invoke-WebRequest	Certificate	System.Security.Cryptography.X509Certificates.X509Certificate	*		todo
+Invoke-WebRequest	CertificateThumbprint	System.String	*		todo
+Invoke-WebRequest	ConnectionTimeoutSeconds	System.Int32	*	TimeoutSec	todo
+Invoke-WebRequest	ContentType	System.String	*		todo
+Invoke-WebRequest	Credential	System.Management.Automation.PSCredential	*		todo
+Invoke-WebRequest	CustomMethod	System.String	CustomMethod,CustomMethodNoProxy	CM	todo
+Invoke-WebRequest	DisableKeepAlive	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	Form	System.Collections.IDictionary	*		todo
+Invoke-WebRequest	Headers	System.Collections.IDictionary	*		todo
+Invoke-WebRequest	HttpVersion	System.Version	*		todo
+Invoke-WebRequest	InFile	System.String	*		todo
+Invoke-WebRequest	MaximumRedirection	System.Int32	*		todo
+Invoke-WebRequest	MaximumRetryCount	System.Int32	*		todo
+Invoke-WebRequest	Method	Microsoft.PowerShell.Commands.WebRequestMethod	StandardMethod,StandardMethodNoProxy		todo
+Invoke-WebRequest	NoProxy	System.Management.Automation.SwitchParameter	CustomMethodNoProxy,StandardMethodNoProxy		todo
+Invoke-WebRequest	OperationTimeoutSeconds	System.Int32	*		todo
+Invoke-WebRequest	OutFile	System.String	*		todo
+Invoke-WebRequest	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	PreserveAuthorizationOnRedirect	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	PreserveHttpMethodOnRedirect	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	Proxy	System.Uri	CustomMethod,StandardMethod		todo
+Invoke-WebRequest	ProxyCredential	System.Management.Automation.PSCredential	CustomMethod,StandardMethod		todo
+Invoke-WebRequest	ProxyUseDefaultCredentials	System.Management.Automation.SwitchParameter	CustomMethod,StandardMethod		todo
+Invoke-WebRequest	Resume	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	RetryIntervalSec	System.Int32	*		todo
+Invoke-WebRequest	SessionVariable	System.String	*	SV	todo
+Invoke-WebRequest	SkipCertificateCheck	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	SkipHeaderValidation	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	SkipHttpErrorCheck	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	SslProtocol	Microsoft.PowerShell.Commands.WebSslProtocol	*		todo
+Invoke-WebRequest	Token	System.Security.SecureString	*		todo
+Invoke-WebRequest	TransferEncoding	System.String	*		todo
+Invoke-WebRequest	UnixSocket	System.Net.Sockets.UnixDomainSocketEndPoint	*		todo
+Invoke-WebRequest	Uri	System.Uri	*		todo
+Invoke-WebRequest	UseBasicParsing	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	UseDefaultCredentials	System.Management.Automation.SwitchParameter	*		todo
+Invoke-WebRequest	UserAgent	System.String	*		todo
+Invoke-WebRequest	WebSession	Microsoft.PowerShell.Commands.WebRequestSession	*		todo
+Join-String	DoubleQuote	System.Management.Automation.SwitchParameter	DoubleQuote		todo
+Join-String	FormatString	System.String	Format		todo
+Join-String	InputObject	System.Management.Automation.PSObject[]	*		todo
+Join-String	OutputPrefix	System.String	*	op	todo
+Join-String	OutputSuffix	System.String	*	os	todo
+Join-String	Property	Microsoft.PowerShell.Commands.PSPropertyExpression	*		todo
+Join-String	Separator	System.String	*		todo
+Join-String	SingleQuote	System.Management.Automation.SwitchParameter	SingleQuote		todo
+Join-String	UseCulture	System.Management.Automation.SwitchParameter	*		todo
+Measure-Command	Expression	System.Management.Automation.ScriptBlock	*		todo
+Measure-Command	InputObject	System.Management.Automation.PSObject	*		todo
+Measure-Object	AllStats	System.Management.Automation.SwitchParameter	GenericMeasure		todo
+Measure-Object	Average	System.Management.Automation.SwitchParameter	GenericMeasure		todo
+Measure-Object	Character	System.Management.Automation.SwitchParameter	TextMeasure		todo
+Measure-Object	IgnoreWhiteSpace	System.Management.Automation.SwitchParameter	TextMeasure		todo
+Measure-Object	InputObject	System.Management.Automation.PSObject	*		todo
+Measure-Object	Line	System.Management.Automation.SwitchParameter	TextMeasure		todo
+Measure-Object	Maximum	System.Management.Automation.SwitchParameter	GenericMeasure		todo
+Measure-Object	Minimum	System.Management.Automation.SwitchParameter	GenericMeasure		todo
+Measure-Object	Property	Microsoft.PowerShell.Commands.PSPropertyExpression[]	*		todo
+Measure-Object	StandardDeviation	System.Management.Automation.SwitchParameter	GenericMeasure		todo
+Measure-Object	Sum	System.Management.Automation.SwitchParameter	GenericMeasure		todo
+Measure-Object	Word	System.Management.Automation.SwitchParameter	TextMeasure		todo
+New-Alias	Description	System.String	*		todo
+New-Alias	Force	System.Management.Automation.SwitchParameter	*		todo
+New-Alias	Name	System.String	*		todo
+New-Alias	Option	System.Management.Automation.ScopedItemOptions	*		todo
+New-Alias	PassThru	System.Management.Automation.SwitchParameter	*		todo
+New-Alias	Scope	System.String	*		todo
+New-Alias	Value	System.String	*		todo
+New-Event	EventArguments	System.Management.Automation.PSObject[]	*		todo
+New-Event	MessageData	System.Management.Automation.PSObject	*		todo
+New-Event	Sender	System.Management.Automation.PSObject	*		todo
+New-Event	SourceIdentifier	System.String	*		todo
+New-Guid	Empty	System.Management.Automation.SwitchParameter	Empty		todo
+New-Guid	InputObject	System.String	InputObject		todo
+New-Object	ArgumentList	System.Object[]	Net	Args	todo
+New-Object	Property	System.Collections.IDictionary	*		todo
+New-Object	Strict	System.Management.Automation.SwitchParameter	Com		todo
+New-Object	TypeName	System.String	Net		todo
+New-TemporaryDirectory	Prefix	System.String	*		todo
+New-TimeSpan	Days	System.Int32	Time		todo
+New-TimeSpan	End	System.DateTime	Date		todo
+New-TimeSpan	Hours	System.Int32	Time		todo
+New-TimeSpan	Milliseconds	System.Int32	Time		todo
+New-TimeSpan	Minutes	System.Int32	Time		todo
+New-TimeSpan	Seconds	System.Int32	Time		todo
+New-TimeSpan	Start	System.DateTime	Date	LastWriteTime	todo
+New-Variable	Description	System.String	*		todo
+New-Variable	Force	System.Management.Automation.SwitchParameter	*		todo
+New-Variable	Name	System.String	*		todo
+New-Variable	Option	System.Management.Automation.ScopedItemOptions	*		todo
+New-Variable	PassThru	System.Management.Automation.SwitchParameter	*		todo
+New-Variable	Scope	System.String	*		todo
+New-Variable	Value	System.Object	*		todo
+New-Variable	Visibility	System.Management.Automation.SessionStateEntryVisibility	*		todo
+Out-File	Append	System.Management.Automation.SwitchParameter	*		todo
+Out-File	Encoding	System.Text.Encoding	*		todo
+Out-File	FilePath	System.String	ByPath	Path	todo
+Out-File	Force	System.Management.Automation.SwitchParameter	*		todo
+Out-File	InputObject	System.Management.Automation.PSObject	*		todo
+Out-File	LiteralPath	System.String	ByLiteralPath	PSPath,LP	todo
+Out-File	NoClobber	System.Management.Automation.SwitchParameter	*	NoOverwrite	todo
+Out-File	NoNewline	System.Management.Automation.SwitchParameter	*		todo
+Out-File	Width	System.Int32	*		todo
+Out-String	InputObject	System.Management.Automation.PSObject	*		todo
+Out-String	NoNewline	System.Management.Automation.SwitchParameter	NoNewLineFormatting		todo
+Out-String	Stream	System.Management.Automation.SwitchParameter	StreamFormatting		todo
+Out-String	Width	System.Int32	*		todo
+Read-Host	AsSecureString	System.Management.Automation.SwitchParameter	AsSecureString		todo
+Read-Host	MaskInput	System.Management.Automation.SwitchParameter	AsString		todo
+Read-Host	Prompt	System.Object	*		todo
+Register-EngineEvent	Action	System.Management.Automation.ScriptBlock	*		todo
+Register-EngineEvent	Forward	System.Management.Automation.SwitchParameter	*		todo
+Register-EngineEvent	MaxTriggerCount	System.Int32	*		todo
+Register-EngineEvent	MessageData	System.Management.Automation.PSObject	*		todo
+Register-EngineEvent	SourceIdentifier	System.String	*		todo
+Register-EngineEvent	SupportEvent	System.Management.Automation.SwitchParameter	*		todo
+Register-ObjectEvent	Action	System.Management.Automation.ScriptBlock	*		todo
+Register-ObjectEvent	EventName	System.String	*		todo
+Register-ObjectEvent	Forward	System.Management.Automation.SwitchParameter	*		todo
+Register-ObjectEvent	InputObject	System.Management.Automation.PSObject	*		todo
+Register-ObjectEvent	MaxTriggerCount	System.Int32	*		todo
+Register-ObjectEvent	MessageData	System.Management.Automation.PSObject	*		todo
+Register-ObjectEvent	SourceIdentifier	System.String	*		todo
+Register-ObjectEvent	SupportEvent	System.Management.Automation.SwitchParameter	*		todo
+Remove-Alias	Force	System.Management.Automation.SwitchParameter	*		todo
+Remove-Alias	Name	System.String[]	*		todo
+Remove-Alias	Scope	System.String	*		todo
+Remove-Event	EventIdentifier	System.Int32	ByIdentifier		todo
+Remove-Event	SourceIdentifier	System.String	BySource		todo
+Remove-PSBreakpoint	Breakpoint	System.Management.Automation.Breakpoint[]	Breakpoint		todo
+Remove-PSBreakpoint	Id	System.Int32[]	Id		todo
+Remove-PSBreakpoint	Runspace	System.Management.Automation.Runspaces.Runspace	Id	RunspaceId	todo
+Remove-TypeData	Path	System.String[]	RemoveFileSet		todo
+Remove-TypeData	TypeData	System.Management.Automation.Runspaces.TypeData	RemoveTypeDataSet		todo
+Remove-TypeData	TypeName	System.String	RemoveTypeSet		todo
+Remove-Variable	Exclude	System.String[]	*		todo
+Remove-Variable	Force	System.Management.Automation.SwitchParameter	*		todo
+Remove-Variable	Include	System.String[]	*		todo
+Remove-Variable	Name	System.String[]	*		todo
+Remove-Variable	Scope	System.String	*		todo
+Select-Object	CaseInsensitive	System.Management.Automation.SwitchParameter	*		todo
+Select-Object	ExcludeProperty	System.String[]	DefaultParameter,SkipLastParameter		todo
+Select-Object	ExpandProperty	System.String	DefaultParameter,SkipLastParameter		todo
+Select-Object	First	System.Int32	DefaultParameter		todo
+Select-Object	Index	System.Int32[]	IndexParameter		todo
+Select-Object	InputObject	System.Management.Automation.PSObject	*		todo
+Select-Object	Last	System.Int32	DefaultParameter		todo
+Select-Object	Property	System.Object[]	DefaultParameter,SkipLastParameter		todo
+Select-Object	Skip	System.Int32	DefaultParameter,SkipLastParameter		todo
+Select-Object	SkipIndex	System.Int32[]	SkipIndexParameter		todo
+Select-Object	SkipLast	System.Int32	SkipLastParameter		todo
+Select-Object	Unique	System.Management.Automation.SwitchParameter	*		todo
+Select-Object	Wait	System.Management.Automation.SwitchParameter	DefaultParameter,IndexParameter		todo
+Select-String	AllMatches	System.Management.Automation.SwitchParameter	*		todo
+Select-String	CaseSensitive	System.Management.Automation.SwitchParameter	*		todo
+Select-String	Context	System.Int32[]	*		todo
+Select-String	Culture	System.String	*		todo
+Select-String	Encoding	System.Text.Encoding	*		todo
+Select-String	Exclude	System.String[]	*		todo
+Select-String	Include	System.String[]	*		todo
+Select-String	InputObject	System.Management.Automation.PSObject	Object,ObjectRaw		todo
+Select-String	List	System.Management.Automation.SwitchParameter	*		todo
+Select-String	LiteralPath	System.String[]	LiteralFile,LiteralFileRaw	PSPath,LP	todo
+Select-String	NoEmphasis	System.Management.Automation.SwitchParameter	*		todo
+Select-String	NotMatch	System.Management.Automation.SwitchParameter	*		todo
+Select-String	Path	System.String[]	File,FileRaw		todo
+Select-String	Pattern	System.String[]	*		todo
+Select-String	Quiet	System.Management.Automation.SwitchParameter	File,LiteralFile,Object		todo
+Select-String	Raw	System.Management.Automation.SwitchParameter	FileRaw,LiteralFileRaw,ObjectRaw		todo
+Select-String	SimpleMatch	System.Management.Automation.SwitchParameter	*		todo
+Select-Xml	Content	System.String[]	Content		todo
+Select-Xml	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Select-Xml	Namespace	System.Collections.Hashtable	*		todo
+Select-Xml	Path	System.String[]	Path		todo
+Select-Xml	Xml	System.Xml.XmlNode[]	Xml	Node	todo
+Select-Xml	XPath	System.String	*		todo
+Send-MailMessage	Attachments	System.String[]	*	PsPath	todo
+Send-MailMessage	Bcc	System.String[]	*		todo
+Send-MailMessage	Body	System.String	*		todo
+Send-MailMessage	BodyAsHtml	System.Management.Automation.SwitchParameter	*	BAH	todo
+Send-MailMessage	Cc	System.String[]	*		todo
+Send-MailMessage	Credential	System.Management.Automation.PSCredential	*		todo
+Send-MailMessage	DeliveryNotificationOption	System.Net.Mail.DeliveryNotificationOptions	*	DNO	todo
+Send-MailMessage	Encoding	System.Text.Encoding	*	BE	todo
+Send-MailMessage	From	System.String	*		todo
+Send-MailMessage	Port	System.Int32	*		todo
+Send-MailMessage	Priority	System.Net.Mail.MailPriority	*		todo
+Send-MailMessage	ReplyTo	System.String[]	*		todo
+Send-MailMessage	SmtpServer	System.String	*	ComputerName	todo
+Send-MailMessage	Subject	System.String	*	sub	todo
+Send-MailMessage	To	System.String[]	*		todo
+Send-MailMessage	UseSsl	System.Management.Automation.SwitchParameter	*		todo
+Set-Alias	Description	System.String	*		todo
+Set-Alias	Force	System.Management.Automation.SwitchParameter	*		todo
+Set-Alias	Name	System.String	*		todo
+Set-Alias	Option	System.Management.Automation.ScopedItemOptions	*		todo
+Set-Alias	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Set-Alias	Scope	System.String	*		todo
+Set-Alias	Value	System.String	*		todo
+Set-Date	Adjust	System.TimeSpan	Adjust		todo
+Set-Date	Date	System.DateTime	Date		todo
+Set-Date	DisplayHint	Microsoft.PowerShell.Commands.DisplayHintType	*		todo
+Set-MarkdownOption	BoldForegroundColor	System.String	IndividualSetting		todo
+Set-MarkdownOption	Code	System.String	IndividualSetting		todo
+Set-MarkdownOption	Header1Color	System.String	IndividualSetting		todo
+Set-MarkdownOption	Header2Color	System.String	IndividualSetting		todo
+Set-MarkdownOption	Header3Color	System.String	IndividualSetting		todo
+Set-MarkdownOption	Header4Color	System.String	IndividualSetting		todo
+Set-MarkdownOption	Header5Color	System.String	IndividualSetting		todo
+Set-MarkdownOption	Header6Color	System.String	IndividualSetting		todo
+Set-MarkdownOption	ImageAltTextForegroundColor	System.String	IndividualSetting		todo
+Set-MarkdownOption	InputObject	System.Management.Automation.PSObject	InputObject		todo
+Set-MarkdownOption	ItalicsForegroundColor	System.String	IndividualSetting		todo
+Set-MarkdownOption	LinkForegroundColor	System.String	IndividualSetting		todo
+Set-MarkdownOption	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Set-MarkdownOption	Theme	System.String	Theme		todo
+Set-PSBreakpoint	Action	System.Management.Automation.ScriptBlock	Command,Line,Variable		todo
+Set-PSBreakpoint	Column	System.Int32	Line		todo
+Set-PSBreakpoint	Command	System.String[]	Command	C	todo
+Set-PSBreakpoint	Line	System.Int32[]	Line		todo
+Set-PSBreakpoint	Mode	System.Management.Automation.VariableAccessMode	Variable		todo
+Set-PSBreakpoint	Runspace	System.Management.Automation.Runspaces.Runspace	*		todo
+Set-PSBreakpoint	Script	System.String[]	Command,Line,Variable		todo
+Set-PSBreakpoint	Variable	System.String[]	Variable	V	todo
+Set-TraceSource	Debugger	System.Management.Automation.SwitchParameter	optionsSet		todo
+Set-TraceSource	FilePath	System.String	optionsSet	PSPath,Path	todo
+Set-TraceSource	Force	System.Management.Automation.SwitchParameter	optionsSet		todo
+Set-TraceSource	ListenerOption	System.Diagnostics.TraceOptions	optionsSet		todo
+Set-TraceSource	Name	System.String[]	*		todo
+Set-TraceSource	Option	System.Management.Automation.PSTraceSourceOptions	optionsSet		todo
+Set-TraceSource	PassThru	System.Management.Automation.SwitchParameter	optionsSet		todo
+Set-TraceSource	PSHost	System.Management.Automation.SwitchParameter	optionsSet		todo
+Set-TraceSource	RemoveFileListener	System.String[]	removeFileListenersSet		todo
+Set-TraceSource	RemoveListener	System.String[]	removeAllListenersSet		todo
+Set-Variable	Append	System.Management.Automation.SwitchParameter	*		todo
+Set-Variable	Description	System.String	*		todo
+Set-Variable	Exclude	System.String[]	*		todo
+Set-Variable	Force	System.Management.Automation.SwitchParameter	*		todo
+Set-Variable	Include	System.String[]	*		todo
+Set-Variable	Name	System.String[]	*		todo
+Set-Variable	Option	System.Management.Automation.ScopedItemOptions	*		todo
+Set-Variable	PassThru	System.Management.Automation.SwitchParameter	*		todo
+Set-Variable	Scope	System.String	*		todo
+Set-Variable	Value	System.Object	*		todo
+Set-Variable	Visibility	System.Management.Automation.SessionStateEntryVisibility	*		todo
+Show-Markdown	InputObject	System.Management.Automation.PSObject	InputObject		todo
+Show-Markdown	LiteralPath	System.String[]	LiteralPath	PSPath,LP	todo
+Show-Markdown	Path	System.String[]	Path		todo
+Show-Markdown	UseBrowser	System.Management.Automation.SwitchParameter	*		todo
+Sort-Object	Bottom	System.Int32	Bottom		todo
+Sort-Object	CaseSensitive	System.Management.Automation.SwitchParameter	*		todo
+Sort-Object	Culture	System.String	*		todo
+Sort-Object	Descending	System.Management.Automation.SwitchParameter	*		todo
+Sort-Object	InputObject	System.Management.Automation.PSObject	*		todo
+Sort-Object	Property	System.Object[]	*		todo
+Sort-Object	Stable	System.Management.Automation.SwitchParameter	Default		todo
+Sort-Object	Top	System.Int32	Top		todo
+Sort-Object	Unique	System.Management.Automation.SwitchParameter	*		todo
+Start-Sleep	Duration	System.TimeSpan	FromTimeSpan	ts	todo
+Start-Sleep	Milliseconds	System.Int32	Milliseconds	ms	todo
+Start-Sleep	Seconds	System.Double	Seconds		todo
+Tee-Object	Append	System.Management.Automation.SwitchParameter	File		todo
+Tee-Object	Encoding	System.Text.Encoding	File,LiteralFile		todo
+Tee-Object	FilePath	System.String	File	Path	todo
+Tee-Object	InputObject	System.Management.Automation.PSObject	*		todo
+Tee-Object	LiteralPath	System.String	LiteralFile	PSPath,LP	todo
+Tee-Object	Variable	System.String	Variable		todo
+Test-Json	FetchExternalReference	System.Management.Automation.SwitchParameter	*		todo
+Test-Json	Json	System.String	JsonString,JsonStringWithSchemaFile,JsonStringWithSchemaString		todo
+Test-Json	LiteralPath	System.String	JsonLiteralPath,JsonLiteralPathWithSchemaFile,JsonLiteralPathWithSchemaString	PSPath,LP	todo
+Test-Json	Options	System.String[]	*		todo
+Test-Json	Path	System.String	JsonPath,JsonPathWithSchemaFile,JsonPathWithSchemaString		todo
+Test-Json	Schema	System.String	JsonLiteralPathWithSchemaString,JsonPathWithSchemaString,JsonStringWithSchemaString		todo
+Test-Json	SchemaFile	System.String	JsonLiteralPathWithSchemaFile,JsonPathWithSchemaFile,JsonStringWithSchemaFile		todo
+Trace-Command	ArgumentList	System.Object[]	commandSet	Args	todo
+Trace-Command	Command	System.String	commandSet		todo
+Trace-Command	Debugger	System.Management.Automation.SwitchParameter	*		todo
+Trace-Command	Expression	System.Management.Automation.ScriptBlock	expressionSet		todo
+Trace-Command	FilePath	System.String	*	PSPath,Path	todo
+Trace-Command	Force	System.Management.Automation.SwitchParameter	*		todo
+Trace-Command	InputObject	System.Management.Automation.PSObject	*		todo
+Trace-Command	ListenerOption	System.Diagnostics.TraceOptions	*		todo
+Trace-Command	Name	System.String[]	*		todo
+Trace-Command	Option	System.Management.Automation.PSTraceSourceOptions	*		todo
+Trace-Command	PSHost	System.Management.Automation.SwitchParameter	*		todo
+Unblock-File	LiteralPath	System.String[]	ByLiteralPath	PSPath,LP	todo
+Unblock-File	Path	System.String[]	ByPath		todo
+Unregister-Event	Force	System.Management.Automation.SwitchParameter	*		todo
+Unregister-Event	SourceIdentifier	System.String	BySource		todo
+Unregister-Event	SubscriptionId	System.Int32	ById		todo
+Update-FormatData	AppendPath	System.String[]	FileSet	PSPath,Path	todo
+Update-FormatData	PrependPath	System.String[]	FileSet		todo
+Update-List	Add	System.Object[]	AddRemoveSet		todo
+Update-List	InputObject	System.Management.Automation.PSObject	*		todo
+Update-List	Property	System.String	*		todo
+Update-List	Remove	System.Object[]	AddRemoveSet		todo
+Update-List	Replace	System.Object[]	ReplaceSet		todo
+Update-TypeData	AppendPath	System.String[]	FileSet	PSPath,Path	todo
+Update-TypeData	DefaultDisplayProperty	System.String	DynamicTypeSet		todo
+Update-TypeData	DefaultDisplayPropertySet	System.String[]	DynamicTypeSet		todo
+Update-TypeData	DefaultKeyPropertySet	System.String[]	DynamicTypeSet		todo
+Update-TypeData	Force	System.Management.Automation.SwitchParameter	DynamicTypeSet,TypeDataSet		todo
+Update-TypeData	InheritPropertySerializationSet	System.Nullable`1[[System.Boolean, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	DynamicTypeSet		todo
+Update-TypeData	MemberName	System.String	DynamicTypeSet		todo
+Update-TypeData	MemberType	System.Management.Automation.PSMemberTypes	DynamicTypeSet		todo
+Update-TypeData	PrependPath	System.String[]	FileSet		todo
+Update-TypeData	PropertySerializationSet	System.String[]	DynamicTypeSet		todo
+Update-TypeData	SecondValue	System.Object	DynamicTypeSet		todo
+Update-TypeData	SerializationDepth	System.Int32	DynamicTypeSet		todo
+Update-TypeData	SerializationMethod	System.String	DynamicTypeSet		todo
+Update-TypeData	StringSerializationSource	System.String	DynamicTypeSet		todo
+Update-TypeData	TargetTypeForDeserialization	System.Type	DynamicTypeSet		todo
+Update-TypeData	TypeAdapter	System.Type	DynamicTypeSet		todo
+Update-TypeData	TypeConverter	System.Type	DynamicTypeSet		todo
+Update-TypeData	TypeData	System.Management.Automation.Runspaces.TypeData[]	TypeDataSet		todo
+Update-TypeData	TypeName	System.String	DynamicTypeSet		todo
+Update-TypeData	Value	System.Object	DynamicTypeSet		todo
+Wait-Event	SourceIdentifier	System.String	*		todo
+Wait-Event	Timeout	System.Int32	*	TimeoutSec	todo
+Write-Debug	Message	System.String	*	Msg	todo
+Write-Error	Category	System.Management.Automation.ErrorCategory	NoException,WithException		todo
+Write-Error	CategoryActivity	System.String	*	Activity	todo
+Write-Error	CategoryReason	System.String	*	Reason	todo
+Write-Error	CategoryTargetName	System.String	*	TargetName	todo
+Write-Error	CategoryTargetType	System.String	*	TargetType	todo
+Write-Error	ErrorId	System.String	NoException,WithException		todo
+Write-Error	ErrorRecord	System.Management.Automation.ErrorRecord	ErrorRecord		todo
+Write-Error	Exception	System.Exception	WithException		todo
+Write-Error	Message	System.String	NoException,WithException	Msg	todo
+Write-Error	RecommendedAction	System.String	*		todo
+Write-Error	TargetObject	System.Object	NoException,WithException		todo
+Write-Host	BackgroundColor	System.ConsoleColor	*		todo
+Write-Host	ForegroundColor	System.ConsoleColor	*		todo
+Write-Host	NoNewline	System.Management.Automation.SwitchParameter	*		todo
+Write-Host	Object	System.Object	*	Msg,Message	todo
+Write-Host	Separator	System.Object	*		todo
+Write-Information	MessageData	System.Object	*	Msg,Message	todo
+Write-Information	Tags	System.String[]	*		todo
+Write-Output	InputObject	System.Management.Automation.PSObject	*		todo
+Write-Output	NoEnumerate	System.Management.Automation.SwitchParameter	*		todo
+Write-Progress	Activity	System.String	*		todo
+Write-Progress	Completed	System.Management.Automation.SwitchParameter	*		todo
+Write-Progress	CurrentOperation	System.String	*		todo
+Write-Progress	Id	System.Int32	*		todo
+Write-Progress	ParentId	System.Int32	*		todo
+Write-Progress	PercentComplete	System.Int32	*		todo
+Write-Progress	SecondsRemaining	System.Int32	*		todo
+Write-Progress	SourceId	System.Int32	*		todo
+Write-Progress	Status	System.String	*		todo
+Write-Verbose	Message	System.String	*	Msg	todo
+Write-Warning	Message	System.String	*	Msg	todo

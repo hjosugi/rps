@@ -1,0 +1,15 @@
+[package]
+name = "rpsh-engine"
+description = "PowerShell execution engine: session state, binding, pipeline"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rpsh-syntax.workspace = true
+rpsh-runtime.workspace = true
+
+[lints]
+workspace = true

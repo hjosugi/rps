@@ -1,0 +1,7 @@
+# `cargo harness <subcommand>` runs the measurement tool:
+#
+#   cargo harness bench              # time rpsh against the pinned pwsh
+#   cargo harness conform check      # differential tests against recorded pwsh output
+#   cargo harness inventory          # upstream surface covered so far
+[alias]
+harness = "run --quiet --release --package rpsh-bench --"

@@ -1,0 +1,7 @@
+exit=0
+caught: boom
+finally
+runtime exception
+System.Management.Automation.RuntimeException
+trapped
+after

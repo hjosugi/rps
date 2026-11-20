@@ -1,0 +1,42 @@
+name: Feature
+description: 移植・機能追加 (背景 / スコープ / Acceptance Criteria / 依存)
+labels: ["kind:feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        該当する `area:*` label を作成後に付与してください。pwsh 7.7.0 と挙動を一致させる作業には `compat` も付けます。
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景
+      description: なぜ必要か。DESIGN.md の該当セクションと、上流 (PowerShell v7.7.0) の該当 source path を書く。
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: スコープ
+      description: やること・やらないことを箇条書きで。対象の cmdlet / parameter / 構文は inventory/*.tsv の行で特定する。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: 完了判定をチェックボックスで。挙動は conformance case (pwsh 7.7.0 の golden) に、性能主張は bench/baselines/ の JSON に紐づけること。
+      value: |
+        - [ ] conformance case を追加し `cargo harness conform check` が通る
+        - [ ] 未対応の入力は `not implemented` (exit 99) のまま (DESIGN.md §2)
+        - [ ] inventory の status を更新
+    validations:
+      required: true
+  - type: textarea
+    id: deps
+    attributes:
+      label: 依存
+      description: "依存する issue を列挙する (例: `- #7`)。なければ「なし」。"
+      value: |
+        - なし
+    validations:
+      required: false

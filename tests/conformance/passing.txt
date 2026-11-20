@@ -1,0 +1,9 @@
+# Conformance cases rpsh passes. Maintained by `cargo harness conform check --bless`.
+expr/int-arithmetic
+expr/string-literals
+stmt/crlf
+stmt/empty
+stmt/exit-code
+stmt/exit-default
+stmt/exit-negative
+stmt/separators

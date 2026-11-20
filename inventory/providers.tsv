@@ -1,0 +1,6 @@
+provider	capabilities	drives	status
+Alias	ShouldProcess	Alias	todo
+Environment	ShouldProcess	Env	todo
+FileSystem	Filter,ShouldProcess,Credentials	/,Temp	todo
+Function	ShouldProcess	Function	todo
+Variable	ShouldProcess	Variable	todo

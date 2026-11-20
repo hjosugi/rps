@@ -1,0 +1,18 @@
+[package]
+name = "rpsh-cli"
+description = "The rpsh executable"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rpsh-host.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "rpsh"
+path = "src/main.rs"

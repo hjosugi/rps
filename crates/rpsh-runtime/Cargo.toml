@@ -1,0 +1,11 @@
+[package]
+name = "rpsh-runtime"
+description = "PowerShell values, conversions and operators"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

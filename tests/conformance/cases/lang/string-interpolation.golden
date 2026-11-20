@@ -1,0 +1,10 @@
+exit=0
+x=5
+sum=6
+prop=n not @{Name=n}.Name
+tab	here
+dollar $x
+5th
+here 5
+"quoted"
+literal $x

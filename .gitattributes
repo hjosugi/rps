@@ -1,0 +1,2 @@
+# Conformance goldens and their scripts are compared byte for byte.
+tests/conformance/cases/** -text

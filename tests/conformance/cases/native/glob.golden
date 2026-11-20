@@ -1,0 +1,4 @@
+exit=0
+fixtures/a.txt fixtures/b.txt
+fixtures/*.txt
+1

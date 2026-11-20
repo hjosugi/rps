@@ -1,0 +1,55 @@
+name	type	options	status
+?	System.Boolean	ReadOnly, AllScope	todo
+^		None	todo
+$		None	todo
+args	System.Object[]	None	todo
+ConfirmPreference	System.Management.Automation.ConfirmImpact	None	todo
+DebugPreference	System.Management.Automation.ActionPreference	None	todo
+EnabledExperimentalFeatures	System.Management.Automation.Internal.ReadOnlyBag`1[[System.String, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	Constant, AllScope	todo
+Error	System.Collections.ArrayList	Constant	todo
+ErrorActionPreference	System.Management.Automation.ActionPreference	None	todo
+ErrorView	System.Management.Automation.ErrorView	None	todo
+ExecutionContext	System.Management.Automation.EngineIntrinsics	Constant, AllScope	todo
+false	System.Boolean	Constant, AllScope	todo
+FormatEnumerationLimit	System.Int32	None	todo
+HOME	System.String	ReadOnly, AllScope	todo
+Host	System.Management.Automation.Internal.Host.InternalHost	Constant, AllScope	todo
+InformationPreference	System.Management.Automation.ActionPreference	None	todo
+input	System.Collections.ArrayList+ArrayListEnumeratorSimple	None	todo
+IsCoreCLR	System.Boolean	ReadOnly, AllScope	todo
+IsLinux	System.Boolean	ReadOnly, AllScope	todo
+IsMacOS	System.Boolean	ReadOnly, AllScope	todo
+IsWindows	System.Boolean	ReadOnly, AllScope	todo
+MaximumHistoryCount	System.Int32	None	todo
+MyInvocation	System.Management.Automation.InvocationInfo	None	todo
+NestedPromptLevel	System.Int32	None	todo
+null		None	todo
+OutDir	System.String	None	todo
+OutputEncoding	System.Text.UTF8Encoding+UTF8EncodingSealed	None	todo
+PID	System.Int32	Constant, AllScope	todo
+PROFILE	System.String	None	todo
+ProgressPreference	System.Management.Automation.ActionPreference	None	todo
+PSApplicationOutputEncoding		None	todo
+PSBoundParameters	System.Management.Automation.PSBoundParametersDictionary	None	todo
+PSCommandPath	System.String	None	todo
+PSCulture	System.String	ReadOnly, AllScope	todo
+PSDefaultParameterValues	System.Management.Automation.DefaultParameterDictionary	None	todo
+PSEdition	System.String	Constant, AllScope	todo
+PSEmailServer	System.String	None	todo
+PSHOME	System.String	Constant, AllScope	todo
+PSNativeCommandArgumentPassing	System.Management.Automation.NativeArgumentPassingStyle	None	todo
+PSNativeCommandUseErrorActionPreference	System.Boolean	None	todo
+PSScriptRoot	System.String	None	todo
+PSSessionApplicationName	System.String	None	todo
+PSSessionConfigurationName	System.String	None	todo
+PSSessionOption	System.Management.Automation.Remoting.PSSessionOption	None	todo
+PSStyle	System.Management.Automation.PSStyle	Constant	todo
+PSUICulture	System.String	ReadOnly, AllScope	todo
+PSVersionTable	System.Management.Automation.PSVersionHashTable	Constant, AllScope	todo
+PWD	System.Management.Automation.PathInfo	None	todo
+ShellId	System.String	Constant, AllScope	todo
+StackTrace		None	todo
+true	System.Boolean	Constant, AllScope	todo
+VerbosePreference	System.Management.Automation.ActionPreference	None	todo
+WarningPreference	System.Management.Automation.ActionPreference	None	todo
+WhatIfPreference	System.Boolean	None	todo

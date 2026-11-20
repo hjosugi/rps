@@ -1,0 +1,4 @@
+feature	enabled_by_default	source	status
+PSLoadAssemblyFromNativeCode	False	PSEngine	todo
+PSProfileDSCResource	False	PSEngine	todo
+PSSerializeJSONLongEnumAsNumber	False	PSEngine	todo

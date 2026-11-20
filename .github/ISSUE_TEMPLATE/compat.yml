@@ -1,0 +1,40 @@
+name: Compatibility / Bug
+description: pwsh 7.7.0 と結果が違う・crash する
+labels: ["compat"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        rpsh は「pwsh と同じ結果」か「not implemented (exit 99)」のどちらかしか返さない設計です (DESIGN.md §2)。それ以外の結果はすべて bug として扱います。
+  - type: textarea
+    id: repro
+    attributes:
+      label: 再現 script
+      description: 最小の .ps1。出力が決定的になるようにする (時刻・乱数・PID を出力しない)。
+      render: powershell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: pwsh 7.7.0 の出力
+      description: "`pwsh -NoProfile -NonInteractive -File repro.ps1` の stdout と exit code。"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: rpsh の出力
+      description: stdout / stderr / exit code。
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 環境
+      value: |
+        - OS:
+        - rpsh commit:
+        - pwsh version:
+    validations:
+      required: true

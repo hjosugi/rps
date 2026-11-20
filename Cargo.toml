@@ -1,0 +1,54 @@
+[workspace]
+members = [
+    "crates/rpsh-syntax",
+    "crates/rpsh-runtime",
+    "crates/rpsh-engine",
+    "crates/rpsh-dotnet",
+    "crates/rpsh-providers",
+    "crates/rpsh-native",
+    "crates/rpsh-format",
+    "crates/rpsh-commands",
+    "crates/rpsh-host",
+    "crates/rpsh-cli",
+    "crates/rpsh-bench",
+]
+default-members = ["crates/rpsh-cli"]
+resolver = "3"
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/hjosugi/rps"
+publish = false
+
+# The startup budget (DESIGN.md §4) is paid by every dependency linked into
+# `rpsh`. A crate is added here only together with the issue that needs it,
+# and a workspace crate only once another crate depends on it.
+[workspace.dependencies]
+rpsh-syntax = { version = "0.0.1", path = "crates/rpsh-syntax" }
+rpsh-runtime = { version = "0.0.1", path = "crates/rpsh-runtime" }
+rpsh-engine = { version = "0.0.1", path = "crates/rpsh-engine" }
+rpsh-host = { version = "0.0.1", path = "crates/rpsh-host" }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+
+# What `rpsh-bench` measures. Tuned for the binary a user would install.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+# `cargo build --profile profiling` keeps symbols for perf / flamegraph.
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = "none"

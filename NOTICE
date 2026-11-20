@@ -1,0 +1,16 @@
+rps reimplements PowerShell and follows the structure, behaviour and public
+names of the upstream implementation:
+
+  PowerShell — https://github.com/PowerShell/PowerShell
+  Copyright (c) Microsoft Corporation.
+  Licensed under the MIT License.
+
+The files under inventory/ are generated from the output of PowerShell 7.7.0.
+The files named *.golden under tests/conformance/ are output recorded from
+PowerShell 7.7.0.
+
+The architecture borrows from Nushell:
+
+  Nushell — https://github.com/nushell/nushell
+  Copyright (c) 2019 - 2026 The Nushell Project Developers
+  Licensed under the MIT License.

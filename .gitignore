@@ -1,0 +1,8 @@
+# Rust build artifacts
+target/
+
+# The pinned upstream pwsh fetched by scripts/fetch-pwsh.sh
+.cache/
+
+# Harness output. A run worth keeping is copied to bench/baselines/.
+bench/results/
