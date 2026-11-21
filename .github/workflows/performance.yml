@@ -7,12 +7,34 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "23 4 * * 1"
+  push:
+    branches: [main]
+  pull_request:
 
 permissions:
   contents: read
 
 jobs:
+  # The startup budget (DESIGN.md §4, docs/05_startup.md). Shared runners
+  # are slower and noisier than the reference machine, so the budget is
+  # doubled here: this catches a regression of the kind that matters — an
+  # eagerly built table, a file read or a library loaded at startup — not a
+  # drift of a few percent, which the reference machine's baselines track.
+  startup-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: 1.100.0
+      - uses: Swatinem/rust-cache@c8037a86dde8214a8310e9f54a8fc61ab362aa31 # v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: scripts/fetch-pwsh.sh
+      - run: cargo harness bench --filter startup --budget-scale 2 --out startup-result.json | tee -a "$GITHUB_STEP_SUMMARY"
+
   benchmark:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
