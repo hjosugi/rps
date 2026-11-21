@@ -15,11 +15,13 @@ Before a PR:
 
 ```bash
 scripts/check.sh
+cargo deny check
 ```
 
-It runs `cargo fmt --all -- --check`,
+`scripts/check.sh` runs `cargo fmt --all -- --check`,
 `cargo clippy --workspace --all-targets -- -D warnings`,
-`cargo test --workspace` and `cargo harness conform check`.
+`cargo test --workspace` and `cargo harness conform check`. CI runs
+`cargo deny check` as its own job; run it locally when a dependency changes.
 
 ## Adding behaviour
 
@@ -37,6 +39,24 @@ It runs `cargo fmt --all -- --check`,
 Anything a change does not handle must stay a refusal
 (`rpsh: not implemented: ...`, exit code 99), never an approximation
 (DESIGN.md §2).
+
+## Adding a dependency
+
+Every external crate is linked into every start, so it answers to the
+startup budget. The rules, the candidate list and the measurement spike are
+in docs/07_dependencies.md. In short: open the issue, measure the startup
+and binary-size cost, put it in `[workspace.dependencies]` with
+`default-features = false`, gate it behind a feature unless `rpsh -Command
+exit` needs it, and run `cargo deny check`.
+
+## Research measurements
+
+A design decision is settled by a bench under `research/benches`, run with
+`cargo bench -p rpsh-research --bench <name>`. Its result is
+`bench/results/research-<name>.json`; copy it to
+`bench/baselines/<date>-<machine>-<topic>.json` and cite that file from the
+decision memo in `docs/`. Add the bench to `research/Cargo.toml` and the
+document to the index in docs/README.md.
 
 ## Performance claims
 
