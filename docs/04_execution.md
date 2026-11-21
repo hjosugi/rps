@@ -84,6 +84,56 @@ Sizes: a stack-VM `Op` is 8 bytes, a register-VM `Ins` is 16, and `Value` is
 16. Loop-sum lowers to 13 AST nodes, 21 stack operations and 14 register
 instructions.
 
+## Prior art
+
+Nushell is the only shell here that executes a register IR. It compiles each
+block at parse time and `eval_block` always runs the IR evaluator, with no AST
+fallback (Nushell 0.117.0 (`a481925`),
+`crates/nu-parser/src/parse_captures_compile.rs:872-876`,
+`crates/nu-engine/src/eval.rs:602-613`); a block that fails to compile is
+reported, not interpreted from the tree (`crates/nu-engine/src/eval_ir.rs:147-167`).
+The instruction set has 58 variants and 21 literal variants; `Instruction` is
+capped at 24 bytes and `RegId` is a `u32` (`crates/nu-protocol/src/ir/mod.rs:100-313`,
+`:465`, `:468-511`; `crates/nu-protocol/src/id.rs:123`). Registers carry
+pipeline data, variables stay in `Stack.vars` by `VarId`, branch targets are
+absolute instruction indices, and strings and names go in a shared `data`
+buffer addressed by `DataSlice` (`crates/nu-engine/src/eval_ir.rs:108-113,241-250`,
+`crates/nu-protocol/src/engine/stack.rs:76,97`,
+`crates/nu-engine/src/compile/builder.rs:595-608`, `crates/nu-protocol/src/ir/mod.rs:77-83`).
+
+The IR is serde-serializable and is used by `view ir --json` and the plugin
+protocol (`crates/nu-protocol/src/ir/mod.rs:36,79,100,468,522`,
+`crates/nu-command/src/debug/view_ir.rs:161-166`,
+`crates/nu-plugin-protocol/src/lib.rs:711`), but Nushell keeps no on-disk IR
+or script cache. The only reuse is an in-memory block cache for the same span
+in the same process (`crates/nu-parser/src/parse_captures_compile.rs:818-847`).
+Nushell also commits no IR-versus-AST benchmark, so its IR is evidence that
+the design is workable at shell scale, not that it is faster than a tree walk
+(inference).
+
+The other four shells walk their AST directly and keep parsed function bodies,
+so a call does not re-parse. fish keeps `NodeRef<ast::BlockStatement>`
+(fish 4.9.3 (`6cf3137`), `src/function.rs:31`) and walks it at call time
+(`src/exec.rs:1034,1056`); brush stores an `Arc<FunctionDefinition>`
+(brush `brush-shell-v0.4.0` (`96a26d0`), `brush-core/src/functions.rs:67`) and
+is the only one with parse memoisation, `cached` at 64 entries in memory
+(`brush-core/src/shell/parsing.rs:47-48`); yash-rs keeps
+`Rc<FullCompoundCommand>` (yash-rs `yash-cli-3.6.0` (`46d2f79`),
+`yash-syntax/src/syntax.rs:709`); ion walks a `Vec<Statement>`
+(ion `1.0.0-alpha` (`e9b3ca4`), `src/lib/shell/flow_control.rs:96,236`). None
+has an on-disk cache of parsed code; ion's only reuse is a thread-local scratch
+buffer (`src/lib/memory.rs:20`). Inference: an AST walker is the default
+because it is cheaper to build, and its per-node lookup cost is the floor rps
+measures against.
+
+Takeaway: rps borrows Nushell's register IR and resolved call targets (a
+`DeclId` on the call instruction, `crates/nu-protocol/src/ir/mod.rs:206`), and
+diverges where none of these shells does — it writes the lowered block to disk
+because lowering costs 220 µs, a cost the AST walkers never pay and Nushell
+pays on every start. The four tree walkers set the build-cost floor; the
+measurements above are what justify paying the register IR's extra upfront
+work.
+
 ## Decision
 
 **Lower the AST to a register IR and interpret it.**

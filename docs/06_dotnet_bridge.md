@@ -220,6 +220,41 @@ independently (#127). The probe's named-context API is the right mechanism;
 until it works on the pinned runtime, the fallback is the default load
 context plus a version check on the facade.
 
+## Prior art
+
+None of the surveyed shells embeds or hosts a managed runtime. fish, brush,
+yash-rs and ion execute external programs (fish 4.9.3 (`6cf3137`),
+`src/exec.rs:86`; brush `brush-shell-v0.4.0` (`96a26d0`),
+`brush-core/src/interp.rs:186`; yash-rs `yash-cli-3.6.0` (`46d2f79`),
+`yash-env/src/system/real.rs:932`; ion `master` (`e9b3ca4`),
+`src/lib/shell/pipe_exec/mod.rs:502`), and Nushell's extension mechanism is
+its own plugin protocol, not a CLR bridge. T1 and T2 have no direct prior art
+here; none of these shells solves the CLR problem.
+
+**T2 lifecycle: Nushell plugins.** Plugin commands are declared from cached
+signatures in a brotli-compressed MessagePack registry without spawning the
+plugin (Nushell 0.117.0 (`a481925`),
+`crates/nu-plugin-engine/src/init.rs:269-286`;
+`crates/nu-protocol/src/plugin/registry_file/mod.rs:61-76, 90-94`). Plugin GC
+stops idle plugin processes
+(`crates/nu-protocol/src/config/plugin_gc.rs:5-6`,
+`crates/nu-plugin-engine/src/gc.rs:11-15`). *Inference:* registry-without-spawn
+plus idle reaping is the nearest lifecycle precedent for T2; the length-
+prefixed Unix-domain socket is rps's own choice, not Nushell's protocol.
+
+**T0 and pipes: Nushell `ByteStream`.** `PipelineData::ByteStream`
+(`crates/nu-protocol/src/pipeline/pipeline_data.rs:49-55`) and `into_stdio`
+(`crates/nu-protocol/src/pipeline/byte_stream.rs:560-587`, used at
+`crates/nu-command/src/system/run_external.rs:256-261`) hand a child's pipe
+directly to the next with no decoding — a contrast for native pipes only,
+since the pipe carries bytes between processes, not CLR objects.
+
+Takeaway. T0's scope follows corpus frequency, as above. T1 does what none of
+these shells does, so 31 ms to the first managed call and 7.3 ns per call
+after is the whole argument. T2's nearest lifecycle precedent is Nushell's
+registry plus idle reaping; the socket is rps's own. Because the four shells
+only spawn external commands, the 6.5 µs warm-sidecar tradeoff is rps-specific.
+
 ## What the implementation issues take from this
 
 | Issue | Scope fixed here |
