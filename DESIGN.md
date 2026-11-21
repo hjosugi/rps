@@ -106,13 +106,19 @@ upstream's error ids.
 
 ### 3.3 Values
 
-A `Value` enum with unboxed primitives. A `PSObject` wrapper exists only
-where extended members are attached, as upstream does lazily. Three decisions
-are open and each has a research issue:
+A 16-byte `Value` enum with unboxed primitives. A `PSObject` wrapper exists
+only where extended members are attached, as upstream does lazily. The
+representation is settled in [docs/02_value_model.md](docs/02_value_model.md)
+and the lifetime rules in [docs/03_memory.md](docs/03_memory.md):
 
 * **Strings.** `.Length`, indexing and `Substring` count UTF-16 code units.
-  The storage has to make that exact while keeping ASCII fast.
-* **Memory.** PowerShell objects form cycles; reference counting alone leaks.
+  A string is either ASCII bytes or UTF-16 code units, never both, so ASCII
+  stays one byte per unit and a non-ASCII string indexes in O(1); lone
+  surrogates are kept exactly and become U+FFFD only at the UTF-8 boundary.
+* **Memory.** Reference counting with `Arc`, plus a generational cycle
+  collector over containers, triggered by container allocations so a short
+  script never pays for it. Values are `Send + Sync`: a runspace may hand an
+  object to another and see the same object.
 * **Numbers.** Upstream's promotion rules (`Int32` overflow becomes `Double`,
   integer division may yield `Double`, conversion rounds half to even) and
   its `G15` formatting of `Double` are reproduced exactly.
@@ -122,7 +128,11 @@ are open and each has a research issue:
 The AST is lowered to a compact register IR, as Nushell does, and interpreted.
 Dynamic sites — member access, method overload resolution, command lookup,
 conversions — carry inline caches, which is the job the DLR's call-site
-caching does upstream.
+caching does upstream. The prototypes and their measurements are in
+[docs/04_execution.md](docs/04_execution.md): the register form is 3.2 times
+faster than walking the AST with name lookups on a million-iteration loop
+(1.5 times faster than the slot-resolved AST or a stack VM), and lowering a
+profile-sized script costs about 220 µs, cached on disk afterwards.
 
 Upstream interprets a script block first and JIT-compiles it once it is hot.
 A long-running tight loop is therefore where rpsh is most likely to lose, and
@@ -149,6 +159,12 @@ assemblies, `tool init | Invoke-Expression` spawns a process and compiles its
 output, and function definitions are re-parsed each time because nothing is
 cached between sessions.
 
+Measured against 7.7.0 ([docs/05_startup.md](docs/05_startup.md)): an empty
+.NET application costs 19 ms and 21 MiB; loading `System.Management.Automation`
+adds 1.4 ms; building a default session state and running `exit` reaches
+164 ms and 77 MiB. `pwsh -NoProfile -Command exit` takes 147 ms and 89 MiB.
+That is the budget rpsh is measured against.
+
 Rules:
 
 1. **Nothing is built before it is used.** The cmdlet table, aliases, type
@@ -171,7 +187,9 @@ Rules:
 ## 5. The .NET bridge
 
 Scripts name .NET types directly, so the question is not whether to support
-.NET but when to pay for it.
+.NET but when to pay for it. The measurements behind the tiers, and the part
+of `System.Management.Automation` binary modules actually use, are in
+[docs/06_dotnet_bridge.md](docs/06_dotnet_bridge.md).
 
 | Tier | What | Cost |
 |---|---|---|
