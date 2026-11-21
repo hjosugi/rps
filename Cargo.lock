@@ -52,6 +52,10 @@ name = "rpsh-providers"
 version = "0.0.1"
 
 [[package]]
+name = "rpsh-research"
+version = "0.0.1"
+
+[[package]]
 name = "rpsh-runtime"
 version = "0.0.1"
 

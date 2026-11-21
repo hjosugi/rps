@@ -1,0 +1,36 @@
+[package]
+name = "rpsh-research"
+description = "Prototypes and measurements behind the decisions in docs/"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# Every bench is a plain program (`harness = false`) that prints a table and
+# writes bench/results/research-<name>.json. Run one with
+#     cargo bench -p rpsh-research --bench <name>
+# and RPSH_RESEARCH_QUICK=1 for a smoke run whose numbers mean nothing.
+
+[[bench]]
+name = "startup_tables"
+harness = false
+
+[[bench]]
+name = "value_model"
+harness = false
+
+[[bench]]
+name = "memory"
+harness = false
+
+[[bench]]
+name = "execution"
+harness = false
+
+[[bench]]
+name = "dotnet_ipc"
+harness = false
+
+[lints]
+workspace = true

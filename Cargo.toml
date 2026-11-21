@@ -11,6 +11,7 @@ members = [
     "crates/rpsh-host",
     "crates/rpsh-cli",
     "crates/rpsh-bench",
+    "research",
 ]
 default-members = ["crates/rpsh-cli"]
 resolver = "3"

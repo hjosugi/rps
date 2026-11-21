@@ -1,0 +1,18 @@
+{
+  "description": "pwsh's start, stage by stage, next to rpsh and an empty process. The probes are pwsh with pwsh.dll replaced by a program that stops at that stage (scripts/build-startup-probes.sh). docs/05_startup.md.",
+  "runs": 40,
+  "warmup": 3,
+  "commands": [
+    {"name": "/usr/bin/true", "argv": ["/usr/bin/true"]},
+    {"name": "rpsh -Version", "argv": ["{rpsh}", "-Version"]},
+    {"name": "rpsh -NoProfile -Command exit", "argv": ["{rpsh}", "-NoProfile", "-NonInteractive", "-Command", "exit"]},
+    {"name": "rpsh -NoProfile -File empty.ps1", "argv": ["{rpsh}", "-NoProfile", "-NonInteractive", "-File", "{root}/bench/cases/startup/empty.ps1"]},
+    {"name": "probe: empty Main", "argv": ["{probes}/empty/pwsh"]},
+    {"name": "probe: load SMA", "argv": ["{probes}/load-sma/pwsh"]},
+    {"name": "probe: runspace + exit", "argv": ["{probes}/runspace/pwsh"]},
+    {"name": "pwsh -Version", "argv": ["{pwsh}", "-Version"]},
+    {"name": "pwsh -NoProfile -Command exit", "argv": ["{pwsh}", "-NoProfile", "-NonInteractive", "-Command", "exit"]},
+    {"name": "pwsh -NoProfile -File empty.ps1", "argv": ["{pwsh}", "-NoProfile", "-NonInteractive", "-File", "{root}/bench/cases/startup/empty.ps1"]},
+    {"name": "pwsh -Command exit (profile lookup)", "argv": ["{pwsh}", "-NonInteractive", "-Command", "exit"]}
+  ]
+}
