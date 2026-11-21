@@ -69,4 +69,14 @@ mod tests {
         assert_eq!(directive(source, "other"), None);
         assert_eq!(directive("$x = 1\n", "runs"), None);
     }
+
+    #[test]
+    fn startup_cases_carry_the_budget() {
+        // DESIGN.md §4 rule 2: the budget is enforced by these cases.
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bench/cases/startup");
+        for case in collect(&root, None).unwrap() {
+            let source = fs::read_to_string(&case.path).unwrap();
+            assert_eq!(directive(&source, "budget-ms"), Some(5), "{}", case.id);
+        }
+    }
 }

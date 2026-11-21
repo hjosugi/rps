@@ -1,0 +1,2004 @@
+{
+ "schema": "rpsh-commands-v1",
+ "spec": "bench/startup/jit.json",
+ "description": "What JIT compilation and pwsh's caches contribute to its start: runtime switches that change code generation, and a HOME without pwsh's startup profile. docs/05_startup.md.",
+ "date": "2026-11-21T01:22:20+00:00",
+ "runs": 20,
+ "warmup": 2,
+ "machine": {
+  "cpu": "AMD Ryzen 5 PRO 4650U with Radeon Graphics",
+  "logical_cpus": 12,
+  "governor": "schedutil",
+  "kernel": "7.3.4-1-cachyos",
+  "load_average": [
+   2.0126953125,
+   2.4482421875,
+   2.0498046875
+  ],
+  "commit": "51168f5",
+  "python": "3.14.10"
+ },
+ "load_average_after": [
+  2.51171875,
+  2.51953125,
+  2.091796875
+ ],
+ "results": [
+  {
+   "name": "default",
+   "argv": [
+    "{root}/.cache/pwsh/7.7.0/pwsh",
+    "-NoProfile",
+    "-NonInteractive",
+    "-File",
+    "{root}/bench/startup/inside.ps1"
+   ],
+   "env": {},
+   "fresh_home": false,
+   "summary": {
+    "wall_ms": 211.3334165,
+    "user_ms": 268.5985,
+    "sys_ms": 80.8655,
+    "max_rss_kib": 97082.0,
+    "minor_faults": 9292.0,
+    "major_faults": 0.0,
+    "wall_min_ms": 189.48954,
+    "wall_p90_ms": 236.432414,
+    "metrics": {
+     "jit_methods": 324.0,
+     "jit_ms": 46.537000000000006,
+     "jit_il_bytes": 19132.0,
+     "assemblies": 66.0,
+     "allocated_kib": 5417.66796875,
+     "gen0_collections": 1.0,
+     "working_set_kib": 98146.0,
+     "threads": 18.0
+    }
+   },
+   "samples": [
+    {
+     "wall_ms": 205.451508,
+     "user_ms": 269.732,
+     "sys_ms": 73.032,
+     "max_rss_kib": 97416,
+     "minor_faults": 9323,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 46.5168,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5419.2265625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98592.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 223.053043,
+     "user_ms": 286.457,
+     "sys_ms": 86.524,
+     "max_rss_kib": 97092,
+     "minor_faults": 9336,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 295.0,
+      "jit_ms": 48.5671,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5416.796875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97984.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 218.778961,
+     "user_ms": 296.435,
+     "sys_ms": 70.433,
+     "max_rss_kib": 97476,
+     "minor_faults": 9283,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 50.5135,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5423.1640625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98328.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 206.556131,
+     "user_ms": 258.757,
+     "sys_ms": 85.227,
+     "max_rss_kib": 97012,
+     "minor_faults": 9326,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 318.0,
+      "jit_ms": 46.5572,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5417.8671875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97952.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 189.48954,
+     "user_ms": 245.385,
+     "sys_ms": 81.366,
+     "max_rss_kib": 97400,
+     "minor_faults": 9317,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 41.77,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5462.3515625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98308.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 236.432414,
+     "user_ms": 260.828,
+     "sys_ms": 89.536,
+     "max_rss_kib": 96352,
+     "minor_faults": 9047,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 209.0,
+      "jit_ms": 37.6568,
+      "jit_il_bytes": 15637.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5415.8515625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97384.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 214.309362,
+     "user_ms": 281.345,
+     "sys_ms": 83.874,
+     "max_rss_kib": 97420,
+     "minor_faults": 9335,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 47.2649,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5424.3203125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98428.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 226.100572,
+     "user_ms": 306.517,
+     "sys_ms": 76.758,
+     "max_rss_kib": 97420,
+     "minor_faults": 9270,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 54.2595,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5412.9453125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98212.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 199.907523,
+     "user_ms": 251.825,
+     "sys_ms": 68.991,
+     "max_rss_kib": 97320,
+     "minor_faults": 9292,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 40.9552,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5417.9921875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98180.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 235.433729,
+     "user_ms": 309.155,
+     "sys_ms": 81.814,
+     "max_rss_kib": 96828,
+     "minor_faults": 9331,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 48.3848,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5413.671875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98148.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 218.126066,
+     "user_ms": 260.056,
+     "sys_ms": 87.076,
+     "max_rss_kib": 96012,
+     "minor_faults": 9166,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 209.0,
+      "jit_ms": 41.5788,
+      "jit_il_bytes": 15637.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5414.4375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97328.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 201.382912,
+     "user_ms": 282.922,
+     "sys_ms": 68.886,
+     "max_rss_kib": 97072,
+     "minor_faults": 9245,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 46.7282,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5420.3515625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98144.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 204.718461,
+     "user_ms": 264.949,
+     "sys_ms": 80.365,
+     "max_rss_kib": 97004,
+     "minor_faults": 9336,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 46.6262,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5420.65625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97904.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 247.608148,
+     "user_ms": 311.632,
+     "sys_ms": 84.612,
+     "max_rss_kib": 97004,
+     "minor_faults": 9270,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 56.7729,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5420.46875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98316.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 194.474165,
+     "user_ms": 258.268,
+     "sys_ms": 71.306,
+     "max_rss_kib": 97412,
+     "minor_faults": 9267,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 41.6486,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5415.328125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98120.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 213.890536,
+     "user_ms": 243.851,
+     "sys_ms": 74.869,
+     "max_rss_kib": 96824,
+     "minor_faults": 9060,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 209.0,
+      "jit_ms": 34.1302,
+      "jit_il_bytes": 15637.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5411.921875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97656.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 201.156987,
+     "user_ms": 265.474,
+     "sys_ms": 77.82,
+     "max_rss_kib": 96872,
+     "minor_faults": 9342,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 42.8169,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5417.46875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98044.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 208.337774,
+     "user_ms": 283.794,
+     "sys_ms": 79.532,
+     "max_rss_kib": 97124,
+     "minor_faults": 9298,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 51.4091,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5409.296875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98276.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 211.917032,
+     "user_ms": 267.465,
+     "sys_ms": 85.773,
+     "max_rss_kib": 97500,
+     "minor_faults": 9292,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 40.8248,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5426.8671875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98420.0,
+      "threads": 20.0
+     }
+    },
+    {
+     "wall_ms": 210.749801,
+     "user_ms": 271.732,
+     "sys_ms": 82.759,
+     "max_rss_kib": 96768,
+     "minor_faults": 9276,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 45.8865,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5415.9296875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98028.0,
+      "threads": 18.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "fresh HOME every run",
+   "argv": [
+    "{root}/.cache/pwsh/7.7.0/pwsh",
+    "-NoProfile",
+    "-NonInteractive",
+    "-File",
+    "{root}/bench/startup/inside.ps1"
+   ],
+   "env": {},
+   "fresh_home": true,
+   "summary": {
+    "wall_ms": 245.8356115,
+    "user_ms": 231.969,
+    "sys_ms": 72.44399999999999,
+    "max_rss_kib": 88284.0,
+    "minor_faults": 8529.0,
+    "major_faults": 0.0,
+    "wall_min_ms": 219.646829,
+    "wall_p90_ms": 267.006356,
+    "metrics": {
+     "jit_methods": 187.0,
+     "jit_ms": 32.756299999999996,
+     "jit_il_bytes": 14708.0,
+     "assemblies": 55.0,
+     "allocated_kib": 5406.16015625,
+     "gen0_collections": 1.0,
+     "working_set_kib": 89070.0,
+     "threads": 19.0
+    }
+   },
+   "samples": [
+    {
+     "wall_ms": 285.317072,
+     "user_ms": 276.012,
+     "sys_ms": 73.548,
+     "max_rss_kib": 88032,
+     "minor_faults": 8522,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 43.9774,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5410.2109375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89008.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 227.021582,
+     "user_ms": 226.804,
+     "sys_ms": 58.314,
+     "max_rss_kib": 87824,
+     "minor_faults": 8565,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 32.0387,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5409.921875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89112.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 231.814256,
+     "user_ms": 215.161,
+     "sys_ms": 74.468,
+     "max_rss_kib": 87948,
+     "minor_faults": 8528,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 31.3636,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5406.1875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 88840.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 259.782107,
+     "user_ms": 267.345,
+     "sys_ms": 76.494,
+     "max_rss_kib": 88292,
+     "minor_faults": 8542,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 31.9842,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5409.171875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89136.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 267.006356,
+     "user_ms": 272.696,
+     "sys_ms": 68.993,
+     "max_rss_kib": 88432,
+     "minor_faults": 8530,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 34.4123,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5397.59375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 88892.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 250.025075,
+     "user_ms": 219.968,
+     "sys_ms": 81.673,
+     "max_rss_kib": 87864,
+     "minor_faults": 8446,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 32.4337,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5406.9296875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 88616.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 251.740715,
+     "user_ms": 258.771,
+     "sys_ms": 68.825,
+     "max_rss_kib": 88280,
+     "minor_faults": 8434,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 188.0,
+      "jit_ms": 35.8419,
+      "jit_il_bytes": 14733.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5389.6015625,
+      "gen0_collections": 2.0,
+      "working_set_kib": 89152.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 244.541393,
+     "user_ms": 243.649,
+     "sys_ms": 64.254,
+     "max_rss_kib": 88288,
+     "minor_faults": 8515,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 36.9345,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5407.3828125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89044.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 235.56768,
+     "user_ms": 232.316,
+     "sys_ms": 71.66,
+     "max_rss_kib": 87524,
+     "minor_faults": 8490,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 30.4739,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5400.8046875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 88628.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 241.992969,
+     "user_ms": 231.622,
+     "sys_ms": 73.228,
+     "max_rss_kib": 88388,
+     "minor_faults": 8482,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 32.564,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5403.125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89192.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 247.12983,
+     "user_ms": 241.113,
+     "sys_ms": 74.679,
+     "max_rss_kib": 88096,
+     "minor_faults": 8530,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 35.1803,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5406.90625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89096.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 225.99845,
+     "user_ms": 219.074,
+     "sys_ms": 57.846,
+     "max_rss_kib": 88488,
+     "minor_faults": 8550,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 31.7985,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5400.75,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89100.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 248.144034,
+     "user_ms": 231.2,
+     "sys_ms": 74.474,
+     "max_rss_kib": 88004,
+     "minor_faults": 8542,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 34.6989,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5407.125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 88880.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 252.269096,
+     "user_ms": 236.016,
+     "sys_ms": 84.453,
+     "max_rss_kib": 88404,
+     "minor_faults": 8523,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 34.3188,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5406.1328125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89040.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 219.646829,
+     "user_ms": 215.061,
+     "sys_ms": 68.392,
+     "max_rss_kib": 88476,
+     "minor_faults": 8532,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 29.6756,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5410.3203125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 88940.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 263.326098,
+     "user_ms": 261.39,
+     "sys_ms": 75.803,
+     "max_rss_kib": 88300,
+     "minor_faults": 8498,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 33.4603,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5408.3671875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89116.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 230.601409,
+     "user_ms": 225.973,
+     "sys_ms": 61.1,
+     "max_rss_kib": 88260,
+     "minor_faults": 8593,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 32.5473,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5400.5703125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89124.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 232.016395,
+     "user_ms": 233.511,
+     "sys_ms": 59.023,
+     "max_rss_kib": 88500,
+     "minor_faults": 8579,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 32.8408,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5401.7421875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89264.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 249.569018,
+     "user_ms": 229.932,
+     "sys_ms": 77.927,
+     "max_rss_kib": 88152,
+     "minor_faults": 8514,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 34.7135,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5394.0,
+      "gen0_collections": 1.0,
+      "working_set_kib": 88884.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 233.398559,
+     "user_ms": 219.868,
+     "sys_ms": 71.475,
+     "max_rss_kib": 88328,
+     "minor_faults": 8551,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 187.0,
+      "jit_ms": 32.6718,
+      "jit_il_bytes": 14708.0,
+      "assemblies": 55.0,
+      "allocated_kib": 5399.3828125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 89208.0,
+      "threads": 19.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "DOTNET_TieredPGO=0",
+   "argv": [
+    "{root}/.cache/pwsh/7.7.0/pwsh",
+    "-NoProfile",
+    "-NonInteractive",
+    "-File",
+    "{root}/bench/startup/inside.ps1"
+   ],
+   "env": {
+    "DOTNET_TieredPGO": "0"
+   },
+   "fresh_home": false,
+   "summary": {
+    "wall_ms": 206.291374,
+    "user_ms": 256.491,
+    "sys_ms": 81.403,
+    "max_rss_kib": 96582.0,
+    "minor_faults": 9112.0,
+    "major_faults": 0.0,
+    "wall_min_ms": 188.332228,
+    "wall_p90_ms": 238.771805,
+    "metrics": {
+     "jit_methods": 230.0,
+     "jit_ms": 37.33625,
+     "jit_il_bytes": 15913.0,
+     "assemblies": 66.0,
+     "allocated_kib": 5419.046875,
+     "gen0_collections": 1.0,
+     "working_set_kib": 97450.0,
+     "threads": 19.0
+    }
+   },
+   "samples": [
+    {
+     "wall_ms": 206.232634,
+     "user_ms": 253.752,
+     "sys_ms": 73.534,
+     "max_rss_kib": 96384,
+     "minor_faults": 9158,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 33.801,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5418.7109375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97528.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 238.771805,
+     "user_ms": 277.192,
+     "sys_ms": 80.998,
+     "max_rss_kib": 97224,
+     "minor_faults": 9260,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 41.9119,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5427.9609375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98152.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 215.791915,
+     "user_ms": 252.559,
+     "sys_ms": 92.754,
+     "max_rss_kib": 96748,
+     "minor_faults": 8975,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 38.2928,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5419.9453125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97456.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 204.783574,
+     "user_ms": 230.676,
+     "sys_ms": 90.617,
+     "max_rss_kib": 96572,
+     "minor_faults": 9169,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 34.9321,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5429.4609375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97468.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 188.332228,
+     "user_ms": 239.943,
+     "sys_ms": 72.445,
+     "max_rss_kib": 95912,
+     "minor_faults": 9119,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 35.3917,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5413.921875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97120.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 211.786768,
+     "user_ms": 253.485,
+     "sys_ms": 69.877,
+     "max_rss_kib": 96612,
+     "minor_faults": 9110,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 35.4487,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5422.3671875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97436.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 199.344235,
+     "user_ms": 254.222,
+     "sys_ms": 72.795,
+     "max_rss_kib": 96972,
+     "minor_faults": 9263,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 42.1718,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5412.6796875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98044.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 220.38732,
+     "user_ms": 264.315,
+     "sys_ms": 82.433,
+     "max_rss_kib": 96848,
+     "minor_faults": 9140,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 41.1474,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5412.265625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97680.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 234.228588,
+     "user_ms": 301.12,
+     "sys_ms": 84.666,
+     "max_rss_kib": 96396,
+     "minor_faults": 9085,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 45.5827,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5426.1953125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97696.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 192.901333,
+     "user_ms": 237.932,
+     "sys_ms": 87.471,
+     "max_rss_kib": 96268,
+     "minor_faults": 9121,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 34.9093,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5413.703125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97268.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 207.202865,
+     "user_ms": 262.169,
+     "sys_ms": 71.622,
+     "max_rss_kib": 96460,
+     "minor_faults": 9106,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 36.7975,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5417.421875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97256.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 205.627157,
+     "user_ms": 258.489,
+     "sys_ms": 78.709,
+     "max_rss_kib": 96728,
+     "minor_faults": 9342,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 42.0116,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5421.953125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98020.0,
+      "threads": 20.0
+     }
+    },
+    {
+     "wall_ms": 235.6211,
+     "user_ms": 262.343,
+     "sys_ms": 92.349,
+     "max_rss_kib": 96616,
+     "minor_faults": 8989,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 34.0828,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5419.3828125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97444.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 193.730379,
+     "user_ms": 236.891,
+     "sys_ms": 78.788,
+     "max_rss_kib": 96264,
+     "minor_faults": 9099,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 34.4089,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5422.0234375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97332.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 217.911463,
+     "user_ms": 276.553,
+     "sys_ms": 81.853,
+     "max_rss_kib": 96224,
+     "minor_faults": 9086,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 44.1888,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5414.453125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97228.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 199.495509,
+     "user_ms": 254.493,
+     "sys_ms": 78.454,
+     "max_rss_kib": 96544,
+     "minor_faults": 9104,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 34.9637,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5415.1796875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97292.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 198.468291,
+     "user_ms": 258.499,
+     "sys_ms": 81.808,
+     "max_rss_kib": 97532,
+     "minor_faults": 9358,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 324.0,
+      "jit_ms": 41.2935,
+      "jit_il_bytes": 19132.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5421.2734375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98408.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 206.350114,
+     "user_ms": 274.125,
+     "sys_ms": 84.329,
+     "max_rss_kib": 96572,
+     "minor_faults": 9114,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 41.7156,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5408.03125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97292.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 238.932075,
+     "user_ms": 284.592,
+     "sys_ms": 88.345,
+     "max_rss_kib": 96988,
+     "minor_faults": 8990,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 37.875,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5418.2578125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97760.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 199.361718,
+     "user_ms": 246.086,
+     "sys_ms": 79.018,
+     "max_rss_kib": 96592,
+     "minor_faults": 9094,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 230.0,
+      "jit_ms": 33.9624,
+      "jit_il_bytes": 15913.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5426.8828125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97432.0,
+      "threads": 19.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "DOTNET_TieredCompilation=0",
+   "argv": [
+    "{root}/.cache/pwsh/7.7.0/pwsh",
+    "-NoProfile",
+    "-NonInteractive",
+    "-File",
+    "{root}/bench/startup/inside.ps1"
+   ],
+   "env": {
+    "DOTNET_TieredCompilation": "0"
+   },
+   "fresh_home": false,
+   "summary": {
+    "wall_ms": 212.949064,
+    "user_ms": 282.925,
+    "sys_ms": 77.959,
+    "max_rss_kib": 97054.0,
+    "minor_faults": 9147.5,
+    "major_faults": 0.0,
+    "wall_min_ms": 188.181325,
+    "wall_p90_ms": 237.566812,
+    "metrics": {
+     "jit_methods": 170.5,
+     "jit_ms": 63.67585,
+     "jit_il_bytes": 15264.5,
+     "assemblies": 66.0,
+     "allocated_kib": 5418.26953125,
+     "gen0_collections": 1.0,
+     "working_set_kib": 97996.0,
+     "threads": 17.0
+    }
+   },
+   "samples": [
+    {
+     "wall_ms": 217.910101,
+     "user_ms": 276.658,
+     "sys_ms": 83.712,
+     "max_rss_kib": 97008,
+     "minor_faults": 9141,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 171.0,
+      "jit_ms": 60.2414,
+      "jit_il_bytes": 15217.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5412.421875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97832.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 229.267887,
+     "user_ms": 310.48,
+     "sys_ms": 89.765,
+     "max_rss_kib": 97100,
+     "minor_faults": 9199,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 163.0,
+      "jit_ms": 76.7176,
+      "jit_il_bytes": 15095.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5415.453125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97780.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 213.387362,
+     "user_ms": 275.467,
+     "sys_ms": 77.95,
+     "max_rss_kib": 97464,
+     "minor_faults": 9138,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 173.0,
+      "jit_ms": 63.6208,
+      "jit_il_bytes": 15293.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5428.4765625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98448.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 196.172983,
+     "user_ms": 242.525,
+     "sys_ms": 79.668,
+     "max_rss_kib": 97108,
+     "minor_faults": 9135,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 188.0,
+      "jit_ms": 58.553,
+      "jit_il_bytes": 15293.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5416.671875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97996.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 207.33357,
+     "user_ms": 284.855,
+     "sys_ms": 83.046,
+     "max_rss_kib": 97004,
+     "minor_faults": 9197,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 168.0,
+      "jit_ms": 62.687,
+      "jit_il_bytes": 15184.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5418.265625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98028.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 241.248843,
+     "user_ms": 351.442,
+     "sys_ms": 78.128,
+     "max_rss_kib": 97248,
+     "minor_faults": 9184,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 198.0,
+      "jit_ms": 84.4917,
+      "jit_il_bytes": 15293.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5418.2734375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98044.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 212.510766,
+     "user_ms": 281.16,
+     "sys_ms": 67.251,
+     "max_rss_kib": 97020,
+     "minor_faults": 9109,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 201.0,
+      "jit_ms": 63.7309,
+      "jit_il_bytes": 15293.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5419.5,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97800.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 237.566812,
+     "user_ms": 321.818,
+     "sys_ms": 78.299,
+     "max_rss_kib": 96980,
+     "minor_faults": 9038,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 203.0,
+      "jit_ms": 77.4139,
+      "jit_il_bytes": 15293.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5413.2109375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97996.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 208.917031,
+     "user_ms": 284.69,
+     "sys_ms": 68.268,
+     "max_rss_kib": 97032,
+     "minor_faults": 9141,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 173.0,
+      "jit_ms": 67.4776,
+      "jit_il_bytes": 15293.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5416.7890625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97908.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 217.490943,
+     "user_ms": 275.926,
+     "sys_ms": 80.364,
+     "max_rss_kib": 96720,
+     "minor_faults": 9182,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 167.0,
+      "jit_ms": 58.2171,
+      "jit_il_bytes": 15272.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5415.125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97860.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 210.134507,
+     "user_ms": 279.765,
+     "sys_ms": 77.571,
+     "max_rss_kib": 97156,
+     "minor_faults": 9185,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 168.0,
+      "jit_ms": 59.2568,
+      "jit_il_bytes": 15243.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5421.921875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98020.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 214.982636,
+     "user_ms": 302.502,
+     "sys_ms": 77.968,
+     "max_rss_kib": 97028,
+     "minor_faults": 9112,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 173.0,
+      "jit_ms": 68.7301,
+      "jit_il_bytes": 15293.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5409.8984375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97856.0,
+      "threads": 16.0
+     }
+    },
+    {
+     "wall_ms": 202.784021,
+     "user_ms": 269.068,
+     "sys_ms": 73.932,
+     "max_rss_kib": 97076,
+     "minor_faults": 9085,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 183.0,
+      "jit_ms": 66.7044,
+      "jit_il_bytes": 15293.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5416.90625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98088.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 228.293137,
+     "user_ms": 312.514,
+     "sys_ms": 87.097,
+     "max_rss_kib": 97024,
+     "minor_faults": 9059,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 203.0,
+      "jit_ms": 77.0827,
+      "jit_il_bytes": 15293.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5438.453125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98052.0,
+      "threads": 19.0
+     }
+    },
+    {
+     "wall_ms": 188.181325,
+     "user_ms": 259.334,
+     "sys_ms": 70.251,
+     "max_rss_kib": 97464,
+     "minor_faults": 9148,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 166.0,
+      "jit_ms": 57.5034,
+      "jit_il_bytes": 15178.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5420.71875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98112.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 219.397883,
+     "user_ms": 304.46,
+     "sys_ms": 77.725,
+     "max_rss_kib": 97112,
+     "minor_faults": 9225,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 169.0,
+      "jit_ms": 66.3742,
+      "jit_il_bytes": 15257.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5428.9609375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 98220.0,
+      "threads": 20.0
+     }
+    },
+    {
+     "wall_ms": 196.101148,
+     "user_ms": 269.478,
+     "sys_ms": 76.154,
+     "max_rss_kib": 96940,
+     "minor_faults": 9168,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 170.0,
+      "jit_ms": 60.5514,
+      "jit_il_bytes": 15217.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5420.8671875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97672.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 218.636903,
+     "user_ms": 296.98,
+     "sys_ms": 84.169,
+     "max_rss_kib": 96984,
+     "minor_faults": 9166,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 162.0,
+      "jit_ms": 66.8365,
+      "jit_il_bytes": 14795.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5418.2109375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97996.0,
+      "threads": 17.0
+     }
+    },
+    {
+     "wall_ms": 196.550061,
+     "user_ms": 275.67,
+     "sys_ms": 68.88,
+     "max_rss_kib": 97096,
+     "minor_faults": 9185,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 168.0,
+      "jit_ms": 61.9865,
+      "jit_il_bytes": 15013.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5428.203125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97872.0,
+      "threads": 18.0
+     }
+    },
+    {
+     "wall_ms": 196.541043,
+     "user_ms": 284.815,
+     "sys_ms": 65.397,
+     "max_rss_kib": 97128,
+     "minor_faults": 9147,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 167.0,
+      "jit_ms": 62.4278,
+      "jit_il_bytes": 15209.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5420.7578125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 97996.0,
+      "threads": 18.0
+     }
+    }
+   ]
+  },
+  {
+   "name": "DOTNET_ReadyToRun=0",
+   "argv": [
+    "{root}/.cache/pwsh/7.7.0/pwsh",
+    "-NoProfile",
+    "-NonInteractive",
+    "-File",
+    "{root}/bench/startup/inside.ps1"
+   ],
+   "env": {
+    "DOTNET_ReadyToRun": "0"
+   },
+   "fresh_home": false,
+   "summary": {
+    "wall_ms": 831.961526,
+    "user_ms": 1424.3625,
+    "sys_ms": 140.145,
+    "max_rss_kib": 101304.0,
+    "minor_faults": 20132.0,
+    "major_faults": 0.0,
+    "wall_min_ms": 776.167583,
+    "wall_p90_ms": 870.827133,
+    "metrics": {
+     "jit_methods": 10611.0,
+     "jit_ms": 1323.2793000000001,
+     "jit_il_bytes": 1001539.5,
+     "assemblies": 66.0,
+     "allocated_kib": 5433.69140625,
+     "gen0_collections": 1.0,
+     "working_set_kib": 102308.0,
+     "threads": 24.0
+    }
+   },
+   "samples": [
+    {
+     "wall_ms": 843.171692,
+     "user_ms": 1455.192,
+     "sys_ms": 148.233,
+     "max_rss_kib": 100584,
+     "minor_faults": 20132,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10626.0,
+      "jit_ms": 1384.8514,
+      "jit_il_bytes": 996706.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5429.65625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 101760.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 799.493806,
+     "user_ms": 1365.809,
+     "sys_ms": 151.54,
+     "max_rss_kib": 101308,
+     "minor_faults": 20410,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10600.0,
+      "jit_ms": 1265.1414,
+      "jit_il_bytes": 1002877.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5427.8203125,
+      "gen0_collections": 1.0,
+      "working_set_kib": 102684.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 828.46499,
+     "user_ms": 1384.205,
+     "sys_ms": 143.741,
+     "max_rss_kib": 100092,
+     "minor_faults": 20088,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10637.0,
+      "jit_ms": 1286.6705,
+      "jit_il_bytes": 996052.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5429.6796875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 101384.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 787.762447,
+     "user_ms": 1327.453,
+     "sys_ms": 127.466,
+     "max_rss_kib": 112432,
+     "minor_faults": 20118,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10629.0,
+      "jit_ms": 1253.9804,
+      "jit_il_bytes": 1003574.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5436.9375,
+      "gen0_collections": 2.0,
+      "working_set_kib": 113516.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 838.537063,
+     "user_ms": 1423.598,
+     "sys_ms": 131.706,
+     "max_rss_kib": 101024,
+     "minor_faults": 20137,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10608.0,
+      "jit_ms": 1328.8166,
+      "jit_il_bytes": 1001889.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5422.34375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 101928.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 824.735419,
+     "user_ms": 1397.822,
+     "sys_ms": 145.632,
+     "max_rss_kib": 112644,
+     "minor_faults": 20080,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10608.0,
+      "jit_ms": 1300.1376,
+      "jit_il_bytes": 998970.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5434.84375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 113868.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 848.345591,
+     "user_ms": 1482.964,
+     "sys_ms": 141.044,
+     "max_rss_kib": 101300,
+     "minor_faults": 20349,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10628.0,
+      "jit_ms": 1354.5417,
+      "jit_il_bytes": 1002648.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5435.1015625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 102896.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 823.690678,
+     "user_ms": 1432.804,
+     "sys_ms": 114.695,
+     "max_rss_kib": 101928,
+     "minor_faults": 19881,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10605.0,
+      "jit_ms": 1315.9814,
+      "jit_il_bytes": 1001917.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5423.484375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 102652.0,
+      "threads": 23.0
+     }
+    },
+    {
+     "wall_ms": 835.587186,
+     "user_ms": 1475.762,
+     "sys_ms": 144.095,
+     "max_rss_kib": 101108,
+     "minor_faults": 20300,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10629.0,
+      "jit_ms": 1378.7434,
+      "jit_il_bytes": 1001742.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5432.5390625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 102272.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 782.951227,
+     "user_ms": 1378.013,
+     "sys_ms": 127.598,
+     "max_rss_kib": 100748,
+     "minor_faults": 20183,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10610.0,
+      "jit_ms": 1280.8544,
+      "jit_il_bytes": 1001683.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5438.859375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 101788.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 835.458062,
+     "user_ms": 1441.678,
+     "sys_ms": 126.172,
+     "max_rss_kib": 102572,
+     "minor_faults": 20156,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10607.0,
+      "jit_ms": 1335.4777,
+      "jit_il_bytes": 1000690.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5486.0390625,
+      "gen0_collections": 1.0,
+      "working_set_kib": 103640.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 804.866688,
+     "user_ms": 1408.206,
+     "sys_ms": 139.246,
+     "max_rss_kib": 101648,
+     "minor_faults": 20240,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10611.0,
+      "jit_ms": 1317.9304,
+      "jit_il_bytes": 1001396.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5436.59375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 102436.0,
+      "threads": 23.0
+     }
+    },
+    {
+     "wall_ms": 836.287819,
+     "user_ms": 1425.127,
+     "sys_ms": 143.423,
+     "max_rss_kib": 100108,
+     "minor_faults": 20078,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10634.0,
+      "jit_ms": 1334.695,
+      "jit_il_bytes": 1003236.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5435.8671875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 102032.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 816.417116,
+     "user_ms": 1416.017,
+     "sys_ms": 133.378,
+     "max_rss_kib": 100880,
+     "minor_faults": 20192,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10642.0,
+      "jit_ms": 1289.7818,
+      "jit_il_bytes": 1003424.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5431.3359375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 101932.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 846.305881,
+     "user_ms": 1465.504,
+     "sys_ms": 137.785,
+     "max_rss_kib": 111976,
+     "minor_faults": 19997,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10611.0,
+      "jit_ms": 1377.5399,
+      "jit_il_bytes": 996631.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5431.0859375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 113116.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 870.827133,
+     "user_ms": 1493.645,
+     "sys_ms": 131.021,
+     "max_rss_kib": 100600,
+     "minor_faults": 20069,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10599.0,
+      "jit_ms": 1364.8539,
+      "jit_il_bytes": 1002181.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5430.1875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 101528.0,
+      "threads": 22.0
+     }
+    },
+    {
+     "wall_ms": 826.929004,
+     "user_ms": 1383.555,
+     "sys_ms": 157.648,
+     "max_rss_kib": 101308,
+     "minor_faults": 20209,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10635.0,
+      "jit_ms": 1307.9081,
+      "jit_il_bytes": 1001044.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5474.984375,
+      "gen0_collections": 1.0,
+      "working_set_kib": 102004.0,
+      "threads": 21.0
+     }
+    },
+    {
+     "wall_ms": 776.167583,
+     "user_ms": 1330.825,
+     "sys_ms": 133.393,
+     "max_rss_kib": 101380,
+     "minor_faults": 20132,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10594.0,
+      "jit_ms": 1235.1343,
+      "jit_il_bytes": 994948.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5442.4296875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 102344.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 888.488971,
+     "user_ms": 1487.196,
+     "sys_ms": 173.992,
+     "max_rss_kib": 100476,
+     "minor_faults": 20090,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10615.0,
+      "jit_ms": 1485.4994,
+      "jit_il_bytes": 1001244.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5435.6328125,
+      "gen0_collections": 2.0,
+      "working_set_kib": 101780.0,
+      "threads": 24.0
+     }
+    },
+    {
+     "wall_ms": 842.172783,
+     "user_ms": 1437.985,
+     "sys_ms": 147.276,
+     "max_rss_kib": 101488,
+     "minor_faults": 19908,
+     "major_faults": 0,
+     "metrics": {
+      "jit_methods": 10599.0,
+      "jit_ms": 1328.6282,
+      "jit_il_bytes": 998421.0,
+      "assemblies": 66.0,
+      "allocated_kib": 5414.6875,
+      "gen0_collections": 1.0,
+      "working_set_kib": 102748.0,
+      "threads": 21.0
+     }
+    }
+   ]
+  }
+ ]
+}
