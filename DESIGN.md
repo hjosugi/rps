@@ -1,8 +1,8 @@
-# rps design
+# rpsh design
 
-rps is an implementation of PowerShell in Rust. Its command is `rpsh`. It
-targets one pinned upstream release, PowerShell 7.7.0, and exists to answer a
-question with measurements instead of opinions: how fast is PowerShell when
+rpsh is an implementation of PowerShell in Rust. It targets one pinned
+upstream release, PowerShell 7.7.0, and exists to answer a question with
+measurements instead of opinions: how fast is PowerShell when
 there is no .NET runtime to start and no JIT to wait for?
 
 Issues refer to the sections of this document by number.

@@ -20,7 +20,7 @@ resolver = "3"
 version = "0.0.1"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/hjosugi/rps"
+repository = "https://github.com/hjosugi/rpsh"
 publish = false
 
 # The startup budget (DESIGN.md §4) is paid by every dependency linked into

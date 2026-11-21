@@ -163,11 +163,11 @@ script needs it at startup. The decision follows:
   196, brush 667, yash-rs 70, ion 311) are workspace-wide, not shipped
   dependencies.
 
-**Takeaway.** rps adopts fish's sorted compile-time table and Nushell's
+**Takeaway.** rpsh adopts fish's sorted compile-time table and Nushell's
 per-command `OnceLock` metadata, rejecting startup-built maps and eager
 signature construction: static like fish but wider, lazy like Nushell but
 unregistered. The ~550 eager registrations and eager env/prelude parsing
-are what rps budgets against; no surveyed shell targets a cold-process
+are what rpsh budgets against; no surveyed shell targets a cold-process
 PowerShell-compatible start, so 5 ms sits far below all of them.
 
 ## The budget

@@ -123,10 +123,10 @@ is the only one with parse memoisation, `cached` at 64 entries in memory
 (ion `1.0.0-alpha` (`e9b3ca4`), `src/lib/shell/flow_control.rs:96,236`). None
 has an on-disk cache of parsed code; ion's only reuse is a thread-local scratch
 buffer (`src/lib/memory.rs:20`). Inference: an AST walker is the default
-because it is cheaper to build, and its per-node lookup cost is the floor rps
+because it is cheaper to build, and its per-node lookup cost is the floor rpsh
 measures against.
 
-Takeaway: rps borrows Nushell's register IR and resolved call targets (a
+Takeaway: rpsh borrows Nushell's register IR and resolved call targets (a
 `DeclId` on the call instruction, `crates/nu-protocol/src/ir/mod.rs:206`), and
 diverges where none of these shells does — it writes the lowered block to disk
 because lowering costs 220 µs, a cost the AST walkers never pay and Nushell

@@ -240,7 +240,7 @@ stops idle plugin processes
 (`crates/nu-protocol/src/config/plugin_gc.rs:5-6`,
 `crates/nu-plugin-engine/src/gc.rs:11-15`). *Inference:* registry-without-spawn
 plus idle reaping is the nearest lifecycle precedent for T2; the length-
-prefixed Unix-domain socket is rps's own choice, not Nushell's protocol.
+prefixed Unix-domain socket is rpsh's own choice, not Nushell's protocol.
 
 **T0 and pipes: Nushell `ByteStream`.** `PipelineData::ByteStream`
 (`crates/nu-protocol/src/pipeline/pipeline_data.rs:49-55`) and `into_stdio`
@@ -252,8 +252,8 @@ since the pipe carries bytes between processes, not CLR objects.
 Takeaway. T0's scope follows corpus frequency, as above. T1 does what none of
 these shells does, so 31 ms to the first managed call and 7.3 ns per call
 after is the whole argument. T2's nearest lifecycle precedent is Nushell's
-registry plus idle reaping; the socket is rps's own. Because the four shells
-only spawn external commands, the 6.5 µs warm-sidecar tradeoff is rps-specific.
+registry plus idle reaping; the socket is rpsh's own. Because the four shells
+only spawn external commands, the 6.5 µs warm-sidecar tradeoff is rpsh-specific.
 
 ## What the implementation issues take from this
 

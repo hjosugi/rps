@@ -1,15 +1,15 @@
-# rps
+# rpsh
 
-rps is an implementation of PowerShell in Rust, measured against upstream
-[PowerShell](https://github.com/PowerShell/PowerShell) 7.7.0. Its command is
+rpsh is an implementation of PowerShell in Rust, measured against upstream
+[PowerShell](https://github.com/PowerShell/PowerShell) 7.7.0. The command is
 `rpsh`.
 
 The aim is to run `.ps1` scripts exactly as `pwsh` does, cover what `pwsh`
 ships, run Linux commands the way a shell should, and find out by measurement
 how much faster that is without a .NET runtime to start. The design is
 [DESIGN.md](DESIGN.md); the work is tracked in the
-[issues](https://github.com/hjosugi/rps/issues), starting from the
-[roadmap](https://github.com/hjosugi/rps/issues/182).
+[issues](https://github.com/hjosugi/rpsh/issues), starting from the
+[roadmap](https://github.com/hjosugi/rpsh/issues/182).
 
 ## Status
 
@@ -78,8 +78,7 @@ That is a floor, not a result (DESIGN.md §7).
 
 ## The name
 
-The project is rps; the command is `rpsh`. `rps` was already taken as a crate
-on crates.io and as a command installed by an npm package.
+The project and the command are both `rpsh`.
 
 ## License
 

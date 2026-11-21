@@ -68,14 +68,14 @@ collecting them:
   (`members/scopes-rs/src/lib.rs:16`), clones values on read
   (`src/lib/shell/variables.rs:217`), and puts only functions behind `Rc`.
 
-That is not evidence that rps can skip collection. The probes above are the
+That is not evidence that rpsh can skip collection. The probes above are the
 cycles these shells avoid — a hashtable that contains itself, an object that
 points at itself, a script block reachable from its own scope — and each
 shell avoids them by copying captures, isolating the process, cloning the
 shell or treating values as immutable. PowerShell keeps identity across
-closures, jobs and runspaces, so rps pays for `Arc` and must collect.
+closures, jobs and runspaces, so rpsh pays for `Arc` and must collect.
 
-Takeaway: rps borrows the cheap part, `Arc` and copy-on-write where mutation
+Takeaway: rpsh borrows the cheap part, `Arc` and copy-on-write where mutation
 is rare, and adds the cycle collector that no surveyed shell needs.
 
 ## Measurements

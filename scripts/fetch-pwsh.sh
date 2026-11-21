@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Download the pinned upstream PowerShell release that rps is measured against.
+# Download the pinned upstream PowerShell release that rpsh is measured against.
 #
 # The archive is verified against the SHA-256 digest published with the
 # upstream release and unpacked into .cache/pwsh/<version>/ (git-ignored).

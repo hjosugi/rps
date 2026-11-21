@@ -1,4 +1,4 @@
-rps reimplements PowerShell and follows the structure, behaviour and public
+rpsh reimplements PowerShell and follows the structure, behaviour and public
 names of the upstream implementation:
 
   PowerShell — https://github.com/PowerShell/PowerShell
