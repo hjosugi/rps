@@ -157,6 +157,40 @@ a vetted crate that provides thin dynamically-sized allocations; the choice
 is made in #35 under the dependency rules of #7. The rest of the workspace
 keeps `unsafe_code = "deny"`.
 
+## Prior art
+
+* **Nushell 0.117.0 (`a481925`)** — `Value` is a 17-variant enum, every variant
+  carries a `Span` (`crates/nu-protocol/src/value/mod.rs:79-222`), strings are
+  owned `String`, and records, lists and binary hold `SharedCow` over
+  `Arc` (`crates/nu-protocol/src/value/record.rs:18-20`;
+  `crates/nu-utils/src/shared_cow.rs:10-12`). `str length` and `str substring`
+  default to UTF-8 bytes (`crates/nu-command/src/strings/str_/length.rs:36-50`;
+  `crates/nu-command/src/strings/str_/substring.rs:183-210`). `Value` has a
+  compile-time upper bound, `size_of::<Value>() <= 56`
+  (`crates/nu-protocol/src/value/mod.rs:383-386`), not an exact size.
+* **fish 4.9.3 (`6cf3137`)** — `WString` is `widestring`'s `Utf32String`, so
+  strings are UTF-32 code points (`crates/widestring/src/lib.rs:15`).
+  Undecodable bytes map one per byte into a private-use range and back, a
+  reversible round trip (`crates/widestring/src/lib.rs:36-50, 133, 219`).
+* **brush 0.4.0 (`96a26d0`)** and **yash-rs 3.6.0 (`46d2f79`)** — Rust
+  `String` throughout (`brush-core/src/variables.rs:597-605`;
+  `yash-env/src/variable/value.rs:23-27`). For non-UTF-8 command substitution,
+  yash substitutes U+FFFD (`yash-semantics/src/expansion/initial/command_subst.rs:175-176`)
+  and brush errors, an inference from `read_to_string`
+  (`brush-core/src/commands.rs:779`), not a behaviour read in brush source.
+* **ion master (`e9b3ca4`)** — `small::String`
+  (`members/types-rs/src/types.rs:12`); script input panics on invalid UTF-8
+  (`src/lib/parser/terminator.rs:130`).
+
+None transfers. PowerShell's `'😀'.Length` is 2 because length counts UTF-16
+code units; UTF-8 bytes (Nushell) would count 4 and UTF-32 code points (fish)
+1, and indexing would follow those units. The surveyed encodings are therefore
+evidence for the compact ASCII/UTF-16 string, not an argument against it.
+rpsh borrows the compile-time size-assertion habit, with a 16-byte budget
+rather than Nushell's 56, and rejects every surveyed representation: UTF-8
+bytes, UTF-32 and plain owned `String`, each of which gives up `.Length` or
+the lone surrogate.
+
 ## PSObject
 
 Upstream wraps lazily. `PSObject.AsPSObject` (`engine/MshObject.cs:1027`)

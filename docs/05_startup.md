@@ -127,6 +127,49 @@ script needs it at startup. The decision follows:
   CLR bridge are resolved by name and built when a script first reaches
   them. A script that prints one integer builds none of them.
 
+## Prior art
+
+* **fish 4.9.3 (`6cf3137`) is the sorted-table precedent:** 64 builtins in
+  a `const` slice, binary-searched (`src/builtins/shared/misc.rs:111`,
+  `:377`), with `share/` embedded (`src/autoload.rs:41`). Functions and
+  completions autoload by file behind a 1024-entry miss LRU with 15 s
+  staleness (`src/autoload.rs:268`, `:246`). Eager: `config.fish`
+  (`src/bin/fish.rs:166-183`), `conf.d` (`share/config.fish:156-164`),
+  universal variables (`src/env/environment.rs:768`). History is mmap-backed,
+  read on use (`src/history/history.rs:1223`); autosuggestion and
+  highlighting use background threads (`src/reader/reader.rs:5590`, `:5784`).
+  Skips: `--no-config`/`-N`, `--no-execute`/`-n` (`src/bin/fish.rs:231`, `:232`).
+* **Nushell 0.117.0 (`a481925`) registers eagerly, caches lazily:** `main`
+  adds about 550 commands (source count, not runtime; `src/main.rs:159`).
+  Registration is not lazy; signatures are, built once on use behind a
+  `OnceLock` (`crates/nu-protocol/src/engine/signature_cache.rs:8-19`,
+  `:55-60`), as are plugin commands declared from cached registry
+  signatures without spawning the plugin
+  (`crates/nu-plugin-engine/src/init.rs:269-286`). The embedded default env
+  file is evaluated every start (`src/config_files.rs:209-218`), as is
+  `use std/prelude *` (`crates/nu-std/src/lib.rs:174-203`); the prelude
+  opens with `use std/dt` (`crates/nu-std/std/prelude/mod.nu:1`), so
+  `std/dt` is inferred parsed too. No on-disk parsed-script cache exists
+  (`crates/nu-parser/src/parse_captures_compile.rs:818-847`). Skips:
+  `-n/--no-config-file`, `--no-std-lib`, `--no-history`
+  (`src/command.rs:746-748`).
+* **brush 0.4.0 (`96a26d0`), yash-rs 3.6.0 (`46d2f79`), ion (`e9b3ca4`)
+  build builtin `HashMap`s at startup** (`brush-core/src/shell.rs:125`;
+  `yash-env/src/lib.rs:125`; `src/lib/builtins/mod.rs:105`). brush reads
+  history before the first prompt (`brush-core/src/shell.rs:251-253`);
+  yash-rs has no line editor, history or completion
+  (`docs/src/README.md:13-14`); ion runs `initrc` only when interactive
+  (`src/binary/mod.rs:63`, `:198`). None autoloads. Lockfile counts (fish
+  196, brush 667, yash-rs 70, ion 311) are workspace-wide, not shipped
+  dependencies.
+
+**Takeaway.** rps adopts fish's sorted compile-time table and Nushell's
+per-command `OnceLock` metadata, rejecting startup-built maps and eager
+signature construction: static like fish but wider, lazy like Nushell but
+unregistered. The ~550 eager registrations and eager env/prelude parsing
+are what rps budgets against; no surveyed shell targets a cold-process
+PowerShell-compatible start, so 5 ms sits far below all of them.
+
 ## The budget
 
 **`rpsh -NoProfile -Command exit` and `-File empty.ps1` stay under 5 ms on

@@ -35,6 +35,49 @@ Two requirements follow:
 | tracing GC with handles | yes | yes | no counting; roots must be tracked everywhere, including Rust locals in cmdlets |
 | no collection: free at exit | yes | leak until exit | nothing, until memory runs out |
 
+## Prior art
+
+None of the surveyed shells has a tracing collector: Nushell, fish, brush,
+yash-rs and ion all free by reference count or by ownership (Nushell 0.117.0
+(`a481925`), crates/nu-protocol/src/value/mod.rs:79; fish 4.9.3 (`6cf3137`),
+src/env/var.rs:157; brush brush-shell-v0.4.0 (`96a26d0`), brush-core/src/env.rs:94;
+yash-rs yash-cli-3.6.0 (`46d2f79`), yash-env/src/variable.rs:212; ion master
+(`e9b3ca4`), src/lib/shell/variables.rs:15). They avoid cycles rather than
+collecting them:
+
+- **Nushell** copies closure captures by value at evaluation
+  (`crates/nu-engine/src/eval_ir.rs:1412`), rejects capturing a `mut`
+  variable at parse time (`ParseError::CaptureOfMutableVar`,
+  `crates/nu-protocol/src/errors/parse_error.rs:228`), and puts Record, List
+  and Binary behind copy-on-write `Arc`s
+  (`crates/nu-utils/src/shared_cow.rs:10`). "Built-in values cannot form
+  cycles" is the survey's inference, and it follows from those three.
+- **fish** stores each variable as an immutable `Arc<[WString]>`
+  (`src/env/var.rs:157`) in an `Arc`-linked chain of scopes under one global
+  `Mutex` (`src/env/impl/environment.rs:144`, `:998`); lookup clones the
+  value (`:162`).
+- **brush** clones the whole `Shell` for subshells and command substitutions
+  (`brush-core/src/shell.rs:148`, `brush-core/src/interp.rs:683`); values are
+  owned, not copy-on-write (inference).
+- **yash-rs** keeps one map with a per-name context stack
+  (`all_variables: HashMap<String, Vec<VariableInContext>>`,
+  `yash-env/src/variable.rs:212`) and calls a real `fork()` for subshells
+  (`yash-env/src/system/real.rs:932`); functions are `Rc`
+  (`yash-env/src/function.rs:181`).
+- **ion** keeps a `Vec` of per-scope `HashMap`s
+  (`members/scopes-rs/src/lib.rs:16`), clones values on read
+  (`src/lib/shell/variables.rs:217`), and puts only functions behind `Rc`.
+
+That is not evidence that rps can skip collection. The probes above are the
+cycles these shells avoid — a hashtable that contains itself, an object that
+points at itself, a script block reachable from its own scope — and each
+shell avoids them by copying captures, isolating the process, cloning the
+shell or treating values as immutable. PowerShell keeps identity across
+closures, jobs and runspaces, so rps pays for `Arc` and must collect.
+
+Takeaway: rps borrows the cheap part, `Arc` and copy-on-write where mutation
+is rare, and adds the cycle collector that no surveyed shell needs.
+
 ## Measurements
 
 Median nanoseconds per operation, uncontended, on the reference machine:
