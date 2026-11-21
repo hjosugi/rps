@@ -13,6 +13,6 @@ Numeric prefixes match the M0 issue that settled the decision.
 | [02_value_model.md](02_value_model.md) | how values are represented; compact strings, 16-byte `Value` | #2 |
 | [03_memory.md](03_memory.md) | reference counting with a backup cycle collector | #3 |
 | [04_execution.md](04_execution.md) | a register IR with inline caches, interpreted | #4 |
-| [05_startup.md](05_startup.md) | where pwsh's 147 ms goes and rpsh's 5 ms budget | #5 |
+| [05_startup.md](05_startup.md) | where pwsh's 156 ms goes and rpsh's 5 ms budget | #5 |
 | [06_dotnet_bridge.md](06_dotnet_bridge.md) | T0 shim, T1 `hostfxr`, T2 sidecar; the SMA facade | #6 |
 | [07_dependencies.md](07_dependencies.md) | what may be linked, and how a crate is admitted | #7 |

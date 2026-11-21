@@ -100,7 +100,7 @@ that change code generation. Median of 20 runs:
 
 ## Static data instead of construction
 
-`bench/startup/startup_tables.rs` builds the command table from the
+`research/benches/startup_tables.rs` builds the command table from the
 inventory and times construction and lookup. Median:
 
 | operation | time |
@@ -172,8 +172,9 @@ PowerShell-compatible start, so 5 ms sits far below all of them.
 
 ## The budget
 
-**`rpsh -NoProfile -Command exit` and `-File empty.ps1` stay under 5 ms on
-the reference machine.** The split, which the implementation is held to:
+**`rpsh -NoProfile -File empty.ps1` stays under 5 ms on the reference
+machine**, and `rpsh -NoProfile -Command exit` answers to the same budget.
+The split, which the implementation is held to:
 
 | stage | budget |
 |---|---:|
@@ -196,12 +197,15 @@ design change, not a tuning change.
 * `bench/cases/startup/*.ps1` carry `# rpsh-bench: budget-ms=5` and
   `runs=30`. The harness records `within_budget` and fails the run when a
   timed case exceeds its budget (`--budget-scale` multiplies it).
-* CI's `startup-budget` job runs those cases on every push and pull request
-  with `--budget-scale 2`. Shared runners are slower and noisier; doubling
-  catches the regressions that matter — an eagerly built table, a file read,
-  a library loaded at startup — while leaving a few percent to the
-  reference machine's baselines.
-* The scheduled benchmark job keeps the full comparison and the coalitions
-  that are too noisy for pull requests.
+* The harness runs cases with `-File`, so `-File empty.ps1` is the case CI
+  enforces. `scripts/time-commands.py` measures `-Command exit` separately
+  and it is part of the same budget; a `-Command` harness case is #9's job.
+* CI's `startup-budget` job runs those cases on every push to `main` and
+  every pull request with `--budget-scale 2`. Shared runners are slower and
+  noisier; doubling catches the regressions that matter — an eagerly built
+  table, a file read, a library loaded at startup — while leaving a few
+  percent to the reference machine's baselines.
+* The scheduled benchmark job keeps the full comparison and the cases that
+  are too noisy for pull requests.
 * A dependency added to `rpsh` answers to the reserve and to binary size;
   the rules are in docs/07_dependencies.md.

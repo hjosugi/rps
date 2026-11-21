@@ -2,8 +2,9 @@
 
 How rpsh represents PowerShell values, strings above all. Settles #2;
 DESIGN.md §3.3 summarises it. Measurements:
-`bench/baselines/2026-11-21-ryzen5-4650u-value-model.json`, written by
-`cargo bench -p rpsh-research --bench value_model`.
+`bench/baselines/2026-11-21-ryzen5-4650u-value-model.json`; the bench writes
+`bench/results/research-value_model.json`, and that run is copied there
+(DESIGN.md §7 rule 5).
 
 ## What has to be exact
 
@@ -51,7 +52,7 @@ bench):
 
 Median nanoseconds per operation on the reference machine. The corpora are
 an 84-character ASCII log line, a 38-character Japanese sentence, and an
-80-unit line with emoji (`CORPORA` in the bench).
+79-unit line with emoji (`CORPORA` in the bench).
 
 ### ASCII
 
@@ -59,11 +60,11 @@ an 84-character ASCII log line, a 38-character Japanese sentence, and an
 |---|---:|---:|---:|
 | from UTF-8 | 143.0 ns | 47.2 ns | **29.3 ns** |
 | write UTF-8 | 39.8 ns | 5.7 ns | **3.2 ns** |
-| `$s[$i]`, every unit | 6.8 ns | 8.0 ns | 10.7 ns |
+| `$s[$i]`, every unit | **6.8 ns** | 8.0 ns | 10.7 ns |
 | `Substring(2, 10)` | **7.3 ns** | 19.3 ns | 19.9 ns |
 | `IndexOf` | 235 ns | **215 ns** | 256 ns |
-| `-eq`, ignoring case | 109 ns | 11.4 ns | **11.6 ns** |
-| hash, ignoring case | 88.9 ns | **80.5 ns** | 82.8 ns |
+| ordinal-ignore-case | 109 ns | **11.4 ns** | 11.6 ns |
+| ordinal-ignore-case hash | 88.9 ns | **80.5 ns** | 82.8 ns |
 | `$s += 'a'`, 2,000 times | 162 µs | **123 µs** | 166 µs |
 | payload, one string | 168 B | **84 B** | **84 B** |
 
@@ -72,13 +73,13 @@ an 84-character ASCII log line, a 38-character Japanese sentence, and an
 | operation | utf16 | wtf8 | compact |
 |---|---:|---:|---:|
 | from UTF-8 | 97.7 ns | **51.1 ns** | 110 ns |
-| write UTF-8 | 251 ns | **90.7 ns** | 254 ns |
+| write UTF-8 | 251 ns | **90.7 ns** | 255 ns |
 | `$s[$i]`, every unit | **4.5 ns** | 2,414 ns | 6.3 ns |
 | `Substring(2, 10)` | **7.5 ns** | 263 ns | 25.2 ns |
 | `IndexOf` | **107 ns** | 388 ns | 121 ns |
-| `-eq`, ignoring case | 25.8 ns | 235 ns | **23.4 ns** |
-| hash, ignoring case | 591 ns | 714 ns | **569 ns** |
-| `$s += 'あ'`, 2,000 times | 189 µs | 12.9 ms | 214 µs |
+| ordinal-ignore-case | 25.8 ns | 235 ns | **23.4 ns** |
+| ordinal-ignore-case hash | 591 ns | 714 ns | **569 ns** |
+| `$s += 'あ'`, 2,000 times | **189 µs** | 12.9 ms | 214 µs |
 | payload, one string | 76 B | 114 B | **76 B** |
 
 ### Emoji
@@ -89,16 +90,18 @@ an 84-character ASCII log line, a 38-character Japanese sentence, and an
 | write UTF-8 | 290 ns | **72.9 ns** | 336 ns |
 | `$s[$i]`, every unit | **7.0 ns** | 7,901 ns | 8.5 ns |
 | `Substring(2, 10)` | **7.5 ns** | 158 ns | 23.7 ns |
-| `IndexOf` | 229 ns | 420 ns | 265 ns |
-| `-eq`, ignoring case | 134 ns | 365 ns | **114 ns** |
-| hash, ignoring case | 132 ns | 288 ns | **131 ns** |
+| `IndexOf` | **229 ns** | 420 ns | 265 ns |
+| ordinal-ignore-case | 134 ns | 365 ns | **114 ns** |
+| ordinal-ignore-case hash | 132 ns | 288 ns | **131 ns** |
 | payload, one string | 158 B | **89 B** | 158 B |
 
 What the numbers say:
 
-* **wtf8 loses on everything that indexes.** Visiting every code unit of
-  the Japanese line costs 2.4 µs, against 4.5 ns for utf16 and 6.3 ns for
-  compact; the emoji line is 7.9 µs. The loop is quadratic: `$s += 'あ'`
+* **wtf8 loses on non-ASCII indexing; on ASCII it is competitive.**
+  Visiting every code unit of the Japanese line costs 2.4 µs, against 4.5 ns
+  for utf16 and 6.3 ns for compact; the emoji line is 7.9 µs. On the ASCII
+  line it is 8.0 ns against 6.8 ns for utf16, and its `IndexOf` is the
+  fastest of the three. The loop is quadratic: `$s += 'あ'`
   2,000 times takes 12.9 ms, against 189 µs and 214 µs. Breadcrumbs (Swift's
   index cache) would fix the asymptotics, at the price of a second index
   structure per string and of code that has to keep it right.
@@ -107,19 +110,23 @@ What the numbers say:
   3.2 ns (utf16: 39.8 ns). Paths, identifiers, JSON keys, log lines and most
   native command output are ASCII, and they cross that boundary all the
   time.
-* **compact costs what utf16 costs for everything else**, because then it
-  *is* utf16. The extra branch on the representation is nanoseconds:
-  `Substring` on the Japanese line is 25.2 ns against 7.5 ns, indexing the
-  ASCII line is 10.7 ns against 6.8 ns, and creating a string from emoji
-  UTF-8 is 204 ns against 146 ns. Neither is close to the cost of the
-  operation around it.
+* **compact costs about what utf16 costs for most other operations**,
+  because then it *is* utf16. The measured exceptions are small in absolute
+  terms but not within noise: `Substring` on the Japanese line is 25.2 ns
+  against 7.5 ns, indexing the ASCII line is 10.7 ns against 6.8 ns, and
+  creating a string from emoji UTF-8 is 204 ns against 146 ns. None of these
+  is more than a few tens of nanoseconds, and none is on a path a script
+  performs per character; #149 revisits them if a profile disagrees.
 * **Memory**: an ASCII string takes one byte per code unit in compact and
   wtf8, two in utf16.
 
 **Decision: compact.** A string is immutable and is either ASCII bytes or
 UTF-16 code units, never both, and ASCII content is always stored narrow
-(a substring or concatenation that turns out ASCII is narrowed), so
-comparing two strings never has to compare across forms. `.Length`,
+(a substring or concatenation that turns out ASCII is narrowed). An
+ordinal-ignore-case key comparison therefore never has to compare across
+forms. Culture-aware comparison (`-eq` and friends, #36) must: `'ﬀ' -eq 'ff'`
+is true even though the two strings take different forms, so the ICU path
+transcodes as needed rather than using the narrow/wide shortcut. `.Length`,
 indexing and `Substring` are O(1) and exact in both forms; a lone surrogate
 lives in the wide form; UTF-8 output turns lone surrogates into U+FFFD as
 .NET does.
@@ -127,9 +134,17 @@ lives in the wide form; UTF-8 output turns lone surrogates into U+FFFD as
 Rejected: utf16 everywhere (twice the memory for ASCII, and a conversion on
 every input and output of ASCII text); wtf8 (O(n) indexing; offsets have to
 be translated between bytes and code units; concatenation must merge
-surrogate halves). Latin-1 as the narrow set would keep `é` and `ü` narrow,
-but makes UTF-8 output a transcoding; ASCII stays unless the corpus (#18)
-shows Latin-1 text to be common.
+surrogate halves); a rope. The `+=` measurement shows the quadratic cost a
+rope would defer, but a rope is a builder, not a `System.String`: `.Length`,
+indexing and `Substring` have to stay O(1) and exact, so a rope needs a
+per-node length tree and a flattening policy, and every boundary that
+expects a flat string pays to flatten it. A `StringBuilder` is the type that
+should own that optimization; the immutable value stays compact. #36 and
+#149 can revisit if profiles show concatenation dominance.
+
+Latin-1 as the narrow set would keep `é` and `ü` narrow, but makes UTF-8
+output a transcoding; ASCII stays unless the corpus (#18) shows Latin-1 text
+to be common.
 
 ## Value layout
 

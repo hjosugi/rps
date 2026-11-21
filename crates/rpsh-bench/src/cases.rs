@@ -74,7 +74,9 @@ mod tests {
     fn startup_cases_carry_the_budget() {
         // DESIGN.md §4 rule 2: the budget is enforced by these cases.
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../bench/cases/startup");
-        for case in collect(&root, None).unwrap() {
+        let cases = collect(&root, None).unwrap();
+        assert!(!cases.is_empty(), "no startup cases in {}", root.display());
+        for case in cases {
             let source = fs::read_to_string(&case.path).unwrap();
             assert_eq!(directive(&source, "budget-ms"), Some(5), "{}", case.id);
         }

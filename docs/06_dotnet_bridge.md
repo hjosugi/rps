@@ -4,17 +4,23 @@ How rpsh answers a script that names a .NET type, and what each answer
 costs. Settles #6; DESIGN.md §5 summarises it.
 
 Measurements: `bench/baselines/2026-11-21-ryzen5-4650u-dotnet-t1.json`
-(`research/dotnet/measure.py` over `research/dotnet/hostfxr-probe.c`) and
+(`research/dotnet/measure.py` over `research/dotnet/hostfxr-probe.c`, written
+to `bench/results/research-dotnet_t1.json`) and
 `bench/baselines/2026-11-21-ryzen5-4650u-dotnet-ipc.json`
-(`cargo bench -p rpsh-research --bench dotnet_ipc`).
+(`cargo bench -p rpsh-research --bench dotnet_ipc`, written to
+`bench/results/research-dotnet_ipc.json`). Both are copied per DESIGN.md §7
+rule 5. `measure.py` records the machine and commit for future runs; the
+committed T1 baseline predates that block, so its provenance is the filename
+and the recorded load average. #9 unifies the machine block across the
+research harness.
 
 ## The three tiers
 
 | Tier | What runs | First use | Later |
 |---|---|---|---|
 | T0 | the type or member is in rpsh's native shim | nothing | nothing |
-| T1 | CoreCLR is loaded into the rpsh process through `hostfxr` | 29 ms before the first managed call | a direct function pointer or a cached delegate |
-| T2 | a per-user sidecar process keeps CoreCLR and assemblies loaded | 6 µs per request after the sidecar is warm | 6 µs per request |
+| T1 | CoreCLR is loaded into the rpsh process through `hostfxr` | 31 ms before the first managed call | a direct function pointer or a cached delegate |
+| T2 | a per-user sidecar process keeps CoreCLR and assemblies loaded | 31 ms to start the sidecar, then 6.3–6.5 µs per request | 6.3–6.5 µs per request |
 
 A script's tier is computed from its AST before it runs (#131), so a
 benchmark can report "this script is T1 because of `[System.IO.File]`" and a
@@ -23,10 +29,11 @@ user can ask why a start is slow.
 ## T0: what the shim covers
 
 Scripts name .NET types directly. `research/dotnet/type-literals.py` counts
-type literals in the `.ps1` and `.psm1` files shipped with pwsh 7.7.0, as a
-stand-in until the corpus analysis of #18. It found 1,388 literals over 123
-distinct names in 144 files. The most frequent, with static accesses
-(`X::member`) in the second column:
+type literals in the `.ps1` and `.psm1` files under `$PSHOME/Modules`
+(`research/dotnet/type-literals.py --top 30 .cache/pwsh/7.7.0/Modules`), as
+a stand-in until the corpus analysis of #18. It found 1,388 literals over
+123 distinct names in 144 files. The most frequent, with static accesses
+(`X::member`) in the third column:
 
 | type | uses | static |
 |---|---:|---:|
@@ -61,13 +68,15 @@ The corpus is biased: it is the modules pwsh ships, so it over-represents
 `PSReadLine`, `PSResource` and `PSModuleInfo` and under-represents what
 scripts in the wild do. It still shows the shape of the shim:
 
-* the primitive and near-primitive types (`String`, `Char`, `Math`,
-  `Convert`, `Array`, `Enum`, `Guid`, `Version`, `Uri`, `Random`,
-  `Environment`, `Console`) and the collection types carry most uses and
-  are #49 / #52;
-* `Path`, `File` and `Directory` are the first I/O surface scripts reach,
-  #51;
-* `StringBuilder`, `Encoding` and the regex API are next, #50;
+* `String` (382 uses), `String[]` (101) and the collection types carry most
+  uses and are #49 / #52. `Path` (26) is the only I/O type the corpus names
+  often; #51;
+* the corpus contains no `Math`, `Convert`, `Enum`, `Random`, `File`,
+  `Directory`, `StringBuilder` or `Encoding` literals. Those come from what
+  scripts in the wild do, not from pwsh's own modules, so their place in the
+  shim is an expectation for #18 to confirm, not a result of this scan;
+* `StringBuilder`, `Encoding` and the regex API are the next expected by
+  use, though the corpus has no literals for them; #50;
 * `Net`, `Security`, `Threading`, `Diagnostics` and `Xml` are small in
   count but each is a whole shim area, #53;
 * the `System.Management.Automation` types scripts see (`PSCmdlet`,
@@ -96,13 +105,14 @@ Default mode, median cumulative milliseconds and RSS:
 | get the `load_assembly` delegate (starts CoreCLR) | 20.74 | 18.2 |
 | get the `get_function_pointer` delegate | 20.83 | 18.2 |
 | load the probe into the default load context | 26.57 | 27.7 |
-| resolve the function pointers | 30.42 | 29.0 |
-| first call into managed code | 30.89 | 29.0 |
-| 1,000,000 calls | 37.88 | 29.0 |
+| resolve the first function pointer | 30.42 | 28.9 |
+| resolve the remaining function pointers | 30.60 | 28.9 |
+| first call into managed code | 30.89 | 28.9 |
+| 1,000,000 calls | 37.88 | 28.9 |
 | `File.ReadAllText` | 39.64 | 29.4 |
 | `Regex.Matches` | 47.16 | 32.8 |
 | touch `System.Management.Automation` | 48.80 | 36.8 |
-| `PowerShell.Create()` + `1+1` | 192.90 | 84.2 |
+| `PowerShell.Create()` + `1+1` | 192.90 | 82.2 |
 | a second `PowerShell` + `1+1` | 213.77 | 85.8 |
 
 What it says:
@@ -114,17 +124,19 @@ What it says:
   pointer take 7.25 ms, or 7.3 ns each. `File.ReadAllText` is 2.0 ms the
   first time (JIT and framework initialization) and 120 µs the second.
 * **SMA is a second program.** Loading and running PowerShell in the same
-  runtime costs another 145 ms and 55 MiB. The bridge must not reach for
-  SMA to answer a `[System.IO.Path]` call.
-* **Two initialization modes were rejected by the pinned runtime.**
+  runtime takes another 145 ms and reaches 82.2 MiB from 37.7 MiB, about
+  45 MiB more. The bridge must not reach for SMA to answer a
+  `[System.IO.Path]` call.
+* **Two other initialization paths were rejected by the pinned runtime.**
   `hostfxr_initialize_for_runtime_config` fails with "Initialization for
   self-contained components is not supported" because pwsh is published
   self-contained; the named load-context API (`coreclr_load_context`)
-  returned `0x80131502` for a load into a named context. Both are re-tested
-  when rpsh ships its own `.runtimeconfig.json`; today the command-line
-  initialization above is the supported path.
+  returned the 32-bit HRESULT `0x80131502` (stored as
+  `0xffffffff80131502`). Both are re-tested when rpsh ships its own
+  `.runtimeconfig.json`; today the command-line initialization above is the
+  supported path.
 
-T1's own process is what a script pays once. It does not pay it twice for
+The rpsh process is what a script pays once. It does not pay it twice for
 the same assembly, and it does not pay it at all when the script stays in
 T0.
 
@@ -208,9 +220,9 @@ PackageManagement) without loading them. The union is **169 SMA types and
 | `System.Management.Automation.Host` | 1 |
 
 So a facade assembly can be useful long before it is complete: 20% of the
-types and 4% of the members cover everything pwsh itself ships. #128 owns
-the facade, starting from this union and growing by the modules scripts
-actually load.
+types and 4% of the members cover everything the scanned bundled binary
+modules reference. #128 owns the facade, starting from this union and
+growing by the modules scripts actually load.
 
 `research/dotnet/bundled-modules.ps1` also shows why module isolation
 matters: PSResourceGet ships 47 assemblies including its own
@@ -260,20 +272,20 @@ only spawn external commands, the 6.5 µs warm-sidecar tradeoff is rpsh-specific
 | Issue | Scope fixed here |
 |---|---|
 | #49–#54 | T0 shim areas, in the order above; each grows by measured use |
-| #125 | T1: runtime discovery, `hostfxr` initialization, handles, delegates |
+| #125 | T1: runtime discovery, `hostfxr` initialization, handles, member dispatch |
 | #126 | T1: value conversion between `Value` and CLR objects |
 | #127 | T1: per-module `AssemblyLoadContext`, lazy dependency resolution |
 | #128 | SMA facade assembly, scoped by the metadata scan above |
-| #129 | `Add-Type`: compile and load in the T1 runtime, no C# compiler in rpsh |
+| #129 | `Add-Type`: compile and load in the T1 runtime; rpsh embeds no compiler and invokes the one pwsh ships, only for this command |
 | #130 | T2 sidecar: protocol, lifecycle, fallback |
 | #131 | tier analysis from the AST, reported by the harness |
 
 Rejected:
 
-* **Make everything T1.** A script that asks for `[Math]::Max` would pay 29
+* **Make everything T1.** A script that asks for `[Math]::Max` would pay 31
   ms and 29 MiB. The shim exists to make the common answer free.
 * **A separate .NET process per call (T2 without a warm sidecar).** Connect
-  plus round trip is 13 µs, but a cold process pays the full 29 ms; only a
+  plus round trip is 13 µs, but a cold process pays the full 31 ms; only a
   resident sidecar amortizes it.
 * **Compile C# in rpsh.** `Add-Type` is a T1 operation: the C# compiler is
   not part of the base runtime, and pwsh ships Roslyn separately. rpsh

@@ -10,8 +10,9 @@ whether or not the script uses it.
 
 ## Rules
 
-1. **A crate answers to the startup budget.** `rpsh -NoProfile -Command
-   exit` stays under 5 ms (docs/05_startup.md). A dependency whose static
+1. **A crate answers to the startup budget.** `rpsh -NoProfile -File
+   empty.ps1` stays under 5 ms, and `-Command exit` answers to the same
+   budget (docs/05_startup.md). A dependency whose static
    initializers, dynamic relocations or page faults show up in
    `scripts/time-commands.py` is rejected or moved behind a feature.
 2. **The startup path is a separate list.** A crate needed by the parser,
@@ -27,8 +28,9 @@ whether or not the script uses it.
 5. **No `unsafe` without a named owner.** Workspace lints deny `unsafe_code`.
    A crate that needs it is accepted only with the unsafe surface described
    in its issue and a test that exercises it.
-6. **Same license as upstream.** MIT, or a permissive license compatible
-   with it. The allow list is in `deny.toml`.
+6. **Compatible with upstream's MIT.** Permissive licenses are accepted, as
+   is weak copyleft limited to the crate (MPL-2.0): it must not impose
+   conditions on rpsh's own code. The allow list is in `deny.toml`.
 7. **Maintenance is part of the decision.** A crate that is unmaintained,
    yanked, or has an open advisory is not admitted. `cargo deny check
    advisories` is the gate.
@@ -43,10 +45,10 @@ yet; each gets its own issue and spike, and this table records the decision.
 | regex | `regex`, `regex-automata` | `rpsh-runtime` default | #41: startup cost, binary size, and whether the .NET regex dialect needs a custom front-end |
 | Unicode / culture | `icu` crates, system ICU via `libicu` | `rpsh-runtime` feature | #36: data size (ICU data is large), startup cost, whether the system ICU the PINNED pwsh already uses is enough |
 | line editor | `reedline`, a custom editor | `rpsh-host` feature | #111: interactive-only, so it must not be on the startup path; pull in the history/completion stack by measurement |
-| OS interfaces | `libc`, `rustix`, `nix` | `rpsh-native` default | #73, #77: syscall coverage, unsafe surface, and whether the engine needs raw `fork`/`pty` interfaces |
+| OS interfaces | `libc`, `rustix`, `nix` | `rpsh-native` default | #73, #76: syscall coverage, unsafe surface, pipes and process control |
 | HTTP | `reqwest`/`hyper`, `ureq` | `rpsh-commands` feature | #97: TLS stack (rustls or native), binary size, and whether web cmdlets stay a feature |
 | JSON | `serde_json`, a custom writer | `rpsh-commands` feature or default | #91: exact formatting of `ConvertTo-Json`, startup cost, and the `-Depth` / escaping quirks |
-| terminal / pty | `rustix`, `nix` | `rpsh-native` default | #76, #77: pty allocation, signal delivery, terminal ownership |
+| terminal / pty | `rustix`, `nix` | `rpsh-native` default | #77: pty allocation, signal delivery, terminal ownership |
 | CLR bridge | `libloading` or hand-written `dlopen` | `rpsh-dotnet` feature | #125: `hostfxr` handling is small enough to keep explicit |
 
 The rule for the two big data crates (ICU and the CLR bridge) is the same:
@@ -85,9 +87,18 @@ feature; the issue then says what the cost was and what the alternative is.
 
 * `deny.toml` is checked by `cargo deny check` (licenses, advisories, bans,
   sources) in CI's `dependencies` job.
-* `scripts/check.sh` remains the local pre-PR gate; it runs the Rust and
-  conformance checks, and `CONTRIBUTING.md` names `cargo deny check`
-  beside it.
+* `scripts/check.sh` remains the local Rust and conformance gate; it does
+  not run `cargo deny check`. `CONTRIBUTING.md` names both.
 * `cargo tree --duplicates` is part of review. A duplicate is allowed only
   when two versions are genuinely required, and then it is recorded in
-  `deny.toml`'s `skip` with the reason.
+  `deny.toml`'s `skip`, with a comment giving the reason.
+* `cargo deny`'s `advisories` check reads the RustSec advisory database, so
+  it supersedes a separate `cargo audit`; #7's scope named both, and this is
+  the one that runs. It is still a scope deviation from the issue, recorded
+  here.
+* CI's `dependencies` job runs on pushes to `main` and pull requests to
+  `main`. While the M0 work merged through a non-default branch it did not
+  run on those PRs; it runs from the first change on `main`.
+* The graph target is `x86_64-unknown-linux-gnu`, the reference platform.
+  Target-specific crates for arm64, macOS and Windows are checked when those
+  targets enter CI.
