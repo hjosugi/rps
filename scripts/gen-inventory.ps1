@@ -11,7 +11,9 @@
 # can be refreshed after a pwsh update. `cargo harness inventory` summarizes
 # them, grouped by platform.
 param(
-    [string] $OutDir = (Join-Path $PSScriptRoot '..' 'inventory')
+    [string] $OutDir = (Join-Path $PSScriptRoot '..' 'inventory'),
+    # For testing a merge: pretend this run is another platform.
+    [string] $PlatformOverride = ''
 )
 
 Set-StrictMode -Version 3.0
@@ -19,7 +21,7 @@ $ErrorActionPreference = 'Stop'
 
 $os = if ($IsWindows) { 'windows' } elseif ($IsMacOS) { 'macos' } else { 'linux' }
 $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
-$Platform = "$os-$arch"
+$Platform = if ($PlatformOverride) { $PlatformOverride } else { "$os-$arch" }
 
 # Only what ships with pwsh, not what the user has installed.
 $env:PSModulePath = Join-Path $PSHOME 'Modules'
@@ -34,17 +36,31 @@ function Write-Inventory {
     )
     $path = Join-Path $OutDir "$Name.tsv"
     $known = @{}
+    $otherPlatform = [System.Collections.Generic.List[string]]::new()
     if (Test-Path $path) {
+        $headerFields = (Get-Content -Path $path -TotalCount 1) -split "`t"
+        $platformIndex = [Array]::IndexOf($headerFields, 'platform')
         foreach ($line in Get-Content $path | Select-Object -Skip 1) {
             $fields = $line -split "`t"
-            $known[($fields[0..($KeyColumns - 1)] -join "`t")] = $fields[-1]
+            $status = $fields[-1]
+            if ($platformIndex -ge 0) {
+                $rowPlatform = $fields[$platformIndex]
+                $key = (@($rowPlatform) + $fields[0..($KeyColumns - 1)]) -join "`t"
+                $known[$key] = $status
+                if ($rowPlatform -ne $Platform) { $otherPlatform.Add($line) }
+            } else {
+                # A v1 inventory: its rows belong to this run's platform.
+                $key = (@($Platform) + $fields[0..($KeyColumns - 1)]) -join "`t"
+                $known[$key] = $status
+            }
         }
     }
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add((@($Columns) + @('platform', 'status')) -join "`t")
+    foreach ($line in $otherPlatform) { $lines.Add($line) }
     foreach ($row in $Rows) {
         $fields = @($row | ForEach-Object { ([string] $_) -replace '[\t\r\n]+', ' ' })
-        $key = $fields[0..($KeyColumns - 1)] -join "`t"
+        $key = (@($Platform) + $fields[0..($KeyColumns - 1)]) -join "`t"
         $status = if ($known.ContainsKey($key)) { $known[$key] } else { 'todo' }
         $lines.Add((@($fields) + @($Platform, $status)) -join "`t")
     }
@@ -56,7 +72,7 @@ New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 
 # Variables first: later steps import modules, which adds to the session.
 # $OutDir is this script's own parameter, not part of a session.
-$variables = Get-Variable | Where-Object Name -NotIn @('OutDir', 'os', 'arch', 'Platform') | Sort-Object Name | ForEach-Object {
+$variables = Get-Variable | Where-Object Name -NotIn @('OutDir', 'PlatformOverride', 'os', 'arch', 'Platform') | Sort-Object Name | ForEach-Object {
     $type = if ($null -eq $_.Value) { '' } else { $_.Value.GetType().FullName }
     , @($_.Name, $type, $_.Options)
 }
@@ -96,6 +112,29 @@ $rows = foreach ($command in $commands | Where-Object CommandType -EQ 'Cmdlet') 
 }
 Write-Inventory parameters @('command', 'parameter', 'type', 'parameter_sets', 'aliases') 2 $rows
 
+# Provider dynamic parameters: what appears in Get-Command's effective
+# parameter set but is not declared on the cmdlet type. The FileSystem provider
+# supplies these when a path-shaped argument is bound.
+$providerCommands = 'Get-ChildItem', 'Get-Item', 'Set-Item', 'New-Item',
+    'Remove-Item', 'Copy-Item', 'Move-Item', 'Get-Content', 'Set-Content',
+    'Test-Path', 'Resolve-Path'
+$common = [System.Management.Automation.Cmdlet]::CommonParameters +
+    [System.Management.Automation.Cmdlet]::OptionalCommonParameters +
+    'WhatIf', 'Confirm'
+$rows = foreach ($name in $providerCommands) {
+    $command = Get-Command $name -CommandType Cmdlet -ErrorAction SilentlyContinue
+    if ($null -eq $command -or $null -eq $command.ImplementingType) { continue }
+    $declared = @($command.ImplementingType.GetProperties() |
+        Where-Object { $_.GetCustomAttributes([System.Management.Automation.ParameterAttribute], $true).Count -gt 0 } |
+        ForEach-Object Name)
+    foreach ($parameter in $command.Parameters.Values | Sort-Object Name) {
+        if ($parameter.Name -in $common -or $parameter.Name -in $declared) { continue }
+        $source = if ($parameter.Name -in 'FromSession', 'ToSession') { 'remoting' } else { 'FileSystem provider' }
+        , @($name, $parameter.Name, $parameter.ParameterType.FullName, $source)
+    }
+}
+Write-Inventory dynamic-parameters @('command', 'parameter', 'type', 'source') 2 $rows
+
 $rows = Get-Alias | Sort-Object Name | ForEach-Object {
     $module = if ($_.Source) { $_.Source } else { '(session)' }
     , @($_.Name, $_.Definition, $module)
@@ -121,6 +160,58 @@ $rows = [enum]::GetValues([System.Management.Automation.Language.TokenKind]) | F
     , @($_, $traits::Text($_), ($traits::GetTraits($_) -replace ', ', ','))
 }
 Write-Inventory token-kinds @('kind', 'text', 'flags') 1 $rows
+
+# Operators and keywords are TokenKind values with the matching Trait flags.
+$operatorMask = [int]([System.Management.Automation.Language.TokenFlags]::BinaryOperator -bor
+    [System.Management.Automation.Language.TokenFlags]::UnaryOperator -bor
+    [System.Management.Automation.Language.TokenFlags]::AssignmentOperator -bor
+    [System.Management.Automation.Language.TokenFlags]::TernaryOperator -bor
+    [System.Management.Automation.Language.TokenFlags]::SpecialOperator)
+$rows = [enum]::GetValues([System.Management.Automation.Language.TokenKind]) | ForEach-Object {
+    $flags = $traits::GetTraits($_)
+    if (([int]$flags -band $operatorMask) -ne 0) {
+        , @($traits::Text($_), $_, ($flags -replace ', ', ','))
+    }
+} | Sort-Object { $_[0] }, { $_[1] }
+Write-Inventory operators @('operator', 'token', 'flags') 2 $rows
+
+$keywordMask = [int][System.Management.Automation.Language.TokenFlags]::Keyword
+$rows = [enum]::GetValues([System.Management.Automation.Language.TokenKind]) | ForEach-Object {
+    $flags = $traits::GetTraits($_)
+    if (([int]$flags -band $keywordMask) -ne 0) {
+        , @($traits::Text($_), $_, ($flags -replace ', ', ','))
+    }
+} | Sort-Object { $_[0] }, { $_[1] }
+Write-Inventory keywords @('keyword', 'token', 'flags') 2 $rows
+
+# Error ids and the exception types that carry them, from deterministic failures.
+$errorExamples = @(
+    'Get-Item /no/such/path -ErrorAction Stop',
+    'Get-Content /no/such/file -ErrorAction Stop',
+    'Set-Location /no/such/directory -ErrorAction Stop',
+    'Get-NoSuchThing',
+    '1 / 0',
+    '[int]::Parse(''x'')',
+    '[int]''abc''',
+    '$null.Foo()',
+    '''abc''.Substring(10)',
+    '[System.IO.File]::ReadAllText(''/no/such/file'')',
+    'throw ''boom'''
+)
+$rows = foreach ($example in $errorExamples) {
+    try {
+        Invoke-Expression $example 2>$null
+    } catch {
+        , @(
+            $_.FullyQualifiedErrorId,
+            $_.CategoryInfo.Category,
+            $_.Exception.GetType().FullName,
+            $example,
+            $_.Exception.Message
+        )
+    }
+}
+Write-Inventory error-ids @('error_id', 'category', 'exception', 'example', 'message') 4 $rows
 
 $rows = Get-PSProvider | Sort-Object Name | ForEach-Object {
     , @($_.Name, ($_.Capabilities -replace ', ', ','), (($_.Drives.Name | Sort-Object) -join ','))

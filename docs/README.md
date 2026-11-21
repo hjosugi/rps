@@ -17,6 +17,8 @@ Numeric prefixes match the M0 issue that settled the decision.
 | [06_dotnet_bridge.md](06_dotnet_bridge.md) | T0 shim, T1 `hostfxr`, T2 sidecar; the SMA facade | #6 |
 | [07_dependencies.md](07_dependencies.md) | what may be linked, and how a crate is admitted | #7 |
 | [07_pester_plan.md](07_pester_plan.md) | how the upstream Pester suite is classified and scored | #16 |
+| [08_corpus.md](08_corpus.md) | what real scripts use, by frequency, and what rpsh refuses first | #18 |
+| [09_xunit_port.md](09_xunit_port.md) | status of the upstream xUnit tests, crate by crate | #17 |
 
 A numeric result in these documents names the PowerShell version it was
 measured against. `scripts/fetch-pwsh.sh` installs the latest stable release;

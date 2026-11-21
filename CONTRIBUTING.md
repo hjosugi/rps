@@ -83,10 +83,26 @@ cargo harness conform record
 cargo harness inventory
 ```
 
-`gen-inventory.ps1` writes a `platform` column (`linux-x64`, `macos-arm64`,
-`windows-x64`, ...) and preserves the hand-edited `status` column. Running it
-on another platform and merging the files is how a platform difference is
-recorded; `cargo harness inventory` summarizes each platform separately.
+`gen-inventory.ps1` also writes `operators.tsv`, `keywords.tsv`,
+`error-ids.tsv` and `dynamic-parameters.tsv`, all from the reference pwsh.
+It writes a `platform` column (`linux-x64`, `macos-arm64`, `windows-x64`,
+...) and preserves the hand-edited `status` column. Running it on another
+platform keeps the rows already present for other platforms, so a difference
+is recorded without losing Linux; `cargo harness inventory` summarizes each
+platform separately. `-PlatformOverride` exercises the merge without that
+platform.
+
+The script corpus is fetched and analysed separately; the corpus itself stays
+out of the repository:
+
+```bash
+scripts/fetch-corpus.sh
+cargo build --release -p rpsh-cli
+scripts/analyze-corpus.py
+```
+
+That rewrites `docs/08_corpus.md`. Refusal counts stop at the first unsupported
+construct in each file, so read them as lower bounds.
 
 ## PTY cases
 
@@ -103,3 +119,17 @@ cargo harness conform pty check
 cases are expected to fail `check` until rpsh implements interactive sessions;
 `scripts/check.sh` does not run them yet. Add a native program case (such as
 `less`) by naming its absolute path in `program`.
+
+## Fuzzing
+
+The tokenizer and parser have libFuzzer targets under `fuzz/`:
+
+```bash
+cargo +nightly fuzz run tokenize
+cargo +nightly fuzz run parse
+```
+
+A crash input is minimized with `cargo fuzz tmin`, then added as a
+conformance case (`tests/conformance/cases/syntax/`, recorded from pwsh) or a
+unit test, and kept under `fuzz/regressions/`. CI runs both targets on a
+weekly schedule; see [fuzz/README.md](fuzz/README.md).

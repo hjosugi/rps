@@ -93,11 +93,15 @@ pub fn parse_args(args: &[String]) -> Result<Invocation, CliError> {
     let mut index = 0;
     while let Some(arg) = args.get(index) {
         index += 1;
-        // Upstream accepts `-switch` and `--switch`. Anything it does not
-        // recognize as a switch starts the script file name.
+        // Upstream accepts `-switch`, `--switch` and `/switch`. Anything it
+        // does not recognize as a switch starts the script file name.
+        if arg.starts_with("/-") || arg.starts_with("-/") {
+            return Err(CliError::NotImplemented("mixed '-' and '/' switch prefix"));
+        }
         let switch = arg
             .strip_prefix('-')
             .map(|rest| rest.strip_prefix('-').unwrap_or(rest))
+            .or_else(|| arg.strip_prefix('/'))
             .and_then(|key| match_switch(&key.to_ascii_lowercase()));
         match switch {
             Some("version") => return Ok(Invocation::Version),
@@ -124,6 +128,9 @@ fn command(rest: &[String]) -> Result<Invocation, CliError> {
     match rest {
         [] => Err(CliError::MissingCommand),
         [only] if only == "-" => Err(CliError::NotImplemented("-Command - (script from stdin)")),
+        [first, ..] if first == "-" => Err(CliError::NotImplemented(
+            "-Command - with trailing arguments",
+        )),
         _ => Ok(Invocation::Command(rest.join(" "))),
     }
 }
