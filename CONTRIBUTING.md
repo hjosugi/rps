@@ -106,6 +106,18 @@ scripts/analyze-corpus.py
 That rewrites `docs/08_corpus.md`. Refusal counts stop at the first unsupported
 construct in each file, so read them as lower bounds.
 
+The tokenizer is checked against the reference parser token by token:
+
+```bash
+scripts/fetch-pwsh.sh
+cargo build -p rpsh-syntax --bin token-dump
+python3 scripts/token-diff.py
+python3 scripts/token-diff.py --cases tests/tokenizer/kinds.json
+```
+
+The comparison is kind and UTF-16 offset (`tests/tokenizer/cases.json` has the
+hand-picked cases; `kinds.json` covers every token kind).
+
 ## PTY cases
 
 `tests/conformance/pty/*.json` describe an interactive program, a schedule of

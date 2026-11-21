@@ -1,0 +1,618 @@
+[
+  {
+    "name": "kind-Unknown",
+    "source": "\\"
+  },
+  {
+    "name": "kind-Variable",
+    "source": "$x"
+  },
+  {
+    "name": "kind-SplattedVariable",
+    "source": "@x"
+  },
+  {
+    "name": "kind-Parameter",
+    "source": "cmd -x"
+  },
+  {
+    "name": "kind-Number",
+    "source": "1"
+  },
+  {
+    "name": "kind-Label",
+    "source": ":label"
+  },
+  {
+    "name": "kind-Identifier",
+    "source": "foo"
+  },
+  {
+    "name": "kind-Generic",
+    "source": "foo-bar"
+  },
+  {
+    "name": "kind-NewLine",
+    "source": "1\n2"
+  },
+  {
+    "name": "kind-LineContinuation",
+    "source": "1 `\n+ 2"
+  },
+  {
+    "name": "kind-Comment",
+    "source": "1 # c\n2"
+  },
+  {
+    "name": "kind-StringLiteral",
+    "source": "'a'"
+  },
+  {
+    "name": "kind-StringExpandable",
+    "source": "\"a\""
+  },
+  {
+    "name": "kind-HereStringLiteral",
+    "source": "@'\na\n'@"
+  },
+  {
+    "name": "kind-HereStringExpandable",
+    "source": "@\"\na\n\"@"
+  },
+  {
+    "name": "kind-LParen",
+    "source": "("
+  },
+  {
+    "name": "kind-RParen",
+    "source": ")"
+  },
+  {
+    "name": "kind-LCurly",
+    "source": "{"
+  },
+  {
+    "name": "kind-RCurly",
+    "source": "}"
+  },
+  {
+    "name": "kind-LBracket",
+    "source": "["
+  },
+  {
+    "name": "kind-RBracket",
+    "source": "]"
+  },
+  {
+    "name": "kind-AtParen",
+    "source": "@("
+  },
+  {
+    "name": "kind-AtCurly",
+    "source": "@{"
+  },
+  {
+    "name": "kind-DollarParen",
+    "source": "$("
+  },
+  {
+    "name": "kind-Semi",
+    "source": ";"
+  },
+  {
+    "name": "kind-AndAnd",
+    "source": "1 && 1"
+  },
+  {
+    "name": "kind-OrOr",
+    "source": "1 || 1"
+  },
+  {
+    "name": "kind-Ampersand",
+    "source": "1 & 1"
+  },
+  {
+    "name": "kind-Pipe",
+    "source": "1 | 1"
+  },
+  {
+    "name": "kind-Comma",
+    "source": "1 , 1"
+  },
+  {
+    "name": "kind-MinusMinus",
+    "source": "1 -- 1"
+  },
+  {
+    "name": "kind-PlusPlus",
+    "source": "1 ++ 1"
+  },
+  {
+    "name": "kind-DotDot",
+    "source": "1 .. 1"
+  },
+  {
+    "name": "kind-ColonColon",
+    "source": "1 :: 1"
+  },
+  {
+    "name": "kind-Dot",
+    "source": "1 . 1"
+  },
+  {
+    "name": "kind-Exclaim",
+    "source": "1 ! 1"
+  },
+  {
+    "name": "kind-Multiply",
+    "source": "1 * 1"
+  },
+  {
+    "name": "kind-Divide",
+    "source": "1 / 1"
+  },
+  {
+    "name": "kind-Rem",
+    "source": "1 % 1"
+  },
+  {
+    "name": "kind-Plus",
+    "source": "1 + 1"
+  },
+  {
+    "name": "kind-Minus",
+    "source": "1 - 1"
+  },
+  {
+    "name": "kind-Equals",
+    "source": "1 = 1"
+  },
+  {
+    "name": "kind-PlusEquals",
+    "source": "1 += 1"
+  },
+  {
+    "name": "kind-MinusEquals",
+    "source": "1 -= 1"
+  },
+  {
+    "name": "kind-MultiplyEquals",
+    "source": "1 *= 1"
+  },
+  {
+    "name": "kind-DivideEquals",
+    "source": "1 /= 1"
+  },
+  {
+    "name": "kind-RemainderEquals",
+    "source": "1 %= 1"
+  },
+  {
+    "name": "kind-Redirection",
+    "source": "> out"
+  },
+  {
+    "name": "kind-RedirectInStd",
+    "source": "< in"
+  },
+  {
+    "name": "kind-Format",
+    "source": "1 -f 1"
+  },
+  {
+    "name": "kind-Not",
+    "source": "1 -not 1"
+  },
+  {
+    "name": "kind-Bnot",
+    "source": "1 -bnot 1"
+  },
+  {
+    "name": "kind-And",
+    "source": "1 -and 1"
+  },
+  {
+    "name": "kind-Or",
+    "source": "1 -or 1"
+  },
+  {
+    "name": "kind-Xor",
+    "source": "1 -xor 1"
+  },
+  {
+    "name": "kind-Band",
+    "source": "1 -band 1"
+  },
+  {
+    "name": "kind-Bor",
+    "source": "1 -bor 1"
+  },
+  {
+    "name": "kind-Bxor",
+    "source": "1 -bxor 1"
+  },
+  {
+    "name": "kind-Join",
+    "source": "1 -join 1"
+  },
+  {
+    "name": "kind-Ieq",
+    "source": "1 -eq 1"
+  },
+  {
+    "name": "kind-Ine",
+    "source": "1 -ne 1"
+  },
+  {
+    "name": "kind-Ige",
+    "source": "1 -ge 1"
+  },
+  {
+    "name": "kind-Igt",
+    "source": "1 -gt 1"
+  },
+  {
+    "name": "kind-Ilt",
+    "source": "1 -lt 1"
+  },
+  {
+    "name": "kind-Ile",
+    "source": "1 -le 1"
+  },
+  {
+    "name": "kind-Ilike",
+    "source": "1 -ilike 1"
+  },
+  {
+    "name": "kind-Inotlike",
+    "source": "1 -inotlike 1"
+  },
+  {
+    "name": "kind-Imatch",
+    "source": "1 -imatch 1"
+  },
+  {
+    "name": "kind-Inotmatch",
+    "source": "1 -inotmatch 1"
+  },
+  {
+    "name": "kind-Ireplace",
+    "source": "1 -ireplace 1"
+  },
+  {
+    "name": "kind-Icontains",
+    "source": "1 -icontains 1"
+  },
+  {
+    "name": "kind-Inotcontains",
+    "source": "1 -inotcontains 1"
+  },
+  {
+    "name": "kind-Iin",
+    "source": "1 -iin 1"
+  },
+  {
+    "name": "kind-Inotin",
+    "source": "1 -inotin 1"
+  },
+  {
+    "name": "kind-Isplit",
+    "source": "1 -isplit 1"
+  },
+  {
+    "name": "kind-Ceq",
+    "source": "1 -ceq 1"
+  },
+  {
+    "name": "kind-Cne",
+    "source": "1 -cne 1"
+  },
+  {
+    "name": "kind-Cge",
+    "source": "1 -cge 1"
+  },
+  {
+    "name": "kind-Cgt",
+    "source": "1 -cgt 1"
+  },
+  {
+    "name": "kind-Clt",
+    "source": "1 -clt 1"
+  },
+  {
+    "name": "kind-Cle",
+    "source": "1 -cle 1"
+  },
+  {
+    "name": "kind-Clike",
+    "source": "1 -clike 1"
+  },
+  {
+    "name": "kind-Cnotlike",
+    "source": "1 -cnotlike 1"
+  },
+  {
+    "name": "kind-Cmatch",
+    "source": "1 -cmatch 1"
+  },
+  {
+    "name": "kind-Cnotmatch",
+    "source": "1 -cnotmatch 1"
+  },
+  {
+    "name": "kind-Creplace",
+    "source": "1 -creplace 1"
+  },
+  {
+    "name": "kind-Ccontains",
+    "source": "1 -ccontains 1"
+  },
+  {
+    "name": "kind-Cnotcontains",
+    "source": "1 -cnotcontains 1"
+  },
+  {
+    "name": "kind-Cin",
+    "source": "1 -cin 1"
+  },
+  {
+    "name": "kind-Cnotin",
+    "source": "1 -cnotin 1"
+  },
+  {
+    "name": "kind-Csplit",
+    "source": "1 -csplit 1"
+  },
+  {
+    "name": "kind-Is",
+    "source": "1 -is 1"
+  },
+  {
+    "name": "kind-IsNot",
+    "source": "1 -isnot 1"
+  },
+  {
+    "name": "kind-As",
+    "source": "1 -as 1"
+  },
+  {
+    "name": "kind-PostfixPlusPlus",
+    "source": "$x++"
+  },
+  {
+    "name": "kind-PostfixMinusMinus",
+    "source": "$x--"
+  },
+  {
+    "name": "kind-Shl",
+    "source": "1 -shl 1"
+  },
+  {
+    "name": "kind-Shr",
+    "source": "1 -shr 1"
+  },
+  {
+    "name": "kind-Colon",
+    "source": "1 : 1"
+  },
+  {
+    "name": "kind-QuestionMark",
+    "source": "1 ? 1"
+  },
+  {
+    "name": "kind-QuestionQuestionEquals",
+    "source": "1 ??= 1"
+  },
+  {
+    "name": "kind-QuestionQuestion",
+    "source": "1 ?? 1"
+  },
+  {
+    "name": "kind-QuestionDot",
+    "source": "1 ?. 1"
+  },
+  {
+    "name": "kind-QuestionLBracket",
+    "source": "?[0]"
+  },
+  {
+    "name": "kind-Begin",
+    "source": "begin"
+  },
+  {
+    "name": "kind-Break",
+    "source": "break"
+  },
+  {
+    "name": "kind-Catch",
+    "source": "catch"
+  },
+  {
+    "name": "kind-Class",
+    "source": "class"
+  },
+  {
+    "name": "kind-Continue",
+    "source": "continue"
+  },
+  {
+    "name": "kind-Data",
+    "source": "data"
+  },
+  {
+    "name": "kind-Define",
+    "source": "define"
+  },
+  {
+    "name": "kind-Do",
+    "source": "do"
+  },
+  {
+    "name": "kind-Dynamicparam",
+    "source": "dynamicparam"
+  },
+  {
+    "name": "kind-Else",
+    "source": "else"
+  },
+  {
+    "name": "kind-ElseIf",
+    "source": "elseif"
+  },
+  {
+    "name": "kind-End",
+    "source": "end"
+  },
+  {
+    "name": "kind-Exit",
+    "source": "exit"
+  },
+  {
+    "name": "kind-Filter",
+    "source": "filter"
+  },
+  {
+    "name": "kind-Finally",
+    "source": "finally"
+  },
+  {
+    "name": "kind-For",
+    "source": "for"
+  },
+  {
+    "name": "kind-Foreach",
+    "source": "foreach"
+  },
+  {
+    "name": "kind-From",
+    "source": "from"
+  },
+  {
+    "name": "kind-Function",
+    "source": "function"
+  },
+  {
+    "name": "kind-If",
+    "source": "if"
+  },
+  {
+    "name": "kind-In",
+    "source": "in"
+  },
+  {
+    "name": "kind-Param",
+    "source": "param"
+  },
+  {
+    "name": "kind-Process",
+    "source": "process"
+  },
+  {
+    "name": "kind-Return",
+    "source": "return"
+  },
+  {
+    "name": "kind-Switch",
+    "source": "switch"
+  },
+  {
+    "name": "kind-Throw",
+    "source": "throw"
+  },
+  {
+    "name": "kind-Trap",
+    "source": "trap"
+  },
+  {
+    "name": "kind-Try",
+    "source": "try"
+  },
+  {
+    "name": "kind-Until",
+    "source": "until"
+  },
+  {
+    "name": "kind-Var",
+    "source": "var"
+  },
+  {
+    "name": "kind-While",
+    "source": "while"
+  },
+  {
+    "name": "kind-Workflow",
+    "source": "workflow"
+  },
+  {
+    "name": "kind-Parallel",
+    "source": "parallel"
+  },
+  {
+    "name": "kind-Sequence",
+    "source": "sequence"
+  },
+  {
+    "name": "kind-InlineScript",
+    "source": "inlinescript"
+  },
+  {
+    "name": "kind-Configuration",
+    "source": "configuration"
+  },
+  {
+    "name": "kind-Public",
+    "source": "public"
+  },
+  {
+    "name": "kind-Private",
+    "source": "private"
+  },
+  {
+    "name": "kind-Static",
+    "source": "static"
+  },
+  {
+    "name": "kind-Interface",
+    "source": "interface"
+  },
+  {
+    "name": "kind-Enum",
+    "source": "enum"
+  },
+  {
+    "name": "kind-Namespace",
+    "source": "namespace"
+  },
+  {
+    "name": "kind-Module",
+    "source": "module"
+  },
+  {
+    "name": "kind-Type",
+    "source": "type"
+  },
+  {
+    "name": "kind-Assembly",
+    "source": "assembly"
+  },
+  {
+    "name": "kind-Command",
+    "source": "command"
+  },
+  {
+    "name": "kind-Hidden",
+    "source": "hidden"
+  },
+  {
+    "name": "kind-Base",
+    "source": "base"
+  },
+  {
+    "name": "kind-Default",
+    "source": "default"
+  },
+  {
+    "name": "kind-Clean",
+    "source": "clean"
+  }
+]

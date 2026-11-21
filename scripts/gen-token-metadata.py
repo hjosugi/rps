@@ -30,6 +30,29 @@ flag_arms = '\n'.join(
     )
     for kind, _, flags in ROWS
 )
+keyword_rows = [
+    (kind, text) for kind, text, flags in ROWS
+    if 'Keyword' in flags and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', text)
+]
+operator_names = {
+    'BinaryOperator', 'UnaryOperator', 'AssignmentOperator', 'TernaryOperator',
+    'SpecialOperator', 'PrefixOrPostfixOperator',
+}
+operator_rows = [
+    (kind, text) for kind, text, flags in ROWS
+    if (operator_names.intersection(flags) or kind in {'AndAnd', 'OrOr'})
+    and (re.fullmatch(r'[^A-Za-z0-9_ ]+', text) or re.fullmatch(r'-[A-Za-z]+', text))
+    and text not in {'<', '>', '?.'}  # redirection and ?. are lexical pairs
+]
+operator_rows.sort(key=lambda row: (-len(row[1]), row[1], row[0]))
+keywords = '\n'.join(
+    '    (FullTokenKind::{kind}, "{text}"),'.format(kind=kind, text=text)
+    for kind, text in keyword_rows
+)
+operators = '\n'.join(
+    '    (FullTokenKind::{kind}, "{text}"),'.format(kind=kind, text=text.replace('\\', '\\\\').replace('"', '\\"'))
+    for kind, text in operator_rows
+)
 table = '\n'.join(
     '    TokenKindInfo {{ kind: FullTokenKind::{kind}, text: {text}, flags: FullTokenKind::{kind}.flags() }},'.format(
         kind=kind, text=json.dumps(text)
@@ -80,6 +103,16 @@ pub struct TokenKindInfo {{
 
 pub static TOKEN_KINDS: &[TokenKindInfo] = &[
 {table}
+];
+
+/// Keyword text, case-insensitive.
+pub static KEYWORDS: &[(FullTokenKind, &str)] = &[
+{keywords}
+];
+
+/// Operator text, longest first so `..` wins over `.`.
+pub static OPERATORS: &[(FullTokenKind, &str)] = &[
+{operators}
 ];
 '''
 out = ROOT / 'crates/rpsh-syntax/src/full_token_kind.rs'

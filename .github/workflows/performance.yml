@@ -31,6 +31,10 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: scripts/fetch-pwsh.sh
+      - name: Token streams match the reference
+        run: |
+          python3 scripts/token-diff.py
+          python3 scripts/token-diff.py --cases tests/tokenizer/kinds.json
       - run: cargo harness bench --filter startup --budget-scale 2 --out startup-result.json | tee -a "$GITHUB_STEP_SUMMARY"
 
   benchmark:

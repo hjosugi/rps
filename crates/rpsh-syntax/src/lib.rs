@@ -5,10 +5,12 @@
 //!
 //! # Status
 //!
-//! This is the walking skeleton from DESIGN.md §8: decimal `Int32` literals,
-//! single-quoted strings, `+ - *`, unary minus, parentheses, statement
-//! separators, `#` comments and `exit`. Everything else is reported as
-//! [`ParseError::NotImplemented`], naming the missing feature.
+//! The full tokenizer produces all 157 reference token kinds with byte and
+//! UTF-16 extents. The walking-skeleton parser still understands only
+//! decimal `Int32` literals, single-quoted strings, `+ - *`, unary minus,
+//! parentheses, statement separators, `#` comments and `exit`; everything
+//! else is reported as [`ParseError::NotImplemented`], naming the missing
+//! feature.
 //!
 //! The rule that matters is in DESIGN.md §2: a script is parsed completely
 //! before anything runs, and input outside the implemented subset is refused
@@ -17,6 +19,7 @@
 mod ast;
 mod error;
 mod full_token_kind;
+mod full_tokenizer;
 mod parser;
 mod span;
 mod token;
@@ -25,6 +28,7 @@ mod tokenizer;
 pub use ast::{BinaryOp, Expr, ExprKind, ScriptBlockAst, Statement, UnaryOp};
 pub use error::ParseError;
 pub use full_token_kind::{FullTokenKind, TOKEN_KINDS, TokenFlags, TokenKindInfo};
+pub use full_tokenizer::{FullToken, tokenize_full};
 pub use parser::parse;
 pub use span::Span;
 pub use token::{Token, TokenKind};

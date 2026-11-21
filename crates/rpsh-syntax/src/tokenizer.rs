@@ -1,293 +1,171 @@
-use crate::{ParseError, Span, Token, TokenKind};
+//! The parser-facing tokenizer: a compatibility view over [`tokenize_full`].
+//!
+//! The walking-skeleton parser still understands only the original ten token
+//! kinds. Instead of keeping a second lexer, this maps the full token stream
+//! into that view and turns every construct the parser does not handle into an
+//! explicit [`ParseError::NotImplemented`], preserving the feature labels the
+//! harness reports. Parser issues replace the mapping as they land.
+
+use crate::full_token_kind::FullTokenKind;
+use crate::{ParseError, Span, Token, TokenKind, tokenize_full};
 
 const NUMERIC_FORMS: &str = "numeric literals other than decimal Int32";
 
-/// Words that start a statement the skeleton does not parse. Reported apart
-/// from command invocation so the two show up separately in harness output.
-const STATEMENT_KEYWORDS: &[&str] = &[
-    "begin",
-    "break",
-    "catch",
-    "class",
-    "clean",
-    "continue",
-    "data",
-    "do",
-    "dynamicparam",
-    "else",
-    "elseif",
-    "end",
-    "enum",
-    "filter",
-    "finally",
-    "for",
-    "foreach",
-    "function",
-    "if",
-    "in",
-    "param",
-    "process",
-    "return",
-    "switch",
-    "throw",
-    "trap",
-    "try",
-    "until",
-    "using",
-    "while",
-];
-
-/// Splits `source` into tokens. The last token is always
-/// [`TokenKind::EndOfInput`].
+/// Splits `source` into the tokens the walking-skeleton parser understands.
+/// The last token is always [`TokenKind::EndOfInput`].
 pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
-    if source.len() > u32::MAX as usize {
-        return Err(ParseError::not_implemented(
-            "scripts larger than 4 GiB",
-            Span::default(),
-        ));
-    }
-    Tokenizer {
-        source,
-        bytes: source.as_bytes(),
-        pos: 0,
-        tokens: Vec::new(),
-    }
-    .run()
-}
-
-struct Tokenizer<'a> {
-    source: &'a str,
-    bytes: &'a [u8],
-    pos: usize,
-    tokens: Vec<Token>,
-}
-
-impl Tokenizer<'_> {
-    fn run(mut self) -> Result<Vec<Token>, ParseError> {
-        while let Some(&byte) = self.bytes.get(self.pos) {
-            match byte {
-                b' ' | b'\t' => self.pos += 1,
-                b'\r' => {
-                    let len = if self.peek(1) == Some(b'\n') { 2 } else { 1 };
-                    self.push(TokenKind::NewLine, len);
+    let full = tokenize_full(source)?;
+    let mut tokens = Vec::with_capacity(full.len());
+    for token in full {
+        let span = token.span;
+        let kind = match token.kind {
+            FullTokenKind::Number => {
+                let text = span.text(source);
+                match text.parse::<i32>() {
+                    Ok(value) => TokenKind::Int32(value),
+                    Err(_) => return Err(ParseError::not_implemented(NUMERIC_FORMS, span)),
                 }
-                b'\n' => self.push(TokenKind::NewLine, 1),
-                b';' => self.push(TokenKind::Semi, 1),
-                b'(' => self.push(TokenKind::LParen, 1),
-                b')' => self.push(TokenKind::RParen, 1),
-                b'+' | b'-' | b'*' => self.operator(byte)?,
-                b'#' => self.comment()?,
-                b'\'' => self.single_quoted_string()?,
-                b'0'..=b'9' => self.number()?,
-                b'a'..=b'z' | b'A'..=b'Z' | b'_' => self.bareword()?,
-                _ => return Err(self.unsupported_char(self.pos)),
             }
-        }
-        let end = self.bytes.len();
-        self.tokens.push(Token {
-            kind: TokenKind::EndOfInput,
-            span: Span::new(end, end),
-        });
-        Ok(self.tokens)
-    }
-
-    fn peek(&self, ahead: usize) -> Option<u8> {
-        self.bytes.get(self.pos + ahead).copied()
-    }
-
-    fn push(&mut self, kind: TokenKind, len: usize) {
-        let span = Span::new(self.pos, self.pos + len);
-        self.tokens.push(Token { kind, span });
-        self.pos += len;
-    }
-
-    fn error(&self, feature: &'static str, start: usize, len: usize) -> ParseError {
-        ParseError::not_implemented(feature, Span::new(start, start + len))
-    }
-
-    fn operator(&mut self, byte: u8) -> Result<(), ParseError> {
-        let next = self.peek(1);
-        if next == Some(b'=') {
-            return Err(self.error("compound assignment operators", self.pos, 2));
-        }
-        let kind = match byte {
-            b'+' if next == Some(b'+') => {
-                return Err(self.error("increment and decrement operators", self.pos, 2));
-            }
-            b'-' if next == Some(b'-') => {
-                return Err(self.error("increment and decrement operators", self.pos, 2));
-            }
-            b'-' if next.is_some_and(|b| b.is_ascii_alphabetic()) => {
-                return Err(self.error(
-                    "dash-prefixed operators and parameters (-eq, -not, -Name)",
-                    self.pos,
-                    2,
-                ));
-            }
-            b'+' => TokenKind::Plus,
-            b'-' => TokenKind::Minus,
-            _ => TokenKind::Multiply,
-        };
-        self.push(kind, 1);
-        Ok(())
-    }
-
-    /// A `#` comment running to the end of the line. The line ending itself is
-    /// left for the main loop.
-    fn comment(&mut self) -> Result<(), ParseError> {
-        let start = self.pos;
-        let at_token_start = match start.checked_sub(1).map(|i| self.bytes[i]) {
-            None => true,
-            Some(prev) => matches!(prev, b' ' | b'\t' | b'\r' | b'\n' | b';' | b'('),
-        };
-        if !at_token_start {
-            return Err(self.error("'#' directly after a token", start, 1));
-        }
-        let end = self.bytes[start..]
-            .iter()
-            .position(|&b| b == b'\n' || b == b'\r')
-            .map_or(self.bytes.len(), |offset| start + offset);
-        let is_requires = self.bytes[start..end]
-            .get(..9)
-            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(b"#requires"));
-        if is_requires {
-            return Err(self.error("#requires statements", start, 9));
-        }
-        self.pos = end;
-        Ok(())
-    }
-
-    fn single_quoted_string(&mut self) -> Result<(), ParseError> {
-        let start = self.pos;
-        let mut value = String::new();
-        let mut at = start + 1;
-        loop {
-            let Some(ch) = self.source[at..].chars().next() else {
-                return Err(self.error(
-                    "syntax error reporting (unterminated string)",
-                    start,
-                    self.bytes.len() - start,
-                ));
-            };
-            let ch_start = at;
-            at += ch.len_utf8();
-            match ch {
-                '\'' if self.bytes.get(at) == Some(&b'\'') => {
-                    value.push('\'');
-                    at += 1;
-                }
-                '\'' => break,
-                // Upstream treats these as quote characters too, so they
-                // would end the string here.
-                '\u{2018}'..='\u{201B}' => {
-                    return Err(self.error(
+            FullTokenKind::StringLiteral => {
+                let text = span.text(source);
+                let mut chars = text.char_indices();
+                let Some((_, first)) = chars.next() else {
+                    return Err(unterminated(span));
+                };
+                let Some((last_start, last)) = chars.next_back() else {
+                    return Err(unterminated(span));
+                };
+                if matches!(first, '\u{2018}'..='\u{201b}')
+                    || matches!(last, '\u{2018}'..='\u{201b}')
+                {
+                    return Err(ParseError::not_implemented(
                         "typographic quote characters",
-                        ch_start,
-                        ch.len_utf8(),
+                        span,
                     ));
                 }
-                '\r' | '\n' => {
-                    return Err(self.error("multi-line string literals", ch_start, 1));
+                if first != '\'' || last != '\'' || last_start < first.len_utf8() {
+                    return Err(unterminated(span));
                 }
-                _ => value.push(ch),
+                let inner = &text[first.len_utf8()..last_start];
+                TokenKind::StringLiteral(inner.replace("''", "'"))
             }
-        }
-        self.tokens.push(Token {
-            kind: TokenKind::StringLiteral(value),
-            span: Span::new(start, at),
-        });
-        self.pos = at;
-        self.expect_literal_end()
-    }
-
-    fn number(&mut self) -> Result<(), ParseError> {
-        let start = self.pos;
-        let len = self.bytes[start..]
-            .iter()
-            .take_while(|b| b.is_ascii_digit())
-            .count();
-        let end = start + len;
-        match self.bytes.get(end) {
-            Some(b'.') if self.bytes.get(end + 1) == Some(&b'.') => {
-                return Err(self.error("range operator", end, 2));
+            FullTokenKind::Plus => TokenKind::Plus,
+            FullTokenKind::Minus => TokenKind::Minus,
+            FullTokenKind::Multiply => TokenKind::Multiply,
+            FullTokenKind::LParen => TokenKind::LParen,
+            FullTokenKind::RParen => TokenKind::RParen,
+            FullTokenKind::Semi => TokenKind::Semi,
+            FullTokenKind::NewLine => TokenKind::NewLine,
+            FullTokenKind::Exit => TokenKind::Exit,
+            FullTokenKind::EndOfInput => TokenKind::EndOfInput,
+            FullTokenKind::Comment => {
+                let text = span.text(source);
+                if text.starts_with("<#") {
+                    return Err(ParseError::not_implemented("block comments", span));
+                }
+                if text
+                    .get(..9)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case("#requires"))
+                {
+                    return Err(ParseError::not_implemented("#requires statements", span));
+                }
+                continue;
             }
-            Some(b) if b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_') => {
-                return Err(self.error(NUMERIC_FORMS, start, len + 1));
-            }
-            _ => {}
-        }
-        let Ok(value) = self.source[start..end].parse::<i32>() else {
-            return Err(self.error(NUMERIC_FORMS, start, len));
+            FullTokenKind::LineContinuation => continue,
+            other => return Err(ParseError::not_implemented(feature_for(other), span)),
         };
-        self.push(TokenKind::Int32(value), len);
-        self.expect_literal_end()
+        tokens.push(Token { kind, span });
     }
+    Ok(tokens)
+}
 
-    /// A literal has to be followed by whitespace, a separator or one of the
-    /// implemented operators. `'a'.Length`, `'a'[0]` and the like are refused
-    /// here, with the character that follows naming the feature.
-    fn expect_literal_end(&self) -> Result<(), ParseError> {
-        match self.bytes.get(self.pos) {
-            None | Some(b' ' | b'\t' | b'\r' | b'\n' | b';' | b')' | b'+' | b'-' | b'*' | b'#') => {
-                Ok(())
-            }
-            Some(b) if b.is_ascii_alphanumeric() || *b == b'_' => {
-                Err(self.error("literals directly followed by another token", self.pos, 1))
-            }
-            Some(_) => Err(self.unsupported_char(self.pos)),
-        }
-    }
+fn unterminated(span: Span) -> ParseError {
+    ParseError::not_implemented("syntax error reporting (unterminated string)", span)
+}
 
-    fn bareword(&mut self) -> Result<(), ParseError> {
-        let start = self.pos;
-        let len = self.bytes[start..]
-            .iter()
-            .take_while(|b| b.is_ascii_alphanumeric() || **b == b'_')
-            .count();
-        let word = &self.source[start..start + len];
-        let ends_token = matches!(
-            self.bytes.get(start + len),
-            None | Some(b' ' | b'\t' | b'\r' | b'\n' | b';' | b'(' | b')')
-        );
-        if ends_token && word.eq_ignore_ascii_case("exit") {
-            self.push(TokenKind::Exit, len);
-            return Ok(());
-        }
-        let is_keyword = ends_token
-            && STATEMENT_KEYWORDS
-                .iter()
-                .any(|keyword| word.eq_ignore_ascii_case(keyword));
-        let feature = if is_keyword {
+fn feature_for(kind: FullTokenKind) -> &'static str {
+    use FullTokenKind as K;
+    match kind {
+        K::Variable => "variables",
+        K::SplattedVariable => "array and hashtable literals, here-strings and splatting",
+        K::Parameter => "dash-prefixed operators and parameters (-eq, -not, -Name)",
+        K::Generic | K::Identifier | K::Label | K::Unknown => "command invocation",
+        K::StringExpandable => "expandable (double-quoted) strings",
+        K::HereStringLiteral | K::HereStringExpandable => "here-strings",
+        K::LCurly | K::RCurly => "script blocks",
+        K::LBracket | K::RBracket => "type literals, casts and indexing",
+        K::AtParen | K::AtCurly => "array and hashtable literals, here-strings and splatting",
+        K::DollarParen => "subexpressions",
+        K::Pipe => "pipelines",
+        K::Ampersand | K::AndAnd | K::OrOr => "call operator, background operator and && chains",
+        K::Comma => "array construction (comma operator)",
+        K::DotDot => "range operator",
+        K::Dot | K::ColonColon => "member access, dot-sourcing and real literals",
+        K::Exclaim => "logical not",
+        K::Divide | K::Rem => "division and remainder operators",
+        K::Redirection | K::RedirectInStd => "redirection",
+        K::QuestionMark
+        | K::QuestionQuestion
+        | K::QuestionQuestionEquals
+        | K::QuestionDot
+        | K::QuestionLBracket => "ternary and null-conditional operators",
+        K::Equals
+        | K::PlusEquals
+        | K::MinusEquals
+        | K::MultiplyEquals
+        | K::DivideEquals
+        | K::RemainderEquals => "assignment",
+        K::Ieq
+        | K::Ine
+        | K::Ige
+        | K::Igt
+        | K::Ilt
+        | K::Ile
+        | K::Ilike
+        | K::Inotlike
+        | K::Imatch
+        | K::Inotmatch
+        | K::Ireplace
+        | K::Icontains
+        | K::Inotcontains
+        | K::Iin
+        | K::Inotin
+        | K::Isplit
+        | K::Ceq
+        | K::Cne
+        | K::Cge
+        | K::Cgt
+        | K::Clt
+        | K::Cle
+        | K::Clike
+        | K::Cnotlike
+        | K::Cmatch
+        | K::Cnotmatch
+        | K::Creplace
+        | K::Ccontains
+        | K::Cnotcontains
+        | K::Cin
+        | K::Cnotin
+        | K::Csplit
+        | K::Is
+        | K::IsNot
+        | K::As
+        | K::Not
+        | K::Bnot
+        | K::And
+        | K::Or
+        | K::Xor
+        | K::Band
+        | K::Bor
+        | K::Bxor
+        | K::Join
+        | K::Format
+        | K::Shl
+        | K::Shr => "dash-prefixed operators and parameters (-eq, -not, -Name)",
+        _ if kind.flags().0 != 0 && kind.name().chars().all(|ch| !ch.is_ascii_lowercase()) => {
             "statement keywords (if, foreach, function, ...)"
-        } else {
-            "command invocation"
-        };
-        Err(self.error(feature, start, len))
-    }
-
-    fn unsupported_char(&self, at: usize) -> ParseError {
-        let ch = self.source[at..].chars().next().unwrap_or('\0');
-        let feature = match ch {
-            '$' => "variables",
-            '"' => "expandable (double-quoted) strings",
-            '@' => "array and hashtable literals, here-strings and splatting",
-            '{' | '}' => "script blocks",
-            '[' | ']' => "type literals, casts and indexing",
-            '|' => "pipelines",
-            '&' => "call operator, background operator and && chains",
-            '=' => "assignment",
-            '<' if self.bytes.get(at + 1) == Some(&b'#') => "block comments",
-            '<' | '>' => "redirection",
-            '/' | '%' => "division and remainder operators",
-            ',' => "array construction (comma operator)",
-            '.' => "member access, dot-sourcing and real literals",
-            '!' => "logical not",
-            '`' => "backtick escapes and line continuation",
-            '?' | ':' => "ternary and null-conditional operators",
-            _ if !ch.is_ascii() => "non-ASCII characters outside string literals",
-            _ => "unrecognized character",
-        };
-        self.error(feature, at, ch.len_utf8())
+        }
+        _ => "statement keywords (if, foreach, function, ...)",
     }
 }
 
@@ -380,8 +258,8 @@ mod tests {
         );
         assert_eq!(refused("'a\u{2019}"), "typographic quote characters");
         assert_eq!(
-            refused("\u{2013}1"),
-            "non-ASCII characters outside string literals"
+            kinds("\u{2013}1"),
+            vec![TokenKind::Minus, TokenKind::Int32(1), TokenKind::EndOfInput]
         );
     }
 
