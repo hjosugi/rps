@@ -51,7 +51,7 @@ bench):
   instead of Latin-1 as the narrow set so that writing UTF-8 stays a copy.
 
 Median nanoseconds per operation on the reference machine. The corpora are
-an 84-character ASCII log line, a 38-character Japanese sentence, and an
+an 84-character ASCII log line, a 38-character Japanese sentence, and a
 79-unit line with emoji (`CORPORA` in the bench).
 
 ### ASCII
@@ -80,7 +80,7 @@ an 84-character ASCII log line, a 38-character Japanese sentence, and an
 | ordinal-ignore-case | 25.8 ns | 235 ns | **23.4 ns** |
 | ordinal-ignore-case hash | 591 ns | 714 ns | **569 ns** |
 | `$s += 'あ'`, 2,000 times | **189 µs** | 12.9 ms | 214 µs |
-| payload, one string | 76 B | 114 B | **76 B** |
+| payload, one string | **76 B** | 114 B | **76 B** |
 
 ### Emoji
 
@@ -114,9 +114,9 @@ What the numbers say:
   because then it *is* utf16. The measured exceptions are small in absolute
   terms but not within noise: `Substring` on the Japanese line is 25.2 ns
   against 7.5 ns, indexing the ASCII line is 10.7 ns against 6.8 ns, and
-  creating a string from emoji UTF-8 is 204 ns against 146 ns. None of these
-  is more than a few tens of nanoseconds, and none is on a path a script
-  performs per character; #149 revisits them if a profile disagrees.
+  creating a string from emoji UTF-8 is 204 ns against 146 ns. All are under
+  60 ns; only the ASCII-indexing difference is on a path a script performs
+  per character, and #149 revisits it if a profile disagrees.
 * **Memory**: an ASCII string takes one byte per code unit in compact and
   wtf8, two in utf16.
 
