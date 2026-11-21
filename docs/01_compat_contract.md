@@ -1,16 +1,18 @@
 # Compatibility contract
 
-What "rpsh behaves like pwsh 7.7.0" means, precisely enough that a test can
-decide it. Every rule below names what enforces it; where nothing does yet,
+What "rpsh behaves like the reference pwsh" means, precisely enough that a
+test can decide it. Every rule below names what enforces it; where nothing does yet,
 the entry says which issue will. Settles #1; DESIGN.md §2 summarises it.
 
 ## The reference
 
-The reference is a binary, not documentation: the PowerShell 7.7.0 release
-for linux-x64, installed by `scripts/fetch-pwsh.sh` and verified by SHA-256.
-It is self-contained and runs on the .NET 11.0.0 runtime it bundles
-(`pwsh.runtimeconfig.json`), so ".NET behaviour" in this document means .NET
-11.0.0's.
+The reference is a binary, not documentation: the latest stable PowerShell
+release, resolved from GitHub by `scripts/fetch-pwsh.sh` and verified against
+the SHA-256 digest the release publishes. It is self-contained and runs on
+the .NET runtime it bundles (`pwsh.runtimeconfig.json`); the exact version and
+runtime are recorded in `tests/conformance/reference.txt`, and every result
+file names the version it ran with. ".NET behaviour" in this document means
+that bundled runtime's.
 
 ### Reference environment
 
@@ -56,17 +58,21 @@ of writing that is .NET 11.0.0, ICU 78.3, en-US, UTC, 80x40.
 | Level | Compared | Enforced by |
 |---|---|---|
 | C1 | exit code and stdout, byte for byte | `judge` in `engines.rs`, today |
-| C2 | C1 plus stderr byte for byte, after the case's directory is replaced by a placeholder in both | #14 |
-| C3 | the stream each record went to (output, error, warning, verbose, debug, information, host) and its order | #14 |
-| C4 | each `ErrorRecord`: `FullyQualifiedErrorId`, `CategoryInfo`, exception type, message, position | #14; `contract/error-records` checks the first four through stdout today |
+| C2 | C1 plus stderr byte for byte, after the case's directory is replaced by `<case>` in both | `judge`, the `.stderr` companion, and the case's `# rpsh-conformance: level=c2`, today |
+| C3 | the stream each record went to (output, error, warning, verbose, debug, information, host) and its order | `contract/streams` (record types through redirection), today |
+| C4 | each `ErrorRecord`: `FullyQualifiedErrorId`, `CategoryInfo`, exception type, message, position | `contract/error-records` through stdout, today |
 
 C1 is weaker than it looks, because under ConsoleHost pwsh writes most
 streams to stdout as text. Measured with output redirected: `Write-Host`,
 `WARNING: `, `VERBOSE: `, `DEBUG: ` and information records go to stdout;
 only error records and `[Console]::Error` go to stderr. C2 adds the error
 view, whose text includes the script's absolute path
-(`Exception: /…/throw.ps1:2`), hence the placeholder. Once C2 exists it is
-the default for every case.
+(`Exception: /…/throw.ps1:2`), hence the placeholder. Every case declares its
+level with `# rpsh-conformance: level=c1|c2`.
+
+A golden v2 is `rpsh-golden-v2`, a `exit=<code>` line, then stdout byte for
+byte. Stderr, when non-empty, is a `<name>.stderr` companion next to it. The
+case's directory is replaced by `<case>` on both sides.
 
 Timing is not part of the contract. A case that needs time to pass prints
 something derived from it instead (`$elapsed -lt 5`), never a duration.
@@ -93,18 +99,19 @@ tested in `engines.rs`.
 
 ## Identity
 
-rpsh answers every question a script can ask about its version the way
-pwsh 7.7.0 does:
+rpsh answers every question a script can ask about its version the way the
+reference pwsh does:
 
-* `$PSVersionTable` has pwsh's nine keys with pwsh's values: `PSVersion`
-  7.7.0, `PSEdition` Core, `GitCommitId` 7.7.0, `Platform` Unix,
-  `PSCompatibleVersions` 1.0 to 7.0, and `OS` as .NET reports it (the
-  `PRETTY_NAME` of `/etc/os-release` on the reference machine). Keys
-  enumerate in pwsh's order: `PSVersion`, `PSEdition`, then the rest
-  ordinal-ignore-case (`PSVersionTableComparer` in
+* `$PSVersionTable` has pwsh's nine keys with the reference version's
+  values: `PSVersion` is the version in `tests/conformance/reference.txt`,
+  `GitCommitId` is what that release reports, `PSEdition` Core, `Platform`
+  Unix, `PSCompatibleVersions` as the reference reports it, and `OS` as .NET
+  reports it (the `PRETTY_NAME` of `/etc/os-release` on the reference
+  machine). Keys enumerate in pwsh's order: `PSVersion`, `PSEdition`, then
+  the rest ordinal-ignore-case (`PSVersionTableComparer` in
   `engine/PSVersionInfo.cs`).
 * `$PSEdition` is `Core`, `$IsCoreCLR` is `$true`, `$Host.Name` is
-  `ConsoleHost`, `$Host.Version` is 7.7.0.
+  `ConsoleHost`, `$Host.Version` is the reference version.
 
 No key is added to `$PSVersionTable` to say "this is rpsh". Its keys and its
 default display are output like any other, and modules gate on its values
@@ -119,7 +126,7 @@ including a real pwsh started from rpsh. Implemented with the
 `System.Management.Automation` shim (#54).
 
 The command line is compared like any other output, with one exception:
-`rpsh -Version` prints `rpsh <version> (targets PowerShell 7.7.0)`, because
+`rpsh -Version` prints `rpsh <version> (targets latest stable PowerShell)`, because
 the question it answers is which program this is. Whether rpsh can be
 installed under the name `pwsh` is decided with distribution (#153).
 
@@ -163,12 +170,21 @@ facts.
 ## Errors and messages
 
 **PowerShell's own messages match exactly.** They come from 150 neutral
-`.resx` files with 4,764 strings (75 files and 3,354 strings in
+`.resx` files with 4,185 strings (75 files and 3,071 strings in
 `System.Management.Automation`). The repository also carries translations
 for 13 cultures, but the Linux release ships no satellite assemblies (no
 `*.resources.dll` in the tarball), and under `LANG=ja_JP.UTF-8` pwsh prints
 the English messages. So rpsh's message catalog is the neutral resources
 alone, and culture changes formatting, never messages. (#8, #115)
+
+`scripts/gen-messages.py` extracts the catalog from the latest stable source
+tag, recorded with its archive SHA-256 in the generated file header, into
+`crates/rpsh-messages/src/catalog.rs`. It is one table sorted by
+`"<resource set>/<name>"`, read with a binary search when a message is
+needed, so no message work happens at startup. `{0}`-style placeholders go
+through `rpsh_messages::format`, which follows .NET's composite formatting
+for string arguments: index, alignment, `{{`/`}}` escapes, and a format
+specifier that a string ignores.
 
 **.NET's messages match too, when they reach the output.** An exception
 thrown by a .NET member shows its message in the error view and in
@@ -197,7 +213,7 @@ environment) is compared byte for byte from level C2 on. (#107)
 
 The culture comes from `LANG`. pwsh does not bundle ICU: it loads the system's
 (`libicuuc.so.78.3` from `/usr/lib` on the reference machine) and takes
-date patterns, number formats and collation from it. The same pwsh 7.7.0
+date patterns, number formats and collation from it. The same reference pwsh
 therefore prints different text on systems with different ICU data. Under
 ICU 78.3, en-US puts U+202F NARROW NO-BREAK SPACE before AM/PM:
 
@@ -235,9 +251,9 @@ pseudo-terminal by its own harness (#15).
 
 ## Quirks
 
-pwsh 7.7.0's behaviour is the specification, including behaviour that looks
+The reference pwsh's behaviour is the specification, including behaviour that looks
 accidental. Changing it is an improvement in the sense of DESIGN.md §9: only
-after parity, and only behind an opt-in. When the pinned release moves, the
+after parity, and only behind an opt-in. When the reference release moves, the
 goldens are re-recorded and every changed golden is reviewed as a change in
 upstream's behaviour (`.github/workflows/performance.yml` already re-records
 and diffs weekly).
@@ -256,7 +272,9 @@ supported (#139, #140).
 | reference recorded | `conform record` writes `tests/conformance/reference.txt` |
 | deterministic goldens | `conform record` (3 runs per case), unit test `repeated_runs_must_agree` |
 | C1 | `judge`, `cargo harness conform check` in CI |
-| C2–C4 | #14 |
+| C2 | `judge`, `<name>.stderr`, per-case level directive |
+| C3–C4 | `contract/streams`, `contract/error-records` |
+| PTY prompt, Ctrl-C, `less` | `cargo harness conform pty record` / `check` |
 | refusal recognised only with its marker | unit test `exit_code_99_without_the_marker_is_an_ordinary_result` |
 | refusal not catchable | #63 |
 | identity | `contract/version-table` |

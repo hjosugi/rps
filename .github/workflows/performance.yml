@@ -1,7 +1,7 @@
 name: Performance
 
 # Shared runners are noisy: this run shows that the harness works against the
-# pinned pwsh and gives a rough ratio. Numbers that are cited come from a
+# reference pwsh and gives a rough ratio. Numbers that are cited come from a
 # quiet machine and are kept in bench/baselines/ (DESIGN.md §7).
 on:
   workflow_dispatch:
@@ -45,7 +45,7 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: scripts/fetch-pwsh.sh
-      - name: Goldens still match the pinned pwsh
+      - name: Goldens still match the latest stable pwsh
         run: |
           cargo harness conform record
           git diff --exit-code -- tests/conformance

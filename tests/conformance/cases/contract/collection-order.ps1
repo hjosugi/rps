@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # docs/01_compat_contract.md, "What does not repeat". A Hashtable with
 # string keys enumerates in a different order in every pwsh process, so no
 # case may print one. Integer keys hash to themselves and the order is the

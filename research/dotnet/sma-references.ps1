@@ -1,5 +1,5 @@
 # Which types and members of System.Management.Automation the binary modules
-# shipped with pwsh 7.7.0 actually reference: the part of the SMA facade
+# shipped with the reference pwsh actually reference: the part of the SMA facade
 # (docs/06_dotnet_bridge.md, #128) those modules need. Read from metadata;
 # no module is loaded.
 param([string[]] $Path)

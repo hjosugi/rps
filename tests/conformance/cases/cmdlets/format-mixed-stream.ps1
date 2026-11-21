@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # The first object decides the table layout for the rest of the output
 # stream: later objects of another shape are squeezed into its columns.
 [pscustomobject]@{ Name = 'a'; Value = 1 }, [pscustomobject]@{ Name = 'bb'; Value = 22 }

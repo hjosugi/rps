@@ -1,103 +1,103 @@
-accelerator	type	status
-Alias	System.Management.Automation.AliasAttribute	todo
-AllowEmptyCollection	System.Management.Automation.AllowEmptyCollectionAttribute	todo
-AllowEmptyString	System.Management.Automation.AllowEmptyStringAttribute	todo
-AllowNull	System.Management.Automation.AllowNullAttribute	todo
-ArgumentCompleter	System.Management.Automation.ArgumentCompleterAttribute	todo
-ArgumentCompletions	System.Management.Automation.ArgumentCompletionsAttribute	todo
-array	System.Array	todo
-bigint	System.Numerics.BigInteger	todo
-bool	System.Boolean	todo
-byte	System.Byte	todo
-char	System.Char	todo
-cimclass	Microsoft.Management.Infrastructure.CimClass	todo
-cimconverter	Microsoft.Management.Infrastructure.CimConverter	todo
-ciminstance	Microsoft.Management.Infrastructure.CimInstance	todo
-CimSession	Microsoft.Management.Infrastructure.CimSession	todo
-cimtype	Microsoft.Management.Infrastructure.CimType	todo
-CmdletBinding	System.Management.Automation.CmdletBindingAttribute	todo
-cultureinfo	System.Globalization.CultureInfo	todo
-datetime	System.DateTime	todo
-decimal	System.Decimal	todo
-double	System.Double	todo
-DscLocalConfigurationManager	System.Management.Automation.DscLocalConfigurationManagerAttribute	todo
-DscProperty	System.Management.Automation.DscPropertyAttribute	todo
-DscResource	System.Management.Automation.DscResourceAttribute	todo
-ExperimentAction	System.Management.Automation.ExperimentAction	todo
-Experimental	System.Management.Automation.ExperimentalAttribute	todo
-ExperimentalFeature	System.Management.Automation.ExperimentalFeature	todo
-float	System.Single	todo
-guid	System.Guid	todo
-hashtable	System.Collections.Hashtable	todo
-initialsessionstate	System.Management.Automation.Runspaces.InitialSessionState	todo
-int	System.Int32	todo
-int16	System.Int16	todo
-int32	System.Int32	todo
-int64	System.Int64	todo
-ipaddress	System.Net.IPAddress	todo
-IPEndpoint	System.Net.IPEndPoint	todo
-long	System.Int64	todo
-mailaddress	System.Net.Mail.MailAddress	todo
-NoRunspaceAffinity	System.Management.Automation.Language.NoRunspaceAffinityAttribute	todo
-NullString	System.Management.Automation.Language.NullString	todo
-ObjectSecurity	System.Security.AccessControl.ObjectSecurity	todo
-ordered	System.Collections.Specialized.OrderedDictionary	todo
-OutputType	System.Management.Automation.OutputTypeAttribute	todo
-Parameter	System.Management.Automation.ParameterAttribute	todo
-PhysicalAddress	System.Net.NetworkInformation.PhysicalAddress	todo
-powershell	System.Management.Automation.PowerShell	todo
-psaliasproperty	System.Management.Automation.PSAliasProperty	todo
-pscredential	System.Management.Automation.PSCredential	todo
-pscustomobject	System.Management.Automation.PSObject	todo
-PSDefaultValue	System.Management.Automation.PSDefaultValueAttribute	todo
-pslistmodifier	System.Management.Automation.PSListModifier	todo
-psmoduleinfo	System.Management.Automation.PSModuleInfo	todo
-psnoteproperty	System.Management.Automation.PSNoteProperty	todo
-psobject	System.Management.Automation.PSObject	todo
-psprimitivedictionary	System.Management.Automation.PSPrimitiveDictionary	todo
-pspropertyexpression	Microsoft.PowerShell.Commands.PSPropertyExpression	todo
-psscriptmethod	System.Management.Automation.PSScriptMethod	todo
-psscriptproperty	System.Management.Automation.PSScriptProperty	todo
-PSTypeNameAttribute	System.Management.Automation.PSTypeNameAttribute	todo
-psvariable	System.Management.Automation.PSVariable	todo
-psvariableproperty	System.Management.Automation.PSVariableProperty	todo
-ref	System.Management.Automation.PSReference	todo
-regex	System.Text.RegularExpressions.Regex	todo
-runspace	System.Management.Automation.Runspaces.Runspace	todo
-runspacefactory	System.Management.Automation.Runspaces.RunspaceFactory	todo
-sbyte	System.SByte	todo
-scriptblock	System.Management.Automation.ScriptBlock	todo
-securestring	System.Security.SecureString	todo
-semver	System.Management.Automation.SemanticVersion	todo
-short	System.Int16	todo
-single	System.Single	todo
-string	System.String	todo
-SupportsWildcards	System.Management.Automation.SupportsWildcardsAttribute	todo
-switch	System.Management.Automation.SwitchParameter	todo
-timespan	System.TimeSpan	todo
-type	System.Type	todo
-uint	System.UInt32	todo
-uint16	System.UInt16	todo
-uint32	System.UInt32	todo
-uint64	System.UInt64	todo
-ulong	System.UInt64	todo
-uri	System.Uri	todo
-ushort	System.UInt16	todo
-ValidateCount	System.Management.Automation.ValidateCountAttribute	todo
-ValidateDrive	System.Management.Automation.ValidateDriveAttribute	todo
-ValidateLength	System.Management.Automation.ValidateLengthAttribute	todo
-ValidateNotNull	System.Management.Automation.ValidateNotNullAttribute	todo
-ValidateNotNullOrEmpty	System.Management.Automation.ValidateNotNullOrEmptyAttribute	todo
-ValidateNotNullOrWhiteSpace	System.Management.Automation.ValidateNotNullOrWhiteSpaceAttribute	todo
-ValidatePattern	System.Management.Automation.ValidatePatternAttribute	todo
-ValidateRange	System.Management.Automation.ValidateRangeAttribute	todo
-ValidateScript	System.Management.Automation.ValidateScriptAttribute	todo
-ValidateSet	System.Management.Automation.ValidateSetAttribute	todo
-ValidateTrustedData	System.Management.Automation.ValidateTrustedDataAttribute	todo
-ValidateUserDrive	System.Management.Automation.ValidateUserDriveAttribute	todo
-version	System.Version	todo
-void	System.Void	todo
-WildcardPattern	System.Management.Automation.WildcardPattern	todo
-X500DistinguishedName	System.Security.Cryptography.X509Certificates.X500DistinguishedName	todo
-X509Certificate	System.Security.Cryptography.X509Certificates.X509Certificate	todo
-xml	System.Xml.XmlDocument	todo
+accelerator	type	platform	status
+Alias	System.Management.Automation.AliasAttribute	linux-x64	todo
+AllowEmptyCollection	System.Management.Automation.AllowEmptyCollectionAttribute	linux-x64	todo
+AllowEmptyString	System.Management.Automation.AllowEmptyStringAttribute	linux-x64	todo
+AllowNull	System.Management.Automation.AllowNullAttribute	linux-x64	todo
+ArgumentCompleter	System.Management.Automation.ArgumentCompleterAttribute	linux-x64	todo
+ArgumentCompletions	System.Management.Automation.ArgumentCompletionsAttribute	linux-x64	todo
+array	System.Array	linux-x64	todo
+bigint	System.Numerics.BigInteger	linux-x64	todo
+bool	System.Boolean	linux-x64	todo
+byte	System.Byte	linux-x64	todo
+char	System.Char	linux-x64	todo
+cimclass	Microsoft.Management.Infrastructure.CimClass	linux-x64	todo
+cimconverter	Microsoft.Management.Infrastructure.CimConverter	linux-x64	todo
+ciminstance	Microsoft.Management.Infrastructure.CimInstance	linux-x64	todo
+CimSession	Microsoft.Management.Infrastructure.CimSession	linux-x64	todo
+cimtype	Microsoft.Management.Infrastructure.CimType	linux-x64	todo
+CmdletBinding	System.Management.Automation.CmdletBindingAttribute	linux-x64	todo
+cultureinfo	System.Globalization.CultureInfo	linux-x64	todo
+datetime	System.DateTime	linux-x64	todo
+decimal	System.Decimal	linux-x64	todo
+double	System.Double	linux-x64	todo
+DscLocalConfigurationManager	System.Management.Automation.DscLocalConfigurationManagerAttribute	linux-x64	todo
+DscProperty	System.Management.Automation.DscPropertyAttribute	linux-x64	todo
+DscResource	System.Management.Automation.DscResourceAttribute	linux-x64	todo
+ExperimentAction	System.Management.Automation.ExperimentAction	linux-x64	todo
+Experimental	System.Management.Automation.ExperimentalAttribute	linux-x64	todo
+ExperimentalFeature	System.Management.Automation.ExperimentalFeature	linux-x64	todo
+float	System.Single	linux-x64	todo
+guid	System.Guid	linux-x64	todo
+hashtable	System.Collections.Hashtable	linux-x64	todo
+initialsessionstate	System.Management.Automation.Runspaces.InitialSessionState	linux-x64	todo
+int	System.Int32	linux-x64	todo
+int16	System.Int16	linux-x64	todo
+int32	System.Int32	linux-x64	todo
+int64	System.Int64	linux-x64	todo
+ipaddress	System.Net.IPAddress	linux-x64	todo
+IPEndpoint	System.Net.IPEndPoint	linux-x64	todo
+long	System.Int64	linux-x64	todo
+mailaddress	System.Net.Mail.MailAddress	linux-x64	todo
+NoRunspaceAffinity	System.Management.Automation.Language.NoRunspaceAffinityAttribute	linux-x64	todo
+NullString	System.Management.Automation.Language.NullString	linux-x64	todo
+ObjectSecurity	System.Security.AccessControl.ObjectSecurity	linux-x64	todo
+ordered	System.Collections.Specialized.OrderedDictionary	linux-x64	todo
+OutputType	System.Management.Automation.OutputTypeAttribute	linux-x64	todo
+Parameter	System.Management.Automation.ParameterAttribute	linux-x64	todo
+PhysicalAddress	System.Net.NetworkInformation.PhysicalAddress	linux-x64	todo
+powershell	System.Management.Automation.PowerShell	linux-x64	todo
+psaliasproperty	System.Management.Automation.PSAliasProperty	linux-x64	todo
+pscredential	System.Management.Automation.PSCredential	linux-x64	todo
+pscustomobject	System.Management.Automation.PSObject	linux-x64	todo
+PSDefaultValue	System.Management.Automation.PSDefaultValueAttribute	linux-x64	todo
+pslistmodifier	System.Management.Automation.PSListModifier	linux-x64	todo
+psmoduleinfo	System.Management.Automation.PSModuleInfo	linux-x64	todo
+psnoteproperty	System.Management.Automation.PSNoteProperty	linux-x64	todo
+psobject	System.Management.Automation.PSObject	linux-x64	todo
+psprimitivedictionary	System.Management.Automation.PSPrimitiveDictionary	linux-x64	todo
+pspropertyexpression	Microsoft.PowerShell.Commands.PSPropertyExpression	linux-x64	todo
+psscriptmethod	System.Management.Automation.PSScriptMethod	linux-x64	todo
+psscriptproperty	System.Management.Automation.PSScriptProperty	linux-x64	todo
+PSTypeNameAttribute	System.Management.Automation.PSTypeNameAttribute	linux-x64	todo
+psvariable	System.Management.Automation.PSVariable	linux-x64	todo
+psvariableproperty	System.Management.Automation.PSVariableProperty	linux-x64	todo
+ref	System.Management.Automation.PSReference	linux-x64	todo
+regex	System.Text.RegularExpressions.Regex	linux-x64	todo
+runspace	System.Management.Automation.Runspaces.Runspace	linux-x64	todo
+runspacefactory	System.Management.Automation.Runspaces.RunspaceFactory	linux-x64	todo
+sbyte	System.SByte	linux-x64	todo
+scriptblock	System.Management.Automation.ScriptBlock	linux-x64	todo
+securestring	System.Security.SecureString	linux-x64	todo
+semver	System.Management.Automation.SemanticVersion	linux-x64	todo
+short	System.Int16	linux-x64	todo
+single	System.Single	linux-x64	todo
+string	System.String	linux-x64	todo
+SupportsWildcards	System.Management.Automation.SupportsWildcardsAttribute	linux-x64	todo
+switch	System.Management.Automation.SwitchParameter	linux-x64	todo
+timespan	System.TimeSpan	linux-x64	todo
+type	System.Type	linux-x64	todo
+uint	System.UInt32	linux-x64	todo
+uint16	System.UInt16	linux-x64	todo
+uint32	System.UInt32	linux-x64	todo
+uint64	System.UInt64	linux-x64	todo
+ulong	System.UInt64	linux-x64	todo
+uri	System.Uri	linux-x64	todo
+ushort	System.UInt16	linux-x64	todo
+ValidateCount	System.Management.Automation.ValidateCountAttribute	linux-x64	todo
+ValidateDrive	System.Management.Automation.ValidateDriveAttribute	linux-x64	todo
+ValidateLength	System.Management.Automation.ValidateLengthAttribute	linux-x64	todo
+ValidateNotNull	System.Management.Automation.ValidateNotNullAttribute	linux-x64	todo
+ValidateNotNullOrEmpty	System.Management.Automation.ValidateNotNullOrEmptyAttribute	linux-x64	todo
+ValidateNotNullOrWhiteSpace	System.Management.Automation.ValidateNotNullOrWhiteSpaceAttribute	linux-x64	todo
+ValidatePattern	System.Management.Automation.ValidatePatternAttribute	linux-x64	todo
+ValidateRange	System.Management.Automation.ValidateRangeAttribute	linux-x64	todo
+ValidateScript	System.Management.Automation.ValidateScriptAttribute	linux-x64	todo
+ValidateSet	System.Management.Automation.ValidateSetAttribute	linux-x64	todo
+ValidateTrustedData	System.Management.Automation.ValidateTrustedDataAttribute	linux-x64	todo
+ValidateUserDrive	System.Management.Automation.ValidateUserDriveAttribute	linux-x64	todo
+version	System.Version	linux-x64	todo
+void	System.Void	linux-x64	todo
+WildcardPattern	System.Management.Automation.WildcardPattern	linux-x64	todo
+X500DistinguishedName	System.Security.Cryptography.X509Certificates.X500DistinguishedName	linux-x64	todo
+X509Certificate	System.Security.Cryptography.X509Certificates.X509Certificate	linux-x64	todo
+xml	System.Xml.XmlDocument	linux-x64	todo

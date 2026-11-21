@@ -1,75 +1,75 @@
-node	base	shape	status
-ArrayExpressionAst	ExpressionAst	open	todo
-ArrayLiteralAst	ExpressionAst	open	todo
-AssignmentStatementAst	PipelineBaseAst	open	todo
-AttributeAst	AttributeBaseAst	open	todo
-AttributeBaseAst	Ast	abstract	todo
-AttributedExpressionAst	ExpressionAst	open	todo
-BaseCtorInvokeMemberExpressionAst	InvokeMemberExpressionAst	open	todo
-BinaryExpressionAst	ExpressionAst	open	todo
-BlockStatementAst	StatementAst	open	todo
-BreakStatementAst	StatementAst	open	todo
-CatchClauseAst	Ast	open	todo
-ChainableAst	PipelineBaseAst	abstract	todo
-CommandAst	CommandBaseAst	open	todo
-CommandBaseAst	StatementAst	abstract	todo
-CommandElementAst	Ast	abstract	todo
-CommandExpressionAst	CommandBaseAst	open	todo
-CommandParameterAst	CommandElementAst	open	todo
-ConfigurationDefinitionAst	StatementAst	open	todo
-ConstantExpressionAst	ExpressionAst	open	todo
-ContinueStatementAst	StatementAst	open	todo
-ConvertExpressionAst	AttributedExpressionAst	open	todo
-DataStatementAst	StatementAst	open	todo
-DoUntilStatementAst	LoopStatementAst	open	todo
-DoWhileStatementAst	LoopStatementAst	open	todo
-DynamicKeywordStatementAst	StatementAst	open	todo
-ErrorExpressionAst	ExpressionAst	open	todo
-ErrorStatementAst	PipelineBaseAst	open	todo
-ExitStatementAst	StatementAst	open	todo
-ExpandableStringExpressionAst	ExpressionAst	open	todo
-ExpressionAst	CommandElementAst	abstract	todo
-FileRedirectionAst	RedirectionAst	open	todo
-ForEachStatementAst	LoopStatementAst	open	todo
-ForStatementAst	LoopStatementAst	open	todo
-FunctionDefinitionAst	StatementAst	open	todo
-FunctionMemberAst	MemberAst	open	todo
-HashtableAst	ExpressionAst	open	todo
-IfStatementAst	StatementAst	open	todo
-IndexExpressionAst	ExpressionAst	open	todo
-InvokeMemberExpressionAst	MemberExpressionAst	open	todo
-LabeledStatementAst	StatementAst	abstract	todo
-LoopStatementAst	LabeledStatementAst	abstract	todo
-MemberAst	Ast	abstract	todo
-MemberExpressionAst	ExpressionAst	open	todo
-MergingRedirectionAst	RedirectionAst	open	todo
-NamedAttributeArgumentAst	Ast	open	todo
-NamedBlockAst	Ast	open	todo
-ParamBlockAst	Ast	open	todo
-ParameterAst	Ast	open	todo
-ParenExpressionAst	ExpressionAst	open	todo
-PipelineAst	ChainableAst	open	todo
-PipelineBaseAst	StatementAst	abstract	todo
-PipelineChainAst	ChainableAst	open	todo
-PropertyMemberAst	MemberAst	open	todo
-RedirectionAst	Ast	abstract	todo
-ReturnStatementAst	StatementAst	open	todo
-ScriptBlockAst	Ast	open	todo
-ScriptBlockExpressionAst	ExpressionAst	open	todo
-StatementAst	Ast	abstract	todo
-StatementBlockAst	Ast	open	todo
-StringConstantExpressionAst	ConstantExpressionAst	open	todo
-SubExpressionAst	ExpressionAst	open	todo
-SwitchStatementAst	LabeledStatementAst	open	todo
-TernaryExpressionAst	ExpressionAst	open	todo
-ThrowStatementAst	StatementAst	open	todo
-TrapStatementAst	StatementAst	open	todo
-TryStatementAst	StatementAst	open	todo
-TypeConstraintAst	AttributeBaseAst	open	todo
-TypeDefinitionAst	StatementAst	open	todo
-TypeExpressionAst	ExpressionAst	open	todo
-UnaryExpressionAst	ExpressionAst	open	todo
-UsingExpressionAst	ExpressionAst	open	todo
-UsingStatementAst	StatementAst	open	todo
-VariableExpressionAst	ExpressionAst	open	todo
-WhileStatementAst	LoopStatementAst	open	todo
+node	base	shape	platform	status
+ArrayExpressionAst	ExpressionAst	open	linux-x64	todo
+ArrayLiteralAst	ExpressionAst	open	linux-x64	todo
+AssignmentStatementAst	PipelineBaseAst	open	linux-x64	todo
+AttributeAst	AttributeBaseAst	open	linux-x64	todo
+AttributeBaseAst	Ast	abstract	linux-x64	todo
+AttributedExpressionAst	ExpressionAst	open	linux-x64	todo
+BaseCtorInvokeMemberExpressionAst	InvokeMemberExpressionAst	open	linux-x64	todo
+BinaryExpressionAst	ExpressionAst	open	linux-x64	todo
+BlockStatementAst	StatementAst	open	linux-x64	todo
+BreakStatementAst	StatementAst	open	linux-x64	todo
+CatchClauseAst	Ast	open	linux-x64	todo
+ChainableAst	PipelineBaseAst	abstract	linux-x64	todo
+CommandAst	CommandBaseAst	open	linux-x64	todo
+CommandBaseAst	StatementAst	abstract	linux-x64	todo
+CommandElementAst	Ast	abstract	linux-x64	todo
+CommandExpressionAst	CommandBaseAst	open	linux-x64	todo
+CommandParameterAst	CommandElementAst	open	linux-x64	todo
+ConfigurationDefinitionAst	StatementAst	open	linux-x64	todo
+ConstantExpressionAst	ExpressionAst	open	linux-x64	todo
+ContinueStatementAst	StatementAst	open	linux-x64	todo
+ConvertExpressionAst	AttributedExpressionAst	open	linux-x64	todo
+DataStatementAst	StatementAst	open	linux-x64	todo
+DoUntilStatementAst	LoopStatementAst	open	linux-x64	todo
+DoWhileStatementAst	LoopStatementAst	open	linux-x64	todo
+DynamicKeywordStatementAst	StatementAst	open	linux-x64	todo
+ErrorExpressionAst	ExpressionAst	open	linux-x64	todo
+ErrorStatementAst	PipelineBaseAst	open	linux-x64	todo
+ExitStatementAst	StatementAst	open	linux-x64	todo
+ExpandableStringExpressionAst	ExpressionAst	open	linux-x64	todo
+ExpressionAst	CommandElementAst	abstract	linux-x64	todo
+FileRedirectionAst	RedirectionAst	open	linux-x64	todo
+ForEachStatementAst	LoopStatementAst	open	linux-x64	todo
+ForStatementAst	LoopStatementAst	open	linux-x64	todo
+FunctionDefinitionAst	StatementAst	open	linux-x64	todo
+FunctionMemberAst	MemberAst	open	linux-x64	todo
+HashtableAst	ExpressionAst	open	linux-x64	todo
+IfStatementAst	StatementAst	open	linux-x64	todo
+IndexExpressionAst	ExpressionAst	open	linux-x64	todo
+InvokeMemberExpressionAst	MemberExpressionAst	open	linux-x64	todo
+LabeledStatementAst	StatementAst	abstract	linux-x64	todo
+LoopStatementAst	LabeledStatementAst	abstract	linux-x64	todo
+MemberAst	Ast	abstract	linux-x64	todo
+MemberExpressionAst	ExpressionAst	open	linux-x64	todo
+MergingRedirectionAst	RedirectionAst	open	linux-x64	todo
+NamedAttributeArgumentAst	Ast	open	linux-x64	todo
+NamedBlockAst	Ast	open	linux-x64	todo
+ParamBlockAst	Ast	open	linux-x64	todo
+ParameterAst	Ast	open	linux-x64	todo
+ParenExpressionAst	ExpressionAst	open	linux-x64	todo
+PipelineAst	ChainableAst	open	linux-x64	todo
+PipelineBaseAst	StatementAst	abstract	linux-x64	todo
+PipelineChainAst	ChainableAst	open	linux-x64	todo
+PropertyMemberAst	MemberAst	open	linux-x64	todo
+RedirectionAst	Ast	abstract	linux-x64	todo
+ReturnStatementAst	StatementAst	open	linux-x64	todo
+ScriptBlockAst	Ast	open	linux-x64	todo
+ScriptBlockExpressionAst	ExpressionAst	open	linux-x64	todo
+StatementAst	Ast	abstract	linux-x64	todo
+StatementBlockAst	Ast	open	linux-x64	todo
+StringConstantExpressionAst	ConstantExpressionAst	open	linux-x64	todo
+SubExpressionAst	ExpressionAst	open	linux-x64	todo
+SwitchStatementAst	LabeledStatementAst	open	linux-x64	todo
+TernaryExpressionAst	ExpressionAst	open	linux-x64	todo
+ThrowStatementAst	StatementAst	open	linux-x64	todo
+TrapStatementAst	StatementAst	open	linux-x64	todo
+TryStatementAst	StatementAst	open	linux-x64	todo
+TypeConstraintAst	AttributeBaseAst	open	linux-x64	todo
+TypeDefinitionAst	StatementAst	open	linux-x64	todo
+TypeExpressionAst	ExpressionAst	open	linux-x64	todo
+UnaryExpressionAst	ExpressionAst	open	linux-x64	todo
+UsingExpressionAst	ExpressionAst	open	linux-x64	todo
+UsingStatementAst	StatementAst	open	linux-x64	todo
+VariableExpressionAst	ExpressionAst	open	linux-x64	todo
+WhileStatementAst	LoopStatementAst	open	linux-x64	todo

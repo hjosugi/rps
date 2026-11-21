@@ -7,6 +7,10 @@ mod conform;
 mod engines;
 mod inventory;
 mod json;
+mod profiles;
+mod pty;
+mod rusage;
+mod shells;
 mod stats;
 
 use std::path::PathBuf;
@@ -15,23 +19,40 @@ use std::process::ExitCode;
 const USAGE: &str = "\
 Usage: cargo harness <command>
 
-  bench [--runs N] [--warmup N] [--filter TEXT] [--out FILE]
-        [--pwsh PATH] [--rpsh PATH]
-      Time every script in bench/cases under pwsh and rpsh. A speedup is
-      reported only for cases where rpsh's stdout and exit code equal pwsh's.
+  bench [--suite scripts|shells] [--runs N] [--warmup N] [--filter TEXT]
+        [--out FILE] [--compare BASELINE.json]
+        [--export-hyperfine FILE] [--pwsh PATH] [--rpsh PATH]
+        [--budget-scale N]
+      suite=scripts times every script in bench/cases under pwsh and rpsh.
+      A speedup is reported only for cases where rpsh's stdout and exit code
+      equal pwsh's. Peak RSS and CPU time come from wait4
+      (scripts/spawn-measure.c). --compare prints a diff against an earlier
+      result file, and --export-hyperfine writes hyperfine-compatible JSON.
+      suite=shells compares bash, dash, zsh, fish, nu, pwsh and rpsh: a
+      one-line run and time to the first prompt on a pseudo-terminal.
+      suite=profiles times pwsh with the fixture profiles in bench/profiles:
+      an empty profile, 100 functions, a module import, tool init | iex and
+      alias/completer registration.
 
   conform record [--filter TEXT] [--pwsh PATH]
-      Run tests/conformance/cases under the pinned pwsh and store what it
+      Run tests/conformance/cases under the reference pwsh and store what it
       printed next to each case as <name>.golden.
 
   conform check [--bless] [--filter TEXT] [--rpsh PATH]
       Run the cases under rpsh and compare with the goldens. Needs no pwsh.
       --bless rewrites tests/conformance/passing.txt to the cases that pass.
 
+  conform pty record|check [--filter TEXT] [--repeat N]
+        [--pwsh PATH] [--rpsh PATH]
+      Run the manifests in tests/conformance/pty on a pseudo-terminal.
+      record uses pwsh, check uses rpsh; each compares the final screen, exit
+      code and timeout. This is separate from scripts/check.sh until rpsh has
+      an interactive host.
+
   inventory
       Summarize inventory/*.tsv: how much of upstream's surface is done.
 
-The pinned pwsh is found through --pwsh, $RPSH_PWSH, .cache/pwsh/ (filled by
+The reference pwsh is found through --pwsh, $RPSH_PWSH, .cache/pwsh/ (filled by
 scripts/fetch-pwsh.sh), then PATH.";
 
 fn main() -> ExitCode {

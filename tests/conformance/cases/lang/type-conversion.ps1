@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # The left operand decides the type of the operation.
 1 + '2'
 '1' + 2

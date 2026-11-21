@@ -1,0 +1,5 @@
+{
+  "exit_code": 0,
+  "screen": "pty fixture line 1\npty fixture line 2\nfixture.txt (END)",
+  "timed_out": false
+}

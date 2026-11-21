@@ -1,54 +1,54 @@
-name	type	options	status
-?	System.Boolean	ReadOnly, AllScope	todo
-^		None	todo
-$		None	todo
-args	System.Object[]	None	todo
-ConfirmPreference	System.Management.Automation.ConfirmImpact	None	todo
-DebugPreference	System.Management.Automation.ActionPreference	None	todo
-EnabledExperimentalFeatures	System.Management.Automation.Internal.ReadOnlyBag`1[[System.String, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	Constant, AllScope	todo
-Error	System.Collections.ArrayList	Constant	todo
-ErrorActionPreference	System.Management.Automation.ActionPreference	None	todo
-ErrorView	System.Management.Automation.ErrorView	None	todo
-ExecutionContext	System.Management.Automation.EngineIntrinsics	Constant, AllScope	todo
-false	System.Boolean	Constant, AllScope	todo
-FormatEnumerationLimit	System.Int32	None	todo
-HOME	System.String	ReadOnly, AllScope	todo
-Host	System.Management.Automation.Internal.Host.InternalHost	Constant, AllScope	todo
-InformationPreference	System.Management.Automation.ActionPreference	None	todo
-input	System.Collections.ArrayList+ArrayListEnumeratorSimple	None	todo
-IsCoreCLR	System.Boolean	ReadOnly, AllScope	todo
-IsLinux	System.Boolean	ReadOnly, AllScope	todo
-IsMacOS	System.Boolean	ReadOnly, AllScope	todo
-IsWindows	System.Boolean	ReadOnly, AllScope	todo
-MaximumHistoryCount	System.Int32	None	todo
-MyInvocation	System.Management.Automation.InvocationInfo	None	todo
-NestedPromptLevel	System.Int32	None	todo
-null		None	todo
-OutputEncoding	System.Text.UTF8Encoding+UTF8EncodingSealed	None	todo
-PID	System.Int32	Constant, AllScope	todo
-PROFILE	System.String	None	todo
-ProgressPreference	System.Management.Automation.ActionPreference	None	todo
-PSApplicationOutputEncoding		None	todo
-PSBoundParameters	System.Management.Automation.PSBoundParametersDictionary	None	todo
-PSCommandPath	System.String	None	todo
-PSCulture	System.String	ReadOnly, AllScope	todo
-PSDefaultParameterValues	System.Management.Automation.DefaultParameterDictionary	None	todo
-PSEdition	System.String	Constant, AllScope	todo
-PSEmailServer	System.String	None	todo
-PSHOME	System.String	Constant, AllScope	todo
-PSNativeCommandArgumentPassing	System.Management.Automation.NativeArgumentPassingStyle	None	todo
-PSNativeCommandUseErrorActionPreference	System.Boolean	None	todo
-PSScriptRoot	System.String	None	todo
-PSSessionApplicationName	System.String	None	todo
-PSSessionConfigurationName	System.String	None	todo
-PSSessionOption	System.Management.Automation.Remoting.PSSessionOption	None	todo
-PSStyle	System.Management.Automation.PSStyle	Constant	todo
-PSUICulture	System.String	ReadOnly, AllScope	todo
-PSVersionTable	System.Management.Automation.PSVersionHashTable	Constant, AllScope	todo
-PWD	System.Management.Automation.PathInfo	None	todo
-ShellId	System.String	Constant, AllScope	todo
-StackTrace		None	todo
-true	System.Boolean	Constant, AllScope	todo
-VerbosePreference	System.Management.Automation.ActionPreference	None	todo
-WarningPreference	System.Management.Automation.ActionPreference	None	todo
-WhatIfPreference	System.Boolean	None	todo
+name	type	options	platform	status
+?	System.Boolean	ReadOnly, AllScope	linux-x64	todo
+^		None	linux-x64	todo
+$		None	linux-x64	todo
+args	System.Object[]	None	linux-x64	todo
+ConfirmPreference	System.Management.Automation.ConfirmImpact	None	linux-x64	todo
+DebugPreference	System.Management.Automation.ActionPreference	None	linux-x64	todo
+EnabledExperimentalFeatures	System.Management.Automation.Internal.ReadOnlyBag`1[[System.String, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]	Constant, AllScope	linux-x64	todo
+Error	System.Collections.ArrayList	Constant	linux-x64	todo
+ErrorActionPreference	System.Management.Automation.ActionPreference	None	linux-x64	todo
+ErrorView	System.Management.Automation.ErrorView	None	linux-x64	todo
+ExecutionContext	System.Management.Automation.EngineIntrinsics	Constant, AllScope	linux-x64	todo
+false	System.Boolean	Constant, AllScope	linux-x64	todo
+FormatEnumerationLimit	System.Int32	None	linux-x64	todo
+HOME	System.String	ReadOnly, AllScope	linux-x64	todo
+Host	System.Management.Automation.Internal.Host.InternalHost	Constant, AllScope	linux-x64	todo
+InformationPreference	System.Management.Automation.ActionPreference	None	linux-x64	todo
+input	System.Collections.ArrayList+ArrayListEnumeratorSimple	None	linux-x64	todo
+IsCoreCLR	System.Boolean	ReadOnly, AllScope	linux-x64	todo
+IsLinux	System.Boolean	ReadOnly, AllScope	linux-x64	todo
+IsMacOS	System.Boolean	ReadOnly, AllScope	linux-x64	todo
+IsWindows	System.Boolean	ReadOnly, AllScope	linux-x64	todo
+MaximumHistoryCount	System.Int32	None	linux-x64	todo
+MyInvocation	System.Management.Automation.InvocationInfo	None	linux-x64	todo
+NestedPromptLevel	System.Int32	None	linux-x64	todo
+null		None	linux-x64	todo
+OutputEncoding	System.Text.UTF8Encoding+UTF8EncodingSealed	None	linux-x64	todo
+PID	System.Int32	Constant, AllScope	linux-x64	todo
+PROFILE	System.String	None	linux-x64	todo
+ProgressPreference	System.Management.Automation.ActionPreference	None	linux-x64	todo
+PSApplicationOutputEncoding		None	linux-x64	todo
+PSBoundParameters	System.Management.Automation.PSBoundParametersDictionary	None	linux-x64	todo
+PSCommandPath	System.String	None	linux-x64	todo
+PSCulture	System.String	ReadOnly, AllScope	linux-x64	todo
+PSDefaultParameterValues	System.Management.Automation.DefaultParameterDictionary	None	linux-x64	todo
+PSEdition	System.String	Constant, AllScope	linux-x64	todo
+PSEmailServer	System.String	None	linux-x64	todo
+PSHOME	System.String	Constant, AllScope	linux-x64	todo
+PSNativeCommandArgumentPassing	System.Management.Automation.NativeArgumentPassingStyle	None	linux-x64	todo
+PSNativeCommandUseErrorActionPreference	System.Boolean	None	linux-x64	todo
+PSScriptRoot	System.String	None	linux-x64	todo
+PSSessionApplicationName	System.String	None	linux-x64	todo
+PSSessionConfigurationName	System.String	None	linux-x64	todo
+PSSessionOption	System.Management.Automation.Remoting.PSSessionOption	None	linux-x64	todo
+PSStyle	System.Management.Automation.PSStyle	Constant	linux-x64	todo
+PSUICulture	System.String	ReadOnly, AllScope	linux-x64	todo
+PSVersionTable	System.Management.Automation.PSVersionHashTable	Constant, AllScope	linux-x64	todo
+PWD	System.Management.Automation.PathInfo	None	linux-x64	todo
+ShellId	System.String	Constant, AllScope	linux-x64	todo
+StackTrace		None	linux-x64	todo
+true	System.Boolean	Constant, AllScope	linux-x64	todo
+VerbosePreference	System.Management.Automation.ActionPreference	None	linux-x64	todo
+WarningPreference	System.Management.Automation.ActionPreference	None	linux-x64	todo
+WhatIfPreference	System.Boolean	None	linux-x64	todo

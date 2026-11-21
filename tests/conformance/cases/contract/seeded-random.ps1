@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # docs/01_compat_contract.md, "What does not repeat". An unseeded random
 # number differs per run and may not be printed; a seeded sequence is the
 # same in every run and is part of the answer.

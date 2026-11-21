@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 switch (3) { 1 { 'one' } 3 { 'three' } default { 'other' } }
 switch -Wildcard ('apple') { 'a*' { 'starts with a' } '*e' { 'ends with e' } }
 switch -Regex ('abc123') { '\d+' { $Matches[0] } }

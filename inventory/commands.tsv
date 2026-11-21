@@ -1,299 +1,299 @@
-module	name	kind	status
-(session)	cd..	Function	todo
-(session)	cd\	Function	todo
-(session)	cd~	Function	todo
-(session)	Clear-Host	Function	todo
-(session)	exec	Function	todo
-(session)	help	Function	todo
-(session)	oss	Function	todo
-(session)	Pause	Function	todo
-(session)	prompt	Function	todo
-(session)	TabExpansion2	Function	todo
-Microsoft.PowerShell.Archive	Compress-Archive	Function	todo
-Microsoft.PowerShell.Archive	Expand-Archive	Function	todo
-Microsoft.PowerShell.Core	Add-History	Cmdlet	todo
-Microsoft.PowerShell.Core	Clear-History	Cmdlet	todo
-Microsoft.PowerShell.Core	Debug-Job	Cmdlet	todo
-Microsoft.PowerShell.Core	Disable-ExperimentalFeature	Cmdlet	todo
-Microsoft.PowerShell.Core	Enable-ExperimentalFeature	Cmdlet	todo
-Microsoft.PowerShell.Core	Enter-PSHostProcess	Cmdlet	todo
-Microsoft.PowerShell.Core	Enter-PSSession	Cmdlet	todo
-Microsoft.PowerShell.Core	Exit-PSHostProcess	Cmdlet	todo
-Microsoft.PowerShell.Core	Exit-PSSession	Cmdlet	todo
-Microsoft.PowerShell.Core	Export-ModuleMember	Cmdlet	todo
-Microsoft.PowerShell.Core	ForEach-Object	Cmdlet	todo
-Microsoft.PowerShell.Core	Get-Command	Cmdlet	todo
-Microsoft.PowerShell.Core	Get-ExperimentalFeature	Cmdlet	todo
-Microsoft.PowerShell.Core	Get-Help	Cmdlet	todo
-Microsoft.PowerShell.Core	Get-History	Cmdlet	todo
-Microsoft.PowerShell.Core	Get-Job	Cmdlet	todo
-Microsoft.PowerShell.Core	Get-Module	Cmdlet	todo
-Microsoft.PowerShell.Core	Get-PSHostProcessInfo	Cmdlet	todo
-Microsoft.PowerShell.Core	Get-PSSession	Cmdlet	todo
-Microsoft.PowerShell.Core	Get-PSSubsystem	Cmdlet	todo
-Microsoft.PowerShell.Core	Import-Module	Cmdlet	todo
-Microsoft.PowerShell.Core	Invoke-Command	Cmdlet	todo
-Microsoft.PowerShell.Core	Invoke-History	Cmdlet	todo
-Microsoft.PowerShell.Core	New-Module	Cmdlet	todo
-Microsoft.PowerShell.Core	New-ModuleManifest	Cmdlet	todo
-Microsoft.PowerShell.Core	New-PSRoleCapabilityFile	Cmdlet	todo
-Microsoft.PowerShell.Core	New-PSSession	Cmdlet	todo
-Microsoft.PowerShell.Core	New-PSSessionConfigurationFile	Cmdlet	todo
-Microsoft.PowerShell.Core	New-PSSessionOption	Cmdlet	todo
-Microsoft.PowerShell.Core	New-PSTransportOption	Cmdlet	todo
-Microsoft.PowerShell.Core	Out-Default	Cmdlet	todo
-Microsoft.PowerShell.Core	Out-Host	Cmdlet	todo
-Microsoft.PowerShell.Core	Out-Null	Cmdlet	todo
-Microsoft.PowerShell.Core	Receive-Job	Cmdlet	todo
-Microsoft.PowerShell.Core	Register-ArgumentCompleter	Cmdlet	todo
-Microsoft.PowerShell.Core	Remove-Job	Cmdlet	todo
-Microsoft.PowerShell.Core	Remove-Module	Cmdlet	todo
-Microsoft.PowerShell.Core	Remove-PSSession	Cmdlet	todo
-Microsoft.PowerShell.Core	Save-Help	Cmdlet	todo
-Microsoft.PowerShell.Core	Set-PSDebug	Cmdlet	todo
-Microsoft.PowerShell.Core	Set-StrictMode	Cmdlet	todo
-Microsoft.PowerShell.Core	Start-Job	Cmdlet	todo
-Microsoft.PowerShell.Core	Stop-Job	Cmdlet	todo
-Microsoft.PowerShell.Core	Switch-Process	Cmdlet	todo
-Microsoft.PowerShell.Core	Test-ModuleManifest	Cmdlet	todo
-Microsoft.PowerShell.Core	Update-Help	Cmdlet	todo
-Microsoft.PowerShell.Core	Wait-Job	Cmdlet	todo
-Microsoft.PowerShell.Core	Where-Object	Cmdlet	todo
-Microsoft.PowerShell.Host	Start-Transcript	Cmdlet	todo
-Microsoft.PowerShell.Host	Stop-Transcript	Cmdlet	todo
-Microsoft.PowerShell.Management	Add-Content	Cmdlet	todo
-Microsoft.PowerShell.Management	Clear-Content	Cmdlet	todo
-Microsoft.PowerShell.Management	Clear-Item	Cmdlet	todo
-Microsoft.PowerShell.Management	Clear-ItemProperty	Cmdlet	todo
-Microsoft.PowerShell.Management	Convert-Path	Cmdlet	todo
-Microsoft.PowerShell.Management	Copy-Item	Cmdlet	todo
-Microsoft.PowerShell.Management	Copy-ItemProperty	Cmdlet	todo
-Microsoft.PowerShell.Management	Debug-Process	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-ChildItem	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-Clipboard	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-Content	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-Item	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-ItemProperty	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-ItemPropertyValue	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-Location	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-Process	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-PSDrive	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-PSProvider	Cmdlet	todo
-Microsoft.PowerShell.Management	Get-TimeZone	Cmdlet	todo
-Microsoft.PowerShell.Management	Invoke-Item	Cmdlet	todo
-Microsoft.PowerShell.Management	Join-Path	Cmdlet	todo
-Microsoft.PowerShell.Management	Move-Item	Cmdlet	todo
-Microsoft.PowerShell.Management	Move-ItemProperty	Cmdlet	todo
-Microsoft.PowerShell.Management	New-Item	Cmdlet	todo
-Microsoft.PowerShell.Management	New-ItemProperty	Cmdlet	todo
-Microsoft.PowerShell.Management	New-PSDrive	Cmdlet	todo
-Microsoft.PowerShell.Management	Pop-Location	Cmdlet	todo
-Microsoft.PowerShell.Management	Push-Location	Cmdlet	todo
-Microsoft.PowerShell.Management	Remove-Item	Cmdlet	todo
-Microsoft.PowerShell.Management	Remove-ItemProperty	Cmdlet	todo
-Microsoft.PowerShell.Management	Remove-PSDrive	Cmdlet	todo
-Microsoft.PowerShell.Management	Rename-Item	Cmdlet	todo
-Microsoft.PowerShell.Management	Rename-ItemProperty	Cmdlet	todo
-Microsoft.PowerShell.Management	Resolve-Path	Cmdlet	todo
-Microsoft.PowerShell.Management	Restart-Computer	Cmdlet	todo
-Microsoft.PowerShell.Management	Set-Clipboard	Cmdlet	todo
-Microsoft.PowerShell.Management	Set-Content	Cmdlet	todo
-Microsoft.PowerShell.Management	Set-Item	Cmdlet	todo
-Microsoft.PowerShell.Management	Set-ItemProperty	Cmdlet	todo
-Microsoft.PowerShell.Management	Set-Location	Cmdlet	todo
-Microsoft.PowerShell.Management	Split-Path	Cmdlet	todo
-Microsoft.PowerShell.Management	Start-Process	Cmdlet	todo
-Microsoft.PowerShell.Management	Stop-Computer	Cmdlet	todo
-Microsoft.PowerShell.Management	Stop-Process	Cmdlet	todo
-Microsoft.PowerShell.Management	Test-Connection	Cmdlet	todo
-Microsoft.PowerShell.Management	Test-Path	Cmdlet	todo
-Microsoft.PowerShell.Management	Wait-Process	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Compress-PSResource	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Find-PSResource	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Get-InstalledPSResource	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Get-PSResourceRepository	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Get-PSScriptFileInfo	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Import-PSGetRepository	Function	todo
-Microsoft.PowerShell.PSResourceGet	Install-PSResource	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	New-PSScriptFileInfo	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Publish-PSResource	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Register-PSResourceRepository	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Reset-PSResourceRepository	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Save-PSResource	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Set-PSResourceRepository	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Test-PSScriptFileInfo	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Uninstall-PSResource	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Unregister-PSResourceRepository	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Update-PSModuleManifest	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Update-PSResource	Cmdlet	todo
-Microsoft.PowerShell.PSResourceGet	Update-PSScriptFileInfo	Cmdlet	todo
-Microsoft.PowerShell.Security	ConvertFrom-SecureString	Cmdlet	todo
-Microsoft.PowerShell.Security	ConvertTo-SecureString	Cmdlet	todo
-Microsoft.PowerShell.Security	Get-CmsMessage	Cmdlet	todo
-Microsoft.PowerShell.Security	Get-Credential	Cmdlet	todo
-Microsoft.PowerShell.Security	Get-ExecutionPolicy	Cmdlet	todo
-Microsoft.PowerShell.Security	Get-PfxCertificate	Cmdlet	todo
-Microsoft.PowerShell.Security	Protect-CmsMessage	Cmdlet	todo
-Microsoft.PowerShell.Security	Set-ExecutionPolicy	Cmdlet	todo
-Microsoft.PowerShell.Security	Unprotect-CmsMessage	Cmdlet	todo
-Microsoft.PowerShell.ThreadJob	Start-ThreadJob	Cmdlet	todo
-Microsoft.PowerShell.Utility	Add-Member	Cmdlet	todo
-Microsoft.PowerShell.Utility	Add-Type	Cmdlet	todo
-Microsoft.PowerShell.Utility	Clear-Variable	Cmdlet	todo
-Microsoft.PowerShell.Utility	Compare-Object	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertFrom-CliXml	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertFrom-Csv	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertFrom-Json	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertFrom-Markdown	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertFrom-StringData	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertTo-CliXml	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertTo-Csv	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertTo-Html	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertTo-Json	Cmdlet	todo
-Microsoft.PowerShell.Utility	ConvertTo-Xml	Cmdlet	todo
-Microsoft.PowerShell.Utility	Debug-Runspace	Cmdlet	todo
-Microsoft.PowerShell.Utility	Disable-PSBreakpoint	Cmdlet	todo
-Microsoft.PowerShell.Utility	Disable-RunspaceDebug	Cmdlet	todo
-Microsoft.PowerShell.Utility	Enable-PSBreakpoint	Cmdlet	todo
-Microsoft.PowerShell.Utility	Enable-RunspaceDebug	Cmdlet	todo
-Microsoft.PowerShell.Utility	Export-Alias	Cmdlet	todo
-Microsoft.PowerShell.Utility	Export-Clixml	Cmdlet	todo
-Microsoft.PowerShell.Utility	Export-Csv	Cmdlet	todo
-Microsoft.PowerShell.Utility	Export-FormatData	Cmdlet	todo
-Microsoft.PowerShell.Utility	Export-PSSession	Cmdlet	todo
-Microsoft.PowerShell.Utility	Format-Custom	Cmdlet	todo
-Microsoft.PowerShell.Utility	Format-Hex	Cmdlet	todo
-Microsoft.PowerShell.Utility	Format-List	Cmdlet	todo
-Microsoft.PowerShell.Utility	Format-Table	Cmdlet	todo
-Microsoft.PowerShell.Utility	Format-Wide	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Alias	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Culture	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Date	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Error	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Event	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-EventSubscriber	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-FileHash	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-FormatData	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Host	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-MarkdownOption	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Member	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-PSBreakpoint	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-PSCallStack	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Random	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Runspace	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-RunspaceDebug	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-SecureRandom	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-TraceSource	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-TypeData	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-UICulture	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Unique	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Uptime	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Variable	Cmdlet	todo
-Microsoft.PowerShell.Utility	Get-Verb	Cmdlet	todo
-Microsoft.PowerShell.Utility	Group-Object	Cmdlet	todo
-Microsoft.PowerShell.Utility	Import-Alias	Cmdlet	todo
-Microsoft.PowerShell.Utility	Import-Clixml	Cmdlet	todo
-Microsoft.PowerShell.Utility	Import-Csv	Cmdlet	todo
-Microsoft.PowerShell.Utility	Import-LocalizedData	Cmdlet	todo
-Microsoft.PowerShell.Utility	Import-PowerShellDataFile	Cmdlet	todo
-Microsoft.PowerShell.Utility	Import-PSSession	Cmdlet	todo
-Microsoft.PowerShell.Utility	Invoke-Expression	Cmdlet	todo
-Microsoft.PowerShell.Utility	Invoke-RestMethod	Cmdlet	todo
-Microsoft.PowerShell.Utility	Invoke-WebRequest	Cmdlet	todo
-Microsoft.PowerShell.Utility	Join-String	Cmdlet	todo
-Microsoft.PowerShell.Utility	Measure-Command	Cmdlet	todo
-Microsoft.PowerShell.Utility	Measure-Object	Cmdlet	todo
-Microsoft.PowerShell.Utility	New-Alias	Cmdlet	todo
-Microsoft.PowerShell.Utility	New-Event	Cmdlet	todo
-Microsoft.PowerShell.Utility	New-Guid	Cmdlet	todo
-Microsoft.PowerShell.Utility	New-Object	Cmdlet	todo
-Microsoft.PowerShell.Utility	New-TemporaryDirectory	Cmdlet	todo
-Microsoft.PowerShell.Utility	New-TemporaryFile	Cmdlet	todo
-Microsoft.PowerShell.Utility	New-TimeSpan	Cmdlet	todo
-Microsoft.PowerShell.Utility	New-Variable	Cmdlet	todo
-Microsoft.PowerShell.Utility	Out-File	Cmdlet	todo
-Microsoft.PowerShell.Utility	Out-String	Cmdlet	todo
-Microsoft.PowerShell.Utility	Read-Host	Cmdlet	todo
-Microsoft.PowerShell.Utility	Register-EngineEvent	Cmdlet	todo
-Microsoft.PowerShell.Utility	Register-ObjectEvent	Cmdlet	todo
-Microsoft.PowerShell.Utility	Remove-Alias	Cmdlet	todo
-Microsoft.PowerShell.Utility	Remove-Event	Cmdlet	todo
-Microsoft.PowerShell.Utility	Remove-PSBreakpoint	Cmdlet	todo
-Microsoft.PowerShell.Utility	Remove-TypeData	Cmdlet	todo
-Microsoft.PowerShell.Utility	Remove-Variable	Cmdlet	todo
-Microsoft.PowerShell.Utility	Select-Object	Cmdlet	todo
-Microsoft.PowerShell.Utility	Select-String	Cmdlet	todo
-Microsoft.PowerShell.Utility	Select-Xml	Cmdlet	todo
-Microsoft.PowerShell.Utility	Send-MailMessage	Cmdlet	todo
-Microsoft.PowerShell.Utility	Set-Alias	Cmdlet	todo
-Microsoft.PowerShell.Utility	Set-Date	Cmdlet	todo
-Microsoft.PowerShell.Utility	Set-MarkdownOption	Cmdlet	todo
-Microsoft.PowerShell.Utility	Set-PSBreakpoint	Cmdlet	todo
-Microsoft.PowerShell.Utility	Set-TraceSource	Cmdlet	todo
-Microsoft.PowerShell.Utility	Set-Variable	Cmdlet	todo
-Microsoft.PowerShell.Utility	Show-Markdown	Cmdlet	todo
-Microsoft.PowerShell.Utility	Sort-Object	Cmdlet	todo
-Microsoft.PowerShell.Utility	Start-Sleep	Cmdlet	todo
-Microsoft.PowerShell.Utility	Tee-Object	Cmdlet	todo
-Microsoft.PowerShell.Utility	Test-Json	Cmdlet	todo
-Microsoft.PowerShell.Utility	Trace-Command	Cmdlet	todo
-Microsoft.PowerShell.Utility	Unblock-File	Cmdlet	todo
-Microsoft.PowerShell.Utility	Unregister-Event	Cmdlet	todo
-Microsoft.PowerShell.Utility	Update-FormatData	Cmdlet	todo
-Microsoft.PowerShell.Utility	Update-List	Cmdlet	todo
-Microsoft.PowerShell.Utility	Update-TypeData	Cmdlet	todo
-Microsoft.PowerShell.Utility	Wait-Debugger	Cmdlet	todo
-Microsoft.PowerShell.Utility	Wait-Event	Cmdlet	todo
-Microsoft.PowerShell.Utility	Write-Debug	Cmdlet	todo
-Microsoft.PowerShell.Utility	Write-Error	Cmdlet	todo
-Microsoft.PowerShell.Utility	Write-Host	Cmdlet	todo
-Microsoft.PowerShell.Utility	Write-Information	Cmdlet	todo
-Microsoft.PowerShell.Utility	Write-Output	Cmdlet	todo
-Microsoft.PowerShell.Utility	Write-Progress	Cmdlet	todo
-Microsoft.PowerShell.Utility	Write-Verbose	Cmdlet	todo
-Microsoft.PowerShell.Utility	Write-Warning	Cmdlet	todo
-PackageManagement	Find-Package	Cmdlet	todo
-PackageManagement	Find-PackageProvider	Cmdlet	todo
-PackageManagement	Get-Package	Cmdlet	todo
-PackageManagement	Get-PackageProvider	Cmdlet	todo
-PackageManagement	Get-PackageSource	Cmdlet	todo
-PackageManagement	Import-PackageProvider	Cmdlet	todo
-PackageManagement	Install-Package	Cmdlet	todo
-PackageManagement	Install-PackageProvider	Cmdlet	todo
-PackageManagement	Register-PackageSource	Cmdlet	todo
-PackageManagement	Save-Package	Cmdlet	todo
-PackageManagement	Set-PackageSource	Cmdlet	todo
-PackageManagement	Uninstall-Package	Cmdlet	todo
-PackageManagement	Unregister-PackageSource	Cmdlet	todo
-PowerShellGet	Find-Command	Function	todo
-PowerShellGet	Find-DscResource	Function	todo
-PowerShellGet	Find-Module	Function	todo
-PowerShellGet	Find-RoleCapability	Function	todo
-PowerShellGet	Find-Script	Function	todo
-PowerShellGet	Get-CredsFromCredentialProvider	Function	todo
-PowerShellGet	Get-InstalledModule	Function	todo
-PowerShellGet	Get-InstalledScript	Function	todo
-PowerShellGet	Get-PSRepository	Function	todo
-PowerShellGet	Install-Module	Function	todo
-PowerShellGet	Install-Script	Function	todo
-PowerShellGet	New-ScriptFileInfo	Function	todo
-PowerShellGet	Publish-Module	Function	todo
-PowerShellGet	Publish-Script	Function	todo
-PowerShellGet	Register-PSRepository	Function	todo
-PowerShellGet	Save-Module	Function	todo
-PowerShellGet	Save-Script	Function	todo
-PowerShellGet	Set-PSRepository	Function	todo
-PowerShellGet	Test-ScriptFileInfo	Function	todo
-PowerShellGet	Uninstall-Module	Function	todo
-PowerShellGet	Uninstall-Script	Function	todo
-PowerShellGet	Unregister-PSRepository	Function	todo
-PowerShellGet	Update-Module	Function	todo
-PowerShellGet	Update-ModuleManifest	Function	todo
-PowerShellGet	Update-Script	Function	todo
-PowerShellGet	Update-ScriptFileInfo	Function	todo
-PSReadLine	Get-PSReadLineKeyHandler	Cmdlet	todo
-PSReadLine	Get-PSReadLineOption	Cmdlet	todo
-PSReadLine	PSConsoleHostReadLine	Function	todo
-PSReadLine	Remove-PSReadLineKeyHandler	Cmdlet	todo
-PSReadLine	Set-PSReadLineKeyHandler	Cmdlet	todo
-PSReadLine	Set-PSReadLineOption	Cmdlet	todo
+module	name	kind	platform	status
+(session)	cd..	Function	linux-x64	todo
+(session)	cd\	Function	linux-x64	todo
+(session)	cd~	Function	linux-x64	todo
+(session)	Clear-Host	Function	linux-x64	todo
+(session)	exec	Function	linux-x64	todo
+(session)	help	Function	linux-x64	todo
+(session)	oss	Function	linux-x64	todo
+(session)	Pause	Function	linux-x64	todo
+(session)	prompt	Function	linux-x64	todo
+(session)	TabExpansion2	Function	linux-x64	todo
+Microsoft.PowerShell.Archive	Compress-Archive	Function	linux-x64	todo
+Microsoft.PowerShell.Archive	Expand-Archive	Function	linux-x64	todo
+Microsoft.PowerShell.Core	Add-History	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Clear-History	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Debug-Job	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Disable-ExperimentalFeature	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Enable-ExperimentalFeature	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Enter-PSHostProcess	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Enter-PSSession	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Exit-PSHostProcess	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Exit-PSSession	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Export-ModuleMember	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	ForEach-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-Command	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-ExperimentalFeature	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-Help	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-History	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-Job	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-Module	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-PSHostProcessInfo	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-PSSession	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-PSSubsystem	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Import-Module	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Invoke-Command	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Invoke-History	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	New-Module	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	New-ModuleManifest	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	New-PSRoleCapabilityFile	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	New-PSSession	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	New-PSSessionConfigurationFile	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	New-PSSessionOption	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	New-PSTransportOption	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Out-Default	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Out-Host	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Out-Null	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Receive-Job	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Register-ArgumentCompleter	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Remove-Job	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Remove-Module	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Remove-PSSession	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Save-Help	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Set-PSDebug	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Set-StrictMode	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Start-Job	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Stop-Job	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Switch-Process	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Test-ModuleManifest	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Update-Help	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Wait-Job	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Where-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Host	Start-Transcript	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Host	Stop-Transcript	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Add-Content	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Clear-Content	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Clear-Item	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Clear-ItemProperty	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Convert-Path	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Copy-Item	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Copy-ItemProperty	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Debug-Process	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-ChildItem	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-Clipboard	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-Content	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-Item	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-ItemProperty	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-ItemPropertyValue	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-Location	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-Process	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-PSDrive	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-PSProvider	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Get-TimeZone	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Invoke-Item	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Join-Path	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Move-Item	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Move-ItemProperty	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	New-Item	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	New-ItemProperty	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	New-PSDrive	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Pop-Location	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Push-Location	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Remove-Item	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Remove-ItemProperty	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Remove-PSDrive	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Rename-Item	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Rename-ItemProperty	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Resolve-Path	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Restart-Computer	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Set-Clipboard	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Set-Content	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Set-Item	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Set-ItemProperty	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Set-Location	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Split-Path	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Start-Process	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Stop-Computer	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Stop-Process	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Test-Connection	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Test-Path	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Management	Wait-Process	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Compress-PSResource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Find-PSResource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Get-InstalledPSResource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Get-PSResourceRepository	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Get-PSScriptFileInfo	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Import-PSGetRepository	Function	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Install-PSResource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	New-PSScriptFileInfo	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Publish-PSResource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Register-PSResourceRepository	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Reset-PSResourceRepository	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Save-PSResource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Set-PSResourceRepository	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Test-PSScriptFileInfo	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Uninstall-PSResource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Unregister-PSResourceRepository	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Update-PSModuleManifest	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Update-PSResource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet	Update-PSScriptFileInfo	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Security	ConvertFrom-SecureString	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Security	ConvertTo-SecureString	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Security	Get-CmsMessage	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Security	Get-Credential	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Security	Get-ExecutionPolicy	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Security	Get-PfxCertificate	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Security	Protect-CmsMessage	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Security	Set-ExecutionPolicy	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Security	Unprotect-CmsMessage	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.ThreadJob	Start-ThreadJob	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Add-Member	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Add-Type	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Clear-Variable	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Compare-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertFrom-CliXml	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertFrom-Csv	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertFrom-Json	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertFrom-Markdown	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertFrom-StringData	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertTo-CliXml	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertTo-Csv	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertTo-Html	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertTo-Json	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	ConvertTo-Xml	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Debug-Runspace	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Disable-PSBreakpoint	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Disable-RunspaceDebug	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Enable-PSBreakpoint	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Enable-RunspaceDebug	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Export-Alias	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Export-Clixml	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Export-Csv	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Export-FormatData	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Export-PSSession	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Format-Custom	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Format-Hex	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Format-List	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Format-Table	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Format-Wide	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Alias	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Culture	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Date	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Error	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Event	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-EventSubscriber	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-FileHash	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-FormatData	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Host	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-MarkdownOption	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Member	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-PSBreakpoint	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-PSCallStack	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Random	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Runspace	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-RunspaceDebug	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-SecureRandom	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-TraceSource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-TypeData	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-UICulture	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Unique	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Uptime	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Variable	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Verb	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Group-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Import-Alias	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Import-Clixml	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Import-Csv	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Import-LocalizedData	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Import-PowerShellDataFile	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Import-PSSession	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Invoke-Expression	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Invoke-RestMethod	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Invoke-WebRequest	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Join-String	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Measure-Command	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Measure-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	New-Alias	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	New-Event	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	New-Guid	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	New-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	New-TemporaryDirectory	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	New-TemporaryFile	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	New-TimeSpan	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	New-Variable	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Out-File	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Out-String	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Read-Host	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Register-EngineEvent	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Register-ObjectEvent	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Remove-Alias	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Remove-Event	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Remove-PSBreakpoint	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Remove-TypeData	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Remove-Variable	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Select-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Select-String	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Select-Xml	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Send-MailMessage	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Set-Alias	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Set-Date	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Set-MarkdownOption	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Set-PSBreakpoint	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Set-TraceSource	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Set-Variable	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Show-Markdown	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Sort-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Start-Sleep	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Tee-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Test-Json	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Trace-Command	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Unblock-File	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Unregister-Event	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Update-FormatData	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Update-List	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Update-TypeData	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Wait-Debugger	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Wait-Event	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Write-Debug	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Write-Error	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Write-Host	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Write-Information	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Write-Output	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Write-Progress	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Write-Verbose	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Write-Warning	Cmdlet	linux-x64	todo
+PackageManagement	Find-Package	Cmdlet	linux-x64	todo
+PackageManagement	Find-PackageProvider	Cmdlet	linux-x64	todo
+PackageManagement	Get-Package	Cmdlet	linux-x64	todo
+PackageManagement	Get-PackageProvider	Cmdlet	linux-x64	todo
+PackageManagement	Get-PackageSource	Cmdlet	linux-x64	todo
+PackageManagement	Import-PackageProvider	Cmdlet	linux-x64	todo
+PackageManagement	Install-Package	Cmdlet	linux-x64	todo
+PackageManagement	Install-PackageProvider	Cmdlet	linux-x64	todo
+PackageManagement	Register-PackageSource	Cmdlet	linux-x64	todo
+PackageManagement	Save-Package	Cmdlet	linux-x64	todo
+PackageManagement	Set-PackageSource	Cmdlet	linux-x64	todo
+PackageManagement	Uninstall-Package	Cmdlet	linux-x64	todo
+PackageManagement	Unregister-PackageSource	Cmdlet	linux-x64	todo
+PowerShellGet	Find-Command	Function	linux-x64	todo
+PowerShellGet	Find-DscResource	Function	linux-x64	todo
+PowerShellGet	Find-Module	Function	linux-x64	todo
+PowerShellGet	Find-RoleCapability	Function	linux-x64	todo
+PowerShellGet	Find-Script	Function	linux-x64	todo
+PowerShellGet	Get-CredsFromCredentialProvider	Function	linux-x64	todo
+PowerShellGet	Get-InstalledModule	Function	linux-x64	todo
+PowerShellGet	Get-InstalledScript	Function	linux-x64	todo
+PowerShellGet	Get-PSRepository	Function	linux-x64	todo
+PowerShellGet	Install-Module	Function	linux-x64	todo
+PowerShellGet	Install-Script	Function	linux-x64	todo
+PowerShellGet	New-ScriptFileInfo	Function	linux-x64	todo
+PowerShellGet	Publish-Module	Function	linux-x64	todo
+PowerShellGet	Publish-Script	Function	linux-x64	todo
+PowerShellGet	Register-PSRepository	Function	linux-x64	todo
+PowerShellGet	Save-Module	Function	linux-x64	todo
+PowerShellGet	Save-Script	Function	linux-x64	todo
+PowerShellGet	Set-PSRepository	Function	linux-x64	todo
+PowerShellGet	Test-ScriptFileInfo	Function	linux-x64	todo
+PowerShellGet	Uninstall-Module	Function	linux-x64	todo
+PowerShellGet	Uninstall-Script	Function	linux-x64	todo
+PowerShellGet	Unregister-PSRepository	Function	linux-x64	todo
+PowerShellGet	Update-Module	Function	linux-x64	todo
+PowerShellGet	Update-ModuleManifest	Function	linux-x64	todo
+PowerShellGet	Update-Script	Function	linux-x64	todo
+PowerShellGet	Update-ScriptFileInfo	Function	linux-x64	todo
+PSReadLine	Get-PSReadLineKeyHandler	Cmdlet	linux-x64	todo
+PSReadLine	Get-PSReadLineOption	Cmdlet	linux-x64	todo
+PSReadLine	PSConsoleHostReadLine	Function	linux-x64	todo
+PSReadLine	Remove-PSReadLineKeyHandler	Cmdlet	linux-x64	todo
+PSReadLine	Set-PSReadLineKeyHandler	Cmdlet	linux-x64	todo
+PSReadLine	Set-PSReadLineOption	Cmdlet	linux-x64	todo

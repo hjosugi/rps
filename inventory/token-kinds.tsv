@@ -1,158 +1,158 @@
-kind	text	flags	status
-Unknown	unknown	None	todo
-Variable	var	None	todo
-SplattedVariable	@var	None	todo
-Parameter	param	None	todo
-Number	number	None	todo
-Label	label	None	todo
-Identifier	ident	None	todo
-Generic	generic	None	todo
-NewLine	newline	ParseModeInvariant	todo
-LineContinuation	line continuation	ParseModeInvariant	todo
-Comment	comment	ParseModeInvariant	todo
-EndOfInput	eof	ParseModeInvariant	todo
-StringLiteral	sqstr	ParseModeInvariant	todo
-StringExpandable	dqstr	ParseModeInvariant	todo
-HereStringLiteral	sq here string	ParseModeInvariant	todo
-HereStringExpandable	dq here string	ParseModeInvariant	todo
-LParen	(	ParseModeInvariant	todo
-RParen	)	ParseModeInvariant	todo
-LCurly	{	ParseModeInvariant	todo
-RCurly	}	ParseModeInvariant	todo
-LBracket	[	None	todo
-RBracket	]	ParseModeInvariant	todo
-AtParen	@(	ParseModeInvariant	todo
-AtCurly	@{	ParseModeInvariant	todo
-DollarParen	$(	ParseModeInvariant	todo
-Semi	;	ParseModeInvariant	todo
-AndAnd	&&	ParseModeInvariant	todo
-OrOr	||	ParseModeInvariant	todo
-Ampersand	&	SpecialOperator,ParseModeInvariant	todo
-Pipe	|	SpecialOperator,ParseModeInvariant	todo
-Comma	,	UnaryOperator,ParseModeInvariant	todo
-MinusMinus	--	UnaryOperator,DisallowedInRestrictedMode,PrefixOrPostfixOperator	todo
-PlusPlus	++	UnaryOperator,DisallowedInRestrictedMode,PrefixOrPostfixOperator	todo
-DotDot	..	BinaryPrecedenceRange,BinaryOperator,DisallowedInRestrictedMode	todo
-ColonColon	::	SpecialOperator,DisallowedInRestrictedMode	todo
-Dot	.	SpecialOperator,DisallowedInRestrictedMode	todo
-Exclaim	!	UnaryOperator,CanConstantFold	todo
-Multiply	*	BinaryPrecedenceMultiply,BinaryOperator,CanConstantFold	todo
-Divide	/	BinaryPrecedenceMultiply,BinaryOperator,CanConstantFold	todo
-Rem	%	BinaryPrecedenceMultiply,BinaryOperator,CanConstantFold	todo
-Plus	+	BinaryPrecedenceAdd,BinaryOperator,UnaryOperator,CanConstantFold	todo
-Minus	-	BinaryPrecedenceAdd,BinaryOperator,UnaryOperator,CanConstantFold	todo
-Equals	=	AssignmentOperator	todo
-PlusEquals	+=	AssignmentOperator	todo
-MinusEquals	-=	AssignmentOperator	todo
-MultiplyEquals	*=	AssignmentOperator	todo
-DivideEquals	/=	AssignmentOperator	todo
-RemainderEquals	%=	AssignmentOperator	todo
-Redirection	redirection	DisallowedInRestrictedMode	todo
-RedirectInStd	<	ParseModeInvariant,DisallowedInRestrictedMode	todo
-Format	-f	BinaryPrecedenceFormat,BinaryOperator,DisallowedInRestrictedMode	todo
-Not	-not	UnaryOperator,CanConstantFold	todo
-Bnot	-bnot	UnaryOperator,CanConstantFold	todo
-And	-and	BinaryPrecedenceLogical,BinaryOperator,CanConstantFold	todo
-Or	-or	BinaryPrecedenceLogical,BinaryOperator,CanConstantFold	todo
-Xor	-xor	BinaryPrecedenceLogical,BinaryOperator,CanConstantFold	todo
-Band	-band	BinaryPrecedenceBitwise,BinaryOperator,CanConstantFold	todo
-Bor	-bor	BinaryPrecedenceBitwise,BinaryOperator,CanConstantFold	todo
-Bxor	-bxor	BinaryPrecedenceBitwise,BinaryOperator,CanConstantFold	todo
-Join	-join	BinaryPrecedenceComparison,BinaryOperator,UnaryOperator,DisallowedInRestrictedMode	todo
-Ieq	-eq	BinaryPrecedenceComparison,BinaryOperator	todo
-Ine	-ne	BinaryPrecedenceComparison,BinaryOperator	todo
-Ige	-ge	BinaryPrecedenceComparison,BinaryOperator	todo
-Igt	-gt	BinaryPrecedenceComparison,BinaryOperator	todo
-Ilt	-lt	BinaryPrecedenceComparison,BinaryOperator	todo
-Ile	-le	BinaryPrecedenceComparison,BinaryOperator	todo
-Ilike	-ilike	BinaryPrecedenceComparison,BinaryOperator	todo
-Inotlike	-inotlike	BinaryPrecedenceComparison,BinaryOperator	todo
-Imatch	-imatch	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	todo
-Inotmatch	-inotmatch	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	todo
-Ireplace	-ireplace	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	todo
-Icontains	-icontains	BinaryPrecedenceComparison,BinaryOperator	todo
-Inotcontains	-inotcontains	BinaryPrecedenceComparison,BinaryOperator	todo
-Iin	-iin	BinaryPrecedenceComparison,BinaryOperator	todo
-Inotin	-inotin	BinaryPrecedenceComparison,BinaryOperator	todo
-Isplit	-isplit	BinaryPrecedenceComparison,BinaryOperator,UnaryOperator,DisallowedInRestrictedMode	todo
-Ceq	-ceq	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Cne	-cne	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Cge	-cge	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Cgt	-cgt	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Clt	-clt	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Cle	-cle	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Clike	-clike	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Cnotlike	-cnotlike	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Cmatch	-cmatch	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator,DisallowedInRestrictedMode	todo
-Cnotmatch	-cnotmatch	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator,DisallowedInRestrictedMode	todo
-Creplace	-creplace	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator,DisallowedInRestrictedMode	todo
-Ccontains	-ccontains	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Cnotcontains	-cnotcontains	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Cin	-cin	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Cnotin	-cnotin	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	todo
-Csplit	-csplit	BinaryPrecedenceComparison,BinaryOperator,UnaryOperator,CaseSensitiveOperator,DisallowedInRestrictedMode	todo
-Is	-is	BinaryPrecedenceComparison,BinaryOperator	todo
-IsNot	-isnot	BinaryPrecedenceComparison,BinaryOperator	todo
-As	-as	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	todo
-PostfixPlusPlus	++	UnaryOperator,DisallowedInRestrictedMode,PrefixOrPostfixOperator	todo
-PostfixMinusMinus	--	UnaryOperator,DisallowedInRestrictedMode,PrefixOrPostfixOperator	todo
-Shl	-shl	BinaryPrecedenceComparison,BinaryOperator,CanConstantFold	todo
-Shr	-shr	BinaryPrecedenceComparison,BinaryOperator,CanConstantFold	todo
-Colon	:	SpecialOperator,DisallowedInRestrictedMode	todo
-QuestionMark	?	TernaryOperator,DisallowedInRestrictedMode	todo
-QuestionQuestionEquals	??=	AssignmentOperator	todo
-QuestionQuestion	??	BinaryPrecedenceCoalesce,BinaryOperator	todo
-QuestionDot	?.	SpecialOperator,DisallowedInRestrictedMode	todo
-QuestionLBracket	?[	None	todo
-Begin	begin	Keyword,ScriptBlockBlockName	todo
-Break	break	Keyword,StatementDoesntSupportAttributes	todo
-Catch	catch	Keyword	todo
-Class	class	Keyword	todo
-Continue	continue	Keyword,StatementDoesntSupportAttributes	todo
-Data	data	Keyword,StatementDoesntSupportAttributes	todo
-Define	define	Keyword,StatementDoesntSupportAttributes	todo
-Do	do	Keyword,StatementDoesntSupportAttributes	todo
-Dynamicparam	dynamicparam	Keyword,ScriptBlockBlockName	todo
-Else	else	Keyword	todo
-ElseIf	elseif	Keyword	todo
-End	end	Keyword,ScriptBlockBlockName	todo
-Exit	exit	Keyword,StatementDoesntSupportAttributes	todo
-Filter	filter	Keyword,StatementDoesntSupportAttributes	todo
-Finally	finally	Keyword	todo
-For	for	Keyword,StatementDoesntSupportAttributes	todo
-Foreach	foreach	Keyword,StatementDoesntSupportAttributes	todo
-From	from	Keyword,StatementDoesntSupportAttributes	todo
-Function	function	Keyword,StatementDoesntSupportAttributes	todo
-If	if	Keyword,StatementDoesntSupportAttributes	todo
-In	in	Keyword	todo
-Param	param	Keyword	todo
-Process	process	Keyword,ScriptBlockBlockName	todo
-Return	return	Keyword,StatementDoesntSupportAttributes	todo
-Switch	switch	Keyword,StatementDoesntSupportAttributes	todo
-Throw	throw	Keyword,StatementDoesntSupportAttributes	todo
-Trap	trap	Keyword,StatementDoesntSupportAttributes	todo
-Try	try	Keyword,StatementDoesntSupportAttributes	todo
-Until	until	Keyword	todo
-Using	using	Keyword,StatementDoesntSupportAttributes	todo
-Var	var	Keyword,StatementDoesntSupportAttributes	todo
-While	while	Keyword,StatementDoesntSupportAttributes	todo
-Workflow	workflow	Keyword,StatementDoesntSupportAttributes	todo
-Parallel	parallel	Keyword,StatementDoesntSupportAttributes	todo
-Sequence	sequence	Keyword,StatementDoesntSupportAttributes	todo
-InlineScript	inlinescript	Keyword,StatementDoesntSupportAttributes	todo
-Configuration	configuration	Keyword	todo
-DynamicKeyword	<dynamic keyword>	Keyword	todo
-Public	public	Keyword	todo
-Private	private	Keyword	todo
-Static	static	Keyword	todo
-Interface	interface	Keyword	todo
-Enum	enum	Keyword	todo
-Namespace	namespace	Keyword	todo
-Module	module	Keyword	todo
-Type	type	Keyword	todo
-Assembly	assembly	Keyword	todo
-Command	command	Keyword	todo
-Hidden	hidden	Keyword	todo
-Base	base	Keyword	todo
-Default	default	Keyword	todo
-Clean	clean	Keyword,ScriptBlockBlockName	todo
+kind	text	flags	platform	status
+Unknown	unknown	None	linux-x64	todo
+Variable	var	None	linux-x64	todo
+SplattedVariable	@var	None	linux-x64	todo
+Parameter	param	None	linux-x64	todo
+Number	number	None	linux-x64	todo
+Label	label	None	linux-x64	todo
+Identifier	ident	None	linux-x64	todo
+Generic	generic	None	linux-x64	todo
+NewLine	newline	ParseModeInvariant	linux-x64	todo
+LineContinuation	line continuation	ParseModeInvariant	linux-x64	todo
+Comment	comment	ParseModeInvariant	linux-x64	todo
+EndOfInput	eof	ParseModeInvariant	linux-x64	todo
+StringLiteral	sqstr	ParseModeInvariant	linux-x64	todo
+StringExpandable	dqstr	ParseModeInvariant	linux-x64	todo
+HereStringLiteral	sq here string	ParseModeInvariant	linux-x64	todo
+HereStringExpandable	dq here string	ParseModeInvariant	linux-x64	todo
+LParen	(	ParseModeInvariant	linux-x64	todo
+RParen	)	ParseModeInvariant	linux-x64	todo
+LCurly	{	ParseModeInvariant	linux-x64	todo
+RCurly	}	ParseModeInvariant	linux-x64	todo
+LBracket	[	None	linux-x64	todo
+RBracket	]	ParseModeInvariant	linux-x64	todo
+AtParen	@(	ParseModeInvariant	linux-x64	todo
+AtCurly	@{	ParseModeInvariant	linux-x64	todo
+DollarParen	$(	ParseModeInvariant	linux-x64	todo
+Semi	;	ParseModeInvariant	linux-x64	todo
+AndAnd	&&	ParseModeInvariant	linux-x64	todo
+OrOr	||	ParseModeInvariant	linux-x64	todo
+Ampersand	&	SpecialOperator,ParseModeInvariant	linux-x64	todo
+Pipe	|	SpecialOperator,ParseModeInvariant	linux-x64	todo
+Comma	,	UnaryOperator,ParseModeInvariant	linux-x64	todo
+MinusMinus	--	UnaryOperator,DisallowedInRestrictedMode,PrefixOrPostfixOperator	linux-x64	todo
+PlusPlus	++	UnaryOperator,DisallowedInRestrictedMode,PrefixOrPostfixOperator	linux-x64	todo
+DotDot	..	BinaryPrecedenceRange,BinaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+ColonColon	::	SpecialOperator,DisallowedInRestrictedMode	linux-x64	todo
+Dot	.	SpecialOperator,DisallowedInRestrictedMode	linux-x64	todo
+Exclaim	!	UnaryOperator,CanConstantFold	linux-x64	todo
+Multiply	*	BinaryPrecedenceMultiply,BinaryOperator,CanConstantFold	linux-x64	todo
+Divide	/	BinaryPrecedenceMultiply,BinaryOperator,CanConstantFold	linux-x64	todo
+Rem	%	BinaryPrecedenceMultiply,BinaryOperator,CanConstantFold	linux-x64	todo
+Plus	+	BinaryPrecedenceAdd,BinaryOperator,UnaryOperator,CanConstantFold	linux-x64	todo
+Minus	-	BinaryPrecedenceAdd,BinaryOperator,UnaryOperator,CanConstantFold	linux-x64	todo
+Equals	=	AssignmentOperator	linux-x64	todo
+PlusEquals	+=	AssignmentOperator	linux-x64	todo
+MinusEquals	-=	AssignmentOperator	linux-x64	todo
+MultiplyEquals	*=	AssignmentOperator	linux-x64	todo
+DivideEquals	/=	AssignmentOperator	linux-x64	todo
+RemainderEquals	%=	AssignmentOperator	linux-x64	todo
+Redirection	redirection	DisallowedInRestrictedMode	linux-x64	todo
+RedirectInStd	<	ParseModeInvariant,DisallowedInRestrictedMode	linux-x64	todo
+Format	-f	BinaryPrecedenceFormat,BinaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+Not	-not	UnaryOperator,CanConstantFold	linux-x64	todo
+Bnot	-bnot	UnaryOperator,CanConstantFold	linux-x64	todo
+And	-and	BinaryPrecedenceLogical,BinaryOperator,CanConstantFold	linux-x64	todo
+Or	-or	BinaryPrecedenceLogical,BinaryOperator,CanConstantFold	linux-x64	todo
+Xor	-xor	BinaryPrecedenceLogical,BinaryOperator,CanConstantFold	linux-x64	todo
+Band	-band	BinaryPrecedenceBitwise,BinaryOperator,CanConstantFold	linux-x64	todo
+Bor	-bor	BinaryPrecedenceBitwise,BinaryOperator,CanConstantFold	linux-x64	todo
+Bxor	-bxor	BinaryPrecedenceBitwise,BinaryOperator,CanConstantFold	linux-x64	todo
+Join	-join	BinaryPrecedenceComparison,BinaryOperator,UnaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+Ieq	-eq	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Ine	-ne	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Ige	-ge	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Igt	-gt	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Ilt	-lt	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Ile	-le	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Ilike	-ilike	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Inotlike	-inotlike	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Imatch	-imatch	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+Inotmatch	-inotmatch	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+Ireplace	-ireplace	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+Icontains	-icontains	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Inotcontains	-inotcontains	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Iin	-iin	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Inotin	-inotin	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+Isplit	-isplit	BinaryPrecedenceComparison,BinaryOperator,UnaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+Ceq	-ceq	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Cne	-cne	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Cge	-cge	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Cgt	-cgt	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Clt	-clt	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Cle	-cle	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Clike	-clike	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Cnotlike	-cnotlike	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Cmatch	-cmatch	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator,DisallowedInRestrictedMode	linux-x64	todo
+Cnotmatch	-cnotmatch	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator,DisallowedInRestrictedMode	linux-x64	todo
+Creplace	-creplace	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator,DisallowedInRestrictedMode	linux-x64	todo
+Ccontains	-ccontains	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Cnotcontains	-cnotcontains	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Cin	-cin	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Cnotin	-cnotin	BinaryPrecedenceComparison,BinaryOperator,CaseSensitiveOperator	linux-x64	todo
+Csplit	-csplit	BinaryPrecedenceComparison,BinaryOperator,UnaryOperator,CaseSensitiveOperator,DisallowedInRestrictedMode	linux-x64	todo
+Is	-is	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+IsNot	-isnot	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+As	-as	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+PostfixPlusPlus	++	UnaryOperator,DisallowedInRestrictedMode,PrefixOrPostfixOperator	linux-x64	todo
+PostfixMinusMinus	--	UnaryOperator,DisallowedInRestrictedMode,PrefixOrPostfixOperator	linux-x64	todo
+Shl	-shl	BinaryPrecedenceComparison,BinaryOperator,CanConstantFold	linux-x64	todo
+Shr	-shr	BinaryPrecedenceComparison,BinaryOperator,CanConstantFold	linux-x64	todo
+Colon	:	SpecialOperator,DisallowedInRestrictedMode	linux-x64	todo
+QuestionMark	?	TernaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+QuestionQuestionEquals	??=	AssignmentOperator	linux-x64	todo
+QuestionQuestion	??	BinaryPrecedenceCoalesce,BinaryOperator	linux-x64	todo
+QuestionDot	?.	SpecialOperator,DisallowedInRestrictedMode	linux-x64	todo
+QuestionLBracket	?[	None	linux-x64	todo
+Begin	begin	Keyword,ScriptBlockBlockName	linux-x64	todo
+Break	break	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Catch	catch	Keyword	linux-x64	todo
+Class	class	Keyword	linux-x64	todo
+Continue	continue	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Data	data	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Define	define	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Do	do	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Dynamicparam	dynamicparam	Keyword,ScriptBlockBlockName	linux-x64	todo
+Else	else	Keyword	linux-x64	todo
+ElseIf	elseif	Keyword	linux-x64	todo
+End	end	Keyword,ScriptBlockBlockName	linux-x64	todo
+Exit	exit	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Filter	filter	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Finally	finally	Keyword	linux-x64	todo
+For	for	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Foreach	foreach	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+From	from	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Function	function	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+If	if	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+In	in	Keyword	linux-x64	todo
+Param	param	Keyword	linux-x64	todo
+Process	process	Keyword,ScriptBlockBlockName	linux-x64	todo
+Return	return	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Switch	switch	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Throw	throw	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Trap	trap	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Try	try	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Until	until	Keyword	linux-x64	todo
+Using	using	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Var	var	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+While	while	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Workflow	workflow	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Parallel	parallel	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Sequence	sequence	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+InlineScript	inlinescript	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
+Configuration	configuration	Keyword	linux-x64	todo
+DynamicKeyword	<dynamic keyword>	Keyword	linux-x64	todo
+Public	public	Keyword	linux-x64	todo
+Private	private	Keyword	linux-x64	todo
+Static	static	Keyword	linux-x64	todo
+Interface	interface	Keyword	linux-x64	todo
+Enum	enum	Keyword	linux-x64	todo
+Namespace	namespace	Keyword	linux-x64	todo
+Module	module	Keyword	linux-x64	todo
+Type	type	Keyword	linux-x64	todo
+Assembly	assembly	Keyword	linux-x64	todo
+Command	command	Keyword	linux-x64	todo
+Hidden	hidden	Keyword	linux-x64	todo
+Base	base	Keyword	linux-x64	todo
+Default	default	Keyword	linux-x64	todo
+Clean	clean	Keyword,ScriptBlockBlockName	linux-x64	todo

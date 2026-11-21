@@ -1,125 +1,125 @@
-alias	definition	module	status
-?	Where-Object	(session)	todo
-%	ForEach-Object	(session)	todo
-cd	Set-Location	(session)	todo
-chdir	Set-Location	(session)	todo
-clc	Clear-Content	(session)	todo
-clhy	Clear-History	(session)	todo
-cli	Clear-Item	(session)	todo
-clp	Clear-ItemProperty	(session)	todo
-cls	Clear-Host	(session)	todo
-clv	Clear-Variable	(session)	todo
-cmres	Compress-PSResource	Microsoft.PowerShell.PSResourceGet	todo
-copy	Copy-Item	(session)	todo
-cpi	Copy-Item	(session)	todo
-cvpa	Convert-Path	(session)	todo
-dbp	Disable-PSBreakpoint	(session)	todo
-del	Remove-Item	(session)	todo
-dir	Get-ChildItem	(session)	todo
-ebp	Enable-PSBreakpoint	(session)	todo
-echo	Write-Output	(session)	todo
-epal	Export-Alias	(session)	todo
-epcsv	Export-Csv	(session)	todo
-erase	Remove-Item	(session)	todo
-etsn	Enter-PSSession	(session)	todo
-exsn	Exit-PSSession	(session)	todo
-fc	Format-Custom	(session)	todo
-fdres	Find-PSResource	Microsoft.PowerShell.PSResourceGet	todo
-fhx	Format-Hex	Microsoft.PowerShell.Utility	todo
-fimo	Find-Module	PowerShellGet	todo
-fl	Format-List	(session)	todo
-foreach	ForEach-Object	(session)	todo
-ft	Format-Table	(session)	todo
-fw	Format-Wide	(session)	todo
-gal	Get-Alias	(session)	todo
-gbp	Get-PSBreakpoint	(session)	todo
-gc	Get-Content	(session)	todo
-gcb	Get-Clipboard	Microsoft.PowerShell.Management	todo
-gci	Get-ChildItem	(session)	todo
-gcm	Get-Command	(session)	todo
-gcs	Get-PSCallStack	(session)	todo
-gdr	Get-PSDrive	(session)	todo
-gerr	Get-Error	(session)	todo
-Get-PSResource	Get-InstalledPSResource	Microsoft.PowerShell.PSResourceGet	todo
-ghy	Get-History	(session)	todo
-gi	Get-Item	(session)	todo
-gjb	Get-Job	(session)	todo
-gl	Get-Location	(session)	todo
-gm	Get-Member	(session)	todo
-gmo	Get-Module	(session)	todo
-gp	Get-ItemProperty	(session)	todo
-gps	Get-Process	(session)	todo
-gpv	Get-ItemPropertyValue	(session)	todo
-gres	Get-InstalledPSResource	Microsoft.PowerShell.PSResourceGet	todo
-group	Group-Object	(session)	todo
-gsn	Get-PSSession	(session)	todo
-gtz	Get-TimeZone	Microsoft.PowerShell.Management	todo
-gu	Get-Unique	(session)	todo
-gv	Get-Variable	(session)	todo
-h	Get-History	(session)	todo
-history	Get-History	(session)	todo
-icm	Invoke-Command	(session)	todo
-iex	Invoke-Expression	(session)	todo
-ihy	Invoke-History	(session)	todo
-ii	Invoke-Item	(session)	todo
-inmo	Install-Module	PowerShellGet	todo
-ipal	Import-Alias	(session)	todo
-ipcsv	Import-Csv	(session)	todo
-ipmo	Import-Module	(session)	todo
-irm	Invoke-RestMethod	(session)	todo
-isres	Install-PSResource	Microsoft.PowerShell.PSResourceGet	todo
-iwr	Invoke-WebRequest	(session)	todo
-md	mkdir	(session)	todo
-measure	Measure-Object	(session)	todo
-mi	Move-Item	(session)	todo
-move	Move-Item	(session)	todo
-mp	Move-ItemProperty	(session)	todo
-nal	New-Alias	(session)	todo
-ndr	New-PSDrive	(session)	todo
-ni	New-Item	(session)	todo
-nmo	New-Module	(session)	todo
-nsn	New-PSSession	(session)	todo
-nv	New-Variable	(session)	todo
-oh	Out-Host	(session)	todo
-pbres	Publish-PSResource	Microsoft.PowerShell.PSResourceGet	todo
-popd	Pop-Location	(session)	todo
-pumo	Publish-Module	PowerShellGet	todo
-pushd	Push-Location	(session)	todo
-pwd	Get-Location	(session)	todo
-r	Invoke-History	(session)	todo
-rbp	Remove-PSBreakpoint	(session)	todo
-rcjb	Receive-Job	(session)	todo
-rcsn	Receive-PSSession	(session)	todo
-rd	Remove-Item	(session)	todo
-rdr	Remove-PSDrive	(session)	todo
-ren	Rename-Item	(session)	todo
-ri	Remove-Item	(session)	todo
-rjb	Remove-Job	(session)	todo
-rmo	Remove-Module	(session)	todo
-rni	Rename-Item	(session)	todo
-rnp	Rename-ItemProperty	(session)	todo
-rp	Remove-ItemProperty	(session)	todo
-rsn	Remove-PSSession	(session)	todo
-rv	Remove-Variable	(session)	todo
-rvpa	Resolve-Path	(session)	todo
-sajb	Start-Job	(session)	todo
-sal	Set-Alias	(session)	todo
-saps	Start-Process	(session)	todo
-sbp	Set-PSBreakpoint	(session)	todo
-scb	Set-Clipboard	Microsoft.PowerShell.Management	todo
-select	Select-Object	(session)	todo
-set	Set-Variable	(session)	todo
-si	Set-Item	(session)	todo
-sl	Set-Location	(session)	todo
-sls	Select-String	(session)	todo
-sp	Set-ItemProperty	(session)	todo
-spjb	Stop-Job	(session)	todo
-spps	Stop-Process	(session)	todo
-sv	Set-Variable	(session)	todo
-svres	Save-PSResource	Microsoft.PowerShell.PSResourceGet	todo
-type	Get-Content	(session)	todo
-udres	Update-PSResource	Microsoft.PowerShell.PSResourceGet	todo
-upmo	Update-Module	PowerShellGet	todo
-usres	Uninstall-PSResource	Microsoft.PowerShell.PSResourceGet	todo
-where	Where-Object	(session)	todo
-wjb	Wait-Job	(session)	todo
+alias	definition	module	platform	status
+?	Where-Object	(session)	linux-x64	todo
+%	ForEach-Object	(session)	linux-x64	todo
+cd	Set-Location	(session)	linux-x64	todo
+chdir	Set-Location	(session)	linux-x64	todo
+clc	Clear-Content	(session)	linux-x64	todo
+clhy	Clear-History	(session)	linux-x64	todo
+cli	Clear-Item	(session)	linux-x64	todo
+clp	Clear-ItemProperty	(session)	linux-x64	todo
+cls	Clear-Host	(session)	linux-x64	todo
+clv	Clear-Variable	(session)	linux-x64	todo
+cmres	Compress-PSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
+copy	Copy-Item	(session)	linux-x64	todo
+cpi	Copy-Item	(session)	linux-x64	todo
+cvpa	Convert-Path	(session)	linux-x64	todo
+dbp	Disable-PSBreakpoint	(session)	linux-x64	todo
+del	Remove-Item	(session)	linux-x64	todo
+dir	Get-ChildItem	(session)	linux-x64	todo
+ebp	Enable-PSBreakpoint	(session)	linux-x64	todo
+echo	Write-Output	(session)	linux-x64	todo
+epal	Export-Alias	(session)	linux-x64	todo
+epcsv	Export-Csv	(session)	linux-x64	todo
+erase	Remove-Item	(session)	linux-x64	todo
+etsn	Enter-PSSession	(session)	linux-x64	todo
+exsn	Exit-PSSession	(session)	linux-x64	todo
+fc	Format-Custom	(session)	linux-x64	todo
+fdres	Find-PSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
+fhx	Format-Hex	Microsoft.PowerShell.Utility	linux-x64	todo
+fimo	Find-Module	PowerShellGet	linux-x64	todo
+fl	Format-List	(session)	linux-x64	todo
+foreach	ForEach-Object	(session)	linux-x64	todo
+ft	Format-Table	(session)	linux-x64	todo
+fw	Format-Wide	(session)	linux-x64	todo
+gal	Get-Alias	(session)	linux-x64	todo
+gbp	Get-PSBreakpoint	(session)	linux-x64	todo
+gc	Get-Content	(session)	linux-x64	todo
+gcb	Get-Clipboard	Microsoft.PowerShell.Management	linux-x64	todo
+gci	Get-ChildItem	(session)	linux-x64	todo
+gcm	Get-Command	(session)	linux-x64	todo
+gcs	Get-PSCallStack	(session)	linux-x64	todo
+gdr	Get-PSDrive	(session)	linux-x64	todo
+gerr	Get-Error	(session)	linux-x64	todo
+Get-PSResource	Get-InstalledPSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
+ghy	Get-History	(session)	linux-x64	todo
+gi	Get-Item	(session)	linux-x64	todo
+gjb	Get-Job	(session)	linux-x64	todo
+gl	Get-Location	(session)	linux-x64	todo
+gm	Get-Member	(session)	linux-x64	todo
+gmo	Get-Module	(session)	linux-x64	todo
+gp	Get-ItemProperty	(session)	linux-x64	todo
+gps	Get-Process	(session)	linux-x64	todo
+gpv	Get-ItemPropertyValue	(session)	linux-x64	todo
+gres	Get-InstalledPSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
+group	Group-Object	(session)	linux-x64	todo
+gsn	Get-PSSession	(session)	linux-x64	todo
+gtz	Get-TimeZone	Microsoft.PowerShell.Management	linux-x64	todo
+gu	Get-Unique	(session)	linux-x64	todo
+gv	Get-Variable	(session)	linux-x64	todo
+h	Get-History	(session)	linux-x64	todo
+history	Get-History	(session)	linux-x64	todo
+icm	Invoke-Command	(session)	linux-x64	todo
+iex	Invoke-Expression	(session)	linux-x64	todo
+ihy	Invoke-History	(session)	linux-x64	todo
+ii	Invoke-Item	(session)	linux-x64	todo
+inmo	Install-Module	PowerShellGet	linux-x64	todo
+ipal	Import-Alias	(session)	linux-x64	todo
+ipcsv	Import-Csv	(session)	linux-x64	todo
+ipmo	Import-Module	(session)	linux-x64	todo
+irm	Invoke-RestMethod	(session)	linux-x64	todo
+isres	Install-PSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
+iwr	Invoke-WebRequest	(session)	linux-x64	todo
+md	mkdir	(session)	linux-x64	todo
+measure	Measure-Object	(session)	linux-x64	todo
+mi	Move-Item	(session)	linux-x64	todo
+move	Move-Item	(session)	linux-x64	todo
+mp	Move-ItemProperty	(session)	linux-x64	todo
+nal	New-Alias	(session)	linux-x64	todo
+ndr	New-PSDrive	(session)	linux-x64	todo
+ni	New-Item	(session)	linux-x64	todo
+nmo	New-Module	(session)	linux-x64	todo
+nsn	New-PSSession	(session)	linux-x64	todo
+nv	New-Variable	(session)	linux-x64	todo
+oh	Out-Host	(session)	linux-x64	todo
+pbres	Publish-PSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
+popd	Pop-Location	(session)	linux-x64	todo
+pumo	Publish-Module	PowerShellGet	linux-x64	todo
+pushd	Push-Location	(session)	linux-x64	todo
+pwd	Get-Location	(session)	linux-x64	todo
+r	Invoke-History	(session)	linux-x64	todo
+rbp	Remove-PSBreakpoint	(session)	linux-x64	todo
+rcjb	Receive-Job	(session)	linux-x64	todo
+rcsn	Receive-PSSession	(session)	linux-x64	todo
+rd	Remove-Item	(session)	linux-x64	todo
+rdr	Remove-PSDrive	(session)	linux-x64	todo
+ren	Rename-Item	(session)	linux-x64	todo
+ri	Remove-Item	(session)	linux-x64	todo
+rjb	Remove-Job	(session)	linux-x64	todo
+rmo	Remove-Module	(session)	linux-x64	todo
+rni	Rename-Item	(session)	linux-x64	todo
+rnp	Rename-ItemProperty	(session)	linux-x64	todo
+rp	Remove-ItemProperty	(session)	linux-x64	todo
+rsn	Remove-PSSession	(session)	linux-x64	todo
+rv	Remove-Variable	(session)	linux-x64	todo
+rvpa	Resolve-Path	(session)	linux-x64	todo
+sajb	Start-Job	(session)	linux-x64	todo
+sal	Set-Alias	(session)	linux-x64	todo
+saps	Start-Process	(session)	linux-x64	todo
+sbp	Set-PSBreakpoint	(session)	linux-x64	todo
+scb	Set-Clipboard	Microsoft.PowerShell.Management	linux-x64	todo
+select	Select-Object	(session)	linux-x64	todo
+set	Set-Variable	(session)	linux-x64	todo
+si	Set-Item	(session)	linux-x64	todo
+sl	Set-Location	(session)	linux-x64	todo
+sls	Select-String	(session)	linux-x64	todo
+sp	Set-ItemProperty	(session)	linux-x64	todo
+spjb	Stop-Job	(session)	linux-x64	todo
+spps	Stop-Process	(session)	linux-x64	todo
+sv	Set-Variable	(session)	linux-x64	todo
+svres	Save-PSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
+type	Get-Content	(session)	linux-x64	todo
+udres	Update-PSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
+upmo	Update-Module	PowerShellGet	linux-x64	todo
+usres	Uninstall-PSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
+where	Where-Object	(session)	linux-x64	todo
+wjb	Wait-Job	(session)	linux-x64	todo

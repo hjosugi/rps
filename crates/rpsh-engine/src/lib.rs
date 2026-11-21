@@ -15,7 +15,9 @@ use std::fmt;
 use std::io::{self, Write};
 
 use rpsh_runtime::{RuntimeError, Value, ops};
-use rpsh_syntax::{BinaryOp, Expr, ExprKind, ParseError, Statement, UnaryOp, parse};
+use rpsh_syntax::{
+    BinaryOp, Expr, ExprKind, ParseError, ScriptBlockAst, Statement, UnaryOp, parse,
+};
 
 /// Runs scripts.
 #[derive(Debug, Default)]
@@ -84,6 +86,16 @@ impl Engine {
     /// `exit`, or 0 when the script runs to its end.
     pub fn run_script(&mut self, source: &str, out: &mut dyn Write) -> Result<i32, EngineError> {
         let script = parse(source)?;
+        self.run_ast(&script, out)
+    }
+
+    /// Runs an already parsed script. For a caller that keeps the AST, this
+    /// separates parsing from execution, as upstream's `ScriptBlock` does.
+    pub fn run_ast(
+        &mut self,
+        script: &ScriptBlockAst,
+        out: &mut dyn Write,
+    ) -> Result<i32, EngineError> {
         for statement in &script.statements {
             match statement {
                 Statement::Expression(expr) => {
@@ -137,6 +149,14 @@ mod tests {
         let mut out = Vec::new();
         let result = Engine::new().run_script(source, &mut out);
         (result, String::from_utf8(out).unwrap())
+    }
+
+    #[test]
+    fn runs_an_ast_that_was_parsed_once() {
+        let ast = parse("1 + 2 * 3").unwrap();
+        let mut out = Vec::new();
+        Engine::new().run_ast(&ast, &mut out).unwrap();
+        assert_eq!(String::from_utf8(out).unwrap(), "7\n");
     }
 
     #[test]

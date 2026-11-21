@@ -1,0 +1,12 @@
+{
+  "program": "{engine}",
+  "args": ["-NoLogo", "-NoExit", "-Command", "function prompt { 'PS> ' }; Remove-Module PSReadLine -Force -ErrorAction SilentlyContinue"],
+  "input": [
+    {"after_ms": 1500, "send": "Start-Sleep -Seconds 30\r"},
+    {"after_ms": 3000, "send": "\u0003"},
+    {"after_ms": 4000, "send": "exit\r"}
+  ],
+  "timeout_ms": 8000,
+  "cols": 80,
+  "rows": 24
+}

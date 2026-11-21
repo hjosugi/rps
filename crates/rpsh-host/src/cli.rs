@@ -30,7 +30,7 @@ pub enum CliError {
 /// Every switch upstream accepts, in the order it tests them, as
 /// `(name, shortest accepted prefix)`. A switch matches when it is a prefix of
 /// `name` at least as long as the second string; the first match wins.
-/// Source: `MatchSwitch` calls in `CommandLineParameterParser.cs`, v7.7.0.
+/// Source: `MatchSwitch` calls in `CommandLineParameterParser.cs`, the reference release.
 const SWITCHES: &[(&str, &str)] = &[
     ("version", "v"),
     ("help", "h"),

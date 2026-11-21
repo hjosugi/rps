@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # docs/01_compat_contract.md, "Errors". Error ids, categories, exception
 # types and messages are part of the answer. Messages come from upstream's
 # resources and, for exceptions .NET raises, from the .NET 11.0.0 runtime.

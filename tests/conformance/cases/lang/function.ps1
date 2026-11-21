@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 function Add($a, $b = 10) { $a + $b }
 Add 1 2
 Add 5

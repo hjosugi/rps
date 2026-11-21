@@ -25,7 +25,7 @@ docs/01_compat_contract.md: own `HOME`, fixed `PATH`, en-US, UTC, no `TERM`.
 
 ## pwsh, stage by stage
 
-The probes are the pinned pwsh with `pwsh.dll` replaced by a small program
+The probes are the reference pwsh with `pwsh.dll` replaced by a small program
 compiled by the Roslyn that ships with it (`scripts/build-startup-probes.sh`,
 `bench/startup/probes`). They keep the same apphost, runtime, runtime
 configuration and assemblies, and stop at one stage:

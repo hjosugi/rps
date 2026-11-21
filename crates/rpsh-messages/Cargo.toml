@@ -1,0 +1,11 @@
+[package]
+name = "rpsh-messages"
+description = "PowerShell's own message text, generated from upstream's neutral resources"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

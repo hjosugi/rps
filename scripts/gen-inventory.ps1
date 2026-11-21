@@ -1,19 +1,25 @@
 #!/usr/bin/env pwsh
 # Regenerates inventory/*.tsv: the surface of upstream PowerShell that rpsh
-# has to reproduce, as reported by the pinned pwsh itself.
+# has to reproduce, as reported by the latest stable pwsh itself.
 #
-#   .cache/pwsh/7.7.0/pwsh -NoProfile -File scripts/gen-inventory.ps1
+#   .cache/pwsh/$(cat .cache/pwsh/current)/pwsh -NoProfile -File scripts/gen-inventory.ps1
 #
-# Every file ends in a `status` column (todo | partial | done | n/a) that is
-# edited by hand as work lands. Regenerating keeps the status of every row
-# that still exists, so the files can be refreshed after a pwsh update.
-# `cargo harness inventory` summarizes them.
+# Every file ends in `platform` and `status` columns (status is todo |
+# partial | done | n/a). The platform is the one this run generated (`linux-
+# x64`, `macos-arm64`, ...); merge files from other platforms to compare them.
+# Regenerating keeps the status of every row that still exists, so the files
+# can be refreshed after a pwsh update. `cargo harness inventory` summarizes
+# them, grouped by platform.
 param(
     [string] $OutDir = (Join-Path $PSScriptRoot '..' 'inventory')
 )
 
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = 'Stop'
+
+$os = if ($IsWindows) { 'windows' } elseif ($IsMacOS) { 'macos' } else { 'linux' }
+$arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+$Platform = "$os-$arch"
 
 # Only what ships with pwsh, not what the user has installed.
 $env:PSModulePath = Join-Path $PSHOME 'Modules'
@@ -35,12 +41,12 @@ function Write-Inventory {
         }
     }
     $lines = [System.Collections.Generic.List[string]]::new()
-    $lines.Add((@($Columns) + 'status') -join "`t")
+    $lines.Add((@($Columns) + @('platform', 'status')) -join "`t")
     foreach ($row in $Rows) {
         $fields = @($row | ForEach-Object { ([string] $_) -replace '[\t\r\n]+', ' ' })
         $key = $fields[0..($KeyColumns - 1)] -join "`t"
         $status = if ($known.ContainsKey($key)) { $known[$key] } else { 'todo' }
-        $lines.Add((@($fields) + $status) -join "`t")
+        $lines.Add((@($fields) + @($Platform, $status)) -join "`t")
     }
     Set-Content -Path $path -Value $lines -Encoding utf8NoBOM
     '{0,-24} {1,6} rows' -f $Name, $Rows.Count
@@ -50,7 +56,7 @@ New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 
 # Variables first: later steps import modules, which adds to the session.
 # $OutDir is this script's own parameter, not part of a session.
-$variables = Get-Variable | Where-Object Name -NE 'OutDir' | Sort-Object Name | ForEach-Object {
+$variables = Get-Variable | Where-Object Name -NotIn @('OutDir', 'os', 'arch', 'Platform') | Sort-Object Name | ForEach-Object {
     $type = if ($null -eq $_.Value) { '' } else { $_.Value.GetType().FullName }
     , @($_.Name, $type, $_.Options)
 }

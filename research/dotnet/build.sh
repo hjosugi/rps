@@ -1,15 +1,16 @@
 #!/bin/sh
 # Builds the T1 probe of docs/06_dotnet_bridge.md into .cache/dotnet-probe:
 # the native host (hostfxr-probe.c) and the managed library it calls
-# (Probe.cs, compiled by the Roslyn that ships with the pinned pwsh).
+# (Probe.cs, compiled by the Roslyn that ships with the reference pwsh).
 set -eu
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
-pwsh_dir="$root/.cache/pwsh/7.7.0"
+version=$(cat "$root/.cache/pwsh/current" 2>/dev/null || true)
+pwsh_dir="$root/.cache/pwsh/$version"
 out="$root/.cache/dotnet-probe"
 
-if [ ! -x "$pwsh_dir/pwsh" ]; then
-    echo "no pinned pwsh in $pwsh_dir; run scripts/fetch-pwsh.sh" >&2
+if [ -z "$version" ] || [ ! -x "$pwsh_dir/pwsh" ]; then
+    echo "no latest stable pwsh in .cache/pwsh; run scripts/fetch-pwsh.sh" >&2
     exit 1
 fi
 mkdir -p "$out"

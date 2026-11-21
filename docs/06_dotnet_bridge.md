@@ -30,7 +30,7 @@ user can ask why a start is slow.
 
 Scripts name .NET types directly. `research/dotnet/type-literals.py` counts
 type literals in the `.ps1` and `.psm1` files under `$PSHOME/Modules`
-(`research/dotnet/type-literals.py --top 30 .cache/pwsh/7.7.0/Modules`), as
+(`research/dotnet/type-literals.py --top 30 .cache/pwsh/$(cat .cache/pwsh/current)/Modules`), as
 a stand-in until the corpus analysis of #18. It found 1,388 literals over
 123 distinct names in 144 files. The most frequent, with static accesses
 (`X::member`) in the third column:
@@ -91,7 +91,7 @@ not in it goes to T1.
 `research/dotnet/build.sh` builds `hostfxr-probe.c` and a managed
 `Probe.cs`; `measure.py` runs each mode 11 times and keeps the median of
 every step. The probe loads the `libhostfxr.so` that ships **inside the
-pinned pwsh**, starts the runtime from the command line, loads the probe
+reference pwsh**, starts the runtime from the command line, loads the probe
 into a load context, resolves unmanaged-callable function pointers and calls
 them. Nothing in the pwsh directory is written.
 
@@ -127,7 +127,7 @@ What it says:
   runtime takes another 145 ms and reaches 82.2 MiB from 36.8 MiB, about
   45 MiB more. The bridge must not reach for SMA to answer a
   `[System.IO.Path]` call.
-* **Two other initialization paths were rejected by the pinned runtime.**
+* **Two other initialization paths were rejected by the reference runtime.**
   `hostfxr_initialize_for_runtime_config` fails with "Initialization for
   self-contained components is not supported" because pwsh is published
   self-contained; the named load-context API (`coreclr_load_context`)
@@ -229,7 +229,7 @@ matters: PSResourceGet ships 47 assemblies including its own
 `Newtonsoft.Json`, `System.Text.Json` and NuGet stack, and PackageManagement
 ships a second provider set. Each module needs its dependencies resolved
 independently (#127). The probe's named-context API is the right mechanism;
-until it works on the pinned runtime, the fallback is the default load
+until it works on the reference runtime, the fallback is the default load
 context plus a version check on the facade.
 
 ## Prior art

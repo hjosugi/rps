@@ -1,0 +1,8 @@
+area	files	notes
+Modules	228	module cmdlets and providers; mostly Linux unless they touch Windows APIs
+engine	84	session state, pipeline, binder, errors
+Language	82	parser, AST, operators, type conversion
+Host	9	ConsoleHost, prompting, line editing
+SDK	3	Microsoft.PowerShell.SDK packaging and hosting
+Provider	2	provider contracts
+dsc	1	Desired State Configuration; Windows-first

@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 sh -c 'exit 3'
 $?
 $LASTEXITCODE

@@ -7,7 +7,7 @@
 //! `nu-command`, `nu-cmd-lang`.
 //!
 //! `inventory/commands.tsv` and `inventory/parameters.tsv` are the checklist:
-//! every command pwsh 7.7.0 exposes on Linux, and every parameter of each,
+//! every command the reference pwsh exposes on Linux, and every parameter of each,
 //! with a `status` column this crate's progress is recorded in.
 //!
 //! One module per upstream module (`core`, `utility`, `management`,

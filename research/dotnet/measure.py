@@ -16,8 +16,15 @@ import statistics
 import subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PWSH_DIR = os.path.join(ROOT, '.cache', 'pwsh', '7.7.0')
+try:
+    with open(os.path.join(ROOT, '.cache', 'pwsh', 'current')) as marker:
+        _version = marker.read().strip()
+except OSError:
+    _version = ''
+PWSH_DIR = os.path.join(ROOT, '.cache', 'pwsh', _version)
 PROBE_DIR = os.path.join(ROOT, '.cache', 'dotnet-probe')
+if not os.path.isfile(os.path.join(PWSH_DIR, 'pwsh')):
+    raise SystemExit('no pwsh in .cache/pwsh; run scripts/fetch-pwsh.sh')
 
 
 def machine():

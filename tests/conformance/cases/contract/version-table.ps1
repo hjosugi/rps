@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # docs/01_compat_contract.md, "Identity". rpsh reports the version table
 # of the release it reproduces, key for key. OS is left out: it names the
 # machine the case runs on.

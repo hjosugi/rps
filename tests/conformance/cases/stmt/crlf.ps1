@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 1 + 1
 'a'
 

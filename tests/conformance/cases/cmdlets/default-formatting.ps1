@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # Out-String formats each pipeline on its own.
 [pscustomobject]@{ Name = 'a'; Value = 1 }, [pscustomobject]@{ Name = 'bb'; Value = 22 } | Out-String
 # Up to four properties make a table, more make a list.

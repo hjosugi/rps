@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 7 / 2
 6 / 2
 (6 / 2).GetType().FullName

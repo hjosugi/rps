@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # Int32 arithmetic and operator precedence.
 1 + 1
 7 - 10

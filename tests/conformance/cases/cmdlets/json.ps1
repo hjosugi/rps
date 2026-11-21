@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 [ordered]@{ a = 1; b = @(1, 2); c = 'x' } | ConvertTo-Json -Compress
 $o = '{"x":1,"y":[1,2,{"z":null}]}' | ConvertFrom-Json
 $o.x

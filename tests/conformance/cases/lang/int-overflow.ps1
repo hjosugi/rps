@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # Int32 arithmetic that overflows is redone in Double, not wrapped.
 2147483647 + 1
 2147483647 * 2

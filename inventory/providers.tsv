@@ -1,6 +1,6 @@
-provider	capabilities	drives	status
-Alias	ShouldProcess	Alias	todo
-Environment	ShouldProcess	Env	todo
-FileSystem	Filter,ShouldProcess,Credentials	/,Temp	todo
-Function	ShouldProcess	Function	todo
-Variable	ShouldProcess	Variable	todo
+provider	capabilities	drives	platform	status
+Alias	ShouldProcess	Alias	linux-x64	todo
+Environment	ShouldProcess	Env	linux-x64	todo
+FileSystem	Filter,ShouldProcess,Credentials	/,Temp	linux-x64	todo
+Function	ShouldProcess	Function	linux-x64	todo
+Variable	ShouldProcess	Variable	linux-x64	todo

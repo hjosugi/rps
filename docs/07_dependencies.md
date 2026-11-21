@@ -53,7 +53,7 @@ yet; each gets its own issue and spike, and this table records the decision.
 
 The rule for the two big data crates (ICU and the CLR bridge) is the same:
 **do not put their data in the binary by default.** ICU is loaded from the
-system or the pinned pwsh; the CLR is found at run time; both fail with a
+system or the reference pwsh; the CLR is found at run time; both fail with a
 precise refusal when absent, never with an approximation.
 
 ## Adding a dependency

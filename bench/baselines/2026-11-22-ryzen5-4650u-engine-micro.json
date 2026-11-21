@@ -1,0 +1,34 @@
+{
+  "schema": "rpsh-research-v1",
+  "name": "engine_micro",
+  "description": "in-process parse, compile and invoke against the reference pwsh (#11)",
+  "quick": false,
+  "machine": {
+    "cpu": "AMD Ryzen 5 PRO 4650U with Radeon Graphics",
+    "governor": "schedutil",
+    "load_average": "2.31 2.48 1.99 3/1816 2163793",
+    "kernel": "7.3.4-1-cachyos",
+    "commit": "fc95661",
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+  },
+  "facts": {
+    "compiler.test.ps1 bytes": "104415",
+    "subset bytes": "100000",
+    "subset statements": "6250",
+    "pwsh method": "stopwatch loops in one pwsh process, not BenchmarkDotNet",
+    "rpsh parse throughput": "37.92 MB/s",
+    "rpsh parse of compiler.test.ps1": "not implemented: statement keywords (if, foreach, function, ...) (at offset 76)",
+    "rpsh compile": "not implemented: there is no compiler or register IR yet (DESIGN.md §3.4, M3)",
+    "pwsh version": "7.7.0",
+    "pwsh parse throughput": "1.05 MB/s"
+  },
+  "unit": "ns per operation",
+  "measurements": [
+    {"group": "parse subset", "candidate": "rpsh", "iterations": 100, "median_ns": 2515117.520, "min_ns": 2487672.440, "samples_ns": [2512375.280, 2526526.620, 2520886.240, 2490715.240, 2497068.760, 2512092.440, 2512358.140, 2487672.440, 2504305.140, 2756937.270, 2528267.490, 2515117.520, 2524079.440, 2620138.540, 2525130.000, 2506799.220, 2513565.010, 2544363.990, 2544545.630, 2502809.730, 2531783.380]},
+    {"group": "invoke 1 + 2 * 3", "candidate": "rpsh", "iterations": 100000, "median_ns": 29.971, "min_ns": 29.900, "samples_ns": [29.965, 29.951, 29.986, 29.985, 29.953, 30.226, 30.002, 29.935, 29.966, 29.970, 29.936, 29.900, 30.001, 29.987, 29.915, 30.355, 30.013, 29.971, 29.953, 29.999, 30.198]},
+    {"group": "parse compiler.test.ps1", "candidate": "pwsh", "iterations": 20, "median_ns": 24289380.000, "min_ns": 15642640.000, "samples_ns": []},
+    {"group": "parse subset", "candidate": "pwsh", "iterations": 20, "median_ns": 90634105.000, "min_ns": 87088790.000, "samples_ns": []},
+    {"group": "compile compiler.test.ps1", "candidate": "pwsh", "iterations": 5, "median_ns": 37028120.000, "min_ns": 33145380.000, "samples_ns": []},
+    {"group": "invoke 1 + 2 * 3", "candidate": "pwsh", "iterations": 100000, "median_ns": 1575.509, "min_ns": 1501.493, "samples_ns": []}
+  ]
+}

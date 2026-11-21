@@ -1,0 +1,8 @@
+rpsh-golden-v2
+exit=0
+output:out
+warning:warn
+verbose:verb
+debug:dbg
+information:info
+error:err

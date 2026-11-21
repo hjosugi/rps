@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # docs/01_compat_contract.md, "Culture". Culture data comes from the
 # system ICU, recorded in tests/conformance/reference.txt. Under ICU 72 and
 # later, en-US puts U+202F NARROW NO-BREAK SPACE before AM/PM.

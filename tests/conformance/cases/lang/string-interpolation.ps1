@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 $x = 5
 $o = [pscustomobject]@{ Name = 'n' }
 "x=$x"

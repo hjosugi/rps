@@ -1,5 +1,5 @@
 name: Compatibility / Bug
-description: pwsh 7.7.0 と結果が違う・crash する
+description: 最新の stable pwsh と結果が違う・crash する
 labels: ["compat"]
 body:
   - type: markdown
@@ -17,7 +17,7 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: pwsh 7.7.0 の出力
+      label: 最新の stable pwsh の出力
       description: "`pwsh -NoProfile -NonInteractive -File repro.ps1` の stdout と exit code。"
     validations:
       required: true

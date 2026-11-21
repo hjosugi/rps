@@ -1,0 +1,324 @@
+{
+  "schema": "rpsh-shells-v1",
+  "generated_at_unix_s": 1795299764,
+  "pwsh": {
+    "version": "7.7.0",
+    "policy": "latest stable"
+  },
+  "environment": {
+    "os": "linux",
+    "arch": "x86_64",
+    "kernel": "7.3.4-1-cachyos",
+    "cpu_model": "AMD Ryzen 5 PRO 4650U with Radeon Graphics",
+    "cpu_count": 12,
+    "cpu_governor": "schedutil",
+    "load_average_before": [
+      1.13,
+      1.76,
+      1.8
+    ],
+    "load_average_after": [
+      0.7,
+      1.47,
+      1.69
+    ],
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "rusage": "wait4 via scripts/spawn-measure.c"
+  },
+  "settings": {
+    "runs": 10,
+    "warmup": 2
+  },
+  "shells": [
+    {
+      "name": "bash",
+      "one_line": {
+        "median_ms": 2.2584625000000003,
+        "median_ci95_ms": [
+          1.976106600000001,
+          2.6651700000000003
+        ],
+        "outliers_ms": [],
+        "min_ms": 1.415877,
+        "max_ms": 2.745611,
+        "mean_ms": 2.2549286,
+        "stddev_ms": 0.4445138294084648,
+        "mean_user_ms": 1.0669,
+        "mean_system_ms": 1.0068,
+        "max_rss_kib": 4640,
+        "samples_ms": [
+          2.303011,
+          2.647347,
+          1.415877,
+          2.213914,
+          2.025049,
+          2.127682,
+          1.7404549999999999,
+          2.745611,
+          2.7164260000000002,
+          2.6139140000000003
+        ]
+      },
+      "interactive": {
+        "median_ms": 18.9050115,
+        "median_ci95_ms": [
+          12.131039,
+          23.126771
+        ],
+        "outliers_ms": [],
+        "min_ms": 10.520758,
+        "max_ms": 26.387995,
+        "mean_ms": 17.8390326,
+        "stddev_ms": 6.0408693052940325,
+        "mean_user_ms": 0,
+        "mean_system_ms": 0,
+        "max_rss_kib": 0,
+        "samples_ms": [
+          23.960951,
+          22.292591,
+          12.393761,
+          10.520758,
+          22.318109,
+          17.015131,
+          20.794891999999997,
+          10.575099,
+          26.387995,
+          12.131039
+        ]
+      },
+      "errors": [],
+      "detail": null
+    },
+    {
+      "name": "dash",
+      "one_line": null,
+      "interactive": null,
+      "errors": [
+        "one line: not found on PATH"
+      ],
+      "detail": "not found on PATH"
+    },
+    {
+      "name": "zsh",
+      "one_line": {
+        "median_ms": 1.525848,
+        "median_ci95_ms": [
+          1.3103635,
+          2.320363
+        ],
+        "outliers_ms": [],
+        "min_ms": 1.216052,
+        "max_ms": 3.027509,
+        "mean_ms": 1.8050795000000002,
+        "stddev_ms": 0.6361040399543755,
+        "mean_user_ms": 0.3242,
+        "mean_system_ms": 1.2974,
+        "max_rss_kib": 4896,
+        "samples_ms": [
+          1.32165,
+          1.339092,
+          2.092876,
+          2.234973,
+          2.54785,
+          1.650066,
+          3.027509,
+          1.4016300000000002,
+          1.2190969999999999,
+          1.216052
+        ]
+      },
+      "interactive": {
+        "median_ms": 16.5885405,
+        "median_ci95_ms": [
+          14.27271367500001,
+          18.261559
+        ],
+        "outliers_ms": [],
+        "min_ms": 10.417584,
+        "max_ms": 20.973757,
+        "mean_ms": 16.1271949,
+        "stddev_ms": 3.1112504902349487,
+        "mean_user_ms": 0,
+        "mean_system_ms": 0,
+        "max_rss_kib": 0,
+        "samples_ms": [
+          20.973757,
+          14.981786,
+          18.068306,
+          16.910405,
+          14.281883,
+          10.417584,
+          19.274199,
+          17.248919,
+          16.266676,
+          12.848434000000001
+        ]
+      },
+      "errors": [],
+      "detail": null
+    },
+    {
+      "name": "fish",
+      "one_line": {
+        "median_ms": 26.095861999999997,
+        "median_ci95_ms": [
+          25.188093000000002,
+          29.447259
+        ],
+        "outliers_ms": [
+          32.010413,
+          40.749517
+        ],
+        "min_ms": 24.380319,
+        "max_ms": 40.749517,
+        "mean_ms": 27.9071638,
+        "stddev_ms": 4.994013935111065,
+        "mean_user_ms": 16.1946,
+        "mean_system_ms": 11.949100000000001,
+        "max_rss_kib": 18672,
+        "samples_ms": [
+          26.380702,
+          27.272914999999998,
+          25.188093000000002,
+          24.380319,
+          25.137669000000002,
+          26.884104999999998,
+          40.749517,
+          25.811021999999998,
+          32.010413,
+          25.256883000000002
+        ]
+      },
+      "interactive": {
+        "median_ms": 42.1898345,
+        "median_ci95_ms": [
+          36.9715195,
+          66.086089
+        ],
+        "outliers_ms": [],
+        "min_ms": 31.688398,
+        "max_ms": 67.220127,
+        "mean_ms": 48.78524750000001,
+        "stddev_ms": 14.925137377191879,
+        "mean_user_ms": 0,
+        "mean_system_ms": 0,
+        "max_rss_kib": 0,
+        "samples_ms": [
+          31.688398,
+          32.238741000000005,
+          42.675371,
+          62.687194000000005,
+          67.220127,
+          66.324196,
+          66.086089,
+          40.08507,
+          41.704298,
+          37.142991
+        ]
+      },
+      "errors": [],
+      "detail": null
+    },
+    {
+      "name": "nu",
+      "one_line": null,
+      "interactive": null,
+      "errors": [
+        "one line: not found on PATH"
+      ],
+      "detail": "not found on PATH"
+    },
+    {
+      "name": "pwsh",
+      "one_line": {
+        "median_ms": 141.1545705,
+        "median_ci95_ms": [
+          135.865779,
+          144.90468599999997
+        ],
+        "outliers_ms": [],
+        "min_ms": 134.582391,
+        "max_ms": 154.517019,
+        "mean_ms": 141.68105139999997,
+        "stddev_ms": 6.158115073935224,
+        "mean_user_ms": 173.55580000000003,
+        "mean_system_ms": 62.504599999999996,
+        "max_rss_kib": 91792,
+        "samples_ms": [
+          147.77700399999998,
+          134.582391,
+          140.315266,
+          154.517019,
+          142.032368,
+          141.993875,
+          135.865779,
+          144.57603999999998,
+          135.231269,
+          139.919503
+        ]
+      },
+      "interactive": {
+        "median_ms": 288.70570150000003,
+        "median_ci95_ms": [
+          282.56804800000003,
+          300.11783649999995
+        ],
+        "outliers_ms": [],
+        "min_ms": 274.932753,
+        "max_ms": 305.9912,
+        "mean_ms": 290.3484958,
+        "stddev_ms": 10.590398481683001,
+        "mean_user_ms": 0,
+        "mean_system_ms": 0,
+        "max_rss_kib": 0,
+        "samples_ms": [
+          286.35033300000003,
+          282.56804800000003,
+          294.94913499999996,
+          279.071107,
+          285.50435600000003,
+          291.06107,
+          305.286538,
+          274.932753,
+          305.9912,
+          297.770418
+        ]
+      },
+      "errors": [],
+      "detail": null
+    },
+    {
+      "name": "rpsh",
+      "one_line": {
+        "median_ms": 1.3416915,
+        "median_ci95_ms": [
+          0.974719,
+          1.7388029999999999
+        ],
+        "outliers_ms": [],
+        "min_ms": 0.841719,
+        "max_ms": 2.061698,
+        "mean_ms": 1.3875030000000002,
+        "stddev_ms": 0.40868091367960896,
+        "mean_user_ms": 0.07699999999999999,
+        "mean_system_ms": 1.1237,
+        "max_rss_kib": 2824,
+        "samples_ms": [
+          1.2177749999999998,
+          2.061698,
+          1.236569,
+          1.619769,
+          1.7388029999999999,
+          1.785229,
+          1.446814,
+          0.974719,
+          0.951935,
+          0.841719
+        ]
+      },
+      "interactive": null,
+      "errors": [],
+      "detail": "interactive sessions are not implemented"
+    }
+  ]
+}

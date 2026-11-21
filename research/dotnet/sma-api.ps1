@@ -1,4 +1,4 @@
-# The public surface of System.Management.Automation 7.7.0: what a facade
+# The public surface of System.Management.Automation in the reference release: what a facade
 # assembly for binary modules has to expose (docs/06_dotnet_bridge.md).
 $ErrorActionPreference = 'Stop'
 $assembly = [System.Management.Automation.PSObject].Assembly

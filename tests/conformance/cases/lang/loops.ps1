@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 for ($i = 0; $i -lt 3; $i++) { $i }
 foreach ($x in 'a', 'b', 'c') { if ($x -eq 'b') { continue }; $x }
 $n = 0

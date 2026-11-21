@@ -1,19 +1,23 @@
 /*
- * Runs a command and reports its wall time and resource usage on file
- * descriptor FD:
+ * Runs a command and reports its wall time and resource usage:
  *
  *     spawn-measure FD PROGRAM [ARG...]
+ *     spawn-measure --path FILE PROGRAM [ARG...]
  *     -> "<wall ns> <user us> <sys us> <max rss KiB> <minor faults> <major faults> <wait status>\n"
  *
- * Used by scripts/time-commands.py. Linux charges a process's peak RSS from
- * before exec to the program it execs, so a child forked from a Python
- * process of 20 MiB reports at least 20 MiB, however small it is. Forked
- * from this program instead, it reports its own.
+ * scripts/time-commands.py passes a file descriptor; `cargo harness bench`
+ * passes a report path, so no descriptor has to survive the exec.
+ *
+ * Linux charges a process's peak RSS from before exec to the program it
+ * execs, so a child forked from a Python process of 20 MiB reports at least
+ * 20 MiB, however small it is. Forked from this program instead, it reports
+ * its own.
  */
 #define _GNU_SOURCE
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -21,17 +25,33 @@
 
 int main(int argc, char **argv)
 {
-    if (argc < 3) {
-        fprintf(stderr, "usage: spawn-measure FD PROGRAM [ARG...]\n");
-        return 2;
+    FILE *report;
+    int program;
+    if (argc > 1 && strcmp(argv[1], "--path") == 0) {
+        if (argc < 4) {
+            fprintf(stderr, "usage: spawn-measure --path FILE PROGRAM [ARG...]\n");
+            return 2;
+        }
+        report = fopen(argv[2], "w");
+        if (report == NULL) {
+            perror("spawn-measure: report file");
+            return 2;
+        }
+        program = 3;
+    } else {
+        if (argc < 3) {
+            fprintf(stderr, "usage: spawn-measure FD PROGRAM [ARG...]\n");
+            return 2;
+        }
+        int fd = atoi(argv[1]);
+        report = fdopen(fd, "w");
+        if (report == NULL) {
+            perror("spawn-measure: report descriptor");
+            return 2;
+        }
+        program = 2;
     }
-    int fd = atoi(argv[1]);
-    FILE *report = fdopen(fd, "w");
-    if (report == NULL) {
-        perror("spawn-measure: report descriptor");
-        return 2;
-    }
-    fcntl(fd, F_SETFD, FD_CLOEXEC);
+    fcntl(fileno(report), F_SETFD, FD_CLOEXEC);
 
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
@@ -41,7 +61,7 @@ int main(int argc, char **argv)
         return 2;
     }
     if (pid == 0) {
-        execv(argv[2], argv + 2);
+        execv(argv[program], argv + program);
         perror("spawn-measure: exec");
         _exit(127);
     }

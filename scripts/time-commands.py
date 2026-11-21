@@ -22,7 +22,7 @@ A spec is JSON:
     }
 
 `{root}`, `{pwsh}`, `{rpsh}` and `{probes}` in argv are replaced by the
-checkout, the pinned pwsh, the release rpsh and .cache/probes. A command with
+checkout, the reference pwsh, the release rpsh and .cache/probes. A command with
 "metrics" prints `name=value` lines on stdout; their medians are reported.
 "fresh_home" gives every run a new, empty HOME.
 
@@ -46,16 +46,29 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PWSH_VERSION = '7.7.0'
 REFERENCE_PATH = '/usr/local/bin:/usr/bin:/bin'
 SPAWN_MEASURE = None
+
+
+def pwsh_path():
+    """The latest stable pwsh installed by scripts/fetch-pwsh.sh."""
+    try:
+        with open(os.path.join(ROOT, '.cache', 'pwsh', 'current')) as marker:
+            version = marker.read().strip()
+    except OSError:
+        version = ''
+    if version:
+        path = os.path.join(ROOT, '.cache', 'pwsh', version, 'pwsh')
+        if os.path.exists(path):
+            return path
+    raise SystemExit('no pwsh in .cache/pwsh; run scripts/fetch-pwsh.sh')
 
 
 def placeholders():
     target = os.environ.get('CARGO_TARGET_DIR') or os.path.join(ROOT, 'target')
     return {
         '{root}': ROOT,
-        '{pwsh}': os.path.join(ROOT, '.cache', 'pwsh', PWSH_VERSION, 'pwsh'),
+        '{pwsh}': pwsh_path(),
         '{rpsh}': os.path.join(target, 'release', 'rpsh'),
         '{probes}': os.path.join(ROOT, '.cache', 'probes'),
     }

@@ -1,3 +1,4 @@
+rpsh-golden-v2
 exit=0
 System.Management.Automation.PSVersionHashTable
 PSVersion,PSEdition,GitCommitId,OS,Platform,PSCompatibleVersions,PSRemotingProtocolVersion,SerializationVersion,WSManStackVersion

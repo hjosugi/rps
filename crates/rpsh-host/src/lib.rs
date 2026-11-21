@@ -15,11 +15,15 @@ use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use rpsh_engine::{Engine, EngineError};
+use rpsh_messages as messages;
 
 pub use cli::{CliError, Invocation, parse_args};
 
-/// The upstream release rpsh is built and measured against.
-pub const TARGET_PWSH_VERSION: &str = "7.7.0";
+/// How rpsh chooses the upstream release it is measured against.
+///
+/// `scripts/fetch-pwsh.sh` resolves the latest stable release; every result
+/// file and golden records the version it actually ran with.
+pub const REFERENCE_POLICY: &str = "latest stable";
 
 /// Exit code when rpsh stops because it does not implement something.
 ///
@@ -35,6 +39,12 @@ pub const NOT_IMPLEMENTED_MARKER: &str = "rpsh: not implemented: ";
 /// Upstream's `ExitCodeBadCommandLineParameter`.
 const EXIT_BAD_COMMAND_LINE: i32 = 64;
 
+/// Upstream `CommandLineParameterParserStrings` messages, by catalog key.
+const MISSING_COMMAND_PARAMETER: &str = "CommandLineParameterParserStrings/MissingCommandParameter";
+const MISSING_FILE_ARGUMENT: &str = "CommandLineParameterParserStrings/MissingFileArgument";
+const ARGUMENT_FILE_DOES_NOT_EXIST: &str =
+    "CommandLineParameterParserStrings/ArgumentFileDoesNotExist";
+
 /// Runs rpsh with the arguments that follow the program name and returns the
 /// process exit code.
 pub fn run(args: &[String]) -> i32 {
@@ -42,24 +52,18 @@ pub fn run(args: &[String]) -> i32 {
         Ok(invocation) => invocation,
         Err(CliError::NotImplemented(feature)) => return not_implemented(feature),
         Err(CliError::MissingCommand) => {
-            eprintln!(
-                "Cannot process the command because of a missing parameter. \
-                 A command must follow -Command."
-            );
+            eprintln!("{}", messages::text(MISSING_COMMAND_PARAMETER));
             return EXIT_BAD_COMMAND_LINE;
         }
         Err(CliError::MissingFile) => {
-            eprintln!(
-                "The command cannot be run because the File parameter requires a file \
-                 path. Supply a path for the File parameter and then try the command again."
-            );
+            eprintln!("{}", messages::text(MISSING_FILE_ARGUMENT));
             return EXIT_BAD_COMMAND_LINE;
         }
     };
     match invocation {
         Invocation::Version => {
             println!(
-                "rpsh {} (targets PowerShell {TARGET_PWSH_VERSION})",
+                "rpsh {} (targets {REFERENCE_POLICY} PowerShell)",
                 env!("CARGO_PKG_VERSION")
             );
             0
@@ -90,11 +94,10 @@ fn run_file(path: &Path) -> i32 {
     let bytes = match fs::read(path) {
         Ok(bytes) => bytes,
         Err(_) => {
+            let path = path.display().to_string();
             eprintln!(
-                "The argument '{}' is not recognized as the name of a script file. \
-                 Check the spelling of the name, or if a path was included, verify \
-                 that the path is correct and try again.",
-                path.display()
+                "{}",
+                messages::format(ARGUMENT_FILE_DOES_NOT_EXIST, &[&path])
             );
             return EXIT_BAD_COMMAND_LINE;
         }

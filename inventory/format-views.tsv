@@ -1,240 +1,240 @@
-type	view	control	status
-Deserialized.Microsoft.PackageManagement.Implementation.PackageProvider	PackageProvider	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.PackageSource	PackageSource	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity	package	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayCulture	PackageWithCulture	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayCulture#DisplayLongName	PackageWithCultureAndLongName	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongName	PackageWithLongName	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName	packageWithLongSourceName	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayCulture	packageWithLongSourceNameAndCulture	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayCulture#DisplayLongName	packageWithLongSourceNameAndCultureAndName	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayLongName	packageWithLongSourceNameAndName	Table	todo
-Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#GetPackage	GetPackage	Table	todo
-Deserialized.Microsoft.PowerShell.Commands.GenericMeasureInfo	Microsoft.PowerShell.Commands.GenericMeasureInfo	List	todo
-Deserialized.Microsoft.PowerShell.Commands.MatchInfo	MatchInfo	Custom	todo
-Deserialized.Microsoft.PowerShell.Commands.TextMeasureInfo	Microsoft.PowerShell.Commands.TextMeasureInfo	Table	todo
-Deserialized.System.Management.Automation.WarningRecord	DeserializedWarningRecord	Custom	todo
-Microsoft.Management.Infrastructure.CimClass	Microsoft.Management.Infrastructure.CimClass	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#__PartialCIMInstance	Microsoft.Management.Infrastructure.CimInstance#__PartialCIMInstance	Custom	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ComputerSystem	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ComputerSystem	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DCOMApplication	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DCOMApplication	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DESKTOP	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DESKTOP	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DESKTOPMONITOR	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DESKTOPMONITOR	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DeviceMemoryAddress	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DeviceMemoryAddress	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Directory	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Directory	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskDrive	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskDrive	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskPartition	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskPartition	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskQuota	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskQuota	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Environment	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Environment	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Group	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Group	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_IDEController	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_IDEController	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_IRQResource	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_IRQResource	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LoadOrderGroup	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LoadOrderGroup	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LogicalDisk	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LogicalDisk	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LogonSession	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LogonSession	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkAdapter	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkAdapter	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkAdapterConfiguration	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkAdapterConfiguration	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkProtocol	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkProtocol	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NTDomain	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NTDomain	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_OnBoardDevice	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_OnBoardDevice	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_OperatingSystem	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_OperatingSystem	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PhysicalMemoryArray	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PhysicalMemoryArray	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PingStatus	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PingStatus	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PortConnector	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PortConnector	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Printer	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Printer	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PrintJob	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PrintJob	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Process	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Process	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_PROCESSOR	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_PROCESSOR	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Product	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Product	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_QuickFixEngineering	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_QuickFixEngineering	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_QuotaSetting	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_QuotaSetting	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ScheduledJob	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ScheduledJob	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_SCSIController	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_SCSIController	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Service	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Service	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_UserAccount	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_UserAccount	Table	todo
-Microsoft.Management.Infrastructure.CimInstance#root/default/SystemRestore	Microsoft.Management.Infrastructure.CimInstance#root/default/SystemRestore	Table	todo
-Microsoft.PackageManagement.Implementation.PackageProvider	PackageProvider	Table	todo
-Microsoft.PackageManagement.Packaging.PackageSource	PackageSource	Table	todo
-Microsoft.PackageManagement.Packaging.SoftwareIdentity	package	Table	todo
-Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayCulture	PackageWithCulture	Table	todo
-Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayCulture#DisplayLongName	PackageWithCultureAndLongName	Table	todo
-Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongName	PackageWithLongName	Table	todo
-Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName	packageWithLongSourceName	Table	todo
-Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayCulture	packageWithLongSourceNameAndCulture	Table	todo
-Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayCulture#DisplayLongName	packageWithLongSourceNameAndCultureAndName	Table	todo
-Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayLongName	packageWithLongSourceNameAndName	Table	todo
-Microsoft.PackageManagement.Packaging.SoftwareIdentity#GetPackage	GetPackage	Table	todo
-Microsoft.PowerShell.Commands.ActiveDirectoryProvider+ADPSDriveInfo	drive	Table	todo
-Microsoft.PowerShell.Commands.AlternateStreamData	FileSystemStream	Table	todo
-Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject	Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject	List	todo
-Microsoft.PowerShell.Commands.ByteCollection	Microsoft.PowerShell.Commands.ByteCollection	Table	todo
-Microsoft.PowerShell.Commands.ComputerChangeInfo	Microsoft.PowerShell.Commands.ComputerChangeInfo	Table	todo
-Microsoft.PowerShell.Commands.ControlPanelItem	ControlPanelItem	Table	todo
-Microsoft.PowerShell.Commands.FileHashInfo	Microsoft.PowerShell.Commands.FileHashInfo	Table	todo
-Microsoft.PowerShell.Commands.GroupInfo	Microsoft.PowerShell.Commands.GroupInfo	List	todo
-Microsoft.PowerShell.Commands.GroupInfo	Microsoft.PowerShell.Commands.GroupInfo	Table	todo
-Microsoft.PowerShell.Commands.GroupInfoNoElement	Microsoft.PowerShell.Commands.GroupInfoNoElement	List	todo
-Microsoft.PowerShell.Commands.GroupInfoNoElement	Microsoft.PowerShell.Commands.GroupInfoNoElement	Table	todo
-Microsoft.PowerShell.Commands.HistoryInfo	history	Table	todo
-Microsoft.PowerShell.Commands.HistoryInfo	history	Wide	todo
-Microsoft.PowerShell.Commands.Internal.TransactedRegistryKey	children	Table	todo
-Microsoft.PowerShell.Commands.ListCommand+MemberInfo	memberinfo	Table	todo
-Microsoft.PowerShell.Commands.ListCommand+MemberInfo	Microsoft.PowerShell.Commands.ListCommand+MemberInfo	List	todo
-Microsoft.PowerShell.Commands.MatchInfo	MatchInfo	Custom	todo
-Microsoft.PowerShell.Commands.MemberDefinition	Microsoft.PowerShell.Commands.MemberDefinition	Table	todo
-Microsoft.PowerShell.Commands.PSGetCommandInfo	PSGetDscResourceInfo	Table	todo
-Microsoft.PowerShell.Commands.PSGetDscResourceInfo	PSGetDscResourceInfo	Table	todo
-Microsoft.PowerShell.Commands.PSGetPath	PSGetPath	List	todo
-Microsoft.PowerShell.Commands.PSGetRoleCapabilityInfo	PSGetRoleCapabilityInfo	Table	todo
-Microsoft.PowerShell.Commands.PSRepository	PSRepository	Table	todo
-Microsoft.PowerShell.Commands.PSRepositoryItemInfo	PSRepositoryItemInfo	Table	todo
-Microsoft.PowerShell.Commands.PSRunspaceDebug	PSRunspaceDebug>	Table	todo
-Microsoft.PowerShell.Commands.PSScriptInfo	PSScriptInfo	Table	todo
-Microsoft.PowerShell.Commands.PSSessionConfigurationCommands#PSSessionConfiguration	PSSessionConfiguration	List	todo
-Microsoft.PowerShell.Commands.RenameComputerChangeInfo	Microsoft.PowerShell.Commands.RenameComputerChangeInfo	Table	todo
-Microsoft.PowerShell.Commands.TestConnectionCommand+PingMtuStatus	Microsoft.PowerShell.Commands.TestConnectionCommand+PingMtuStatus	Table	todo
-Microsoft.PowerShell.Commands.TestConnectionCommand+PingStatus	Microsoft.PowerShell.Commands.TestConnectionCommand+PingStatus	Table	todo
-Microsoft.PowerShell.Commands.TestConnectionCommand+TcpPortStatus	Microsoft.PowerShell.Commands.TestConnectionCommand+TcpPortStatus	Table	todo
-Microsoft.PowerShell.Commands.TestConnectionCommand+TraceStatus	Microsoft.PowerShell.Commands.TestConnectionCommand+TraceStatus	Table	todo
-Microsoft.PowerShell.Commands.WebResponseObject	Microsoft.PowerShell.Commands.WebResponseObject	List	todo
-Microsoft.PowerShell.Commands.X509StoreLocation	PathOnly	List	todo
-Microsoft.PowerShell.Commands.X509StoreLocation	ThumbprintList	List	todo
-Microsoft.PowerShell.Commands.X509StoreLocation	ThumbprintWide	Wide	todo
-Microsoft.PowerShell.KeyHandler	PSReadLine-KeyBindings	Table	todo
-Microsoft.PowerShell.MarkdownRender.PSMarkdownOptionInfo	Microsoft.PowerShell.MarkdownRender.PSMarkdownOptionInfo	List	todo
-Microsoft.PowerShell.PSConsoleReadLine+HistoryItem	PSReadLine-HistoryItem	List	todo
-Microsoft.PowerShell.PSConsoleReadLineOptions	PSReadLine-Options	List	todo
-Microsoft.PowerShell.PSResourceGet.UtilClasses.PSCommandResourceInfo	PSCommandResourceInfo	Table	todo
-Microsoft.PowerShell.PSResourceGet.UtilClasses.PSIncludedResourceInfo	PSIncludedResourceInfoTable	Table	todo
-Microsoft.PowerShell.PSResourceGet.UtilClasses.PSRepositoryInfo	PSRepositoryInfo	Table	todo
-Microsoft.PowerShell.PSResourceGet.UtilClasses.PSResourceInfo	PSResourceInfo	Table	todo
-Microsoft.PowerShell.PSResourceGet.UtilClasses.PSScriptFileInfo	PSScriptFileInfo	Table	todo
-Microsoft.Win32.RegistryKey	children	Table	todo
-ModuleInfoGrouping	Module	Table	todo
-System.AppDomain	System.AppDomain	List	todo
-System.CodeDom.Compiler.CompilerError	System.CodeDom.Compiler.CompilerError	List	todo
-System.Collections.DictionaryEntry	Dictionary	Table	todo
-System.Collections.DictionaryEntry	System.Collections.DictionaryEntry	List	todo
-System.DateTime	DateTime	Custom	todo
-System.Diagnostics.EventLog	System.Diagnostics.EventLog	List	todo
-System.Diagnostics.EventLog	System.Diagnostics.EventLog	Table	todo
-System.Diagnostics.EventLogEntry	System.Diagnostics.EventLogEntry	List	todo
-System.Diagnostics.EventLogEntry	System.Diagnostics.EventLogEntry	Table	todo
-System.Diagnostics.FileVersionInfo	System.Diagnostics.FileVersionInfo	List	todo
-System.Diagnostics.FileVersionInfo	System.Diagnostics.FileVersionInfo	Table	todo
-System.Diagnostics.Process	Priority	Table	todo
-System.Diagnostics.Process	process	Table	todo
-System.Diagnostics.Process	process	Wide	todo
-System.Diagnostics.Process	StartTime	Table	todo
-System.Diagnostics.Process#IncludeUserName	ProcessWithUserName	Table	todo
-System.Diagnostics.ProcessModule	ProcessModule	Table	todo
-System.DirectoryServices.DirectoryEntry	DirectoryEntry	List	todo
-System.Drawing.Printing.PrintDocument	System.Drawing.Printing.PrintDocument	Table	todo
-System.Exception#PSExtendedError	GetErrorInstance	Custom	todo
-System.Globalization.CultureInfo	System.Globalization.CultureInfo	Table	todo
-System.Guid	System.Guid	Table	todo
-System.IO.DirectoryInfo	children	List	todo
-System.IO.DirectoryInfo	children	Table	todo
-System.IO.DirectoryInfo	children	Wide	todo
-System.IO.DirectoryInfo	childrenWithHardlink	Table	todo
-System.IO.DirectoryInfo	childrenWithUnixStat	Table	todo
-System.IO.FileInfo	children	List	todo
-System.IO.FileInfo	children	Table	todo
-System.IO.FileInfo	children	Wide	todo
-System.IO.FileInfo	childrenWithHardlink	Table	todo
-System.IO.FileInfo	childrenWithUnixStat	Table	todo
-System.Management.Automation.AliasInfo	AliasInfo	Table	todo
-System.Management.Automation.AliasInfo	CommandInfo	Table	todo
-System.Management.Automation.AliasInfo	System.Management.Automation.AliasInfo	List	todo
-System.Management.Automation.ApplicationInfo	ApplicationInfo	Table	todo
-System.Management.Automation.ApplicationInfo	CommandInfo	Table	todo
-System.Management.Automation.ApplicationInfo	System.Management.Automation.ApplicationInfo	List	todo
-System.Management.Automation.CallStackFrame	CallStackFrame	Table	todo
-System.Management.Automation.CmdletInfo	CommandInfo	Table	todo
-System.Management.Automation.CmdletInfo	System.Management.Automation.CmdletInfo	List	todo
-System.Management.Automation.CommandBreakpoint	Breakpoint	List	todo
-System.Management.Automation.CommandBreakpoint	Breakpoint	Table	todo
-System.Management.Automation.CommandInfo	CommandInfo	Table	todo
-System.Management.Automation.CommandParameterSetInfo	CommandParameterSetInfo	Custom	todo
-System.Management.Automation.ErrorRecord	ErrorInstance	Custom	todo
-System.Management.Automation.ErrorRecord#PSExtendedError	GetErrorInstance	Custom	todo
-System.Management.Automation.ExperimentalFeature	ExperimentalFeature	List	todo
-System.Management.Automation.ExperimentalFeature	ExperimentalFeature	Table	todo
-System.Management.Automation.ExternalScriptInfo	CommandInfo	Table	todo
-System.Management.Automation.ExternalScriptInfo	ExternalScriptInfo	Table	todo
-System.Management.Automation.FilterInfo	CommandInfo	Table	todo
-System.Management.Automation.FilterInfo	FilterInfo	Table	todo
-System.Management.Automation.FilterInfo	System.Management.Automation.CommandInfo	List	todo
-System.Management.Automation.FunctionInfo	CommandInfo	Table	todo
-System.Management.Automation.FunctionInfo	FunctionInfo	Table	todo
-System.Management.Automation.FunctionInfo	System.Management.Automation.CommandInfo	List	todo
-System.Management.Automation.InformationRecord	InformationRecord	Custom	todo
-System.Management.Automation.Job	Job	Table	todo
-System.Management.Automation.LineBreakpoint	Breakpoint	List	todo
-System.Management.Automation.LineBreakpoint	Breakpoint	Table	todo
-System.Management.Automation.PathInfo	PathInfo	Table	todo
-System.Management.Automation.ProviderInfo	provider	List	todo
-System.Management.Automation.ProviderInfo	provider	Table	todo
-System.Management.Automation.PSDriveInfo	drive	Table	todo
-System.Management.Automation.PSDriveInfo	System.Management.Automation.PSDriveInfo	List	todo
-System.Management.Automation.PSMethod	System.Management.Automation.PSMethod	Table	todo
-System.Management.Automation.PSModuleInfo	Module	List	todo
-System.Management.Automation.PSModuleInfo	Module	Table	todo
-System.Management.Automation.PSModuleInfo	Module	Wide	todo
-System.Management.Automation.PSSnapInInfo	PSSnapInInfo	List	todo
-System.Management.Automation.PSSnapInInfo	PSSnapInInfo	Table	todo
-System.Management.Automation.PSStyle	System.Management.Automation.PSStyle	List	todo
-System.Management.Automation.PSStyle+BackgroundColor	System.Management.Automation.PSStyle+BackgroundColor	List	todo
-System.Management.Automation.PSStyle+FileInfoFormatting	System.Management.Automation.PSStyle+FileInfoFormatting	List	todo
-System.Management.Automation.PSStyle+ForegroundColor	System.Management.Automation.PSStyle+ForegroundColor	List	todo
-System.Management.Automation.PSStyle+FormattingData	System.Management.Automation.PSStyle+FormattingData	List	todo
-System.Management.Automation.PSStyle+ProgressConfiguration	System.Management.Automation.PSStyle+ProgressConfiguration	List	todo
-System.Management.Automation.PSTraceSource	System.Management.Automation.PSTraceSource	List	todo
-System.Management.Automation.PSTraceSource	System.Management.Automation.PSTraceSource	Table	todo
-System.Management.Automation.PSVariable	Variable	Table	todo
-System.Management.Automation.Runspaces.PSSession	PSSession	Table	todo
-System.Management.Automation.Runspaces.Runspace	Runspace	Table	todo
-System.Management.Automation.Runspaces.TypeData	TypeData	Table	todo
-System.Management.Automation.ScriptBlock	ScriptBlock	Custom	todo
-System.Management.Automation.ScriptInfo	CommandInfo	Table	todo
-System.Management.Automation.ScriptInfo	ScriptInfo	Table	todo
-System.Management.Automation.ScriptInfo	System.Management.Automation.ScriptInfo	List	todo
-System.Management.Automation.SemanticVersion	System.Management.Automation.SemanticVersion	Table	todo
-System.Management.Automation.ShellVariable	ShellVariable	List	todo
-System.Management.Automation.Signature	PSThumbprintTable	Table	todo
-System.Management.Automation.Signature	PSThumbprintWide	Wide	todo
-System.Management.Automation.Subsystem.SubsystemInfo	System.Management.Automation.Subsystem.SubsystemInfo	Table	todo
-System.Management.Automation.Subsystem.SubsystemInfo+ImplementationInfo	System.Management.Automation.Subsystem.SubsystemInfo+ImplementationInfo	List	todo
-System.Management.Automation.TreatAs.RegistryValue	children	Table	todo
-System.Management.Automation.VariableBreakpoint	Breakpoint	List	todo
-System.Management.Automation.VariableBreakpoint	Breakpoint	Table	todo
-System.Management.Automation.WarningRecord	WarningRecord	Custom	todo
-System.Management.ManagementClass	System.Management.ManagementClass	Table	todo
-System.Management.ManagementObject#root\cimv2\Win32_PingStatus	System.Management.ManagementObject#root\cimv2\Win32_PingStatus	Table	todo
-System.Management.ManagementObject#root\cimv2\Win32_QuickFixEngineering	System.Management.ManagementObject#root\cimv2\Win32_QuickFixEngineering	Table	todo
-System.Management.ManagementObject#root\default\SystemRestore	System.Management.ManagementObject#root\default\SystemRestore	Table	todo
-System.Net.NetworkCredential	System.Net.NetworkCredential	Table	todo
-System.Reflection.Assembly	System.Reflection.Assembly	List	todo
-System.Reflection.Assembly	System.Reflection.Assembly	Table	todo
-System.Reflection.AssemblyName	System.Reflection.AssemblyName	Table	todo
-System.RuntimeType	System.RuntimeType	Table	todo
-System.Security.AccessControl.FileSystemSecurity	FileSecurityTable	Table	todo
-System.Security.AccessControl.ObjectSecurity	System.Security.AccessControl.ObjectSecurity	List	todo
-System.Security.AccessControl.ObjectSecurity	System.Security.AccessControl.ObjectSecurity	Table	todo
-System.Security.Cryptography.X509Certificates.X509Certificate2	PathOnly	List	todo
-System.Security.Cryptography.X509Certificates.X509Certificate2	ThumbprintList	List	todo
-System.Security.Cryptography.X509Certificates.X509Certificate2	ThumbprintTable	Table	todo
-System.Security.Cryptography.X509Certificates.X509Certificate2	ThumbprintWide	Wide	todo
-System.Security.Cryptography.X509Certificates.X509CertificateEx	System.Security.Cryptography.X509Certificates.X509CertificateEx	Table	todo
-System.Security.Cryptography.X509Certificates.X509Store	PathOnly	List	todo
-System.Security.Cryptography.X509Certificates.X509Store	ThumbprintList	List	todo
-System.Security.Cryptography.X509Certificates.X509Store	ThumbprintWide	Wide	todo
-System.ServiceProcess.ServiceController	service	Table	todo
-System.ServiceProcess.ServiceController	System.ServiceProcess.ServiceController	List	todo
-System.Threading.Tasks.Task	System.Threading.Tasks.Task	List	todo
-System.Threading.Tasks.Task	System.Threading.Tasks.Task	Table	todo
-System.TimeSpan	System.TimeSpan	List	todo
-System.TimeSpan	System.TimeSpan	Table	todo
-System.TimeSpan	System.TimeSpan	Wide	todo
-System.Version	System.Version	Table	todo
-System.Version#IncludeLabel	System.Version	Table	todo
+type	view	control	platform	status
+Deserialized.Microsoft.PackageManagement.Implementation.PackageProvider	PackageProvider	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.PackageSource	PackageSource	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity	package	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayCulture	PackageWithCulture	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayCulture#DisplayLongName	PackageWithCultureAndLongName	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongName	PackageWithLongName	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName	packageWithLongSourceName	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayCulture	packageWithLongSourceNameAndCulture	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayCulture#DisplayLongName	packageWithLongSourceNameAndCultureAndName	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayLongName	packageWithLongSourceNameAndName	Table	linux-x64	todo
+Deserialized.Microsoft.PackageManagement.Packaging.SoftwareIdentity#GetPackage	GetPackage	Table	linux-x64	todo
+Deserialized.Microsoft.PowerShell.Commands.GenericMeasureInfo	Microsoft.PowerShell.Commands.GenericMeasureInfo	List	linux-x64	todo
+Deserialized.Microsoft.PowerShell.Commands.MatchInfo	MatchInfo	Custom	linux-x64	todo
+Deserialized.Microsoft.PowerShell.Commands.TextMeasureInfo	Microsoft.PowerShell.Commands.TextMeasureInfo	Table	linux-x64	todo
+Deserialized.System.Management.Automation.WarningRecord	DeserializedWarningRecord	Custom	linux-x64	todo
+Microsoft.Management.Infrastructure.CimClass	Microsoft.Management.Infrastructure.CimClass	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#__PartialCIMInstance	Microsoft.Management.Infrastructure.CimInstance#__PartialCIMInstance	Custom	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ComputerSystem	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ComputerSystem	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DCOMApplication	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DCOMApplication	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DESKTOP	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DESKTOP	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DESKTOPMONITOR	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_DESKTOPMONITOR	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DeviceMemoryAddress	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DeviceMemoryAddress	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Directory	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Directory	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskDrive	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskDrive	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskPartition	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskPartition	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskQuota	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_DiskQuota	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Environment	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Environment	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Group	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Group	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_IDEController	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_IDEController	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_IRQResource	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_IRQResource	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LoadOrderGroup	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LoadOrderGroup	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LogicalDisk	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LogicalDisk	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LogonSession	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_LogonSession	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkAdapter	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkAdapter	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkAdapterConfiguration	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkAdapterConfiguration	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkProtocol	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NetworkProtocol	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NTDomain	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_NTDomain	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_OnBoardDevice	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_OnBoardDevice	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_OperatingSystem	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_OperatingSystem	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PhysicalMemoryArray	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PhysicalMemoryArray	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PingStatus	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PingStatus	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PortConnector	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PortConnector	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Printer	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Printer	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PrintJob	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_PrintJob	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Process	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Process	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_PROCESSOR	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/WIN32_PROCESSOR	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Product	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Product	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_QuickFixEngineering	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_QuickFixEngineering	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_QuotaSetting	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_QuotaSetting	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ScheduledJob	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_ScheduledJob	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_SCSIController	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_SCSIController	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Service	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_Service	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_UserAccount	Microsoft.Management.Infrastructure.CimInstance#root/cimv2/Win32_UserAccount	Table	linux-x64	todo
+Microsoft.Management.Infrastructure.CimInstance#root/default/SystemRestore	Microsoft.Management.Infrastructure.CimInstance#root/default/SystemRestore	Table	linux-x64	todo
+Microsoft.PackageManagement.Implementation.PackageProvider	PackageProvider	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.PackageSource	PackageSource	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.SoftwareIdentity	package	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayCulture	PackageWithCulture	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayCulture#DisplayLongName	PackageWithCultureAndLongName	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongName	PackageWithLongName	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName	packageWithLongSourceName	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayCulture	packageWithLongSourceNameAndCulture	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayCulture#DisplayLongName	packageWithLongSourceNameAndCultureAndName	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.SoftwareIdentity#DisplayLongSourceName#DisplayLongName	packageWithLongSourceNameAndName	Table	linux-x64	todo
+Microsoft.PackageManagement.Packaging.SoftwareIdentity#GetPackage	GetPackage	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.ActiveDirectoryProvider+ADPSDriveInfo	drive	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.AlternateStreamData	FileSystemStream	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject	Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject	List	linux-x64	todo
+Microsoft.PowerShell.Commands.ByteCollection	Microsoft.PowerShell.Commands.ByteCollection	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.ComputerChangeInfo	Microsoft.PowerShell.Commands.ComputerChangeInfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.ControlPanelItem	ControlPanelItem	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.FileHashInfo	Microsoft.PowerShell.Commands.FileHashInfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.GroupInfo	Microsoft.PowerShell.Commands.GroupInfo	List	linux-x64	todo
+Microsoft.PowerShell.Commands.GroupInfo	Microsoft.PowerShell.Commands.GroupInfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.GroupInfoNoElement	Microsoft.PowerShell.Commands.GroupInfoNoElement	List	linux-x64	todo
+Microsoft.PowerShell.Commands.GroupInfoNoElement	Microsoft.PowerShell.Commands.GroupInfoNoElement	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.HistoryInfo	history	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.HistoryInfo	history	Wide	linux-x64	todo
+Microsoft.PowerShell.Commands.Internal.TransactedRegistryKey	children	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.ListCommand+MemberInfo	memberinfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.ListCommand+MemberInfo	Microsoft.PowerShell.Commands.ListCommand+MemberInfo	List	linux-x64	todo
+Microsoft.PowerShell.Commands.MatchInfo	MatchInfo	Custom	linux-x64	todo
+Microsoft.PowerShell.Commands.MemberDefinition	Microsoft.PowerShell.Commands.MemberDefinition	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.PSGetCommandInfo	PSGetDscResourceInfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.PSGetDscResourceInfo	PSGetDscResourceInfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.PSGetPath	PSGetPath	List	linux-x64	todo
+Microsoft.PowerShell.Commands.PSGetRoleCapabilityInfo	PSGetRoleCapabilityInfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.PSRepository	PSRepository	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.PSRepositoryItemInfo	PSRepositoryItemInfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.PSRunspaceDebug	PSRunspaceDebug>	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.PSScriptInfo	PSScriptInfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.PSSessionConfigurationCommands#PSSessionConfiguration	PSSessionConfiguration	List	linux-x64	todo
+Microsoft.PowerShell.Commands.RenameComputerChangeInfo	Microsoft.PowerShell.Commands.RenameComputerChangeInfo	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.TestConnectionCommand+PingMtuStatus	Microsoft.PowerShell.Commands.TestConnectionCommand+PingMtuStatus	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.TestConnectionCommand+PingStatus	Microsoft.PowerShell.Commands.TestConnectionCommand+PingStatus	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.TestConnectionCommand+TcpPortStatus	Microsoft.PowerShell.Commands.TestConnectionCommand+TcpPortStatus	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.TestConnectionCommand+TraceStatus	Microsoft.PowerShell.Commands.TestConnectionCommand+TraceStatus	Table	linux-x64	todo
+Microsoft.PowerShell.Commands.WebResponseObject	Microsoft.PowerShell.Commands.WebResponseObject	List	linux-x64	todo
+Microsoft.PowerShell.Commands.X509StoreLocation	PathOnly	List	linux-x64	todo
+Microsoft.PowerShell.Commands.X509StoreLocation	ThumbprintList	List	linux-x64	todo
+Microsoft.PowerShell.Commands.X509StoreLocation	ThumbprintWide	Wide	linux-x64	todo
+Microsoft.PowerShell.KeyHandler	PSReadLine-KeyBindings	Table	linux-x64	todo
+Microsoft.PowerShell.MarkdownRender.PSMarkdownOptionInfo	Microsoft.PowerShell.MarkdownRender.PSMarkdownOptionInfo	List	linux-x64	todo
+Microsoft.PowerShell.PSConsoleReadLine+HistoryItem	PSReadLine-HistoryItem	List	linux-x64	todo
+Microsoft.PowerShell.PSConsoleReadLineOptions	PSReadLine-Options	List	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet.UtilClasses.PSCommandResourceInfo	PSCommandResourceInfo	Table	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet.UtilClasses.PSIncludedResourceInfo	PSIncludedResourceInfoTable	Table	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet.UtilClasses.PSRepositoryInfo	PSRepositoryInfo	Table	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet.UtilClasses.PSResourceInfo	PSResourceInfo	Table	linux-x64	todo
+Microsoft.PowerShell.PSResourceGet.UtilClasses.PSScriptFileInfo	PSScriptFileInfo	Table	linux-x64	todo
+Microsoft.Win32.RegistryKey	children	Table	linux-x64	todo
+ModuleInfoGrouping	Module	Table	linux-x64	todo
+System.AppDomain	System.AppDomain	List	linux-x64	todo
+System.CodeDom.Compiler.CompilerError	System.CodeDom.Compiler.CompilerError	List	linux-x64	todo
+System.Collections.DictionaryEntry	Dictionary	Table	linux-x64	todo
+System.Collections.DictionaryEntry	System.Collections.DictionaryEntry	List	linux-x64	todo
+System.DateTime	DateTime	Custom	linux-x64	todo
+System.Diagnostics.EventLog	System.Diagnostics.EventLog	List	linux-x64	todo
+System.Diagnostics.EventLog	System.Diagnostics.EventLog	Table	linux-x64	todo
+System.Diagnostics.EventLogEntry	System.Diagnostics.EventLogEntry	List	linux-x64	todo
+System.Diagnostics.EventLogEntry	System.Diagnostics.EventLogEntry	Table	linux-x64	todo
+System.Diagnostics.FileVersionInfo	System.Diagnostics.FileVersionInfo	List	linux-x64	todo
+System.Diagnostics.FileVersionInfo	System.Diagnostics.FileVersionInfo	Table	linux-x64	todo
+System.Diagnostics.Process	Priority	Table	linux-x64	todo
+System.Diagnostics.Process	process	Table	linux-x64	todo
+System.Diagnostics.Process	process	Wide	linux-x64	todo
+System.Diagnostics.Process	StartTime	Table	linux-x64	todo
+System.Diagnostics.Process#IncludeUserName	ProcessWithUserName	Table	linux-x64	todo
+System.Diagnostics.ProcessModule	ProcessModule	Table	linux-x64	todo
+System.DirectoryServices.DirectoryEntry	DirectoryEntry	List	linux-x64	todo
+System.Drawing.Printing.PrintDocument	System.Drawing.Printing.PrintDocument	Table	linux-x64	todo
+System.Exception#PSExtendedError	GetErrorInstance	Custom	linux-x64	todo
+System.Globalization.CultureInfo	System.Globalization.CultureInfo	Table	linux-x64	todo
+System.Guid	System.Guid	Table	linux-x64	todo
+System.IO.DirectoryInfo	children	List	linux-x64	todo
+System.IO.DirectoryInfo	children	Table	linux-x64	todo
+System.IO.DirectoryInfo	children	Wide	linux-x64	todo
+System.IO.DirectoryInfo	childrenWithHardlink	Table	linux-x64	todo
+System.IO.DirectoryInfo	childrenWithUnixStat	Table	linux-x64	todo
+System.IO.FileInfo	children	List	linux-x64	todo
+System.IO.FileInfo	children	Table	linux-x64	todo
+System.IO.FileInfo	children	Wide	linux-x64	todo
+System.IO.FileInfo	childrenWithHardlink	Table	linux-x64	todo
+System.IO.FileInfo	childrenWithUnixStat	Table	linux-x64	todo
+System.Management.Automation.AliasInfo	AliasInfo	Table	linux-x64	todo
+System.Management.Automation.AliasInfo	CommandInfo	Table	linux-x64	todo
+System.Management.Automation.AliasInfo	System.Management.Automation.AliasInfo	List	linux-x64	todo
+System.Management.Automation.ApplicationInfo	ApplicationInfo	Table	linux-x64	todo
+System.Management.Automation.ApplicationInfo	CommandInfo	Table	linux-x64	todo
+System.Management.Automation.ApplicationInfo	System.Management.Automation.ApplicationInfo	List	linux-x64	todo
+System.Management.Automation.CallStackFrame	CallStackFrame	Table	linux-x64	todo
+System.Management.Automation.CmdletInfo	CommandInfo	Table	linux-x64	todo
+System.Management.Automation.CmdletInfo	System.Management.Automation.CmdletInfo	List	linux-x64	todo
+System.Management.Automation.CommandBreakpoint	Breakpoint	List	linux-x64	todo
+System.Management.Automation.CommandBreakpoint	Breakpoint	Table	linux-x64	todo
+System.Management.Automation.CommandInfo	CommandInfo	Table	linux-x64	todo
+System.Management.Automation.CommandParameterSetInfo	CommandParameterSetInfo	Custom	linux-x64	todo
+System.Management.Automation.ErrorRecord	ErrorInstance	Custom	linux-x64	todo
+System.Management.Automation.ErrorRecord#PSExtendedError	GetErrorInstance	Custom	linux-x64	todo
+System.Management.Automation.ExperimentalFeature	ExperimentalFeature	List	linux-x64	todo
+System.Management.Automation.ExperimentalFeature	ExperimentalFeature	Table	linux-x64	todo
+System.Management.Automation.ExternalScriptInfo	CommandInfo	Table	linux-x64	todo
+System.Management.Automation.ExternalScriptInfo	ExternalScriptInfo	Table	linux-x64	todo
+System.Management.Automation.FilterInfo	CommandInfo	Table	linux-x64	todo
+System.Management.Automation.FilterInfo	FilterInfo	Table	linux-x64	todo
+System.Management.Automation.FilterInfo	System.Management.Automation.CommandInfo	List	linux-x64	todo
+System.Management.Automation.FunctionInfo	CommandInfo	Table	linux-x64	todo
+System.Management.Automation.FunctionInfo	FunctionInfo	Table	linux-x64	todo
+System.Management.Automation.FunctionInfo	System.Management.Automation.CommandInfo	List	linux-x64	todo
+System.Management.Automation.InformationRecord	InformationRecord	Custom	linux-x64	todo
+System.Management.Automation.Job	Job	Table	linux-x64	todo
+System.Management.Automation.LineBreakpoint	Breakpoint	List	linux-x64	todo
+System.Management.Automation.LineBreakpoint	Breakpoint	Table	linux-x64	todo
+System.Management.Automation.PathInfo	PathInfo	Table	linux-x64	todo
+System.Management.Automation.ProviderInfo	provider	List	linux-x64	todo
+System.Management.Automation.ProviderInfo	provider	Table	linux-x64	todo
+System.Management.Automation.PSDriveInfo	drive	Table	linux-x64	todo
+System.Management.Automation.PSDriveInfo	System.Management.Automation.PSDriveInfo	List	linux-x64	todo
+System.Management.Automation.PSMethod	System.Management.Automation.PSMethod	Table	linux-x64	todo
+System.Management.Automation.PSModuleInfo	Module	List	linux-x64	todo
+System.Management.Automation.PSModuleInfo	Module	Table	linux-x64	todo
+System.Management.Automation.PSModuleInfo	Module	Wide	linux-x64	todo
+System.Management.Automation.PSSnapInInfo	PSSnapInInfo	List	linux-x64	todo
+System.Management.Automation.PSSnapInInfo	PSSnapInInfo	Table	linux-x64	todo
+System.Management.Automation.PSStyle	System.Management.Automation.PSStyle	List	linux-x64	todo
+System.Management.Automation.PSStyle+BackgroundColor	System.Management.Automation.PSStyle+BackgroundColor	List	linux-x64	todo
+System.Management.Automation.PSStyle+FileInfoFormatting	System.Management.Automation.PSStyle+FileInfoFormatting	List	linux-x64	todo
+System.Management.Automation.PSStyle+ForegroundColor	System.Management.Automation.PSStyle+ForegroundColor	List	linux-x64	todo
+System.Management.Automation.PSStyle+FormattingData	System.Management.Automation.PSStyle+FormattingData	List	linux-x64	todo
+System.Management.Automation.PSStyle+ProgressConfiguration	System.Management.Automation.PSStyle+ProgressConfiguration	List	linux-x64	todo
+System.Management.Automation.PSTraceSource	System.Management.Automation.PSTraceSource	List	linux-x64	todo
+System.Management.Automation.PSTraceSource	System.Management.Automation.PSTraceSource	Table	linux-x64	todo
+System.Management.Automation.PSVariable	Variable	Table	linux-x64	todo
+System.Management.Automation.Runspaces.PSSession	PSSession	Table	linux-x64	todo
+System.Management.Automation.Runspaces.Runspace	Runspace	Table	linux-x64	todo
+System.Management.Automation.Runspaces.TypeData	TypeData	Table	linux-x64	todo
+System.Management.Automation.ScriptBlock	ScriptBlock	Custom	linux-x64	todo
+System.Management.Automation.ScriptInfo	CommandInfo	Table	linux-x64	todo
+System.Management.Automation.ScriptInfo	ScriptInfo	Table	linux-x64	todo
+System.Management.Automation.ScriptInfo	System.Management.Automation.ScriptInfo	List	linux-x64	todo
+System.Management.Automation.SemanticVersion	System.Management.Automation.SemanticVersion	Table	linux-x64	todo
+System.Management.Automation.ShellVariable	ShellVariable	List	linux-x64	todo
+System.Management.Automation.Signature	PSThumbprintTable	Table	linux-x64	todo
+System.Management.Automation.Signature	PSThumbprintWide	Wide	linux-x64	todo
+System.Management.Automation.Subsystem.SubsystemInfo	System.Management.Automation.Subsystem.SubsystemInfo	Table	linux-x64	todo
+System.Management.Automation.Subsystem.SubsystemInfo+ImplementationInfo	System.Management.Automation.Subsystem.SubsystemInfo+ImplementationInfo	List	linux-x64	todo
+System.Management.Automation.TreatAs.RegistryValue	children	Table	linux-x64	todo
+System.Management.Automation.VariableBreakpoint	Breakpoint	List	linux-x64	todo
+System.Management.Automation.VariableBreakpoint	Breakpoint	Table	linux-x64	todo
+System.Management.Automation.WarningRecord	WarningRecord	Custom	linux-x64	todo
+System.Management.ManagementClass	System.Management.ManagementClass	Table	linux-x64	todo
+System.Management.ManagementObject#root\cimv2\Win32_PingStatus	System.Management.ManagementObject#root\cimv2\Win32_PingStatus	Table	linux-x64	todo
+System.Management.ManagementObject#root\cimv2\Win32_QuickFixEngineering	System.Management.ManagementObject#root\cimv2\Win32_QuickFixEngineering	Table	linux-x64	todo
+System.Management.ManagementObject#root\default\SystemRestore	System.Management.ManagementObject#root\default\SystemRestore	Table	linux-x64	todo
+System.Net.NetworkCredential	System.Net.NetworkCredential	Table	linux-x64	todo
+System.Reflection.Assembly	System.Reflection.Assembly	List	linux-x64	todo
+System.Reflection.Assembly	System.Reflection.Assembly	Table	linux-x64	todo
+System.Reflection.AssemblyName	System.Reflection.AssemblyName	Table	linux-x64	todo
+System.RuntimeType	System.RuntimeType	Table	linux-x64	todo
+System.Security.AccessControl.FileSystemSecurity	FileSecurityTable	Table	linux-x64	todo
+System.Security.AccessControl.ObjectSecurity	System.Security.AccessControl.ObjectSecurity	List	linux-x64	todo
+System.Security.AccessControl.ObjectSecurity	System.Security.AccessControl.ObjectSecurity	Table	linux-x64	todo
+System.Security.Cryptography.X509Certificates.X509Certificate2	PathOnly	List	linux-x64	todo
+System.Security.Cryptography.X509Certificates.X509Certificate2	ThumbprintList	List	linux-x64	todo
+System.Security.Cryptography.X509Certificates.X509Certificate2	ThumbprintTable	Table	linux-x64	todo
+System.Security.Cryptography.X509Certificates.X509Certificate2	ThumbprintWide	Wide	linux-x64	todo
+System.Security.Cryptography.X509Certificates.X509CertificateEx	System.Security.Cryptography.X509Certificates.X509CertificateEx	Table	linux-x64	todo
+System.Security.Cryptography.X509Certificates.X509Store	PathOnly	List	linux-x64	todo
+System.Security.Cryptography.X509Certificates.X509Store	ThumbprintList	List	linux-x64	todo
+System.Security.Cryptography.X509Certificates.X509Store	ThumbprintWide	Wide	linux-x64	todo
+System.ServiceProcess.ServiceController	service	Table	linux-x64	todo
+System.ServiceProcess.ServiceController	System.ServiceProcess.ServiceController	List	linux-x64	todo
+System.Threading.Tasks.Task	System.Threading.Tasks.Task	List	linux-x64	todo
+System.Threading.Tasks.Task	System.Threading.Tasks.Task	Table	linux-x64	todo
+System.TimeSpan	System.TimeSpan	List	linux-x64	todo
+System.TimeSpan	System.TimeSpan	Table	linux-x64	todo
+System.TimeSpan	System.TimeSpan	Wide	linux-x64	todo
+System.Version	System.Version	Table	linux-x64	todo
+System.Version#IncludeLabel	System.Version	Table	linux-x64	todo

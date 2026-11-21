@@ -7,6 +7,10 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[dev-dependencies]
+rpsh-engine.workspace = true
+rpsh-syntax.workspace = true
+
 # Every bench is a plain program (`harness = false`) that prints a table and
 # writes bench/results/research-<name>.json. Run one with
 #     cargo bench -p rpsh-research --bench <name>
@@ -30,6 +34,10 @@ harness = false
 
 [[bench]]
 name = "dotnet_ipc"
+harness = false
+
+[[bench]]
+name = "engine_micro"
 harness = false
 
 [lints]

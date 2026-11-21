@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 $lines = sh -c 'printf "a\nb\n"'
 $lines.Count
 $lines[1]

@@ -1,9 +1,9 @@
 # rpsh design
 
-rpsh is an implementation of PowerShell in Rust. It targets one pinned
-upstream release, PowerShell 7.7.0, and exists to answer a question with
-measurements instead of opinions: how fast is PowerShell when
-there is no .NET runtime to start and no JIT to wait for?
+rpsh is an implementation of PowerShell in Rust. It targets the latest stable
+upstream release and exists to answer a question with measurements instead of
+opinions: how fast is PowerShell when there is no .NET runtime to start and no
+JIT to wait for?
 
 Issues refer to the sections of this document by number.
 
@@ -13,7 +13,7 @@ In priority order. A later goal never justifies breaking an earlier one.
 
 1. **Measure honestly.** The benchmark and conformance harnesses exist before
    the engine does, and every performance claim cites a result file (§7).
-2. **Run `.ps1` scripts exactly as pwsh 7.7.0 does**, on Linux first.
+2. **Run `.ps1` scripts exactly as the latest stable pwsh does**, on Linux first.
 3. **Cover what upstream ships**: every cmdlet, provider, host feature and
    engine subsystem in the inventory (§2), then macOS and Windows.
 4. **Linux commands just work**: native programs run, pipe and take over the
@@ -24,8 +24,10 @@ In priority order. A later goal never justifies breaking an earlier one.
 
 ## 2. What "a complete port" means
 
-The reference is the pinned pwsh binary, not documentation and not memory.
-`scripts/fetch-pwsh.sh` installs it, verified by SHA-256. The full contract is
+The reference is a pwsh binary, not documentation and not memory.
+`scripts/fetch-pwsh.sh` installs the latest stable release, verified against
+the SHA-256 digest the release publishes; every result and golden records the
+exact version it ran with. The full contract is
 [docs/01_compat_contract.md](docs/01_compat_contract.md); in short:
 
 * **One environment.** Both engines run every case in an environment built
@@ -36,9 +38,9 @@ The reference is the pinned pwsh binary, not documentation and not memory.
   stderr, the stream of every record, and every `ErrorRecord` field.
   Messages match exactly: PowerShell's own (English only — the Linux release
   ships no translations) and .NET's.
-* **Identity.** `$PSVersionTable`, `$PSEdition` and `$Host` read as pwsh
-  7.7.0's. A script that needs to know it runs under rpsh asks for the type
-  `[Rpsh.EngineInfo]`.
+* **Identity.** `$PSVersionTable`, `$PSEdition` and `$Host` read as the
+  reference pwsh's. A script that needs to know it runs under rpsh asks for
+  the type `[Rpsh.EngineInfo]`.
 * **Determinism.** A golden is recorded only if three pwsh runs agree. What
   pwsh randomizes (string hash order) rpsh may fix; what pwsh repeats
   (integer-key order, seeded random numbers) rpsh reproduces.
@@ -159,7 +161,8 @@ assemblies, `tool init | Invoke-Expression` spawns a process and compiles its
 output, and function definitions are re-parsed each time because nothing is
 cached between sessions.
 
-Measured against 7.7.0 ([docs/05_startup.md](docs/05_startup.md)): an empty
+Measured against 7.7.0, the reference at the time of writing
+([docs/05_startup.md](docs/05_startup.md)): an empty
 .NET application costs 20 ms and 21 MiB; loading `System.Management.Automation`
 adds 2.2 ms; building a default session state and running `exit` reaches
 170 ms and 77 MiB. `pwsh -NoProfile -Command exit` takes 156 ms and 89 MiB.
@@ -239,16 +242,19 @@ to §9.
 
 ## 7. Measurement discipline
 
-1. **Pinned reference.** Results name the pwsh version they were taken
-   against; goldens are recorded from 7.7.0 only.
+1. **Versioned reference.** `scripts/fetch-pwsh.sh` installs the latest stable
+   release; results and goldens record the exact version they were taken
+   against (`tests/conformance/reference.txt`, and the `pwsh` block of each
+   result file).
 2. **Verified or not reported.** A speedup is computed only for a case where
    rpsh's stdout and exit code equal pwsh's. A refusal shows pwsh's time and
    the missing feature. A different answer fails the run.
 3. **Same invocation.** Both engines get the same switches, locale, time zone
    and working directory.
 4. **Method.** Warm-up runs, then alternating timed runs; the median is
-   reported and every sample is kept. The result file records CPU, governor,
-   load average, toolchain and commit.
+   reported with a bootstrap confidence interval and every sample is kept.
+   `wait4` records CPU time and peak RSS, and the result file records binary
+   size, CPU, governor, load average, toolchain and commit.
 5. **Baselines.** A result worth citing is copied to `bench/baselines/`. A
    number in the README or in an issue points at one.
 6. **Floors are labelled.** While rpsh initializes nothing, its startup time
@@ -264,7 +270,7 @@ to §9.
 | Milestone | Exit criterion |
 |---|---|
 | M0 Foundation | harnesses, inventory, CI, baseline, the open design decisions settled |
-| M1 Language Front-end | every construct pwsh 7.7.0 parses yields the same AST; same parse errors |
+| M1 Language Front-end | every construct the reference pwsh parses yields the same AST; same parse errors |
 | M2 Runtime Core | values, conversions, operators, extended type system, T0 shim core |
 | M3 Engine | functions, scopes, binder, pipeline, errors, modules: real scripts run |
 | M4 Native Interop | the Linux command matrix passes |

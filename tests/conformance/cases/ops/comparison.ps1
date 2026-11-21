@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 1 -eq 1
 'a' -eq 'A'
 'a' -ceq 'A'

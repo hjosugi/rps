@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 $a = 1, 2, 3
 $a.Count
 $a[0]

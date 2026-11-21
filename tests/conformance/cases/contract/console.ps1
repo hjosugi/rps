@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 # docs/01_compat_contract.md, "Reference environment". With output
 # redirected and no TERM, pwsh's console is 80 columns wide; default
 # formatting and error views wrap at that width.

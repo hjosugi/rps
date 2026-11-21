@@ -5,9 +5,12 @@ names of the upstream implementation:
   Copyright (c) Microsoft Corporation.
   Licensed under the MIT License.
 
-The files under inventory/ are generated from the output of PowerShell 7.7.0.
-The files named *.golden under tests/conformance/ are output recorded from
-PowerShell 7.7.0.
+The files under inventory/, the message catalog under
+crates/rpsh-messages/src/, and the files named *.golden under
+tests/conformance/ are generated from the latest stable PowerShell release
+installed by scripts/fetch-pwsh.sh. The exact version is recorded in the
+generated header or in tests/conformance/reference.txt.
+bench/assets/compiler.test.ps1 is copied from the upstream test suite.
 
 The architecture borrows from Nushell:
 

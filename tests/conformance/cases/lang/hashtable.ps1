@@ -1,3 +1,4 @@
+# rpsh-conformance: level=c2
 $h = [ordered]@{ one = 1; two = 2 }
 $h.one
 $h['two']

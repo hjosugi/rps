@@ -1,0 +1,5 @@
+{
+  "exit_code": 0,
+  "screen": "PS> Start-Sleep -Seconds 30\nPS> exit",
+  "timed_out": false
+}

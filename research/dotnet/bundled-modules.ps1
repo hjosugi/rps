@@ -1,4 +1,4 @@
-# The modules pwsh 7.7.0 ships in $PSHOME/Modules: which are binary (load a
+# The modules the reference pwsh ships in $PSHOME/Modules: which are binary (load a
 # DLL) and which assemblies they bring (docs/06_dotnet_bridge.md).
 $ErrorActionPreference = 'Stop'
 foreach ($directory in Get-ChildItem (Join-Path $PSHOME 'Modules') -Directory | Sort-Object Name) {
