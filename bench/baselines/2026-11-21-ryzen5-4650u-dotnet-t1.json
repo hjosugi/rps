@@ -1,0 +1,3743 @@
+{
+ "schema": "rpsh-research-dotnet-t1-v1",
+ "runs": 11,
+ "modes": {
+  "cmdline": {
+   "exit": 0,
+   "stderr": "",
+   "steps": [
+    {
+     "step": "start",
+     "rc": "0",
+     "delta_ms": 0.048,
+     "at_ms": 0.048,
+     "rss_kib": 2168
+    },
+    {
+     "step": "dlopen hostfxr",
+     "rc": "0",
+     "delta_ms": 1.879,
+     "at_ms": 1.955,
+     "rss_kib": 4504
+    },
+    {
+     "step": "initialize (command line)",
+     "rc": "0",
+     "delta_ms": 2.25,
+     "at_ms": 4.193,
+     "rss_kib": 5280
+    },
+    {
+     "step": "delegate (starts runtime)",
+     "rc": "0",
+     "delta_ms": 16.277,
+     "at_ms": 20.208,
+     "rss_kib": 18608
+    },
+    {
+     "step": "load assembly + Add",
+     "rc": "0",
+     "delta_ms": 18.635,
+     "at_ms": 41.329,
+     "rss_kib": 30864
+    },
+    {
+     "step": "function pointers (rest)",
+     "rc": "0",
+     "delta_ms": 0.216,
+     "at_ms": 41.559,
+     "rss_kib": 30872
+    },
+    {
+     "step": "first call Add",
+     "rc": "0x5",
+     "delta_ms": 0.232,
+     "at_ms": 41.782,
+     "rss_kib": 30872
+    },
+    {
+     "step": "second call Add",
+     "rc": "0x9",
+     "delta_ms": 0.049,
+     "at_ms": 41.83,
+     "rss_kib": 30872
+    },
+    {
+     "step": "1e6 calls Add",
+     "rc": "0xf4240",
+     "delta_ms": 7.017,
+     "at_ms": 48.847,
+     "rss_kib": 30872
+    },
+    {
+     "step": "File.ReadAllText",
+     "rc": "0x236",
+     "delta_ms": 1.875,
+     "at_ms": 50.903,
+     "rss_kib": 31304
+    },
+    {
+     "step": "File.ReadAllText again",
+     "rc": "0x236",
+     "delta_ms": 0.108,
+     "at_ms": 51.05,
+     "rss_kib": 31316
+    },
+    {
+     "step": "Regex.Matches",
+     "rc": "0x3",
+     "delta_ms": 7.767,
+     "at_ms": 59.266,
+     "rss_kib": 34616
+    },
+    {
+     "step": "touch SMA",
+     "rc": "0x7",
+     "delta_ms": 1.591,
+     "at_ms": 60.781,
+     "rss_kib": 38664
+    },
+    {
+     "step": "PowerShell.Create + 1+1",
+     "rc": "0x2",
+     "delta_ms": 142.389,
+     "at_ms": 200.594,
+     "rss_kib": 85456
+    },
+    {
+     "step": "again PowerShell + 1+1",
+     "rc": "0x2",
+     "delta_ms": 19.516,
+     "at_ms": 219.649,
+     "rss_kib": 89056
+    },
+    {
+     "step": "close",
+     "rc": "0",
+     "delta_ms": 0.151,
+     "at_ms": 219.806,
+     "rss_kib": 89056
+    }
+   ],
+   "samples": [
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.048,
+      "delta_ms": 0.048,
+      "rss_kib": 2160
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.969,
+      "delta_ms": 1.921,
+      "rss_kib": 4496
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 4.694,
+      "delta_ms": 2.725,
+      "rss_kib": 5272
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 20.971,
+      "delta_ms": 16.277,
+      "rss_kib": 18596
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 41.846,
+      "delta_ms": 20.875,
+      "rss_kib": 30860
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 42.055,
+      "delta_ms": 0.208,
+      "rss_kib": 30868
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 42.293,
+      "delta_ms": 0.239,
+      "rss_kib": 30868
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 42.342,
+      "delta_ms": 0.049,
+      "rss_kib": 30868
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 49.23,
+      "delta_ms": 6.888,
+      "rss_kib": 30868
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 51.105,
+      "delta_ms": 1.875,
+      "rss_kib": 31304
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 51.217,
+      "delta_ms": 0.111,
+      "rss_kib": 31316
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 59.301,
+      "delta_ms": 8.085,
+      "rss_kib": 34620
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 61.116,
+      "delta_ms": 1.815,
+      "rss_kib": 38668
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 200.594,
+      "delta_ms": 139.477,
+      "rss_kib": 85636
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 219.649,
+      "delta_ms": 19.055,
+      "rss_kib": 89232
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 219.806,
+      "delta_ms": 0.157,
+      "rss_kib": 89232
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.056,
+      "delta_ms": 0.056,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.291,
+      "delta_ms": 2.235,
+      "rss_kib": 4476
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 4.965,
+      "delta_ms": 2.674,
+      "rss_kib": 5232
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 24.826,
+      "delta_ms": 19.862,
+      "rss_kib": 18560
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 44.411,
+      "delta_ms": 19.584,
+      "rss_kib": 30832
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 44.639,
+      "delta_ms": 0.228,
+      "rss_kib": 30840
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 44.871,
+      "delta_ms": 0.232,
+      "rss_kib": 30840
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 44.918,
+      "delta_ms": 0.047,
+      "rss_kib": 30840
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 52.032,
+      "delta_ms": 7.114,
+      "rss_kib": 30840
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 54.005,
+      "delta_ms": 1.974,
+      "rss_kib": 31276
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 54.114,
+      "delta_ms": 0.108,
+      "rss_kib": 31288
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 61.88,
+      "delta_ms": 7.767,
+      "rss_kib": 34612
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 63.657,
+      "delta_ms": 1.777,
+      "rss_kib": 38664
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 244.795,
+      "delta_ms": 181.137,
+      "rss_kib": 85756
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 280.517,
+      "delta_ms": 35.722,
+      "rss_kib": 89320
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 280.669,
+      "delta_ms": 0.152,
+      "rss_kib": 89320
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.059,
+      "delta_ms": 0.059,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.25,
+      "delta_ms": 2.192,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 4.501,
+      "delta_ms": 2.25,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 22.381,
+      "delta_ms": 17.88,
+      "rss_kib": 18612
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 41.329,
+      "delta_ms": 18.948,
+      "rss_kib": 30860
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 41.559,
+      "delta_ms": 0.23,
+      "rss_kib": 30868
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 41.782,
+      "delta_ms": 0.224,
+      "rss_kib": 30868
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 41.83,
+      "delta_ms": 0.048,
+      "rss_kib": 30868
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 48.847,
+      "delta_ms": 7.017,
+      "rss_kib": 30868
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 50.903,
+      "delta_ms": 2.055,
+      "rss_kib": 31292
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 51.05,
+      "delta_ms": 0.147,
+      "rss_kib": 31304
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 59.266,
+      "delta_ms": 8.216,
+      "rss_kib": 34608
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 60.781,
+      "delta_ms": 1.515,
+      "rss_kib": 38660
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 200.762,
+      "delta_ms": 139.982,
+      "rss_kib": 85364
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 219.526,
+      "delta_ms": 18.763,
+      "rss_kib": 88968
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 219.615,
+      "delta_ms": 0.089,
+      "rss_kib": 88968
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.054,
+      "delta_ms": 0.054,
+      "rss_kib": 2140
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.329,
+      "delta_ms": 2.276,
+      "rss_kib": 4476
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 5.037,
+      "delta_ms": 2.708,
+      "rss_kib": 5252
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 20.208,
+      "delta_ms": 15.171,
+      "rss_kib": 18576
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 38.246,
+      "delta_ms": 18.038,
+      "rss_kib": 30852
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 38.451,
+      "delta_ms": 0.205,
+      "rss_kib": 30860
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 38.691,
+      "delta_ms": 0.24,
+      "rss_kib": 30860
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 38.739,
+      "delta_ms": 0.048,
+      "rss_kib": 30860
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 45.654,
+      "delta_ms": 6.914,
+      "rss_kib": 30860
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 47.358,
+      "delta_ms": 1.704,
+      "rss_kib": 31284
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 47.455,
+      "delta_ms": 0.098,
+      "rss_kib": 31296
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 54.706,
+      "delta_ms": 7.251,
+      "rss_kib": 34600
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 56.181,
+      "delta_ms": 1.475,
+      "rss_kib": 38644
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 194.115,
+      "delta_ms": 137.934,
+      "rss_kib": 85488
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 224.013,
+      "delta_ms": 29.898,
+      "rss_kib": 89076
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 224.164,
+      "delta_ms": 0.151,
+      "rss_kib": 89076
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.024,
+      "delta_ms": 0.024,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 0.987,
+      "delta_ms": 0.963,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 1.987,
+      "delta_ms": 1.0,
+      "rss_kib": 5280
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 16.337,
+      "delta_ms": 14.35,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 35.877,
+      "delta_ms": 19.541,
+      "rss_kib": 30864
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 36.16,
+      "delta_ms": 0.283,
+      "rss_kib": 30872
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 36.399,
+      "delta_ms": 0.239,
+      "rss_kib": 30872
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 36.451,
+      "delta_ms": 0.052,
+      "rss_kib": 30872
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 43.568,
+      "delta_ms": 7.117,
+      "rss_kib": 30872
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 45.434,
+      "delta_ms": 1.866,
+      "rss_kib": 31296
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 45.549,
+      "delta_ms": 0.115,
+      "rss_kib": 31308
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 54.432,
+      "delta_ms": 8.884,
+      "rss_kib": 34632
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 56.039,
+      "delta_ms": 1.607,
+      "rss_kib": 38684
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 205.003,
+      "delta_ms": 148.964,
+      "rss_kib": 85456
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 224.639,
+      "delta_ms": 19.636,
+      "rss_kib": 89056
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 224.731,
+      "delta_ms": 0.092,
+      "rss_kib": 89056
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.076,
+      "delta_ms": 0.076,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.955,
+      "delta_ms": 1.879,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 4.193,
+      "delta_ms": 2.239,
+      "rss_kib": 5308
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 25.03,
+      "delta_ms": 20.837,
+      "rss_kib": 18636
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 42.703,
+      "delta_ms": 17.673,
+      "rss_kib": 30892
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 42.906,
+      "delta_ms": 0.203,
+      "rss_kib": 30900
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 43.137,
+      "delta_ms": 0.23,
+      "rss_kib": 30900
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 43.185,
+      "delta_ms": 0.049,
+      "rss_kib": 30900
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 50.135,
+      "delta_ms": 6.95,
+      "rss_kib": 30900
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 51.839,
+      "delta_ms": 1.704,
+      "rss_kib": 31324
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 51.938,
+      "delta_ms": 0.099,
+      "rss_kib": 31336
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 59.308,
+      "delta_ms": 7.37,
+      "rss_kib": 34660
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 61.141,
+      "delta_ms": 1.833,
+      "rss_kib": 38712
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 231.568,
+      "delta_ms": 170.427,
+      "rss_kib": 86024
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 251.213,
+      "delta_ms": 19.645,
+      "rss_kib": 89636
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 251.37,
+      "delta_ms": 0.157,
+      "rss_kib": 89636
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.027,
+      "delta_ms": 0.027,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 0.998,
+      "delta_ms": 0.971,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.012,
+      "delta_ms": 1.014,
+      "rss_kib": 5280
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 15.486,
+      "delta_ms": 13.474,
+      "rss_kib": 18572
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 32.925,
+      "delta_ms": 17.439,
+      "rss_kib": 30868
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 33.135,
+      "delta_ms": 0.211,
+      "rss_kib": 30876
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 33.358,
+      "delta_ms": 0.222,
+      "rss_kib": 30876
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 33.406,
+      "delta_ms": 0.048,
+      "rss_kib": 30876
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 40.371,
+      "delta_ms": 6.965,
+      "rss_kib": 30876
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 42.11,
+      "delta_ms": 1.738,
+      "rss_kib": 31304
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 42.228,
+      "delta_ms": 0.118,
+      "rss_kib": 31316
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 49.794,
+      "delta_ms": 7.566,
+      "rss_kib": 34640
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 51.33,
+      "delta_ms": 1.536,
+      "rss_kib": 38692
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 195.407,
+      "delta_ms": 144.077,
+      "rss_kib": 85380
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 214.923,
+      "delta_ms": 19.516,
+      "rss_kib": 89028
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 215.079,
+      "delta_ms": 0.156,
+      "rss_kib": 89028
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.028,
+      "delta_ms": 0.028,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.051,
+      "delta_ms": 1.023,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.062,
+      "delta_ms": 1.011,
+      "rss_kib": 5292
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 15.677,
+      "delta_ms": 13.615,
+      "rss_kib": 18616
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 33.379,
+      "delta_ms": 17.702,
+      "rss_kib": 30888
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 33.589,
+      "delta_ms": 0.21,
+      "rss_kib": 30896
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 33.812,
+      "delta_ms": 0.222,
+      "rss_kib": 30896
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 33.861,
+      "delta_ms": 0.05,
+      "rss_kib": 30896
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 40.845,
+      "delta_ms": 6.984,
+      "rss_kib": 30896
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 42.759,
+      "delta_ms": 1.914,
+      "rss_kib": 31332
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 42.866,
+      "delta_ms": 0.106,
+      "rss_kib": 31344
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 50.57,
+      "delta_ms": 7.704,
+      "rss_kib": 34616
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 52.156,
+      "delta_ms": 1.587,
+      "rss_kib": 38664
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 184.451,
+      "delta_ms": 132.294,
+      "rss_kib": 85376
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 203.871,
+      "delta_ms": 19.42,
+      "rss_kib": 88956
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 204.062,
+      "delta_ms": 0.191,
+      "rss_kib": 88956
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.03,
+      "delta_ms": 0.03,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.163,
+      "delta_ms": 1.132,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 3.461,
+      "delta_ms": 2.298,
+      "rss_kib": 5280
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 18.599,
+      "delta_ms": 15.138,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 37.234,
+      "delta_ms": 18.635,
+      "rss_kib": 30876
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 37.45,
+      "delta_ms": 0.216,
+      "rss_kib": 30884
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 37.68,
+      "delta_ms": 0.23,
+      "rss_kib": 30884
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 37.728,
+      "delta_ms": 0.048,
+      "rss_kib": 30884
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 44.748,
+      "delta_ms": 7.021,
+      "rss_kib": 30884
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 46.559,
+      "delta_ms": 1.81,
+      "rss_kib": 31308
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 46.662,
+      "delta_ms": 0.103,
+      "rss_kib": 31320
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 55.791,
+      "delta_ms": 9.129,
+      "rss_kib": 34652
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 57.291,
+      "delta_ms": 1.5,
+      "rss_kib": 38704
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 199.68,
+      "delta_ms": 142.389,
+      "rss_kib": 85344
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 218.427,
+      "delta_ms": 18.747,
+      "rss_kib": 88972
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 218.528,
+      "delta_ms": 0.101,
+      "rss_kib": 88972
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.057,
+      "delta_ms": 0.057,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.252,
+      "delta_ms": 2.195,
+      "rss_kib": 4472
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 5.035,
+      "delta_ms": 2.784,
+      "rss_kib": 5224
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 29.091,
+      "delta_ms": 24.055,
+      "rss_kib": 18544
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 46.793,
+      "delta_ms": 17.702,
+      "rss_kib": 30816
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 47.041,
+      "delta_ms": 0.248,
+      "rss_kib": 30824
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 47.324,
+      "delta_ms": 0.284,
+      "rss_kib": 30824
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 47.381,
+      "delta_ms": 0.057,
+      "rss_kib": 30824
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 54.42,
+      "delta_ms": 7.039,
+      "rss_kib": 30824
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 56.3,
+      "delta_ms": 1.881,
+      "rss_kib": 31256
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 56.403,
+      "delta_ms": 0.102,
+      "rss_kib": 31268
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 63.764,
+      "delta_ms": 7.361,
+      "rss_kib": 34500
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 65.368,
+      "delta_ms": 1.604,
+      "rss_kib": 38552
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 211.266,
+      "delta_ms": 145.898,
+      "rss_kib": 85260
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 234.53,
+      "delta_ms": 23.265,
+      "rss_kib": 88880
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 234.66,
+      "delta_ms": 0.13,
+      "rss_kib": 88880
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.039,
+      "delta_ms": 0.039,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.29,
+      "delta_ms": 1.251,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.525,
+      "delta_ms": 1.235,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate (starts runtime)",
+      "rc": "0",
+      "at_ms": 19.995,
+      "delta_ms": 17.47,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load assembly + Add",
+      "rc": "0",
+      "at_ms": 41.384,
+      "delta_ms": 21.39,
+      "rss_kib": 30880
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 41.601,
+      "delta_ms": 0.216,
+      "rss_kib": 30888
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 41.844,
+      "delta_ms": 0.244,
+      "rss_kib": 30888
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 41.901,
+      "delta_ms": 0.057,
+      "rss_kib": 30888
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 49.899,
+      "delta_ms": 7.998,
+      "rss_kib": 30888
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 51.895,
+      "delta_ms": 1.996,
+      "rss_kib": 31324
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 52.012,
+      "delta_ms": 0.117,
+      "rss_kib": 31336
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 59.962,
+      "delta_ms": 7.95,
+      "rss_kib": 34576
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 61.553,
+      "delta_ms": 1.591,
+      "rss_kib": 38624
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 198.148,
+      "delta_ms": 136.595,
+      "rss_kib": 85544
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 216.386,
+      "delta_ms": 18.238,
+      "rss_kib": 89152
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 216.479,
+      "delta_ms": 0.093,
+      "rss_kib": 89152
+     }
+    ]
+   ]
+  },
+  "default": {
+   "exit": 0,
+   "stderr": "",
+   "steps": [
+    {
+     "step": "start",
+     "rc": "0",
+     "delta_ms": 0.056,
+     "at_ms": 0.056,
+     "rss_kib": 2172
+    },
+    {
+     "step": "dlopen hostfxr",
+     "rc": "0",
+     "delta_ms": 2.206,
+     "at_ms": 2.247,
+     "rss_kib": 4508
+    },
+    {
+     "step": "initialize (command line)",
+     "rc": "0",
+     "delta_ms": 1.085,
+     "at_ms": 3.305,
+     "rss_kib": 5284
+    },
+    {
+     "step": "delegate hdt_load_assembly",
+     "rc": "0",
+     "delta_ms": 15.734,
+     "at_ms": 20.735,
+     "rss_kib": 18608
+    },
+    {
+     "step": "delegate get_function_ptr",
+     "rc": "0",
+     "delta_ms": 0.096,
+     "at_ms": 20.831,
+     "rss_kib": 18608
+    },
+    {
+     "step": "load into default context",
+     "rc": "0",
+     "delta_ms": 6.047,
+     "at_ms": 26.569,
+     "rss_kib": 28352
+    },
+    {
+     "step": "function pointer Add",
+     "rc": "0",
+     "delta_ms": 4.109,
+     "at_ms": 30.417,
+     "rss_kib": 29580
+    },
+    {
+     "step": "function pointers (rest)",
+     "rc": "0",
+     "delta_ms": 0.179,
+     "at_ms": 30.595,
+     "rss_kib": 29588
+    },
+    {
+     "step": "first call Add",
+     "rc": "0x5",
+     "delta_ms": 0.235,
+     "at_ms": 30.891,
+     "rss_kib": 29588
+    },
+    {
+     "step": "second call Add",
+     "rc": "0x9",
+     "delta_ms": 0.049,
+     "at_ms": 30.94,
+     "rss_kib": 29588
+    },
+    {
+     "step": "1e6 calls Add",
+     "rc": "0xf4240",
+     "delta_ms": 7.246,
+     "at_ms": 37.883,
+     "rss_kib": 29588
+    },
+    {
+     "step": "File.ReadAllText",
+     "rc": "0x236",
+     "delta_ms": 1.974,
+     "at_ms": 39.638,
+     "rss_kib": 30084
+    },
+    {
+     "step": "File.ReadAllText again",
+     "rc": "0x236",
+     "delta_ms": 0.118,
+     "at_ms": 39.753,
+     "rss_kib": 30092
+    },
+    {
+     "step": "Regex.Matches",
+     "rc": "0x3",
+     "delta_ms": 7.786,
+     "at_ms": 47.164,
+     "rss_kib": 33568
+    },
+    {
+     "step": "touch SMA",
+     "rc": "0x7",
+     "delta_ms": 1.597,
+     "at_ms": 48.799,
+     "rss_kib": 37704
+    },
+    {
+     "step": "PowerShell.Create + 1+1",
+     "rc": "0x2",
+     "delta_ms": 145.175,
+     "at_ms": 192.897,
+     "rss_kib": 84212
+    },
+    {
+     "step": "again PowerShell + 1+1",
+     "rc": "0x2",
+     "delta_ms": 19.022,
+     "at_ms": 213.771,
+     "rss_kib": 87824
+    },
+    {
+     "step": "close",
+     "rc": "0",
+     "delta_ms": 0.156,
+     "at_ms": 213.931,
+     "rss_kib": 87824
+    }
+   ],
+   "samples": [
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.028,
+      "delta_ms": 0.028,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.072,
+      "delta_ms": 1.044,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.157,
+      "delta_ms": 1.085,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 21.754,
+      "delta_ms": 19.597,
+      "rss_kib": 18608
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 21.848,
+      "delta_ms": 0.094,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 27.938,
+      "delta_ms": 6.09,
+      "rss_kib": 28352
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 31.926,
+      "delta_ms": 3.988,
+      "rss_kib": 29576
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 32.096,
+      "delta_ms": 0.169,
+      "rss_kib": 29584
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 32.317,
+      "delta_ms": 0.221,
+      "rss_kib": 29584
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 32.369,
+      "delta_ms": 0.052,
+      "rss_kib": 29584
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 39.257,
+      "delta_ms": 6.888,
+      "rss_kib": 29584
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 41.329,
+      "delta_ms": 2.072,
+      "rss_kib": 30080
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 41.459,
+      "delta_ms": 0.129,
+      "rss_kib": 30088
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 49.155,
+      "delta_ms": 7.696,
+      "rss_kib": 33552
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 50.71,
+      "delta_ms": 1.555,
+      "rss_kib": 37688
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 189.987,
+      "delta_ms": 139.277,
+      "rss_kib": 84220
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 225.51,
+      "delta_ms": 35.523,
+      "rss_kib": 87824
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 225.669,
+      "delta_ms": 0.159,
+      "rss_kib": 87824
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.055,
+      "delta_ms": 0.055,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.288,
+      "delta_ms": 1.233,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.276,
+      "delta_ms": 0.988,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 16.514,
+      "delta_ms": 14.238,
+      "rss_kib": 18612
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 16.607,
+      "delta_ms": 0.093,
+      "rss_kib": 18612
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 22.653,
+      "delta_ms": 6.047,
+      "rss_kib": 28356
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 26.857,
+      "delta_ms": 4.203,
+      "rss_kib": 29592
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 27.128,
+      "delta_ms": 0.272,
+      "rss_kib": 29600
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 27.462,
+      "delta_ms": 0.334,
+      "rss_kib": 29600
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 27.526,
+      "delta_ms": 0.064,
+      "rss_kib": 29600
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 34.803,
+      "delta_ms": 7.276,
+      "rss_kib": 29600
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 36.777,
+      "delta_ms": 1.974,
+      "rss_kib": 30096
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 36.884,
+      "delta_ms": 0.107,
+      "rss_kib": 30104
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 44.894,
+      "delta_ms": 8.01,
+      "rss_kib": 33604
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 47.116,
+      "delta_ms": 2.222,
+      "rss_kib": 37744
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 187.692,
+      "delta_ms": 140.576,
+      "rss_kib": 84288
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 206.714,
+      "delta_ms": 19.022,
+      "rss_kib": 87892
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 206.917,
+      "delta_ms": 0.203,
+      "rss_kib": 87892
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.056,
+      "delta_ms": 0.056,
+      "rss_kib": 2164
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.262,
+      "delta_ms": 2.206,
+      "rss_kib": 4500
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 4.92,
+      "delta_ms": 2.658,
+      "rss_kib": 5276
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 26.694,
+      "delta_ms": 21.774,
+      "rss_kib": 18600
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 26.79,
+      "delta_ms": 0.096,
+      "rss_kib": 18600
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 32.502,
+      "delta_ms": 5.712,
+      "rss_kib": 28344
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 36.444,
+      "delta_ms": 3.942,
+      "rss_kib": 29580
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 36.665,
+      "delta_ms": 0.221,
+      "rss_kib": 29588
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 36.894,
+      "delta_ms": 0.23,
+      "rss_kib": 29588
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 36.945,
+      "delta_ms": 0.051,
+      "rss_kib": 29588
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 46.099,
+      "delta_ms": 9.154,
+      "rss_kib": 29588
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 47.995,
+      "delta_ms": 1.896,
+      "rss_kib": 30084
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 48.116,
+      "delta_ms": 0.121,
+      "rss_kib": 30092
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 55.569,
+      "delta_ms": 7.453,
+      "rss_kib": 33556
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 57.153,
+      "delta_ms": 1.584,
+      "rss_kib": 37696
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 190.961,
+      "delta_ms": 133.809,
+      "rss_kib": 84080
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 208.856,
+      "delta_ms": 17.895,
+      "rss_kib": 87720
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 209.013,
+      "delta_ms": 0.156,
+      "rss_kib": 87720
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.058,
+      "delta_ms": 0.058,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.474,
+      "delta_ms": 1.416,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.509,
+      "delta_ms": 1.035,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 16.645,
+      "delta_ms": 14.135,
+      "rss_kib": 18612
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 16.751,
+      "delta_ms": 0.106,
+      "rss_kib": 18612
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 22.63,
+      "delta_ms": 5.879,
+      "rss_kib": 28356
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 26.739,
+      "delta_ms": 4.109,
+      "rss_kib": 29592
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 26.916,
+      "delta_ms": 0.177,
+      "rss_kib": 29600
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 27.137,
+      "delta_ms": 0.22,
+      "rss_kib": 29600
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 27.185,
+      "delta_ms": 0.048,
+      "rss_kib": 29600
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 34.688,
+      "delta_ms": 7.503,
+      "rss_kib": 29600
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 37.264,
+      "delta_ms": 2.576,
+      "rss_kib": 30096
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 37.409,
+      "delta_ms": 0.145,
+      "rss_kib": 30104
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 45.13,
+      "delta_ms": 7.721,
+      "rss_kib": 33600
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 46.727,
+      "delta_ms": 1.597,
+      "rss_kib": 37736
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 219.649,
+      "delta_ms": 172.921,
+      "rss_kib": 84168
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 236.813,
+      "delta_ms": 17.164,
+      "rss_kib": 87816
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 236.907,
+      "delta_ms": 0.094,
+      "rss_kib": 87816
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.06,
+      "delta_ms": 0.06,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.281,
+      "delta_ms": 2.222,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 5.002,
+      "delta_ms": 2.72,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 20.735,
+      "delta_ms": 15.734,
+      "rss_kib": 18608
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 20.831,
+      "delta_ms": 0.096,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 26.569,
+      "delta_ms": 5.738,
+      "rss_kib": 28348
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 30.417,
+      "delta_ms": 3.848,
+      "rss_kib": 29584
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 30.595,
+      "delta_ms": 0.179,
+      "rss_kib": 29592
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 30.891,
+      "delta_ms": 0.296,
+      "rss_kib": 29592
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 30.94,
+      "delta_ms": 0.049,
+      "rss_kib": 29592
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 37.883,
+      "delta_ms": 6.943,
+      "rss_kib": 29592
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 39.638,
+      "delta_ms": 1.755,
+      "rss_kib": 30088
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 39.753,
+      "delta_ms": 0.115,
+      "rss_kib": 30096
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 47.164,
+      "delta_ms": 7.41,
+      "rss_kib": 33568
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 48.799,
+      "delta_ms": 1.635,
+      "rss_kib": 37704
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 187.909,
+      "delta_ms": 139.11,
+      "rss_kib": 84432
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 204.922,
+      "delta_ms": 17.014,
+      "rss_kib": 88064
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 205.079,
+      "delta_ms": 0.156,
+      "rss_kib": 88064
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.034,
+      "delta_ms": 0.034,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.014,
+      "delta_ms": 0.979,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.057,
+      "delta_ms": 1.044,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 16.144,
+      "delta_ms": 14.086,
+      "rss_kib": 18612
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 16.259,
+      "delta_ms": 0.116,
+      "rss_kib": 18612
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 23.824,
+      "delta_ms": 7.565,
+      "rss_kib": 28356
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 28.021,
+      "delta_ms": 4.197,
+      "rss_kib": 29580
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 28.193,
+      "delta_ms": 0.172,
+      "rss_kib": 29588
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 28.406,
+      "delta_ms": 0.213,
+      "rss_kib": 29588
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 28.454,
+      "delta_ms": 0.048,
+      "rss_kib": 29588
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 35.498,
+      "delta_ms": 7.044,
+      "rss_kib": 29588
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 37.84,
+      "delta_ms": 2.342,
+      "rss_kib": 30084
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 37.948,
+      "delta_ms": 0.108,
+      "rss_kib": 30092
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 46.138,
+      "delta_ms": 8.191,
+      "rss_kib": 33572
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 47.722,
+      "delta_ms": 1.584,
+      "rss_kib": 37712
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 192.897,
+      "delta_ms": 145.175,
+      "rss_kib": 84248
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 212.079,
+      "delta_ms": 19.181,
+      "rss_kib": 87852
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 212.235,
+      "delta_ms": 0.156,
+      "rss_kib": 87852
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.067,
+      "delta_ms": 0.067,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.446,
+      "delta_ms": 2.379,
+      "rss_kib": 4408
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 5.243,
+      "delta_ms": 2.797,
+      "rss_kib": 5236
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 27.161,
+      "delta_ms": 21.918,
+      "rss_kib": 18564
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 27.252,
+      "delta_ms": 0.091,
+      "rss_kib": 18564
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 32.991,
+      "delta_ms": 5.739,
+      "rss_kib": 28308
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 36.867,
+      "delta_ms": 3.876,
+      "rss_kib": 29544
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 37.033,
+      "delta_ms": 0.166,
+      "rss_kib": 29552
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 37.33,
+      "delta_ms": 0.297,
+      "rss_kib": 29552
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 37.378,
+      "delta_ms": 0.048,
+      "rss_kib": 29552
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 44.309,
+      "delta_ms": 6.931,
+      "rss_kib": 29552
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 46.021,
+      "delta_ms": 1.711,
+      "rss_kib": 30048
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 46.12,
+      "delta_ms": 0.099,
+      "rss_kib": 30056
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 53.593,
+      "delta_ms": 7.473,
+      "rss_kib": 33524
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 55.284,
+      "delta_ms": 1.69,
+      "rss_kib": 37664
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 202.07,
+      "delta_ms": 146.786,
+      "rss_kib": 84048
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 238.436,
+      "delta_ms": 36.366,
+      "rss_kib": 87664
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 238.606,
+      "delta_ms": 0.17,
+      "rss_kib": 87664
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.024,
+      "delta_ms": 0.024,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.247,
+      "delta_ms": 2.223,
+      "rss_kib": 4480
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 3.305,
+      "delta_ms": 1.058,
+      "rss_kib": 5316
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 18.115,
+      "delta_ms": 14.81,
+      "rss_kib": 18644
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 18.217,
+      "delta_ms": 0.103,
+      "rss_kib": 18644
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 24.164,
+      "delta_ms": 5.947,
+      "rss_kib": 28388
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 28.593,
+      "delta_ms": 4.429,
+      "rss_kib": 29600
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 28.821,
+      "delta_ms": 0.228,
+      "rss_kib": 29608
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 29.055,
+      "delta_ms": 0.234,
+      "rss_kib": 29608
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 29.103,
+      "delta_ms": 0.048,
+      "rss_kib": 29608
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 36.349,
+      "delta_ms": 7.246,
+      "rss_kib": 29608
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 38.322,
+      "delta_ms": 1.973,
+      "rss_kib": 30104
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 38.43,
+      "delta_ms": 0.108,
+      "rss_kib": 30112
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 46.398,
+      "delta_ms": 7.968,
+      "rss_kib": 33584
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 48.053,
+      "delta_ms": 1.655,
+      "rss_kib": 37724
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 194.19,
+      "delta_ms": 146.137,
+      "rss_kib": 84212
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 213.771,
+      "delta_ms": 19.581,
+      "rss_kib": 87856
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 213.931,
+      "delta_ms": 0.16,
+      "rss_kib": 87856
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.048,
+      "delta_ms": 0.048,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.614,
+      "delta_ms": 2.566,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 5.667,
+      "delta_ms": 3.053,
+      "rss_kib": 5280
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 32.398,
+      "delta_ms": 26.731,
+      "rss_kib": 18608
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 32.536,
+      "delta_ms": 0.138,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 41.384,
+      "delta_ms": 8.848,
+      "rss_kib": 28352
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 47.857,
+      "delta_ms": 6.474,
+      "rss_kib": 29588
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 48.15,
+      "delta_ms": 0.293,
+      "rss_kib": 29596
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 48.456,
+      "delta_ms": 0.306,
+      "rss_kib": 29596
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 48.526,
+      "delta_ms": 0.07,
+      "rss_kib": 29596
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 58.42,
+      "delta_ms": 9.894,
+      "rss_kib": 29596
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 61.203,
+      "delta_ms": 2.784,
+      "rss_kib": 30092
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 61.379,
+      "delta_ms": 0.176,
+      "rss_kib": 30100
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 73.324,
+      "delta_ms": 11.945,
+      "rss_kib": 33564
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 74.997,
+      "delta_ms": 1.673,
+      "rss_kib": 37704
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 224.616,
+      "delta_ms": 149.619,
+      "rss_kib": 84120
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 243.669,
+      "delta_ms": 19.053,
+      "rss_kib": 87732
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 243.837,
+      "delta_ms": 0.168,
+      "rss_kib": 87732
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.058,
+      "delta_ms": 0.058,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.275,
+      "delta_ms": 2.217,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 4.97,
+      "delta_ms": 2.695,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 26.73,
+      "delta_ms": 21.76,
+      "rss_kib": 18608
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 26.824,
+      "delta_ms": 0.094,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 33.009,
+      "delta_ms": 6.184,
+      "rss_kib": 28352
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 37.04,
+      "delta_ms": 4.031,
+      "rss_kib": 29576
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 37.213,
+      "delta_ms": 0.173,
+      "rss_kib": 29584
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 37.448,
+      "delta_ms": 0.235,
+      "rss_kib": 29584
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 37.497,
+      "delta_ms": 0.049,
+      "rss_kib": 29584
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 44.497,
+      "delta_ms": 7.0,
+      "rss_kib": 29584
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 46.329,
+      "delta_ms": 1.832,
+      "rss_kib": 30080
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 46.447,
+      "delta_ms": 0.118,
+      "rss_kib": 30088
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 54.232,
+      "delta_ms": 7.786,
+      "rss_kib": 33572
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 55.777,
+      "delta_ms": 1.545,
+      "rss_kib": 37708
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 189.728,
+      "delta_ms": 133.951,
+      "rss_kib": 84484
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 208.003,
+      "delta_ms": 18.274,
+      "rss_kib": 88132
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 208.158,
+      "delta_ms": 0.155,
+      "rss_kib": 88132
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.056,
+      "delta_ms": 0.056,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.506,
+      "delta_ms": 1.45,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.575,
+      "delta_ms": 1.069,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 17.243,
+      "delta_ms": 14.668,
+      "rss_kib": 18608
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 17.334,
+      "delta_ms": 0.092,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load into default context",
+      "rc": "0",
+      "at_ms": 23.868,
+      "delta_ms": 6.534,
+      "rss_kib": 28352
+     },
+     {
+      "step": "function pointer Add",
+      "rc": "0",
+      "at_ms": 28.174,
+      "delta_ms": 4.305,
+      "rss_kib": 29580
+     },
+     {
+      "step": "function pointers (rest)",
+      "rc": "0",
+      "at_ms": 28.37,
+      "delta_ms": 0.196,
+      "rss_kib": 29588
+     },
+     {
+      "step": "first call Add",
+      "rc": "0x5",
+      "at_ms": 28.605,
+      "delta_ms": 0.235,
+      "rss_kib": 29588
+     },
+     {
+      "step": "second call Add",
+      "rc": "0x9",
+      "at_ms": 28.653,
+      "delta_ms": 0.049,
+      "rss_kib": 29588
+     },
+     {
+      "step": "1e6 calls Add",
+      "rc": "0xf4240",
+      "at_ms": 36.242,
+      "delta_ms": 7.589,
+      "rss_kib": 29588
+     },
+     {
+      "step": "File.ReadAllText",
+      "rc": "0x236",
+      "at_ms": 38.512,
+      "delta_ms": 2.27,
+      "rss_kib": 30084
+     },
+     {
+      "step": "File.ReadAllText again",
+      "rc": "0x236",
+      "at_ms": 38.63,
+      "delta_ms": 0.118,
+      "rss_kib": 30092
+     },
+     {
+      "step": "Regex.Matches",
+      "rc": "0x3",
+      "at_ms": 46.488,
+      "delta_ms": 7.858,
+      "rss_kib": 33540
+     },
+     {
+      "step": "touch SMA",
+      "rc": "0x7",
+      "at_ms": 48.084,
+      "delta_ms": 1.596,
+      "rss_kib": 37680
+     },
+     {
+      "step": "PowerShell.Create + 1+1",
+      "rc": "0x2",
+      "at_ms": 210.065,
+      "delta_ms": 161.98,
+      "rss_kib": 84132
+     },
+     {
+      "step": "again PowerShell + 1+1",
+      "rc": "0x2",
+      "at_ms": 228.189,
+      "delta_ms": 18.124,
+      "rss_kib": 87756
+     },
+     {
+      "step": "close",
+      "rc": "0",
+      "at_ms": 228.344,
+      "delta_ms": 0.156,
+      "rss_kib": 87756
+     }
+    ]
+   ]
+  },
+  "runtimeconfig": {
+   "exit": 1,
+   "stderr": "Initialization for self-contained components is not supported",
+   "steps": [
+    {
+     "step": "start",
+     "rc": "0",
+     "delta_ms": 0.055,
+     "at_ms": 0.055,
+     "rss_kib": 2168
+    },
+    {
+     "step": "dlopen hostfxr",
+     "rc": "0",
+     "delta_ms": 2.184,
+     "at_ms": 2.239,
+     "rss_kib": 4504
+    },
+    {
+     "step": "initialize (runtimeconfig)",
+     "rc": "0xffffffff80008093",
+     "delta_ms": 0.305,
+     "at_ms": 2.512,
+     "rss_kib": 4604
+    }
+   ],
+   "samples": [
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.056,
+      "delta_ms": 0.056,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.275,
+      "delta_ms": 2.219,
+      "rss_kib": 4500
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 2.599,
+      "delta_ms": 0.324,
+      "rss_kib": 4604
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.057,
+      "delta_ms": 0.057,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.467,
+      "delta_ms": 1.41,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 1.604,
+      "delta_ms": 0.137,
+      "rss_kib": 4608
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.054,
+      "delta_ms": 0.054,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.239,
+      "delta_ms": 2.184,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 2.543,
+      "delta_ms": 0.305,
+      "rss_kib": 4604
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.094,
+      "delta_ms": 0.094,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.279,
+      "delta_ms": 2.185,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 2.584,
+      "delta_ms": 0.305,
+      "rss_kib": 4604
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.055,
+      "delta_ms": 0.055,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.919,
+      "delta_ms": 1.863,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 2.13,
+      "delta_ms": 0.212,
+      "rss_kib": 4608
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.057,
+      "delta_ms": 0.057,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.39,
+      "delta_ms": 2.333,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 2.697,
+      "delta_ms": 0.307,
+      "rss_kib": 4604
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.055,
+      "delta_ms": 0.055,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.194,
+      "delta_ms": 2.139,
+      "rss_kib": 4496
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 2.512,
+      "delta_ms": 0.318,
+      "rss_kib": 4604
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.026,
+      "delta_ms": 0.026,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.249,
+      "delta_ms": 2.223,
+      "rss_kib": 4472
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 2.397,
+      "delta_ms": 0.148,
+      "rss_kib": 4540
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.049,
+      "delta_ms": 0.049,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.199,
+      "delta_ms": 2.15,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 2.501,
+      "delta_ms": 0.302,
+      "rss_kib": 4604
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.054,
+      "delta_ms": 0.054,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.409,
+      "delta_ms": 2.355,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 2.715,
+      "delta_ms": 0.306,
+      "rss_kib": 4604
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.079,
+      "delta_ms": 0.079,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.541,
+      "delta_ms": 1.461,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (runtimeconfig)",
+      "rc": "0xffffffff80008093",
+      "at_ms": 1.67,
+      "delta_ms": 0.13,
+      "rss_kib": 4608
+     }
+    ]
+   ]
+  },
+  "named": {
+   "exit": 1,
+   "stderr": "",
+   "steps": [
+    {
+     "step": "start",
+     "rc": "0",
+     "delta_ms": 0.053,
+     "at_ms": 0.053,
+     "rss_kib": 2168
+    },
+    {
+     "step": "dlopen hostfxr",
+     "rc": "0",
+     "delta_ms": 1.305,
+     "at_ms": 1.338,
+     "rss_kib": 4504
+    },
+    {
+     "step": "initialize (command line)",
+     "rc": "0",
+     "delta_ms": 1.226,
+     "at_ms": 2.601,
+     "rss_kib": 5280
+    },
+    {
+     "step": "delegate hdt_load_assembly",
+     "rc": "0",
+     "delta_ms": 16.737,
+     "at_ms": 18.744,
+     "rss_kib": 18608
+    },
+    {
+     "step": "delegate get_function_ptr",
+     "rc": "0",
+     "delta_ms": 0.103,
+     "at_ms": 18.84,
+     "rss_kib": 18608
+    },
+    {
+     "step": "load into named context",
+     "rc": "0xffffffff80131502",
+     "delta_ms": 8.068,
+     "at_ms": 26.501,
+     "rss_kib": 28904
+    }
+   ],
+   "samples": [
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.053,
+      "delta_ms": 0.053,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.223,
+      "delta_ms": 2.169,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 4.885,
+      "delta_ms": 2.663,
+      "rss_kib": 5280
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 26.831,
+      "delta_ms": 21.946,
+      "rss_kib": 18604
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 26.927,
+      "delta_ms": 0.096,
+      "rss_kib": 18604
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 34.131,
+      "delta_ms": 7.204,
+      "rss_kib": 28904
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.026,
+      "delta_ms": 0.026,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 0.991,
+      "delta_ms": 0.965,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.034,
+      "delta_ms": 1.043,
+      "rss_kib": 5280
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 15.98,
+      "delta_ms": 13.946,
+      "rss_kib": 18608
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 16.094,
+      "delta_ms": 0.114,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 24.275,
+      "delta_ms": 8.18,
+      "rss_kib": 28904
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.029,
+      "delta_ms": 0.029,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.003,
+      "delta_ms": 0.974,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.02,
+      "delta_ms": 1.017,
+      "rss_kib": 5284
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 17.682,
+      "delta_ms": 15.662,
+      "rss_kib": 18612
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 17.778,
+      "delta_ms": 0.096,
+      "rss_kib": 18612
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 25.846,
+      "delta_ms": 8.068,
+      "rss_kib": 28904
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.061,
+      "delta_ms": 0.061,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.555,
+      "delta_ms": 1.494,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.781,
+      "delta_ms": 1.226,
+      "rss_kib": 5296
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 16.653,
+      "delta_ms": 13.873,
+      "rss_kib": 18620
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 16.756,
+      "delta_ms": 0.103,
+      "rss_kib": 18620
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 24.784,
+      "delta_ms": 8.028,
+      "rss_kib": 28920
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.033,
+      "delta_ms": 0.033,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.338,
+      "delta_ms": 1.305,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.601,
+      "delta_ms": 1.263,
+      "rss_kib": 5280
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 23.323,
+      "delta_ms": 20.722,
+      "rss_kib": 18604
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 23.454,
+      "delta_ms": 0.131,
+      "rss_kib": 18604
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 36.896,
+      "delta_ms": 13.442,
+      "rss_kib": 28904
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.054,
+      "delta_ms": 0.054,
+      "rss_kib": 2172
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.017,
+      "delta_ms": 1.964,
+      "rss_kib": 4508
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 3.923,
+      "delta_ms": 1.906,
+      "rss_kib": 5292
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 27.681,
+      "delta_ms": 23.757,
+      "rss_kib": 18620
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 27.822,
+      "delta_ms": 0.141,
+      "rss_kib": 18620
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 39.992,
+      "delta_ms": 12.17,
+      "rss_kib": 28916
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.053,
+      "delta_ms": 0.053,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 2.552,
+      "delta_ms": 2.499,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 5.24,
+      "delta_ms": 2.688,
+      "rss_kib": 5280
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 27.237,
+      "delta_ms": 21.997,
+      "rss_kib": 18608
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 27.366,
+      "delta_ms": 0.129,
+      "rss_kib": 18608
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 38.81,
+      "delta_ms": 11.444,
+      "rss_kib": 28904
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.025,
+      "delta_ms": 0.025,
+      "rss_kib": 2164
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.011,
+      "delta_ms": 0.985,
+      "rss_kib": 4500
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.121,
+      "delta_ms": 1.111,
+      "rss_kib": 5276
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 16.967,
+      "delta_ms": 14.846,
+      "rss_kib": 18604
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 17.063,
+      "delta_ms": 0.096,
+      "rss_kib": 18604
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 25.102,
+      "delta_ms": 8.04,
+      "rss_kib": 28900
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.058,
+      "delta_ms": 0.058,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.095,
+      "delta_ms": 1.037,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.11,
+      "delta_ms": 1.015,
+      "rss_kib": 5280
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 15.258,
+      "delta_ms": 13.148,
+      "rss_kib": 18604
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 15.352,
+      "delta_ms": 0.094,
+      "rss_kib": 18604
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 22.333,
+      "delta_ms": 6.981,
+      "rss_kib": 28904
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.027,
+      "delta_ms": 0.027,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.014,
+      "delta_ms": 0.987,
+      "rss_kib": 4504
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 2.007,
+      "delta_ms": 0.992,
+      "rss_kib": 5304
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 18.744,
+      "delta_ms": 16.737,
+      "rss_kib": 18632
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 18.84,
+      "delta_ms": 0.096,
+      "rss_kib": 18632
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 26.501,
+      "delta_ms": 7.661,
+      "rss_kib": 28928
+     }
+    ],
+    [
+     {
+      "step": "start",
+      "rc": "0",
+      "at_ms": 0.061,
+      "delta_ms": 0.061,
+      "rss_kib": 2168
+     },
+     {
+      "step": "dlopen hostfxr",
+      "rc": "0",
+      "at_ms": 1.844,
+      "delta_ms": 1.782,
+      "rss_kib": 4472
+     },
+     {
+      "step": "initialize (command line)",
+      "rc": "0",
+      "at_ms": 4.014,
+      "delta_ms": 2.17,
+      "rss_kib": 5216
+     },
+     {
+      "step": "delegate hdt_load_assembly",
+      "rc": "0",
+      "at_ms": 26.083,
+      "delta_ms": 22.069,
+      "rss_kib": 18604
+     },
+     {
+      "step": "delegate get_function_ptr",
+      "rc": "0",
+      "at_ms": 26.253,
+      "delta_ms": 0.17,
+      "rss_kib": 18604
+     },
+     {
+      "step": "load into named context",
+      "rc": "0xffffffff80131502",
+      "at_ms": 39.378,
+      "delta_ms": 13.125,
+      "rss_kib": 28904
+     }
+    ]
+   ]
+  }
+ },
+ "load_average_after": [
+  "2.35",
+  "2.57",
+  "2.07"
+ ]
+}
