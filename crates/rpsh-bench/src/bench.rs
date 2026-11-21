@@ -29,12 +29,22 @@ struct CaseResult {
     status: Status,
     pwsh: Summary,
     rpsh: Option<Summary>,
+    /// rpsh's allowed median, from `# rpsh-bench: budget-ms=N` times
+    /// `--budget-scale` (docs/05_startup.md).
+    budget_ms: Option<f64>,
 }
 
 impl CaseResult {
     fn speedup(&self) -> Option<f64> {
         let rpsh = self.rpsh.as_ref()?;
         Some(self.pwsh.median_ms / rpsh.median_ms)
+    }
+
+    /// `Some(false)` when rpsh was timed and its median exceeds the budget.
+    fn within_budget(&self) -> Option<bool> {
+        let budget = self.budget_ms?;
+        let rpsh = self.rpsh.as_ref()?;
+        Some(rpsh.median_ms <= budget)
     }
 }
 
@@ -46,6 +56,14 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
     let out = args.value("--out")?;
     let pwsh_path = args.value("--pwsh")?;
     let rpsh_path = args.value("--rpsh")?;
+    let budget_scale = match args.value("--budget-scale")? {
+        Some(text) => text
+            .parse::<f64>()
+            .ok()
+            .filter(|scale| *scale > 0.0)
+            .ok_or_else(|| format!("--budget-scale expects a positive number, got {text}"))?,
+        None => 1.0,
+    };
     args.finish()?;
     if runs == 0 {
         return Err("--runs must be at least 1".to_owned());
@@ -69,11 +87,14 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
     let mut results = Vec::new();
     for case in &cases {
         eprint!("{} ... ", case.id);
-        let result = measure(case, &pwsh, &rpsh, runs, warmup)?;
+        let result = measure(case, &pwsh, &rpsh, runs, warmup, budget_scale)?;
         match &result.status {
             Status::Verified => eprintln!("verified"),
             Status::NotImplemented(feature) => eprintln!("not implemented: {feature}"),
             Status::Mismatch(why) => eprintln!("MISMATCH: {why}"),
+        }
+        if result.within_budget() == Some(false) {
+            eprintln!("  OVER BUDGET");
         }
         results.push(result);
     }
@@ -98,6 +119,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
             Json::Object(vec![
                 ("runs", Json::Number(runs as f64)),
                 ("warmup", Json::Number(warmup as f64)),
+                ("budget_scale", Json::Number(budget_scale)),
             ]),
         ),
         ("summary", summary_json(&results)),
@@ -118,9 +140,9 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
         .map_err(|error| format!("cannot write {}: {error}", out.display()))?;
     eprintln!("results written to {}", out.display());
 
-    Ok(!results
-        .iter()
-        .any(|result| matches!(result.status, Status::Mismatch(_))))
+    Ok(!results.iter().any(|result| {
+        matches!(result.status, Status::Mismatch(_)) || result.within_budget() == Some(false)
+    }))
 }
 
 fn measure(
@@ -129,11 +151,14 @@ fn measure(
     rpsh: &Engine,
     runs: usize,
     warmup: usize,
+    budget_scale: f64,
 ) -> Result<CaseResult, String> {
     let source = fs::read_to_string(&case.path)
         .map_err(|error| format!("cannot read {}: {error}", case.path.display()))?;
     let runs = cases::directive(&source, "runs").unwrap_or(runs).max(1);
     let warmup = cases::directive(&source, "warmup").unwrap_or(warmup);
+    let budget_ms =
+        cases::directive(&source, "budget-ms").map(|budget| budget as f64 * budget_scale);
 
     // The first run of each engine establishes the answer and is not timed.
     let first = pwsh.run_file(&case.path)?;
@@ -188,6 +213,7 @@ fn measure(
         status,
         pwsh: stats::summarize(&pwsh_samples),
         rpsh,
+        budget_ms,
     })
 }
 
@@ -196,9 +222,9 @@ fn markdown(results: &[CaseResult], pwsh_version: &str) -> String {
     let _ = writeln!(out, "## rpsh vs pwsh {pwsh_version}\n");
     let _ = writeln!(
         out,
-        "| case | status | pwsh median | rpsh median | speedup |"
+        "| case | status | pwsh median | rpsh median | speedup | rpsh budget |"
     );
-    let _ = writeln!(out, "|---|---|---:|---:|---:|");
+    let _ = writeln!(out, "|---|---|---:|---:|---:|---|");
     for result in results {
         let status = match &result.status {
             Status::Verified => "verified".to_owned(),
@@ -210,9 +236,15 @@ fn markdown(results: &[CaseResult], pwsh_version: &str) -> String {
             .as_ref()
             .map_or("—".to_owned(), |summary| millis(summary.median_ms));
         let speedup = result.speedup().map_or("—".to_owned(), ratio);
+        let budget = match (result.budget_ms, result.within_budget()) {
+            (None, _) => "—".to_owned(),
+            (Some(budget), None) => format!("{} (not timed)", millis(budget)),
+            (Some(budget), Some(true)) => format!("{} ok", millis(budget)),
+            (Some(budget), Some(false)) => format!("{} **OVER**", millis(budget)),
+        };
         let _ = writeln!(
             out,
-            "| {} | {status} | {} | {rpsh} | {speedup} |",
+            "| {} | {status} | {} | {rpsh} | {speedup} | {budget} |",
             result.id,
             millis(result.pwsh.median_ms),
         );
@@ -283,8 +315,13 @@ fn summary_json(results: &[CaseResult]) -> Json {
         Json::Number(results.iter().filter(|r| wanted(&r.status)).count() as f64)
     };
     let speedups: Vec<f64> = results.iter().filter_map(CaseResult::speedup).collect();
+    let over_budget = results
+        .iter()
+        .filter(|result| result.within_budget() == Some(false))
+        .count();
     Json::Object(vec![
         ("cases", Json::Number(results.len() as f64)),
+        ("over_budget", Json::Number(over_budget as f64)),
         ("verified", count(|s| matches!(s, Status::Verified))),
         (
             "not_implemented",
@@ -309,6 +346,14 @@ fn case_json(result: &CaseResult) -> Json {
         ("status", Json::text(status)),
         ("detail", Json::optional(detail, Json::Text)),
         ("speedup", Json::optional(result.speedup(), Json::Number)),
+        (
+            "rpsh_budget_ms",
+            Json::optional(result.budget_ms, Json::Number),
+        ),
+        (
+            "within_budget",
+            Json::optional(result.within_budget(), Json::Bool),
+        ),
         ("pwsh", summary_to_json(&result.pwsh)),
         (
             "rpsh",

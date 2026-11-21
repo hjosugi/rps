@@ -1,0 +1,28 @@
+{
+  "schema": "rpsh-research-v1",
+  "name": "startup_tables",
+  "description": "eager construction of the command table against static lookup (#5)",
+  "quick": false,
+  "machine": {
+    "cpu": "AMD Ryzen 5 PRO 4650U with Radeon Graphics",
+    "governor": "schedutil",
+    "load_average": "2.40 2.59 2.07 1/2009 1081446",
+    "kernel": "7.3.4-1-cachyos",
+    "commit": "51168f5",
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)"
+  },
+  "facts": {
+    "commands": "298",
+    "aliases": "124",
+    "type accelerators": "102",
+    "parameters": "2076",
+    "lookups per sample": "422"
+  },
+  "unit": "ns per operation",
+  "measurements": [
+    {"group": "construct", "candidate": "eager map of names", "iterations": 2000, "median_ns": 63886.240, "min_ns": 60075.282, "samples_ns": [67509.586, 64690.043, 67179.571, 63886.240, 61424.103, 61683.395, 61333.594, 71062.519, 66601.566, 67407.944, 61237.344, 61887.914, 60355.238, 60075.282, 60871.446, 65062.613, 68067.773, 66372.772, 65252.073, 62458.005, 61349.734]},
+    {"group": "construct", "candidate": "eager parameter metadata", "iterations": 500, "median_ns": 999703.268, "min_ns": 960798.730, "samples_ns": [984895.678, 1049356.942, 963112.476, 999703.268, 973137.730, 1011640.594, 960798.730, 1064494.914, 963437.824, 1108423.300, 1004975.144, 1044199.862, 972881.490, 1026918.808, 971038.690, 1162431.004, 980501.508, 1068628.430, 972980.254, 1114923.800, 964111.988]},
+    {"group": "lookup x422", "candidate": "eager map, lowercased key", "iterations": 5000, "median_ns": 25953.625, "min_ns": 25367.831, "samples_ns": [26490.791, 26378.450, 25802.676, 25730.065, 25512.014, 25368.693, 27829.682, 26358.501, 25775.667, 25953.625, 25496.118, 26177.437, 26247.172, 25367.831, 26232.452, 27390.902, 26949.837, 25697.693, 25479.126, 26091.027, 25611.579]},
+    {"group": "lookup x422", "candidate": "static sorted table", "iterations": 5000, "median_ns": 38932.985, "min_ns": 37927.017, "samples_ns": [41696.348, 38864.831, 37927.017, 38214.940, 39068.020, 41492.300, 40599.237, 39358.698, 39813.924, 45460.484, 41162.045, 40587.569, 38455.519, 38083.902, 38932.985, 38588.547, 38124.039, 38153.913, 38331.729, 38220.720, 40055.901]}
+  ]
+}
