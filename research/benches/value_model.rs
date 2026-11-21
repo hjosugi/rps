@@ -22,8 +22,9 @@ use std::rc::Rc;
 
 use rpsh_research::{Report, iterations, measure};
 
-/// Simple case folding of one UTF-16 code unit, enough for the
-/// `OrdinalIgnoreCase` comparison PowerShell's `@{}` uses.
+/// Simple case folding of one UTF-16 code unit: an approximation of .NET's
+/// `OrdinalIgnoreCase`, exact for the corpora measured here. Full Unicode
+/// case folding and the culture-aware comparison belong to #36.
 fn fold(unit: u16) -> u16 {
     if unit < 0x80 {
         return (unit as u8).to_ascii_uppercase() as u16;
@@ -576,13 +577,13 @@ fn bench_strings<S: PsString>(report: &mut Report, candidate: &str) {
             || text.index_of(&needle),
         ));
         report.add(measure(
-            &group("-eq ignoring case"),
+            &group("ordinal-ignore-case"),
             candidate,
             iterations(200_000),
             || text.eq_ignore_case(&other),
         ));
         report.add(measure(
-            &group("hash ignoring case"),
+            &group("ordinal-ignore-case hash"),
             candidate,
             iterations(200_000),
             || text.hash_ignore_case(),

@@ -11,12 +11,33 @@ Writes bench/results/research-dotnet_t1.json.
 import argparse
 import json
 import os
+import platform
 import statistics
 import subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PWSH_DIR = os.path.join(ROOT, '.cache', 'pwsh', '7.7.0')
 PROBE_DIR = os.path.join(ROOT, '.cache', 'dotnet-probe')
+
+
+def machine():
+    cpu = ''
+    try:
+        with open('/proc/cpuinfo') as info:
+            for line in info:
+                if line.startswith('model name'):
+                    cpu = line.split(':', 1)[1].strip()
+                    break
+    except OSError:
+        pass
+    commit = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=ROOT,
+                            capture_output=True, text=True).stdout.strip()
+    return {
+        'cpu': cpu,
+        'kernel': platform.release(),
+        'commit': commit,
+        'python': platform.python_version(),
+    }
 
 
 def run(mode):
@@ -44,7 +65,8 @@ def main():
     parser.add_argument('--runs', type=int, default=11)
     parser.add_argument('--out', default=os.path.join(ROOT, 'bench', 'results', 'research-dotnet_t1.json'))
     args = parser.parse_args()
-    document = {'schema': 'rpsh-research-dotnet-t1-v1', 'runs': args.runs, 'modes': {}}
+    document = {'schema': 'rpsh-research-dotnet-t1-v1', 'runs': args.runs,
+                'machine': machine(), 'modes': {}}
     for mode in ('cmdline', 'default', 'runtimeconfig', 'named'):
         runs = [run(mode) for _ in range(args.runs)]
         exit_code, first_steps, stderr = runs[0]

@@ -6,3 +6,7 @@ target/
 
 # Harness output. A run worth keeping is copied to bench/baselines/.
 bench/results/
+
+# Python bytecode from the research scripts
+__pycache__/
+*.py[cod]

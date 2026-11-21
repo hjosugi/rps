@@ -1,7 +1,8 @@
 # Dependency rules (#7, docs/07_dependencies.md).
 #
-# `cargo deny check` runs in CI and in `scripts/check.sh`. A crate that is
-# added to the workspace must pass all four checks: its license is on the
+# `cargo deny check` runs in CI's `dependencies` job; run it locally with
+# `cargo deny check` (it is not part of `scripts/check.sh`). A crate that
+# is added to the workspace must pass all four checks: its license is on the
 # allow list, it has no advisory, it is not a duplicate brought in for no
 # reason, and it comes from crates.io or a git source named here.
 
@@ -30,9 +31,12 @@ allow = [
 ]
 confidence-threshold = 0.93
 exceptions = []
+# The workspace has no external dependency yet, so most allowances are
+# unmatched. Keep them: they are the list a new crate is checked against.
+unused-allowed-license = "allow"
 
 [bans]
-multiple-versions = "warn"
+multiple-versions = "deny"
 wildcards = "deny"
 allow-workspace = true
 allow = []

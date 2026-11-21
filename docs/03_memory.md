@@ -12,7 +12,7 @@ Probed on pwsh 7.7.0:
 $h = @{ n = 0 }; $h.self = $h                       → a hashtable that contains itself
 $o | Add-Member -NotePropertyName me -NotePropertyValue $o   → an object that points at itself
 $sb = { $sb }; & $sb                                 → a script block reachable from its own scope
-1..8 | ForEach-Object -Parallel { ($using:shared).count++ … }   → 8: the same object in four threads
+# ForEach-Object -Parallel and Start-ThreadJob hand the same object to another runspace
 Start-ThreadJob { param($x) $x.added = 'by job' } -ArgumentList $h
 $h.added                                             → by job: the job mutated the caller's object
 ```
@@ -89,11 +89,11 @@ Median nanoseconds per operation, uncontended, on the reference machine:
 | element read | 0.86 ns | 8.62 ns | 8.67 ns |
 
 For scale: pwsh runs `bench/cases/language/loop-sum.ps1`, a million
-iterations of `$sum += $i`, in 1,080 ms including about 150 ms of startup
-(`bench/baselines/2026-11-20-ryzen5-4650u-scaffold.json`), roughly 0.9 µs
-per iteration. An atomic count pair or an uncontended lock costs tens of
-nanoseconds. It is visible in a micro benchmark and invisible against the
-interpreter work each operation already does; the hot-loop budget is #147's.
+iterations of `$sum += $i`, in 1,080 ms including about 158 ms of startup
+(`bench/baselines/2026-11-20-ryzen5-4650u-scaffold.json`), roughly 0.92 µs
+per iteration. An atomic count pair or an uncontended lock costs about 9 ns.
+It is visible in a micro benchmark and invisible against the interpreter
+work each operation already does; the hot-loop budget is #147's.
 
 The cycle collector prototype (`Heap` in the bench) is CPython's algorithm
 in safe Rust: every container is registered weakly, and a collection
@@ -104,19 +104,25 @@ rest is cyclic garbage and is broken up.
 
 * **Garbage loop**: 1,000,000 iterations of `$h = @{…}; $h.self = $h`.
   Without a collector the loop runs in 196.1 ns per iteration and leaves
-  325 MiB behind; collecting every 10,000 containers costs 197.1 ns per
-  iteration and the RSS does not grow at all, because freed containers are
-  reused. Collecting every 100,000 costs 337.1 ns per iteration. A
-  collection every 10,000 allocations costs about the same as never
-  collecting at this size, and it is the threshold the implementation
-  starts with.
-* **Pause**: a collection costs 212 µs with 1,000 live containers, 3.49 ms
-  with 10,000 and 55.7 ms with 100,000. Linear in the live heap, as expected
-  of a non-generational collector. The prototype pays for a hash map and a
-  lock per container; an implementation with the count bookkeeping in the
-  object header (as CPython does) is cheaper per object, but linear all the
-  same. This is why the collector is generational and why the threshold
-  keeps young scripts from ever reaching it.
+  about 318 MiB behind (325,096 KiB); collecting every 10,000 containers
+  costs 197.1 ns per iteration and the RSS does not grow further, because
+  freed containers are reused. Collecting every 100,000 costs 337.1 ns per
+  iteration. A collection every 10,000 allocations costs about the same as
+  never collecting at this size, and it is the threshold the implementation
+  starts with. The three candidates run in one process in this bench; the
+  `+0 KiB` means the collector added nothing to the RSS the no-collector run
+  had already reached, not that the process stayed small.
+* **Pause**: the timed group allocates another 1,000, 10,000 or 100,000
+  already-live-shaped containers and then collects, so it measures
+  allocation plus a collection over roughly twice that many containers. It
+  costs 212 µs, 3.49 ms and 55.7 ms respectively: close to linear, mildly
+  superlinear (about 16 times per ten times), as expected of a
+  non-generational collector over a hash map and a lock per container. An
+  implementation with the count bookkeeping in the object header (as CPython
+  does) is cheaper per object, but the same shape. The design is
+  generational to contain the pause; the prototype measured only the
+  non-generational case, so the generational gain is a design inference for
+  #149 to verify, not a measurement in this memo.
 
 ## Decision
 
@@ -128,7 +134,7 @@ rest is cyclic garbage and is broken up.
 * **A backup cycle collector over containers only**, by trial deletion.
   * It is triggered by the number of containers allocated since the last
     collection, so a short script never pays for it (the startup budget,
-    docs/05).
+    docs/05_startup.md).
   * It is generational: young containers are examined first, old ones
     rarely, because the pause is linear in what is examined.
   * It runs at safe points (statement boundaries in the VM, #55), where

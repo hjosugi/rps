@@ -160,9 +160,9 @@ output, and function definitions are re-parsed each time because nothing is
 cached between sessions.
 
 Measured against 7.7.0 ([docs/05_startup.md](docs/05_startup.md)): an empty
-.NET application costs 19 ms and 21 MiB; loading `System.Management.Automation`
-adds 1.4 ms; building a default session state and running `exit` reaches
-164 ms and 77 MiB. `pwsh -NoProfile -Command exit` takes 147 ms and 89 MiB.
+.NET application costs 20 ms and 21 MiB; loading `System.Management.Automation`
+adds 2.2 ms; building a default session state and running `exit` reaches
+170 ms and 77 MiB. `pwsh -NoProfile -Command exit` takes 156 ms and 89 MiB.
 That is the budget rpsh is measured against.
 
 Rules:
@@ -171,8 +171,9 @@ Rules:
    accelerators, type and format data, providers and the .NET shim are static
    data resolved by name, or are constructed on first use. A script that
    prints one integer constructs none of them.
-2. **A budget, enforced.** `rpsh -NoProfile -Command exit` stays under 5 ms
-   on the reference machine. `bench/cases/startup` guards it, and every
+2. **A budget, enforced.** `rpsh -NoProfile -File empty.ps1` stays under
+   5 ms on the reference machine, and `-Command exit` answers to the same
+   budget. `bench/cases/startup` guards the `-File` path, and every
    dependency linked into `rpsh` answers to it.
 3. **Compile once.** Parsed and lowered scripts, the profile included, are
    cached on disk under a content hash. Function bodies compile on first

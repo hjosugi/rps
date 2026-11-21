@@ -1,8 +1,9 @@
 # Execution
 
 How rpsh runs a parsed script. Settles #4; DESIGN.md §3.4 summarises it.
-Measurements: `bench/baselines/2026-11-21-ryzen5-4650u-execution.json`,
-written by `cargo bench -p rpsh-research --bench execution`.
+Measurements: `bench/baselines/2026-11-21-ryzen5-4650u-execution.json`; the
+bench writes `bench/results/research-execution.json`, and that run is copied
+there (DESIGN.md §7 rule 5).
 
 ## What upstream does
 
@@ -61,7 +62,7 @@ Loop-sum, one million iterations, median wall time:
 | register-vm | **60.8 ms** | **1.00** |
 | register-vm+call-cache | 61.0 ms | 1.00 |
 
-Fib 18, 13,529 calls, median wall time:
+Fib 18, 8,361 calls, median wall time:
 
 | candidate | time | relative |
 |---|---:|---:|
@@ -140,8 +141,9 @@ work.
 
 * The register form is 3.2 times faster than the name-walked AST on the
   tight loop and 1.5 times faster than the slot-resolved AST or the stack
-  VM. On the call-heavy program the call cache is the fastest of the five,
-  21% ahead of the plain register VM and 17% ahead of the stack VM. The win
+  VM. On the call-heavy program the call cache is the fastest of the five:
+  it takes 21% less time than the plain register VM (1.26 times faster) and
+  17% less than the stack VM (1.21 times faster). The win
   is not from better dispatch alone: naming registers removes the stack
   traffic and lets the interpreter keep the loop variables in one place.
 * Resolution happens at lowering time, not at run time. The `ast-slots`
@@ -155,8 +157,8 @@ work.
   is not tied to a process.
 * The call cache is kept even though it does not show on loop-sum: it turns
   a name lookup into a generation check at every call site and takes 21% off
-  Fib 18 over the plain register VM. Redefining a function bumps the generation, so a cached call can
-  never call the old body.
+  Fib 18 over the plain register VM. Redefining a function bumps the
+  generation, so a cached call can never call the old body.
 * A compiler is not required now. The register IR is the shape a later
   copy-and-patch or JIT tier would consume, so adding one does not mean
   throwing the interpreter away; it means replacing the dispatch loop for
@@ -168,8 +170,10 @@ Rejected:
   on the loop and it leaves the tree in cache while running. It stays as
   the reference implementation in the bench.
 * **Stack bytecode.** No faster than the slot-resolved AST on loop-sum and
-  slower than registers on both programs; its instructions are smaller (8
-  bytes against 16), which does not matter at these code sizes.
+  slower than the cached register VM on both programs; it beats the plain
+  register VM on Fib 18 (1.05 ms against 1.10 ms) but not by enough to
+  matter against the cache. Its instructions are smaller (8 bytes against
+  16), which does not matter at these code sizes.
 * **Compile everything on first run.** No measured prototype pays back a
   compiler on a one-shot script, and it contradicts the startup budget
   (docs/05_startup.md).
