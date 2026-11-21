@@ -1,0 +1,12 @@
+{
+  "description": "What JIT compilation and pwsh's caches contribute to its start: runtime switches that change code generation, and a HOME without pwsh's startup profile. docs/05_startup.md.",
+  "runs": 20,
+  "warmup": 2,
+  "commands": [
+    {"name": "default", "argv": ["{pwsh}", "-NoProfile", "-NonInteractive", "-File", "{root}/bench/startup/inside.ps1"], "metrics": true},
+    {"name": "fresh HOME every run", "argv": ["{pwsh}", "-NoProfile", "-NonInteractive", "-File", "{root}/bench/startup/inside.ps1"], "metrics": true, "fresh_home": true},
+    {"name": "DOTNET_TieredPGO=0", "argv": ["{pwsh}", "-NoProfile", "-NonInteractive", "-File", "{root}/bench/startup/inside.ps1"], "metrics": true, "env": {"DOTNET_TieredPGO": "0"}},
+    {"name": "DOTNET_TieredCompilation=0", "argv": ["{pwsh}", "-NoProfile", "-NonInteractive", "-File", "{root}/bench/startup/inside.ps1"], "metrics": true, "env": {"DOTNET_TieredCompilation": "0"}},
+    {"name": "DOTNET_ReadyToRun=0", "argv": ["{pwsh}", "-NoProfile", "-NonInteractive", "-File", "{root}/bench/startup/inside.ps1"], "metrics": true, "env": {"DOTNET_ReadyToRun": "0"}}
+  ]
+}
