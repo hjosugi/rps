@@ -66,7 +66,10 @@ enum Value {
     Double(f64),
     /// Never created by these programs. It is here so that `Value` has drop
     /// glue and a clone has to check the tag, as rpsh's value will.
-    #[expect(dead_code, reason = "present for its effect on Value's layout and clone")]
+    #[expect(
+        dead_code,
+        reason = "present for its effect on Value's layout and clone"
+    )]
     Text(Rc<String>),
 }
 
@@ -620,9 +623,7 @@ impl Frame<'_> {
 
 mod by_slot {
     use super::resolve::{Read, Resolver};
-    use super::{
-        BinaryOp, Error, Expr, Frame, HashMap, Outcome, Program, Rc, Stmt, Value, ops,
-    };
+    use super::{BinaryOp, Error, Expr, Frame, HashMap, Outcome, Program, Rc, Stmt, Value, ops};
 
     #[derive(Debug)]
     enum RExpr {
@@ -1173,18 +1174,52 @@ mod register_vm {
 
     #[derive(Debug, Clone)]
     pub(super) enum Ins {
-        Constant { dst: u16, constant: u32 },
-        Name { dst: u16, name: u32 },
-        Move { dst: u16, src: u16 },
-        Binary { op: BinaryOp, dst: u16, left: u16, right: u16 },
-        Jump { target: u32 },
-        JumpUnless { condition: u16, target: u32 },
+        Constant {
+            dst: u16,
+            constant: u32,
+        },
+        Name {
+            dst: u16,
+            name: u32,
+        },
+        Move {
+            dst: u16,
+            src: u16,
+        },
+        Binary {
+            op: BinaryOp,
+            dst: u16,
+            left: u16,
+            right: u16,
+        },
+        Jump {
+            target: u32,
+        },
+        JumpUnless {
+            condition: u16,
+            target: u32,
+        },
         /// Arguments are in `args .. args + argc`.
-        Call { dst: u16, name: u32, args: u16, argc: u16 },
+        Call {
+            dst: u16,
+            name: u32,
+            args: u16,
+            argc: u16,
+        },
         /// `Call` with an inline cache: `cache` indexes `Code::call_caches`.
-        CallCached { dst: u16, name: u32, args: u16, argc: u16, cache: u32 },
-        Return { src: u16 },
-        Output { src: u16 },
+        CallCached {
+            dst: u16,
+            name: u32,
+            args: u16,
+            argc: u16,
+            cache: u32,
+        },
+        Return {
+            src: u16,
+        },
+        Output {
+            src: u16,
+        },
     }
 
     /// What a call site remembers: the function a name resolved to, valid
@@ -1694,7 +1729,11 @@ fn main() {
         let stack_ops: usize =
             stack.main.ops.len() + stack.functions.iter().map(|f| f.ops.len()).sum::<usize>();
         let register_ins: usize = registers.main.ins.len()
-            + registers.functions.iter().map(|f| f.ins.len()).sum::<usize>();
+            + registers
+                .functions
+                .iter()
+                .map(|f| f.ins.len())
+                .sum::<usize>();
         report.fact(&format!("{label}: AST nodes"), count_nodes(program));
         report.fact(&format!("{label}: stack-vm ops"), stack_ops);
         report.fact(&format!("{label}: register-vm instructions"), register_ins);
