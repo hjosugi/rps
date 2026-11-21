@@ -85,6 +85,8 @@ cargo harness inventory
 
 `gen-inventory.ps1` also writes `operators.tsv`, `keywords.tsv`,
 `error-ids.tsv` and `dynamic-parameters.tsv`, all from the reference pwsh.
+After it runs, regenerate the token-kind metadata with
+`scripts/gen-token-metadata.py`.
 It writes a `platform` column (`linux-x64`, `macos-arm64`, `windows-x64`,
 ...) and preserves the hand-edited `status` column. Running it on another
 platform keeps the rows already present for other platforms, so a difference
