@@ -69,14 +69,14 @@ The corpus is biased: it is the modules pwsh ships, so it over-represents
 scripts in the wild do. It still shows the shape of the shim:
 
 * `String` (382 uses), `String[]` (101) and the collection types carry most
-  uses and are #49 / #52. `Path` (26) is the only I/O type the corpus names
-  often; #51;
-* the corpus contains no `Math`, `Convert`, `Enum`, `Random`, `File`,
-  `Directory`, `StringBuilder` or `Encoding` literals. Those come from what
-  scripts in the wild do, not from pwsh's own modules, so their place in the
-  shim is an expectation for #18 to confirm, not a result of this scan;
-* `StringBuilder`, `Encoding` and the regex API are the next expected by
-  use, though the corpus has no literals for them; #50;
+  uses and are #49 / #52. `Path` (26) is the most frequent I/O type; `File`
+  (6), `Directory` (1) and the `FileMode`/`FileAccess`/`FileShare` family
+  follow; #51;
+* `Encoding` (1) and the regex API (`Text.RegularExpressions.Regex` 5,
+  `Regex` 2) appear, but `Math`, `Convert`, `Enum`, `Random` and
+  `StringBuilder` have no literals at all. Those come from what scripts in
+  the wild do, not from pwsh's own modules, so their place in the shim is an
+  expectation for #18 to confirm, not a result of this scan; #50;
 * `Net`, `Security`, `Threading`, `Diagnostics` and `Xml` are small in
   count but each is a whole shim area, #53;
 * the `System.Management.Automation` types scripts see (`PSCmdlet`,
@@ -124,7 +124,7 @@ What it says:
   pointer take 7.25 ms, or 7.3 ns each. `File.ReadAllText` is 2.0 ms the
   first time (JIT and framework initialization) and 120 µs the second.
 * **SMA is a second program.** Loading and running PowerShell in the same
-  runtime takes another 145 ms and reaches 82.2 MiB from 37.7 MiB, about
+  runtime takes another 145 ms and reaches 82.2 MiB from 36.8 MiB, about
   45 MiB more. The bridge must not reach for SMA to answer a
   `[System.IO.Path]` call.
 * **Two other initialization paths were rejected by the pinned runtime.**
