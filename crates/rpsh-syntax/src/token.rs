@@ -1,4 +1,4 @@
-use crate::Span;
+use crate::{NumberLiteral, Span};
 
 /// The kinds of token the skeleton recognizes.
 ///
@@ -6,8 +6,10 @@ use crate::Span;
 /// are added here as the tokenizer grows.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
-    /// A decimal literal that fits `System.Int32`.
+    /// A decimal, hex or binary literal that fits `System.Int32`.
     Int32(i32),
+    /// A numeric literal of another .NET type or format.
+    Numeric(NumberLiteral),
     /// A single-quoted string, with `''` already unescaped.
     StringLiteral(String),
     Plus,
@@ -16,6 +18,8 @@ pub enum TokenKind {
     LParen,
     RParen,
     Semi,
+    Dot,
+    Identifier(String),
     NewLine,
     /// The `exit` keyword.
     Exit,

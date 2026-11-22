@@ -135,11 +135,49 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Expr, ParseError> {
+        let mut expression = self.base_expression()?;
+        while self.peek().kind == TokenKind::Dot {
+            self.pos += 1;
+            let Token { kind, span } = self.peek().clone();
+            let TokenKind::Identifier(name) = kind else {
+                return self.refuse("member access, dot-sourcing and real literals");
+            };
+            self.pos += 1;
+            let mut span = expression.span.to(span);
+            let kind = if self.peek().kind == TokenKind::LParen {
+                let open = self.peek().span;
+                self.pos += 1;
+                if self.peek().kind != TokenKind::RParen {
+                    return self.refuse("method arguments");
+                }
+                span = span.to(self.peek().span);
+                self.pos += 1;
+                let _ = open;
+                ExprKind::InvokeMember {
+                    target: Box::new(expression),
+                    name,
+                }
+            } else {
+                ExprKind::Member {
+                    target: Box::new(expression),
+                    name,
+                }
+            };
+            expression = self.expr(kind, span)?;
+        }
+        Ok(expression)
+    }
+
+    fn base_expression(&mut self) -> Result<Expr, ParseError> {
         let Token { kind, span } = self.peek().clone();
         match kind {
             TokenKind::Int32(value) => {
                 self.pos += 1;
                 self.expr(ExprKind::Int32(value), span)
+            }
+            TokenKind::Numeric(value) => {
+                self.pos += 1;
+                self.expr(ExprKind::Number(value), span)
             }
             TokenKind::StringLiteral(value) => {
                 self.pos += 1;
@@ -161,6 +199,8 @@ impl Parser {
                     _ => self.refuse(SYNTAX_ERRORS),
                 }
             }
+            TokenKind::Identifier(_) => self.refuse("command invocation"),
+            TokenKind::Dot => self.refuse("member access, dot-sourcing and real literals"),
             _ => self.refuse(SYNTAX_ERRORS),
         }
     }
@@ -205,6 +245,7 @@ mod tests {
     fn show(expr: &Expr) -> String {
         match &expr.kind {
             ExprKind::Int32(value) => value.to_string(),
+            ExprKind::Number(value) => value.to_string(),
             ExprKind::String(value) => format!("'{value}'"),
             ExprKind::Unary { operand, .. } => format!("(-{})", show(operand)),
             ExprKind::Binary { op, left, right } => {
@@ -216,6 +257,8 @@ mod tests {
                 format!("({} {symbol} {})", show(left), show(right))
             }
             ExprKind::Paren(inner) => show(inner),
+            ExprKind::Member { target, name } => format!("{}.{}", show(target), name),
+            ExprKind::InvokeMember { target, name } => format!("{}.{}()", show(target), name),
         }
     }
 
@@ -246,8 +289,8 @@ mod tests {
 
     #[test]
     fn unary_minus_binds_tighter_than_binary_operators() {
-        assert_eq!(shown("-2 * 3"), ["((-2) * 3)"]);
-        assert_eq!(shown("1 - -1"), ["(1 - (-1))"]);
+        assert_eq!(shown("-2 * 3"), ["(-2 * 3)"]);
+        assert_eq!(shown("1 - -1"), ["(1 - -1)"]);
     }
 
     #[test]
@@ -259,7 +302,7 @@ mod tests {
     #[test]
     fn a_binary_operator_continues_onto_the_next_line() {
         assert_eq!(shown("1 +\n2"), ["(1 + 2)"]);
-        assert_eq!(shown("1\n-2"), ["1", "(-2)"]);
+        assert_eq!(shown("1\n-2"), ["1", "-2"]);
     }
 
     #[test]

@@ -4,7 +4,7 @@
 //! follow them so that the public `System.Management.Automation.Language` API
 //! can later be layered on top without renaming.
 
-use crate::Span;
+use crate::{NumberLiteral, Span};
 
 /// A parsed script. Upstream: `ScriptBlockAst`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +32,8 @@ pub struct Expr {
 pub enum ExprKind {
     /// Upstream: `ConstantExpressionAst` holding an `int`.
     Int32(i32),
+    /// Upstream: `ConstantExpressionAst` holding another numeric type.
+    Number(NumberLiteral),
     /// Upstream: `StringConstantExpressionAst` (single-quoted).
     String(String),
     /// Upstream: `UnaryExpressionAst`.
@@ -44,6 +46,10 @@ pub enum ExprKind {
     },
     /// Upstream: `ParenExpressionAst`.
     Paren(Box<Expr>),
+    /// Upstream: `MemberExpressionAst`.
+    Member { target: Box<Expr>, name: String },
+    /// Upstream: `InvokeMemberExpressionAst` with no arguments.
+    InvokeMember { target: Box<Expr>, name: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

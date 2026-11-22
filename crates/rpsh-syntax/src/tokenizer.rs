@@ -7,9 +7,7 @@
 //! harness reports. Parser issues replace the mapping as they land.
 
 use crate::full_token_kind::FullTokenKind;
-use crate::{ParseError, Span, Token, TokenKind, tokenize_full};
-
-const NUMERIC_FORMS: &str = "numeric literals other than decimal Int32";
+use crate::{ParseError, Span, Token, TokenKind, parse_number_literal, tokenize_full};
 
 /// Splits `source` into the tokens the walking-skeleton parser understands.
 /// The last token is always [`TokenKind::EndOfInput`].
@@ -21,9 +19,14 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
         let kind = match token.kind {
             FullTokenKind::Number => {
                 let text = span.text(source);
-                match text.parse::<i32>() {
-                    Ok(value) => TokenKind::Int32(value),
-                    Err(_) => return Err(ParseError::not_implemented(NUMERIC_FORMS, span)),
+                match parse_number_literal(text, span) {
+                    Some(Ok(literal)) => literal
+                        .is_int32()
+                        .map_or(TokenKind::Numeric(literal), TokenKind::Int32),
+                    Some(Err(error)) => return Err(error),
+                    None => {
+                        return Err(ParseError::not_implemented("unrecognized character", span));
+                    }
                 }
             }
             FullTokenKind::StringLiteral => {
@@ -55,6 +58,8 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::LParen => TokenKind::LParen,
             FullTokenKind::RParen => TokenKind::RParen,
             FullTokenKind::Semi => TokenKind::Semi,
+            FullTokenKind::Dot => TokenKind::Dot,
+            FullTokenKind::Identifier => TokenKind::Identifier(span.text(source).to_owned()),
             FullTokenKind::NewLine => TokenKind::NewLine,
             FullTokenKind::Exit => TokenKind::Exit,
             FullTokenKind::EndOfInput => TokenKind::EndOfInput,
@@ -243,13 +248,18 @@ mod tests {
             "dash-prefixed operators and parameters (-eq, -not, -Name)"
         );
         assert_eq!(refused("1..3"), "range operator");
-        assert_eq!(refused("2147483648"), NUMERIC_FORMS);
-        assert_eq!(refused("1kb"), NUMERIC_FORMS);
-        assert_eq!(refused("1.5"), NUMERIC_FORMS);
+        assert!(matches!(
+            kinds("2147483648")[0],
+            TokenKind::Numeric(crate::NumberLiteral::Int64(2147483648))
+        ));
         assert_eq!(
-            refused("'a'.Length"),
-            "member access, dot-sourcing and real literals"
+            kinds("1kb"),
+            vec![TokenKind::Int32(1024), TokenKind::EndOfInput]
         );
+        assert!(matches!(
+            kinds("1.5")[0],
+            TokenKind::Numeric(crate::NumberLiteral::Double(_))
+        ));
         assert_eq!(refused("<# c #>"), "block comments");
         assert_eq!(refused("#Requires -Version 7"), "#requires statements");
         assert_eq!(
@@ -265,7 +275,10 @@ mod tests {
 
     #[test]
     fn exit_is_a_keyword_only_as_a_whole_word() {
-        assert_eq!(refused("exits"), "command invocation");
+        assert_eq!(
+            crate::parse("exits").unwrap_err().feature(),
+            "command invocation"
+        );
         assert_eq!(refused("exit.exe"), "command invocation");
     }
 }

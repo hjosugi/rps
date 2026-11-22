@@ -16,7 +16,7 @@ use std::io::{self, Write};
 
 use rpsh_runtime::{RuntimeError, Value, ops};
 use rpsh_syntax::{
-    BinaryOp, Expr, ExprKind, ParseError, ScriptBlockAst, Statement, UnaryOp, parse,
+    BinaryOp, Expr, ExprKind, NumberLiteral, ParseError, ScriptBlockAst, Statement, UnaryOp, parse,
 };
 
 /// Runs scripts.
@@ -123,8 +123,19 @@ impl Engine {
 fn evaluate(expr: &Expr) -> Result<Value, RuntimeError> {
     match &expr.kind {
         ExprKind::Int32(value) => Ok(Value::Int32(*value)),
+        ExprKind::Number(value) => Ok(number_value(value)),
         ExprKind::String(value) => Ok(Value::String(value.clone())),
         ExprKind::Paren(inner) => evaluate(inner),
+        ExprKind::Member { target, name } => member(&evaluate(target)?, name),
+        ExprKind::InvokeMember { target, name } => {
+            if name == "GetType" {
+                Ok(Value::Type(evaluate(target)?.type_name().to_owned()))
+            } else {
+                Err(RuntimeError::NotImplemented {
+                    feature: "method invocation other than GetType()",
+                })
+            }
+        }
         ExprKind::Unary {
             op: UnaryOp::Negate,
             operand,
@@ -138,6 +149,35 @@ fn evaluate(expr: &Expr) -> Result<Value, RuntimeError> {
                 BinaryOp::Multiply => ops::multiply(&left, &right),
             }
         }
+    }
+}
+
+fn number_value(value: &NumberLiteral) -> Value {
+    match value {
+        NumberLiteral::Int32(value) => Value::Int32(*value),
+        NumberLiteral::Int64(value) => Value::Int64(*value),
+        NumberLiteral::UInt32(value) => Value::UInt32(*value),
+        NumberLiteral::UInt64(value) => Value::UInt64(*value),
+        NumberLiteral::Int16(value) => Value::Int16(*value),
+        NumberLiteral::UInt16(value) => Value::UInt16(*value),
+        NumberLiteral::Byte(value) => Value::Byte(*value),
+        NumberLiteral::SByte(value) => Value::SByte(*value),
+        NumberLiteral::Decimal(value) => Value::Decimal(value.clone()),
+        NumberLiteral::Double(value) => Value::Double(*value),
+        NumberLiteral::BigInteger(value) => Value::BigInteger(value.clone()),
+    }
+}
+
+fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
+    match (value, name) {
+        (_, "GetType") => Ok(Value::Type(value.type_name().to_owned())),
+        (Value::Type(full), "FullName") => Ok(Value::String(full.clone())),
+        (Value::Type(full), "Name") => Ok(Value::String(
+            full.rsplit('.').next().unwrap_or(full).to_owned(),
+        )),
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "member access other than GetType().FullName / .Name",
+        }),
     }
 }
 

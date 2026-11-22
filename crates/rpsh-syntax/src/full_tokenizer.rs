@@ -10,7 +10,7 @@
 //! differential harness can report them without losing the rest.
 
 use crate::full_token_kind::{FullTokenKind, KEYWORDS, OPERATORS, TokenFlags};
-use crate::{ParseError, Span};
+use crate::{ParseError, Span, parse_number_literal};
 
 /// One token of the full tokenizer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -474,22 +474,43 @@ impl Tokenizer<'_> {
 
     fn number(&mut self) -> Result<bool, ParseError> {
         let start = self.pos;
-        let Some(ch) = self.char() else {
+        let Some(mut ch) = self.char() else {
             return Ok(false);
         };
-        if !ch.is_ascii_digit()
-            && !(ch == '.' && self.peek_char(1).is_some_and(|c| c.is_ascii_digit()))
+        if ch == '-'
+            && self.peek_char(1).is_some_and(|next| next.is_ascii_digit())
+            && (self.mode == Mode::Expression || !self.command_seen)
         {
+            self.pos += 1;
+            let Some(next) = self.char() else {
+                self.pos = start;
+                return Ok(false);
+            };
+            ch = next;
+        }
+        let radix = if self.source[self.pos..].starts_with("0x")
+            || self.source[self.pos..].starts_with("0X")
+        {
+            16
+        } else if self.source[self.pos..].starts_with("0b")
+            || self.source[self.pos..].starts_with("0B")
+        {
+            2
+        } else {
+            10
+        };
+        if ch == '.' && self.peek_char(1).is_some_and(|c| c.is_ascii_digit()) {
+            self.pos += 1;
+        } else if !ch.is_ascii_digit() {
+            self.pos = start;
             return Ok(false);
         }
-        if ch == '.' {
-            self.pos += 1;
-        } else if ch == '0' && matches!(self.peek_char(1), Some('x' | 'X' | 'b' | 'B')) {
+        if radix != 10 {
             self.pos += 2;
-            while self
-                .char()
-                .is_some_and(|c| c.is_ascii_hexdigit() || c == '_')
-            {
+            while self.char().is_some_and(|c| match radix {
+                16 => c.is_ascii_hexdigit() || c == '_',
+                _ => matches!(c, '0' | '1' | '_'),
+            }) {
                 self.pos += 1;
             }
         } else {
@@ -502,40 +523,43 @@ impl Tokenizer<'_> {
                     self.pos += 1;
                 }
             }
-        }
-        if matches!(self.char(), Some('e' | 'E')) {
-            let save = self.pos;
-            self.pos += 1;
-            if matches!(self.char(), Some('+' | '-')) {
+            if matches!(self.char(), Some('e' | 'E')) {
+                let save = self.pos;
                 self.pos += 1;
-            }
-            if self.char().is_some_and(|c| c.is_ascii_digit()) {
-                while self.char().is_some_and(|c| c.is_ascii_digit()) {
+                if matches!(self.char(), Some('+' | '-')) {
                     self.pos += 1;
                 }
-            } else {
-                self.pos = save;
+                if self.char().is_some_and(|c| c.is_ascii_digit()) {
+                    while self.char().is_some_and(|c| c.is_ascii_digit()) {
+                        self.pos += 1;
+                    }
+                } else {
+                    self.pos = save;
+                }
             }
         }
-        if let Some('l' | 'L' | 'd' | 'D') = self.char() {
+        while self.char().is_some_and(|c| c.is_ascii_alphabetic()) {
             self.pos += 1;
         }
-        for suffix in ["kb", "mb", "gb", "tb", "pb"] {
-            if self
-                .source
-                .get(self.pos..self.pos + 2)
-                .is_some_and(|text| text.eq_ignore_ascii_case(suffix))
-            {
-                self.pos += 2;
-                break;
+        let text = &self.source[start..self.pos];
+        match parse_number_literal(text, Span::new(start, self.pos)) {
+            Some(Ok(_)) => {
+                self.push(FullTokenKind::Number, start, self.pos);
+                if self.mode == Mode::Command {
+                    self.mode = Mode::Expression;
+                }
+                self.statement_start = false;
+                Ok(true)
+            }
+            Some(Err(error)) => {
+                self.pos = start;
+                Err(error)
+            }
+            None => {
+                self.pos = start;
+                Ok(false)
             }
         }
-        self.push(FullTokenKind::Number, start, self.pos);
-        if self.mode == Mode::Command {
-            self.mode = Mode::Expression;
-        }
-        self.statement_start = false;
-        Ok(true)
     }
 
     fn string(&mut self) -> Result<bool, ParseError> {
