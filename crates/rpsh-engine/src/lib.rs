@@ -210,6 +210,8 @@ fn evaluate(
                 BinaryOp::Add => ops::add(&left, &right),
                 BinaryOp::Subtract => ops::subtract(&left, &right),
                 BinaryOp::Multiply => ops::multiply(&left, &right),
+                BinaryOp::Divide => ops::divide(&left, &right),
+                BinaryOp::Remainder => ops::remainder(&left, &right),
             }
         }
     }

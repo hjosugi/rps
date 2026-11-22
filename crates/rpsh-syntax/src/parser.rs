@@ -121,13 +121,18 @@ impl Parser {
 
     fn multiplicative(&mut self) -> Result<Expr, ParseError> {
         let mut left = self.unary()?;
-        while self.peek().kind == TokenKind::Multiply {
+        loop {
+            let op = match self.peek().kind {
+                TokenKind::Multiply => BinaryOp::Multiply,
+                TokenKind::Divide => BinaryOp::Divide,
+                TokenKind::Remainder => BinaryOp::Remainder,
+                _ => return Ok(left),
+            };
             self.pos += 1;
             self.skip_newlines();
             let right = self.unary()?;
-            left = self.binary(BinaryOp::Multiply, left, right)?;
+            left = self.binary(op, left, right)?;
         }
-        Ok(left)
     }
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
@@ -526,6 +531,8 @@ mod tests {
                     BinaryOp::Add => '+',
                     BinaryOp::Subtract => '-',
                     BinaryOp::Multiply => '*',
+                    BinaryOp::Divide => '/',
+                    BinaryOp::Remainder => '%',
                 };
                 format!("({} {symbol} {})", show(left), show(right))
             }

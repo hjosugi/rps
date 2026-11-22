@@ -100,7 +100,7 @@ impl fmt::Display for Value {
             Value::Decimal(value) | Value::BigInteger(value) | Value::Type(value) => {
                 f.write_str(value)
             }
-            Value::Double(value) => write!(f, "{value}"),
+            Value::Double(value) => f.write_str(&format_double(*value)),
             Value::Object(entries) => {
                 f.write_str("@{")?;
                 for (index, (name, value)) in entries.iter().enumerate() {
@@ -114,6 +114,25 @@ impl fmt::Display for Value {
             Value::String(value) => f.write_str(value),
         }
     }
+}
+
+fn format_double(value: f64) -> String {
+    if value == 0.0 {
+        return "0".to_owned();
+    }
+    if !value.is_finite() {
+        return value.to_string();
+    }
+    let mut text = format!("{value:.15}");
+    if let Some(dot) = text.find('.') {
+        while text.ends_with('0') {
+            text.pop();
+        }
+        if text.len() == dot + 1 {
+            text.pop();
+        }
+    }
+    text
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

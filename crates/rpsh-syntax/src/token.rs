@@ -15,6 +15,8 @@ pub enum TokenKind {
     Plus,
     Minus,
     Multiply,
+    Divide,
+    Remainder,
     LParen,
     RParen,
     Semi,

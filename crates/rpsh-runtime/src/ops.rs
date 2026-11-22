@@ -49,6 +49,31 @@ pub fn multiply(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
     }
 }
 
+/// Binary `/`: an exact Int32 division stays Int32, otherwise the result is
+/// the Double `a / b`, as upstream does.
+pub fn divide(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Value::Int32(_), Value::Int32(0)) => refuse("divide by zero"),
+        (Value::Int32(a), Value::Int32(b)) => {
+            if a % b == 0 {
+                Ok(Value::Int32(a / b))
+            } else {
+                Ok(Value::Double(f64::from(*a) / f64::from(*b)))
+            }
+        }
+        _ => refuse(MIXED_OPERANDS),
+    }
+}
+
+/// Binary `%`: the sign follows the dividend, as in C#.
+pub fn remainder(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Value::Int32(_), Value::Int32(0)) => refuse("divide by zero"),
+        (Value::Int32(a), Value::Int32(b)) => Ok(Value::Int32(a % b)),
+        _ => refuse(MIXED_OPERANDS),
+    }
+}
+
 /// Unary `-`.
 pub fn negate(operand: &Value) -> Result<Value, RuntimeError> {
     match operand {
@@ -78,6 +103,10 @@ mod tests {
         assert_eq!(subtract(&int(2), &int(3)), Ok(int(-1)));
         assert_eq!(multiply(&int(-4), &int(3)), Ok(int(-12)));
         assert_eq!(negate(&int(7)), Ok(int(-7)));
+        assert_eq!(divide(&int(6), &int(2)), Ok(int(3)));
+        assert_eq!(divide(&int(7), &int(2)), Ok(Value::Double(3.5)));
+        assert_eq!(remainder(&int(7), &int(3)), Ok(int(1)));
+        assert_eq!(remainder(&int(-7), &int(3)), Ok(int(-1)));
     }
 
     #[test]
