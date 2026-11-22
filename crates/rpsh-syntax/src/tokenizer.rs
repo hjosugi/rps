@@ -58,7 +58,12 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::Equals => TokenKind::Equals,
             FullTokenKind::LBracket => TokenKind::LBracket,
             FullTokenKind::RBracket => TokenKind::RBracket,
+            FullTokenKind::AtParen => TokenKind::AtParen,
             FullTokenKind::AtCurly => TokenKind::AtCurly,
+            FullTokenKind::Comma => TokenKind::Comma,
+            FullTokenKind::DotDot => TokenKind::DotDot,
+            FullTokenKind::PlusEquals => TokenKind::PlusEquals,
+            FullTokenKind::Join => TokenKind::Join,
             FullTokenKind::RCurly => TokenKind::RCurly,
             FullTokenKind::DollarParen => TokenKind::DollarParen,
             FullTokenKind::Variable => {
@@ -284,7 +289,15 @@ mod tests {
             refused("1 -eq 1"),
             "dash-prefixed operators and parameters (-eq, -not, -Name)"
         );
-        assert_eq!(refused("1..3"), "range operator");
+        assert_eq!(
+            kinds("1..3"),
+            vec![
+                TokenKind::Int32(1),
+                TokenKind::DotDot,
+                TokenKind::Int32(3),
+                TokenKind::EndOfInput
+            ]
+        );
         assert!(matches!(
             kinds("2147483648")[0],
             TokenKind::Numeric(crate::NumberLiteral::Int64(2147483648))

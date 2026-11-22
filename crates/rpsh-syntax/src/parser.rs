@@ -70,23 +70,26 @@ impl Parser {
 
     fn statement(&mut self) -> Result<Statement, ParseError> {
         if let TokenKind::Variable(name) = &self.peek().kind
-            && self
-                .tokens
-                .get(self.pos + 1)
-                .is_some_and(|token| token.kind == TokenKind::Equals)
+            && let Some(next) = self.tokens.get(self.pos + 1)
+            && matches!(next.kind, TokenKind::Equals | TokenKind::PlusEquals)
         {
+            let append = next.kind == TokenKind::PlusEquals;
             let name = name.clone();
             let start = self.peek().span;
             self.pos += 2;
-            let value = self.additive()?;
+            let value = self.expression()?;
             let span = start.to(value.span);
             if !self.at_statement_end() {
                 return self.refuse(SYNTAX_ERRORS);
             }
-            return Ok(Statement::Assign { name, value, span });
+            return Ok(if append {
+                Statement::AppendAssign { name, value, span }
+            } else {
+                Statement::Assign { name, value, span }
+            });
         }
         if self.peek().kind != TokenKind::Exit {
-            return Ok(Statement::Expression(self.additive()?));
+            return Ok(Statement::Expression(self.expression()?));
         }
         let exit = self.peek().span;
         self.pos += 1;
@@ -96,12 +99,38 @@ impl Parser {
                 span: exit,
             });
         }
-        let code = self.additive()?;
+        let code = self.expression()?;
         let span = exit.to(code.span);
         Ok(Statement::Exit {
             code: Some(code),
             span,
         })
+    }
+
+    fn expression(&mut self) -> Result<Expr, ParseError> {
+        self.join()
+    }
+
+    fn join(&mut self) -> Result<Expr, ParseError> {
+        let mut left = self.range()?;
+        while self.peek().kind == TokenKind::Join {
+            self.pos += 1;
+            self.skip_newlines();
+            let right = self.range()?;
+            left = self.binary(BinaryOp::Join, left, right)?;
+        }
+        Ok(left)
+    }
+
+    fn range(&mut self) -> Result<Expr, ParseError> {
+        let mut left = self.additive()?;
+        while self.peek().kind == TokenKind::DotDot {
+            self.pos += 1;
+            self.skip_newlines();
+            let right = self.additive()?;
+            left = self.binary(BinaryOp::Range, left, right)?;
+        }
+        Ok(left)
     }
 
     fn additive(&mut self) -> Result<Expr, ParseError> {
@@ -120,7 +149,7 @@ impl Parser {
     }
 
     fn multiplicative(&mut self) -> Result<Expr, ParseError> {
-        let mut left = self.unary()?;
+        let mut left = self.comma()?;
         loop {
             let op = match self.peek().kind {
                 TokenKind::Multiply => BinaryOp::Multiply,
@@ -130,13 +159,49 @@ impl Parser {
             };
             self.pos += 1;
             self.skip_newlines();
-            let right = self.unary()?;
+            let right = self.comma()?;
             left = self.binary(op, left, right)?;
         }
     }
 
+    fn comma(&mut self) -> Result<Expr, ParseError> {
+        let first = self.unary()?;
+        if self.peek().kind != TokenKind::Comma {
+            return Ok(first);
+        }
+        let span = first.span;
+        let mut items = vec![first];
+        while self.peek().kind == TokenKind::Comma {
+            self.pos += 1;
+            self.skip_newlines();
+            items.push(self.unary()?);
+        }
+        let span = span.to(items.last().map_or(span, |expr| expr.span));
+        self.expr(ExprKind::Array(items), span)
+    }
+
     fn unary(&mut self) -> Result<Expr, ParseError> {
         match self.peek().kind {
+            TokenKind::Comma => {
+                let span = self.peek().span;
+                self.pos += 1;
+                let item = self.unary()?;
+                let span = span.to(item.span);
+                self.expr(ExprKind::Array(vec![item]), span)
+            }
+            TokenKind::Join => {
+                let span = self.peek().span;
+                self.pos += 1;
+                let operand = self.unary()?;
+                let span = span.to(operand.span);
+                self.expr(
+                    ExprKind::Unary {
+                        op: UnaryOp::Join,
+                        operand: Box::new(operand),
+                    },
+                    span,
+                )
+            }
             TokenKind::Minus => {
                 let minus = self.peek().span;
                 self.pos += 1;
@@ -157,36 +222,55 @@ impl Parser {
 
     fn primary(&mut self) -> Result<Expr, ParseError> {
         let mut expression = self.base_expression()?;
-        while self.peek().kind == TokenKind::Dot {
-            self.pos += 1;
-            let Token { kind, span } = self.peek().clone();
-            let TokenKind::Identifier(name) = kind else {
-                return self.refuse("member access, dot-sourcing and real literals");
-            };
-            self.pos += 1;
-            let mut span = expression.span.to(span);
-            let kind = if self.peek().kind == TokenKind::LParen {
-                let open = self.peek().span;
-                self.pos += 1;
-                if self.peek().kind != TokenKind::RParen {
-                    return self.refuse("method arguments");
+        loop {
+            match self.peek().kind {
+                TokenKind::Dot => {
+                    self.pos += 1;
+                    let Token { kind, span } = self.peek().clone();
+                    let TokenKind::Identifier(name) = kind else {
+                        return self.refuse("member access, dot-sourcing and real literals");
+                    };
+                    self.pos += 1;
+                    let mut span = expression.span.to(span);
+                    let kind = if self.peek().kind == TokenKind::LParen {
+                        self.pos += 1;
+                        if self.peek().kind != TokenKind::RParen {
+                            return self.refuse("method arguments");
+                        }
+                        span = span.to(self.peek().span);
+                        self.pos += 1;
+                        ExprKind::InvokeMember {
+                            target: Box::new(expression),
+                            name,
+                        }
+                    } else {
+                        ExprKind::Member {
+                            target: Box::new(expression),
+                            name,
+                        }
+                    };
+                    expression = self.expr(kind, span)?;
                 }
-                span = span.to(self.peek().span);
-                self.pos += 1;
-                let _ = open;
-                ExprKind::InvokeMember {
-                    target: Box::new(expression),
-                    name,
+                TokenKind::LBracket => {
+                    self.pos += 1;
+                    let index = self.expression()?;
+                    let close = match self.peek().kind {
+                        TokenKind::RBracket => self.peek().span,
+                        _ => return self.refuse(SYNTAX_ERRORS),
+                    };
+                    self.pos += 1;
+                    let span = expression.span.to(close);
+                    expression = self.expr(
+                        ExprKind::Index {
+                            target: Box::new(expression),
+                            index: Box::new(index),
+                        },
+                        span,
+                    )?;
                 }
-            } else {
-                ExprKind::Member {
-                    target: Box::new(expression),
-                    name,
-                }
-            };
-            expression = self.expr(kind, span)?;
+                _ => return Ok(expression),
+            }
         }
-        Ok(expression)
     }
 
     fn base_expression(&mut self) -> Result<Expr, ParseError> {
@@ -219,9 +303,29 @@ impl Parser {
                 };
                 self.expr(ExprKind::ExpandableString(parts), span)
             }
+            TokenKind::AtParen => {
+                self.pos += 1;
+                if self.peek().kind == TokenKind::RParen {
+                    let close = self.peek().span;
+                    self.pos += 1;
+                    self.expr(ExprKind::Array(Vec::new()), span.to(close))
+                } else {
+                    let inner = self.expression()?;
+                    let close = match self.peek().kind {
+                        TokenKind::RParen => self.peek().span,
+                        _ => return self.refuse(SYNTAX_ERRORS),
+                    };
+                    self.pos += 1;
+                    let items = match inner.kind {
+                        ExprKind::Array(items) => items,
+                        _ => vec![inner],
+                    };
+                    self.expr(ExprKind::Array(items), span.to(close))
+                }
+            }
             TokenKind::DollarParen => {
                 self.pos += 1;
-                let inner = self.additive()?;
+                let inner = self.expression()?;
                 let close = match self.peek().kind {
                     TokenKind::RParen => self.peek().span,
                     _ => return self.refuse(SYNTAX_ERRORS),
@@ -280,7 +384,7 @@ impl Parser {
                         return self.refuse(SYNTAX_ERRORS);
                     }
                     self.pos += 1;
-                    let value = self.additive()?;
+                    let value = self.expression()?;
                     let _ = key_span;
                     entries.push((key, value));
                     while matches!(self.peek().kind, TokenKind::NewLine) {
@@ -302,7 +406,7 @@ impl Parser {
                 if self.peek().kind == TokenKind::NewLine {
                     return self.refuse("newlines inside parentheses");
                 }
-                let inner = self.additive()?;
+                let inner = self.expression()?;
                 match self.peek().kind {
                     TokenKind::RParen => {
                         let close = self.peek().span;
@@ -525,14 +629,19 @@ mod tests {
             ExprKind::Int32(value) => value.to_string(),
             ExprKind::Number(value) => value.to_string(),
             ExprKind::String(value) => format!("'{value}'"),
-            ExprKind::Unary { operand, .. } => format!("(-{})", show(operand)),
+            ExprKind::Unary { op, operand } => match op {
+                UnaryOp::Negate => format!("(-{})", show(operand)),
+                UnaryOp::Join => format!("(-join {})", show(operand)),
+            },
             ExprKind::Binary { op, left, right } => {
                 let symbol = match op {
-                    BinaryOp::Add => '+',
-                    BinaryOp::Subtract => '-',
-                    BinaryOp::Multiply => '*',
-                    BinaryOp::Divide => '/',
-                    BinaryOp::Remainder => '%',
+                    BinaryOp::Add => "+",
+                    BinaryOp::Subtract => "-",
+                    BinaryOp::Multiply => "*",
+                    BinaryOp::Divide => "/",
+                    BinaryOp::Remainder => "%",
+                    BinaryOp::Range => "..",
+                    BinaryOp::Join => "-join",
                 };
                 format!("({} {symbol} {})", show(left), show(right))
             }
@@ -550,6 +659,10 @@ mod tests {
                     .collect::<String>()
             ),
             ExprKind::Subexpression(expr) => format!("$({})", show(expr)),
+            ExprKind::Array(items) => {
+                format!("[{}]", items.iter().map(show).collect::<Vec<_>>().join(","))
+            }
+            ExprKind::Index { target, index } => format!("{}[{}]", show(target), show(index)),
             ExprKind::Object(entries) => format!(
                 "@{{{}}}",
                 entries
@@ -572,6 +685,9 @@ mod tests {
             .map(|statement| match statement {
                 Statement::Expression(expr) => show(expr),
                 Statement::Assign { name, value, .. } => format!("${name} = {}", show(value)),
+                Statement::AppendAssign { name, value, .. } => {
+                    format!("${name} += {}", show(value))
+                }
                 Statement::Exit { code: None, .. } => "exit".to_owned(),
                 Statement::Exit {
                     code: Some(code), ..
@@ -622,7 +738,10 @@ mod tests {
         assert_eq!(refused("1 +"), SYNTAX_ERRORS);
         assert_eq!(refused("+1"), "unary plus");
         assert_eq!(refused("(1\n)"), "newlines inside parentheses");
-        assert_eq!(refused("$x += 1"), "assignment");
+        assert_eq!(
+            refused("if (1) { 2 }"),
+            "statement keywords (if, foreach, function, ...)"
+        );
     }
 
     #[test]

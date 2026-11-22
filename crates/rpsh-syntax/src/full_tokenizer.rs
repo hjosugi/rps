@@ -360,7 +360,11 @@ impl Tokenizer<'_> {
                 self.command_seen = false;
                 self.statement_start = true;
             }
-            FullTokenKind::LParen | FullTokenKind::LBracket | FullTokenKind::DollarParen => {
+            FullTokenKind::LParen
+            | FullTokenKind::LBracket
+            | FullTokenKind::DollarParen
+            | FullTokenKind::AtParen
+            | FullTokenKind::AtCurly => {
                 self.mode = Mode::Expression;
                 self.statement_start = false;
             }

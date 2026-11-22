@@ -74,6 +74,49 @@ pub fn remainder(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
     }
 }
 
+/// The range operator `a..b`.
+pub fn range(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Value::Int32(a), Value::Int32(b)) => {
+            let mut values = Vec::new();
+            if a <= b {
+                for value in *a..=*b {
+                    values.push(Value::Int32(value));
+                }
+            } else {
+                for value in (*b..=*a).rev() {
+                    values.push(Value::Int32(value));
+                }
+            }
+            Ok(Value::Array(values))
+        }
+        _ => refuse("range on non-Int32 operands"),
+    }
+}
+
+/// Binary and unary `-join`.
+pub fn join(left: &Value, separator: &Value) -> Result<Value, RuntimeError> {
+    let separator = match separator {
+        Value::String(text) => text.as_str(),
+        Value::Int32(value) => return join(left, &Value::String(value.to_string())),
+        _ => return refuse("join separator other than a string"),
+    };
+    let text = match left {
+        Value::Array(items) => items
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(separator),
+        other => other.to_string(),
+    };
+    Ok(Value::String(text))
+}
+
+/// Unary `-join`: join an array with no separator.
+pub fn unary_join(operand: &Value) -> Result<Value, RuntimeError> {
+    join(operand, &Value::String(String::new()))
+}
+
 /// Unary `-`.
 pub fn negate(operand: &Value) -> Result<Value, RuntimeError> {
     match operand {

@@ -24,6 +24,12 @@ pub enum Statement {
         value: Expr,
         span: Span,
     },
+    /// `$name += expression`.
+    AppendAssign {
+        name: String,
+        value: Expr,
+        span: Span,
+    },
     /// `exit` with an optional exit code. Upstream: `ExitStatementAst`.
     Exit { code: Option<Expr>, span: Span },
 }
@@ -58,6 +64,10 @@ pub enum ExprKind {
     ExpandableString(Vec<StringPart>),
     /// Upstream: `SubExpressionAst`.
     Subexpression(Box<Expr>),
+    /// Upstream: `ArrayLiteralAst`.
+    Array(Vec<Expr>),
+    /// Upstream: `IndexExpressionAst`.
+    Index { target: Box<Expr>, index: Box<Expr> },
     /// Upstream: `HashtableAst` (and the value of `[pscustomobject]`).
     Object(Vec<(String, Expr)>),
     /// Upstream: `ConvertExpressionAst` for the supported `[pscustomobject]`.
@@ -78,6 +88,7 @@ pub enum StringPart {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
     Negate,
+    Join,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,4 +98,6 @@ pub enum BinaryOp {
     Multiply,
     Divide,
     Remainder,
+    Range,
+    Join,
 }

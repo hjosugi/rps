@@ -102,9 +102,24 @@ impl Engine {
             match statement {
                 Statement::Expression(expr) => {
                     let value = evaluate(expr, &self.variables, self.last_success)?;
-                    if !matches!(value, Value::Null) {
-                        writeln!(out, "{value}")?;
+                    match value {
+                        Value::Array(items) => {
+                            for item in items {
+                                if !matches!(item, Value::Null) {
+                                    writeln!(out, "{item}")?;
+                                }
+                            }
+                        }
+                        Value::Null => {}
+                        value => writeln!(out, "{value}")?,
                     }
+                    self.last_success = true;
+                }
+                Statement::AppendAssign { name, value, .. } => {
+                    let value = evaluate(value, &self.variables, self.last_success)?;
+                    let key = strip_scope(name);
+                    let updated = append(self.variables.get(key), value)?;
+                    self.variables.insert(key.to_owned(), updated);
                     self.last_success = true;
                 }
                 Statement::Assign { name, value, .. } => {
@@ -166,6 +181,18 @@ fn evaluate(
             Ok(Value::String(text))
         }
         ExprKind::Subexpression(expr) => evaluate(expr, variables, last_success),
+        ExprKind::Array(items) => {
+            let mut values = Vec::with_capacity(items.len());
+            for item in items {
+                values.push(evaluate(item, variables, last_success)?);
+            }
+            Ok(Value::Array(values))
+        }
+        ExprKind::Index { target, index } => {
+            let target = evaluate(target, variables, last_success)?;
+            let index = evaluate(index, variables, last_success)?;
+            index_value(&target, &index)
+        }
         ExprKind::Object(entries) => {
             let mut object = Vec::with_capacity(entries.len());
             for (name, value) in entries {
@@ -203,6 +230,10 @@ fn evaluate(
             op: UnaryOp::Negate,
             operand,
         } => ops::negate(&evaluate(operand, variables, last_success)?),
+        ExprKind::Unary {
+            op: UnaryOp::Join,
+            operand,
+        } => ops::unary_join(&evaluate(operand, variables, last_success)?),
         ExprKind::Binary { op, left, right } => {
             let left = evaluate(left, variables, last_success)?;
             let right = evaluate(right, variables, last_success)?;
@@ -212,8 +243,69 @@ fn evaluate(
                 BinaryOp::Multiply => ops::multiply(&left, &right),
                 BinaryOp::Divide => ops::divide(&left, &right),
                 BinaryOp::Remainder => ops::remainder(&left, &right),
+                BinaryOp::Range => ops::range(&left, &right),
+                BinaryOp::Join => ops::join(&left, &right),
             }
         }
+    }
+}
+
+fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
+    let Value::Array(items) = target else {
+        return Err(RuntimeError::NotImplemented {
+            feature: "indexing other than arrays",
+        });
+    };
+    match index {
+        Value::Int32(at) => {
+            let at = if *at < 0 {
+                items.len() as i32 + *at
+            } else {
+                *at
+            };
+            usize::try_from(at)
+                .ok()
+                .and_then(|at| items.get(at).cloned())
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "index out of range",
+                })
+        }
+        Value::Array(indices) => {
+            let mut values = Vec::new();
+            for index in indices {
+                values.push(index_value(target, index)?);
+            }
+            Ok(Value::Array(values))
+        }
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "index of this type",
+        }),
+    }
+}
+
+fn append(old: Option<&Value>, value: Value) -> Result<Value, RuntimeError> {
+    match (old, value) {
+        (None, value) => Ok(Value::Array(vec![value])),
+        (Some(Value::Array(items)), Value::Array(mut more)) => {
+            let mut items = items.clone();
+            items.append(&mut more);
+            Ok(Value::Array(items))
+        }
+        (Some(Value::Array(items)), value) => {
+            let mut items = items.clone();
+            items.push(value);
+            Ok(Value::Array(items))
+        }
+        (Some(Value::Int32(a)), Value::Int32(b)) => a.checked_add(b).map_or(
+            Err(RuntimeError::NotImplemented {
+                feature: "Int32 overflow (promotion to Double)",
+            }),
+            |value| Ok(Value::Int32(value)),
+        ),
+        (Some(Value::String(a)), Value::String(b)) => Ok(Value::String(format!("{a}{b}"))),
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "compound assignment on these values",
+        }),
     }
 }
 
@@ -268,6 +360,7 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
         (Value::Type(full), "Name") => Ok(Value::String(
             full.rsplit('.').next().unwrap_or(full).to_owned(),
         )),
+        (Value::Array(items), "Count" | "Length") => Ok(Value::Int32(items.len() as i32)),
         (Value::Object(entries), name) => entries
             .iter()
             .find(|(key, _)| key.eq_ignore_ascii_case(name))
