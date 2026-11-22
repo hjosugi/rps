@@ -24,6 +24,7 @@ use rpsh_syntax::{
 #[derive(Debug, Default)]
 pub struct Engine {
     variables: HashMap<String, Value>,
+    last_success: bool,
 }
 
 #[derive(Debug)]
@@ -100,18 +101,23 @@ impl Engine {
         for statement in &script.statements {
             match statement {
                 Statement::Expression(expr) => {
-                    let value = evaluate(expr, &self.variables)?;
-                    writeln!(out, "{value}")?;
+                    let value = evaluate(expr, &self.variables, self.last_success)?;
+                    if !matches!(value, Value::Null) {
+                        writeln!(out, "{value}")?;
+                    }
+                    self.last_success = true;
                 }
                 Statement::Assign { name, value, .. } => {
-                    let value = evaluate(value, &self.variables)?;
-                    self.variables.insert(name.clone(), value);
+                    let value = evaluate(value, &self.variables, self.last_success)?;
+                    let key = strip_scope(name);
+                    self.variables.insert(key.to_owned(), value);
+                    self.last_success = true;
                 }
                 Statement::Exit { code: None, .. } => return Ok(0),
                 Statement::Exit {
                     code: Some(code), ..
                 } => {
-                    return match evaluate(code, &self.variables)? {
+                    return match evaluate(code, &self.variables, self.last_success)? {
                         Value::Int32(code) => Ok(code),
                         _ => Err(RuntimeError::NotImplemented {
                             feature: "exit with a value other than Int32",
@@ -125,19 +131,20 @@ impl Engine {
     }
 }
 
-fn evaluate(expr: &Expr, variables: &HashMap<String, Value>) -> Result<Value, RuntimeError> {
+fn evaluate(
+    expr: &Expr,
+    variables: &HashMap<String, Value>,
+    last_success: bool,
+) -> Result<Value, RuntimeError> {
     match &expr.kind {
         ExprKind::Int32(value) => Ok(Value::Int32(*value)),
         ExprKind::Number(value) => Ok(number_value(value)),
         ExprKind::String(value) => Ok(Value::String(value.clone())),
-        ExprKind::Paren(inner) => evaluate(inner, variables),
+        ExprKind::Paren(inner) => evaluate(inner, variables, last_success),
         ExprKind::Variable(name) => {
-            variables
-                .get(name)
-                .cloned()
-                .ok_or(RuntimeError::NotImplemented {
-                    feature: "undefined variable",
-                })
+            lookup(name, variables, last_success).ok_or(RuntimeError::NotImplemented {
+                feature: "undefined variable",
+            })
         }
         ExprKind::ExpandableString(parts) => {
             let mut text = String::new();
@@ -145,29 +152,29 @@ fn evaluate(expr: &Expr, variables: &HashMap<String, Value>) -> Result<Value, Ru
                 match part {
                     rpsh_syntax::StringPart::Literal(value) => text.push_str(value),
                     rpsh_syntax::StringPart::Variable(name) => {
-                        if let Some(value) = variables.get(name) {
+                        if let Some(value) = lookup(name, variables, last_success) {
                             use std::fmt::Write as _;
                             let _ = write!(text, "{value}");
                         }
                     }
                     rpsh_syntax::StringPart::Subexpression(expr) => {
                         use std::fmt::Write as _;
-                        let _ = write!(text, "{}", evaluate(expr, variables)?);
+                        let _ = write!(text, "{}", evaluate(expr, variables, last_success)?);
                     }
                 }
             }
             Ok(Value::String(text))
         }
-        ExprKind::Subexpression(expr) => evaluate(expr, variables),
+        ExprKind::Subexpression(expr) => evaluate(expr, variables, last_success),
         ExprKind::Object(entries) => {
             let mut object = Vec::with_capacity(entries.len());
             for (name, value) in entries {
-                object.push((name.clone(), evaluate(value, variables)?));
+                object.push((name.clone(), evaluate(value, variables, last_success)?));
             }
             Ok(Value::Object(object))
         }
         ExprKind::Cast { type_name, value } => {
-            let value = evaluate(value, variables)?;
+            let value = evaluate(value, variables, last_success)?;
             if type_name.eq_ignore_ascii_case("pscustomobject") {
                 Ok(value)
             } else {
@@ -176,11 +183,15 @@ fn evaluate(expr: &Expr, variables: &HashMap<String, Value>) -> Result<Value, Ru
                 })
             }
         }
-        ExprKind::Member { target, name } => member(&evaluate(target, variables)?, name),
+        ExprKind::Member { target, name } => {
+            member(&evaluate(target, variables, last_success)?, name)
+        }
         ExprKind::InvokeMember { target, name } => {
             if name == "GetType" {
                 Ok(Value::Type(
-                    evaluate(target, variables)?.type_name().to_owned(),
+                    evaluate(target, variables, last_success)?
+                        .type_name()
+                        .to_owned(),
                 ))
             } else {
                 Err(RuntimeError::NotImplemented {
@@ -191,10 +202,10 @@ fn evaluate(expr: &Expr, variables: &HashMap<String, Value>) -> Result<Value, Ru
         ExprKind::Unary {
             op: UnaryOp::Negate,
             operand,
-        } => ops::negate(&evaluate(operand, variables)?),
+        } => ops::negate(&evaluate(operand, variables, last_success)?),
         ExprKind::Binary { op, left, right } => {
-            let left = evaluate(left, variables)?;
-            let right = evaluate(right, variables)?;
+            let left = evaluate(left, variables, last_success)?;
+            let right = evaluate(right, variables, last_success)?;
             match op {
                 BinaryOp::Add => ops::add(&left, &right),
                 BinaryOp::Subtract => ops::subtract(&left, &right),
@@ -202,6 +213,34 @@ fn evaluate(expr: &Expr, variables: &HashMap<String, Value>) -> Result<Value, Ru
             }
         }
     }
+}
+
+fn strip_scope(name: &str) -> &str {
+    for scope in ["global:", "script:", "local:", "private:", "using:"] {
+        if let Some(rest) = name.strip_prefix(scope) {
+            return rest;
+        }
+    }
+    name
+}
+
+fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) -> Option<Value> {
+    match name {
+        "null" => return Some(Value::Null),
+        "true" => return Some(Value::Bool(true)),
+        "false" => return Some(Value::Bool(false)),
+        "?" => return Some(Value::Bool(last_success)),
+        "_" => return Some(Value::Null),
+        _ => {}
+    }
+    if let Some(rest) = name.strip_prefix("env:") {
+        if let Some(value) = variables.get(name) {
+            return Some(value.clone());
+        }
+        return std::env::var(rest).ok().map(Value::String);
+    }
+    let key = strip_scope(name);
+    variables.get(key).cloned()
 }
 
 fn number_value(value: &NumberLiteral) -> Value {

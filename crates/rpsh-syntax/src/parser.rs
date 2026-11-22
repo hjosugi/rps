@@ -481,10 +481,17 @@ fn parse_expandable_body(body: &str, span: Span) -> Result<Vec<StringPart>, Pars
                     .map(char::len_utf8)
                     .sum::<usize>();
                 if len > 0 {
+                    let name = &rest[..len];
+                    if name.ends_with(':') {
+                        return Err(ParseError::not_implemented(
+                            "variable reference is not valid ('$x:')",
+                            span,
+                        ));
+                    }
                     if !literal.is_empty() {
                         parts.push(StringPart::Literal(std::mem::take(&mut literal)));
                     }
-                    parts.push(StringPart::Variable(rest[..len].to_owned()));
+                    parts.push(StringPart::Variable(name.to_owned()));
                     at += 1 + len;
                     continue;
                 }

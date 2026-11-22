@@ -66,6 +66,12 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
                     .and_then(|rest| rest.strip_suffix('}'))
                     .or_else(|| text.strip_prefix('$'))
                     .unwrap_or(text);
+                if name.ends_with(':') {
+                    return Err(ParseError::not_implemented(
+                        "variable reference is not valid ('$x:')",
+                        span,
+                    ));
+                }
                 TokenKind::Variable(name.to_owned())
             }
             FullTokenKind::StringExpandable => {

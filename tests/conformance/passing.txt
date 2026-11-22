@@ -4,6 +4,7 @@ expr/string-literals
 lang/numeric-literals
 lang/string-escapes
 lang/string-interpolation
+lang/variable-paths
 stmt/crlf
 stmt/empty
 stmt/exit-code

@@ -24,6 +24,10 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Value {
+    /// `$null`
+    Null,
+    /// `System.Boolean`
+    Bool(bool),
     /// `System.Int32`
     Int32(i32),
     /// `System.Int64`
@@ -58,6 +62,8 @@ impl Value {
     /// The .NET type name scripts see through `.GetType().FullName`.
     pub fn type_name(&self) -> &'static str {
         match self {
+            Value::Null => "System.Object",
+            Value::Bool(_) => "System.Boolean",
             Value::Int32(_) => "System.Int32",
             Value::Int64(_) => "System.Int64",
             Value::UInt32(_) => "System.UInt32",
@@ -81,6 +87,8 @@ impl Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Value::Null => Ok(()),
+            Value::Bool(value) => write!(f, "{}", if *value { "True" } else { "False" }),
             Value::Int32(value) => write!(f, "{value}"),
             Value::Int64(value) => write!(f, "{value}"),
             Value::UInt32(value) => write!(f, "{value}"),
