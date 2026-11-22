@@ -19,6 +19,18 @@ pub enum TokenKind {
     RParen,
     Semi,
     Dot,
+    Equals,
+    LBracket,
+    RBracket,
+    AtCurly,
+    RCurly,
+    DollarParen,
+    Variable(String),
+    ExpandableString(String),
+    HereString {
+        text: String,
+        expandable: bool,
+    },
     Identifier(String),
     NewLine,
     /// The `exit` keyword.

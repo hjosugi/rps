@@ -38,15 +38,9 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
                 let Some((last_start, last)) = chars.next_back() else {
                     return Err(unterminated(span));
                 };
-                if matches!(first, '\u{2018}'..='\u{201b}')
-                    || matches!(last, '\u{2018}'..='\u{201b}')
-                {
-                    return Err(ParseError::not_implemented(
-                        "typographic quote characters",
-                        span,
-                    ));
-                }
-                if first != '\'' || last != '\'' || last_start < first.len_utf8() {
+                let single = matches!(first, '\'' | '\u{2018}'..='\u{201b}');
+                let closes = matches!(last, '\'' | '\u{2018}'..='\u{201b}');
+                if !single || !closes || last_start < first.len_utf8() {
                     return Err(unterminated(span));
                 }
                 let inner = &text[first.len_utf8()..last_start];
@@ -59,6 +53,32 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::RParen => TokenKind::RParen,
             FullTokenKind::Semi => TokenKind::Semi,
             FullTokenKind::Dot => TokenKind::Dot,
+            FullTokenKind::Equals => TokenKind::Equals,
+            FullTokenKind::LBracket => TokenKind::LBracket,
+            FullTokenKind::RBracket => TokenKind::RBracket,
+            FullTokenKind::AtCurly => TokenKind::AtCurly,
+            FullTokenKind::RCurly => TokenKind::RCurly,
+            FullTokenKind::DollarParen => TokenKind::DollarParen,
+            FullTokenKind::Variable => {
+                let text = span.text(source);
+                let name = text
+                    .strip_prefix("${")
+                    .and_then(|rest| rest.strip_suffix('}'))
+                    .or_else(|| text.strip_prefix('$'))
+                    .unwrap_or(text);
+                TokenKind::Variable(name.to_owned())
+            }
+            FullTokenKind::StringExpandable => {
+                TokenKind::ExpandableString(span.text(source).to_owned())
+            }
+            FullTokenKind::HereStringLiteral => TokenKind::HereString {
+                text: span.text(source).to_owned(),
+                expandable: false,
+            },
+            FullTokenKind::HereStringExpandable => TokenKind::HereString {
+                text: span.text(source).to_owned(),
+                expandable: true,
+            },
             FullTokenKind::Identifier => TokenKind::Identifier(span.text(source).to_owned()),
             FullTokenKind::NewLine => TokenKind::NewLine,
             FullTokenKind::Exit => TokenKind::Exit,
@@ -235,8 +255,17 @@ mod tests {
 
     #[test]
     fn names_the_missing_feature() {
-        assert_eq!(refused("$x"), "variables");
-        assert_eq!(refused("\"a\""), "expandable (double-quoted) strings");
+        assert_eq!(
+            kinds("$x"),
+            vec![TokenKind::Variable("x".to_owned()), TokenKind::EndOfInput]
+        );
+        assert_eq!(
+            kinds("\"a\""),
+            vec![
+                TokenKind::ExpandableString("\"a\"".to_owned()),
+                TokenKind::EndOfInput
+            ]
+        );
         assert_eq!(refused("1 | x"), "pipelines");
         assert_eq!(refused("Get-Date"), "command invocation");
         assert_eq!(
@@ -266,7 +295,13 @@ mod tests {
             refused("'abc"),
             "syntax error reporting (unterminated string)"
         );
-        assert_eq!(refused("'a\u{2019}"), "typographic quote characters");
+        assert_eq!(
+            kinds("'a\u{2019}"),
+            vec![
+                TokenKind::StringLiteral("a".to_owned()),
+                TokenKind::EndOfInput
+            ]
+        );
         assert_eq!(
             kinds("\u{2013}1"),
             vec![TokenKind::Minus, TokenKind::Int32(1), TokenKind::EndOfInput]

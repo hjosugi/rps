@@ -46,6 +46,8 @@ pub enum Value {
     Double(f64),
     /// `System.Numerics.BigInteger`
     BigInteger(String),
+    /// A PowerShell object/hashtable with ordered keys.
+    Object(Vec<(String, Value)>),
     /// The result of `.GetType()`, holding the full .NET type name.
     Type(String),
     /// `System.String`
@@ -67,6 +69,7 @@ impl Value {
             Value::Decimal(_) => "System.Decimal",
             Value::Double(_) => "System.Double",
             Value::BigInteger(_) => "System.Numerics.BigInteger",
+            Value::Object(_) => "System.Management.Automation.PSCustomObject",
             Value::Type(_) => "System.RuntimeType",
             Value::String(_) => "System.String",
         }
@@ -90,6 +93,16 @@ impl fmt::Display for Value {
                 f.write_str(value)
             }
             Value::Double(value) => write!(f, "{value}"),
+            Value::Object(entries) => {
+                f.write_str("@{")?;
+                for (index, (name, value)) in entries.iter().enumerate() {
+                    if index > 0 {
+                        f.write_str("; ")?;
+                    }
+                    write!(f, "{name}={value}")?;
+                }
+                f.write_str("}")
+            }
             Value::String(value) => f.write_str(value),
         }
     }

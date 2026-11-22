@@ -18,6 +18,12 @@ pub enum Statement {
     /// An expression whose value goes to the output stream.
     /// Upstream: a `PipelineAst` holding one `CommandExpressionAst`.
     Expression(Expr),
+    /// `$name = expression`. Upstream: `AssignmentStatementAst`.
+    Assign {
+        name: String,
+        value: Expr,
+        span: Span,
+    },
     /// `exit` with an optional exit code. Upstream: `ExitStatementAst`.
     Exit { code: Option<Expr>, span: Span },
 }
@@ -46,10 +52,27 @@ pub enum ExprKind {
     },
     /// Upstream: `ParenExpressionAst`.
     Paren(Box<Expr>),
+    /// Upstream: `VariableExpressionAst`.
+    Variable(String),
+    /// Upstream: `ExpandableStringExpressionAst`.
+    ExpandableString(Vec<StringPart>),
+    /// Upstream: `SubExpressionAst`.
+    Subexpression(Box<Expr>),
+    /// Upstream: `HashtableAst` (and the value of `[pscustomobject]`).
+    Object(Vec<(String, Expr)>),
+    /// Upstream: `ConvertExpressionAst` for the supported `[pscustomobject]`.
+    Cast { type_name: String, value: Box<Expr> },
     /// Upstream: `MemberExpressionAst`.
     Member { target: Box<Expr>, name: String },
     /// Upstream: `InvokeMemberExpressionAst` with no arguments.
     InvokeMember { target: Box<Expr>, name: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StringPart {
+    Literal(String),
+    Variable(String),
+    Subexpression(Box<Expr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

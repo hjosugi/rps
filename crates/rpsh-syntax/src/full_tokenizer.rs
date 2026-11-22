@@ -391,7 +391,9 @@ impl Tokenizer<'_> {
             while at < self.bytes.len() {
                 if self.bytes[at] == b'\n' {
                     let line_start = at + 1;
-                    if self.bytes.get(line_start) == Some(&close) {
+                    if self.bytes.get(line_start) == Some(&close)
+                        && self.bytes.get(line_start + 1) == Some(&b'@')
+                    {
                         at = line_start + 2;
                         self.pos = at;
                         self.push(here_string_kind_for(quote), start, at);
@@ -588,7 +590,7 @@ impl Tokenizer<'_> {
                 self.statement_start = false;
                 return Ok(true);
             }
-            if ch == '\\' && kind == FullTokenKind::StringExpandable {
+            if ch == '`' && kind == FullTokenKind::StringExpandable {
                 self.pos += 1;
                 if let Some(next) = self.char() {
                     self.pos += next.len_utf8();

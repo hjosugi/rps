@@ -1,0 +1,15 @@
+rpsh-golden-v2
+exit=0
+tab	here
+newline
+here
+dollar $x
+unicode 😀
+quote " inside
+double "quote"
+line 1
+line 2 2
+literal $x
+line 2
+single
+double

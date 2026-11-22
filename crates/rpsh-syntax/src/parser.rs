@@ -1,6 +1,6 @@
 use crate::{
-    BinaryOp, Expr, ExprKind, ParseError, ScriptBlockAst, Span, Statement, Token, TokenKind,
-    UnaryOp, tokenize,
+    BinaryOp, Expr, ExprKind, ParseError, ScriptBlockAst, Span, Statement, StringPart, Token,
+    TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -69,6 +69,22 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Statement, ParseError> {
+        if let TokenKind::Variable(name) = &self.peek().kind
+            && self
+                .tokens
+                .get(self.pos + 1)
+                .is_some_and(|token| token.kind == TokenKind::Equals)
+        {
+            let name = name.clone();
+            let start = self.peek().span;
+            self.pos += 2;
+            let value = self.additive()?;
+            let span = start.to(value.span);
+            if !self.at_statement_end() {
+                return self.refuse(SYNTAX_ERRORS);
+            }
+            return Ok(Statement::Assign { name, value, span });
+        }
         if self.peek().kind != TokenKind::Exit {
             return Ok(Statement::Expression(self.additive()?));
         }
@@ -179,6 +195,99 @@ impl Parser {
                 self.pos += 1;
                 self.expr(ExprKind::Number(value), span)
             }
+            TokenKind::Variable(name) => {
+                self.pos += 1;
+                self.expr(ExprKind::Variable(name), span)
+            }
+            TokenKind::ExpandableString(text) => {
+                self.pos += 1;
+                let parts = parse_expandable(&text, span)?;
+                self.expr(ExprKind::ExpandableString(parts), span)
+            }
+            TokenKind::HereString { text, expandable } => {
+                self.pos += 1;
+                let content = here_string_content(&text);
+                let parts = if expandable {
+                    parse_expandable_body(content, span)?
+                } else {
+                    vec![StringPart::Literal(content.to_owned())]
+                };
+                self.expr(ExprKind::ExpandableString(parts), span)
+            }
+            TokenKind::DollarParen => {
+                self.pos += 1;
+                let inner = self.additive()?;
+                let close = match self.peek().kind {
+                    TokenKind::RParen => self.peek().span,
+                    _ => return self.refuse(SYNTAX_ERRORS),
+                };
+                self.pos += 1;
+                self.expr(ExprKind::Subexpression(Box::new(inner)), span.to(close))
+            }
+            TokenKind::LBracket => {
+                self.pos += 1;
+                let Token {
+                    kind,
+                    span: name_span,
+                } = self.peek().clone();
+                let TokenKind::Identifier(type_name) = kind else {
+                    return self.refuse("type literals, casts and indexing");
+                };
+                self.pos += 1;
+                if self.peek().kind != TokenKind::RBracket {
+                    return self.refuse("type literals, casts and indexing");
+                }
+                let close = self.peek().span;
+                self.pos += 1;
+                let value = self.primary()?;
+                let span = span.to(value.span);
+                let _ = (name_span, close);
+                self.expr(
+                    ExprKind::Cast {
+                        type_name,
+                        value: Box::new(value),
+                    },
+                    span,
+                )
+            }
+            TokenKind::AtCurly => {
+                self.pos += 1;
+                let mut entries = Vec::new();
+                loop {
+                    while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
+                        self.pos += 1;
+                    }
+                    if self.peek().kind == TokenKind::RCurly {
+                        self.pos += 1;
+                        break;
+                    }
+                    let Token {
+                        kind,
+                        span: key_span,
+                    } = self.peek().clone();
+                    let key = match kind {
+                        TokenKind::Identifier(name) => name,
+                        TokenKind::StringLiteral(value) => value,
+                        _ => return self.refuse("hashtable keys"),
+                    };
+                    self.pos += 1;
+                    if self.peek().kind != TokenKind::Equals {
+                        return self.refuse(SYNTAX_ERRORS);
+                    }
+                    self.pos += 1;
+                    let value = self.additive()?;
+                    let _ = key_span;
+                    entries.push((key, value));
+                    while matches!(self.peek().kind, TokenKind::NewLine) {
+                        self.pos += 1;
+                    }
+                    match self.peek().kind {
+                        TokenKind::Semi | TokenKind::RCurly => {}
+                        _ => return self.refuse(SYNTAX_ERRORS),
+                    }
+                }
+                self.expr(ExprKind::Object(entries), span)
+            }
             TokenKind::StringLiteral(value) => {
                 self.pos += 1;
                 self.expr(ExprKind::String(value), span)
@@ -237,6 +346,163 @@ impl Parser {
     }
 }
 
+fn here_string_content(text: &str) -> &str {
+    let mut content = &text[2..text.len().saturating_sub(2)];
+    content = content.strip_prefix("\r\n").unwrap_or(content);
+    content = content
+        .strip_prefix('\n')
+        .or_else(|| content.strip_prefix('\r'))
+        .unwrap_or(content);
+    content = content.strip_suffix("\r\n").unwrap_or(content);
+    content = content
+        .strip_suffix('\n')
+        .or_else(|| content.strip_suffix('\r'))
+        .unwrap_or(content);
+    content
+}
+
+fn parse_expandable(text: &str, span: Span) -> Result<Vec<StringPart>, ParseError> {
+    let mut chars = text.chars();
+    let Some(first) = chars.next() else {
+        return Ok(Vec::new());
+    };
+    let mut body = &text[first.len_utf8()..];
+    let close = match first {
+        '\'' | '\u{2018}' | '\u{2019}' | '\u{201a}' | '\u{201b}' => '\'',
+        '"' => '"',
+        '\u{201c}' | '\u{201d}' | '\u{201e}' | '\u{201f}' => '\u{201d}',
+        '@' => '"',
+        _ => return Ok(vec![StringPart::Literal(text.to_owned())]),
+    };
+    body = body.strip_suffix(close).unwrap_or(body);
+    parse_expandable_body(body, span)
+}
+
+fn parse_expandable_body(body: &str, span: Span) -> Result<Vec<StringPart>, ParseError> {
+    let mut parts = Vec::new();
+    let mut literal = String::new();
+    let mut at = 0;
+    while at < body.len() {
+        let ch = body[at..].chars().next().unwrap_or('\0');
+        match ch {
+            '`' => {
+                at += 1;
+                let Some(escaped) = body[at..].chars().next() else {
+                    break;
+                };
+                at += escaped.len_utf8();
+                match escaped {
+                    'n' => literal.push('\n'),
+                    't' => literal.push('\t'),
+                    '0' => literal.push('\0'),
+                    'a' => literal.push('\u{7}'),
+                    'b' => literal.push('\u{8}'),
+                    'e' => literal.push('\u{1b}'),
+                    'f' => literal.push('\u{c}'),
+                    'r' => literal.push('\r'),
+                    'v' => literal.push('\u{b}'),
+                    'u' if body[at..].starts_with('{') => {
+                        let end = body[at..].find('}').map(|offset| at + offset);
+                        if let Some(end) = end {
+                            let hex = &body[at + 1..end];
+                            if let Ok(code) = u32::from_str_radix(hex, 16)
+                                && let Some(ch) = char::from_u32(code)
+                            {
+                                literal.push(ch);
+                                at = end + 1;
+                                continue;
+                            }
+                        }
+                        literal.push('u');
+                    }
+                    other => literal.push(other),
+                }
+                continue;
+            }
+            '"' => {
+                if body[at + 1..].starts_with('"') {
+                    literal.push('"');
+                    at += 2;
+                    continue;
+                }
+                literal.push('"');
+                at += 1;
+                continue;
+            }
+            '$' => {
+                if body[at + 1..].starts_with('(') {
+                    if !literal.is_empty() {
+                        parts.push(StringPart::Literal(std::mem::take(&mut literal)));
+                    }
+                    let start = at + 2;
+                    let mut depth = 1usize;
+                    let mut end = start;
+                    for (offset, ch) in body[start..].char_indices() {
+                        match ch {
+                            '(' => depth += 1,
+                            ')' => {
+                                depth -= 1;
+                                if depth == 0 {
+                                    end = start + offset;
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    let inner = &body[start..end];
+                    let ast = parse(inner)?;
+                    let Some(Statement::Expression(expr)) = ast.statements.into_iter().next()
+                    else {
+                        return Err(ParseError::not_implemented(
+                            "subexpressions with statements",
+                            span,
+                        ));
+                    };
+                    parts.push(StringPart::Subexpression(Box::new(expr)));
+                    at = end + 1;
+                    continue;
+                }
+                if body[at + 1..].starts_with('{')
+                    && let Some(offset) = body[at + 2..].find('}')
+                {
+                    let name = &body[at + 2..at + 2 + offset];
+                    if !literal.is_empty() {
+                        parts.push(StringPart::Literal(std::mem::take(&mut literal)));
+                    }
+                    parts.push(StringPart::Variable(name.to_owned()));
+                    at = at + 2 + offset + 1;
+                    continue;
+                }
+                let rest = &body[at + 1..];
+                let len = rest
+                    .chars()
+                    .take_while(|ch| ch.is_alphanumeric() || matches!(ch, '_' | ':' | '?'))
+                    .map(char::len_utf8)
+                    .sum::<usize>();
+                if len > 0 {
+                    if !literal.is_empty() {
+                        parts.push(StringPart::Literal(std::mem::take(&mut literal)));
+                    }
+                    parts.push(StringPart::Variable(rest[..len].to_owned()));
+                    at += 1 + len;
+                    continue;
+                }
+                literal.push('$');
+                at += 1;
+            }
+            other => {
+                literal.push(other);
+                at += other.len_utf8();
+            }
+        }
+    }
+    if !literal.is_empty() {
+        parts.push(StringPart::Literal(literal));
+    }
+    Ok(parts)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -257,6 +523,28 @@ mod tests {
                 format!("({} {symbol} {})", show(left), show(right))
             }
             ExprKind::Paren(inner) => show(inner),
+            ExprKind::Variable(name) => format!("${name}"),
+            ExprKind::ExpandableString(parts) => format!(
+                "\"{}\"",
+                parts
+                    .iter()
+                    .map(|part| match part {
+                        StringPart::Literal(text) => text.clone(),
+                        StringPart::Variable(name) => format!("${name}"),
+                        StringPart::Subexpression(expr) => format!("$({})", show(expr)),
+                    })
+                    .collect::<String>()
+            ),
+            ExprKind::Subexpression(expr) => format!("$({})", show(expr)),
+            ExprKind::Object(entries) => format!(
+                "@{{{}}}",
+                entries
+                    .iter()
+                    .map(|(name, value)| format!("{name}={}", show(value)))
+                    .collect::<Vec<_>>()
+                    .join(";")
+            ),
+            ExprKind::Cast { type_name, value } => format!("[{type_name}]{}", show(value)),
             ExprKind::Member { target, name } => format!("{}.{}", show(target), name),
             ExprKind::InvokeMember { target, name } => format!("{}.{}()", show(target), name),
         }
@@ -269,6 +557,7 @@ mod tests {
             .iter()
             .map(|statement| match statement {
                 Statement::Expression(expr) => show(expr),
+                Statement::Assign { name, value, .. } => format!("${name} = {}", show(value)),
                 Statement::Exit { code: None, .. } => "exit".to_owned(),
                 Statement::Exit {
                     code: Some(code), ..
@@ -319,7 +608,7 @@ mod tests {
         assert_eq!(refused("1 +"), SYNTAX_ERRORS);
         assert_eq!(refused("+1"), "unary plus");
         assert_eq!(refused("(1\n)"), "newlines inside parentheses");
-        assert_eq!(refused("$x = 1"), "variables");
+        assert_eq!(refused("$x += 1"), "assignment");
     }
 
     #[test]

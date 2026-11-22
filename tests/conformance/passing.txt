@@ -2,6 +2,8 @@
 expr/int-arithmetic
 expr/string-literals
 lang/numeric-literals
+lang/string-escapes
+lang/string-interpolation
 stmt/crlf
 stmt/empty
 stmt/exit-code

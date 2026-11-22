@@ -11,6 +11,7 @@
 //! requires that this stays true as state is added, by building each table
 //! on first use.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -22,7 +23,7 @@ use rpsh_syntax::{
 /// Runs scripts.
 #[derive(Debug, Default)]
 pub struct Engine {
-    _private: (),
+    variables: HashMap<String, Value>,
 }
 
 #[derive(Debug)]
@@ -99,14 +100,18 @@ impl Engine {
         for statement in &script.statements {
             match statement {
                 Statement::Expression(expr) => {
-                    let value = evaluate(expr)?;
+                    let value = evaluate(expr, &self.variables)?;
                     writeln!(out, "{value}")?;
+                }
+                Statement::Assign { name, value, .. } => {
+                    let value = evaluate(value, &self.variables)?;
+                    self.variables.insert(name.clone(), value);
                 }
                 Statement::Exit { code: None, .. } => return Ok(0),
                 Statement::Exit {
                     code: Some(code), ..
                 } => {
-                    return match evaluate(code)? {
+                    return match evaluate(code, &self.variables)? {
                         Value::Int32(code) => Ok(code),
                         _ => Err(RuntimeError::NotImplemented {
                             feature: "exit with a value other than Int32",
@@ -120,16 +125,63 @@ impl Engine {
     }
 }
 
-fn evaluate(expr: &Expr) -> Result<Value, RuntimeError> {
+fn evaluate(expr: &Expr, variables: &HashMap<String, Value>) -> Result<Value, RuntimeError> {
     match &expr.kind {
         ExprKind::Int32(value) => Ok(Value::Int32(*value)),
         ExprKind::Number(value) => Ok(number_value(value)),
         ExprKind::String(value) => Ok(Value::String(value.clone())),
-        ExprKind::Paren(inner) => evaluate(inner),
-        ExprKind::Member { target, name } => member(&evaluate(target)?, name),
+        ExprKind::Paren(inner) => evaluate(inner, variables),
+        ExprKind::Variable(name) => {
+            variables
+                .get(name)
+                .cloned()
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "undefined variable",
+                })
+        }
+        ExprKind::ExpandableString(parts) => {
+            let mut text = String::new();
+            for part in parts {
+                match part {
+                    rpsh_syntax::StringPart::Literal(value) => text.push_str(value),
+                    rpsh_syntax::StringPart::Variable(name) => {
+                        if let Some(value) = variables.get(name) {
+                            use std::fmt::Write as _;
+                            let _ = write!(text, "{value}");
+                        }
+                    }
+                    rpsh_syntax::StringPart::Subexpression(expr) => {
+                        use std::fmt::Write as _;
+                        let _ = write!(text, "{}", evaluate(expr, variables)?);
+                    }
+                }
+            }
+            Ok(Value::String(text))
+        }
+        ExprKind::Subexpression(expr) => evaluate(expr, variables),
+        ExprKind::Object(entries) => {
+            let mut object = Vec::with_capacity(entries.len());
+            for (name, value) in entries {
+                object.push((name.clone(), evaluate(value, variables)?));
+            }
+            Ok(Value::Object(object))
+        }
+        ExprKind::Cast { type_name, value } => {
+            let value = evaluate(value, variables)?;
+            if type_name.eq_ignore_ascii_case("pscustomobject") {
+                Ok(value)
+            } else {
+                Err(RuntimeError::NotImplemented {
+                    feature: "type casts other than [pscustomobject]",
+                })
+            }
+        }
+        ExprKind::Member { target, name } => member(&evaluate(target, variables)?, name),
         ExprKind::InvokeMember { target, name } => {
             if name == "GetType" {
-                Ok(Value::Type(evaluate(target)?.type_name().to_owned()))
+                Ok(Value::Type(
+                    evaluate(target, variables)?.type_name().to_owned(),
+                ))
             } else {
                 Err(RuntimeError::NotImplemented {
                     feature: "method invocation other than GetType()",
@@ -139,10 +191,10 @@ fn evaluate(expr: &Expr) -> Result<Value, RuntimeError> {
         ExprKind::Unary {
             op: UnaryOp::Negate,
             operand,
-        } => ops::negate(&evaluate(operand)?),
+        } => ops::negate(&evaluate(operand, variables)?),
         ExprKind::Binary { op, left, right } => {
-            let left = evaluate(left)?;
-            let right = evaluate(right)?;
+            let left = evaluate(left, variables)?;
+            let right = evaluate(right, variables)?;
             match op {
                 BinaryOp::Add => ops::add(&left, &right),
                 BinaryOp::Subtract => ops::subtract(&left, &right),
@@ -175,6 +227,13 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
         (Value::Type(full), "Name") => Ok(Value::String(
             full.rsplit('.').next().unwrap_or(full).to_owned(),
         )),
+        (Value::Object(entries), name) => entries
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.clone())
+            .ok_or(RuntimeError::NotImplemented {
+                feature: "missing object property",
+            }),
         _ => Err(RuntimeError::NotImplemented {
             feature: "member access other than GetType().FullName / .Name",
         }),
@@ -219,8 +278,11 @@ mod tests {
 
     #[test]
     fn an_unparsable_script_runs_nothing() {
-        let (result, out) = run("1\n2\n$x = 3");
-        assert_eq!(result.unwrap_err().missing_feature(), Some("variables"));
+        let (result, out) = run("1\n2\nif (1) { 3 }");
+        assert_eq!(
+            result.unwrap_err().missing_feature(),
+            Some("statement keywords (if, foreach, function, ...)")
+        );
         assert_eq!(out, "");
     }
 
