@@ -5,3 +5,4 @@
 (Get-Item fixtures/data.txt).Extension
 ('ab', 'cde' | ForEach-Object -MemberName Length) -join ','
 (Get-Item fixtures/data.txt).BaseName
+(Get-Item fixtures/tree/*.txt | ForEach-Object Name | Sort-Object) -join ','

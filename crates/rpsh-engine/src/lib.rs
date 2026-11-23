@@ -1617,71 +1617,26 @@ impl Engine {
                     }
                     .into());
                 };
-                let text = path;
-                if !std::path::Path::new(&text).exists() {
+                if path.contains(['*', '?']) {
+                    return Ok(Some(
+                        expand_glob(&path)
+                            .iter()
+                            .map(|path| item_value(path))
+                            .collect(),
+                    ));
+                }
+                if !std::path::Path::new(&path).exists() {
                     return Err(RuntimeError::Script {
                         id: "PathNotFound,Microsoft.PowerShell.Commands.GetItemCommand",
                         category: format!(
-                            "ObjectNotFound: ({text}:String) [Get-Item], ItemNotFoundException"
+                            "ObjectNotFound: ({path}:String) [Get-Item], ItemNotFoundException"
                         ),
                         exception_type: "System.Management.Automation.ItemNotFoundException",
-                        message: format!("Cannot find path '{text}' because it does not exist."),
+                        message: format!("Cannot find path '{path}' because it does not exist."),
                     }
                     .into());
                 }
-                let target = std::path::Path::new(&text);
-                let mut entries = vec![
-                    (
-                        "__TypeName".to_owned(),
-                        Value::String(
-                            if target.is_dir() {
-                                "System.IO.DirectoryInfo"
-                            } else {
-                                "System.IO.FileInfo"
-                            }
-                            .into(),
-                        ),
-                    ),
-                    ("FullName".to_owned(), Value::String(text.clone().into())),
-                    (
-                        "Name".to_owned(),
-                        Value::String(
-                            target
-                                .file_name()
-                                .map_or_else(String::new, |name| name.to_string_lossy().to_string())
-                                .into(),
-                        ),
-                    ),
-                ];
-                if target.is_file() {
-                    entries.push((
-                        "Length".to_owned(),
-                        Value::Int64(target.metadata().map_or(0, |meta| meta.len()) as i64),
-                    ));
-                    entries.push((
-                        "BaseName".to_owned(),
-                        Value::String(
-                            target
-                                .file_stem()
-                                .map_or_else(String::new, |value| {
-                                    value.to_string_lossy().to_string()
-                                })
-                                .into(),
-                        ),
-                    ));
-                    entries.push((
-                        "Extension".to_owned(),
-                        Value::String(
-                            target
-                                .extension()
-                                .map_or_else(String::new, |value| {
-                                    format!(".{}", value.to_string_lossy())
-                                })
-                                .into(),
-                        ),
-                    ));
-                }
-                Ok(Some(vec![Value::object(entries)]))
+                Ok(Some(vec![item_value(&path)]))
             }
             "new-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -4640,6 +4595,58 @@ fn copy_directory(source: &str, destination: &str) -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+fn item_value(text: &str) -> Value {
+    let target = std::path::Path::new(text);
+    let mut entries = vec![
+        (
+            "__TypeName".to_owned(),
+            Value::String(
+                if target.is_dir() {
+                    "System.IO.DirectoryInfo"
+                } else {
+                    "System.IO.FileInfo"
+                }
+                .into(),
+            ),
+        ),
+        ("FullName".to_owned(), Value::String(text.to_owned().into())),
+        (
+            "Name".to_owned(),
+            Value::String(
+                target
+                    .file_name()
+                    .map_or_else(String::new, |name| name.to_string_lossy().to_string())
+                    .into(),
+            ),
+        ),
+    ];
+    if target.is_file() {
+        entries.push((
+            "Length".to_owned(),
+            Value::Int64(target.metadata().map_or(0, |meta| meta.len()) as i64),
+        ));
+        entries.push((
+            "BaseName".to_owned(),
+            Value::String(
+                target
+                    .file_stem()
+                    .map_or_else(String::new, |value| value.to_string_lossy().to_string())
+                    .into(),
+            ),
+        ));
+        entries.push((
+            "Extension".to_owned(),
+            Value::String(
+                target
+                    .extension()
+                    .map_or_else(String::new, |value| format!(".{}", value.to_string_lossy()))
+                    .into(),
+            ),
+        ));
+    }
+    Value::object(entries)
 }
 
 fn collect_children(
