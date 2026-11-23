@@ -27,6 +27,7 @@ lang/format-operator
 lang/function
 lang/function-basic
 lang/get-command
+lang/get-date
 lang/hashtable
 lang/if-else
 lang/int-overflow

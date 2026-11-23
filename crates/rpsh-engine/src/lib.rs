@@ -1759,6 +1759,82 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
+            "get-date" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let date = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("date"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(date) = date else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Get-Date without -Date",
+                    }
+                    .into());
+                };
+                let (year, month, day, hour, minute, second) =
+                    parse_datetime_text(&date).ok_or(RuntimeError::NotImplemented {
+                        feature: "this Get-Date input",
+                    })?;
+                let format = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("format"))
+                    .map(|(_, value)| value.to_string());
+                match format {
+                    Some(format) => Ok(Some(vec![Value::String(
+                        format_datetime(year, month, day, hour, minute, second, &format).into(),
+                    )])),
+                    None => {
+                        const WEEKDAYS: [&str; 7] = [
+                            "Sunday",
+                            "Monday",
+                            "Tuesday",
+                            "Wednesday",
+                            "Thursday",
+                            "Friday",
+                            "Saturday",
+                        ];
+                        const MONTHS: [&str; 12] = [
+                            "January",
+                            "February",
+                            "March",
+                            "April",
+                            "May",
+                            "June",
+                            "July",
+                            "August",
+                            "September",
+                            "October",
+                            "November",
+                            "December",
+                        ];
+                        let (hour12, ampm) = if hour == 0 {
+                            (12, "AM")
+                        } else if hour < 12 {
+                            (hour, "AM")
+                        } else if hour == 12 {
+                            (12, "PM")
+                        } else {
+                            (hour - 12, "PM")
+                        };
+                        let host_text = format!(
+                            "{}, {} {}, {} {hour12}:{minute:02}:{second:02}\u{202F}{ampm}",
+                            WEEKDAYS[weekday(year, month, day) as usize % 7],
+                            MONTHS[(month as usize).clamp(1, 12) - 1],
+                            day,
+                            year
+                        );
+                        let mut value = datetime_value(year, month, day, hour, minute, second);
+                        if let Value::Object(entries) = &value {
+                            let mut entries = entries.as_ref().clone();
+                            entries
+                                .push(("__HostText".to_owned(), Value::String(host_text.into())));
+                            value = Value::object(entries);
+                        }
+                        Ok(Some(vec![value]))
+                    }
+                }
+            }
             "get-command" | "gcm" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let wanted = named
@@ -2321,7 +2397,29 @@ impl Engine {
             }
             return Ok(());
         }
-        if matches!(value, Value::Object(_)) {
+        if let Value::Object(entries) = &value {
+            let host_text = entries
+                .iter()
+                .find(|(key, _)| key == "__HostText")
+                .and_then(|(_, value)| match value {
+                    Value::String(text) => Some(text.clone()),
+                    _ => None,
+                });
+            if let Some(text) = host_text {
+                write!(out, "\n{text}\n\n")?;
+                return Ok(());
+            }
+            let text = entries
+                .iter()
+                .find(|(key, _)| key == "__Text")
+                .and_then(|(_, value)| match value {
+                    Value::String(text) => Some(text.clone()),
+                    _ => None,
+                });
+            if let Some(text) = text {
+                writeln!(out, "{text}")?;
+                return Ok(());
+            }
             self.host_objects.push(value);
             return Ok(());
         }
@@ -3633,6 +3731,82 @@ fn normalize_type(type_name: &str) -> String {
     lower
         .strip_prefix("system.")
         .map_or(lower.clone(), ToOwned::to_owned)
+}
+
+fn parse_datetime_text(text: &str) -> Option<(i32, i32, i32, i32, i32, i32)> {
+    let text = text.trim();
+    let (date, time) = text.split_once(' ').unwrap_or((text, "00:00:00"));
+    let mut date_parts = date.split(['-', '/']);
+    let year = date_parts.next()?.parse().ok()?;
+    let month = date_parts.next()?.parse().ok()?;
+    let day = date_parts.next()?.parse().ok()?;
+    let mut time_parts = time.split(':');
+    let hour = time_parts
+        .next()
+        .map_or(Some(0), |value| value.parse().ok())?;
+    let minute = time_parts
+        .next()
+        .map_or(Some(0), |value| value.parse().ok())?;
+    let second = time_parts
+        .next()
+        .map_or(Some(0), |value| value.parse().ok())?;
+    Some((year, month, day, hour, minute, second))
+}
+
+fn format_datetime(
+    year: i32,
+    month: i32,
+    day: i32,
+    hour: i32,
+    minute: i32,
+    second: i32,
+    format: &str,
+) -> String {
+    let mut out = String::new();
+    let mut chars = format.chars().peekable();
+    while let Some(ch) = chars.next() {
+        let count = 1 + chars.clone().take_while(|next| *next == ch).count();
+        for _ in 1..count {
+            chars.next();
+        }
+        match (ch, count) {
+            ('y', 4) => out.push_str(&format!("{year:04}")),
+            ('y', 2) => out.push_str(&format!("{:02}", year % 100)),
+            ('M', 2) => out.push_str(&format!("{month:02}")),
+            ('M', 1) => out.push_str(&month.to_string()),
+            ('d', 2) => out.push_str(&format!("{day:02}")),
+            ('d', 1) => out.push_str(&day.to_string()),
+            ('H', 2) => out.push_str(&format!("{hour:02}")),
+            ('H', 1) => out.push_str(&hour.to_string()),
+            ('m', 2) => out.push_str(&format!("{minute:02}")),
+            ('m', 1) => out.push_str(&minute.to_string()),
+            ('s', 2) => out.push_str(&format!("{second:02}")),
+            ('s', 1) => out.push_str(&second.to_string()),
+            (other, _) => {
+                for _ in 0..count {
+                    out.push(other);
+                }
+            }
+        }
+    }
+    out
+}
+
+fn datetime_value(year: i32, month: i32, day: i32, hour: i32, minute: i32, second: i32) -> Value {
+    let text = format!("{month:02}/{day:02}/{year:04} {hour:02}:{minute:02}:{second:02}");
+    Value::object(vec![
+        (
+            "__TypeName".to_owned(),
+            Value::String("System.DateTime".into()),
+        ),
+        ("__Year".to_owned(), Value::Int32(year)),
+        ("__Month".to_owned(), Value::Int32(month)),
+        ("__Day".to_owned(), Value::Int32(day)),
+        ("__Hour".to_owned(), Value::Int32(hour)),
+        ("__Minute".to_owned(), Value::Int32(minute)),
+        ("__Second".to_owned(), Value::Int32(second)),
+        ("__Text".to_owned(), Value::String(text.into())),
+    ])
 }
 
 fn culture_value() -> Value {
