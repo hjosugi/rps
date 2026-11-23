@@ -19,6 +19,7 @@ pub fn parse(source: &str) -> Result<ScriptBlockAst, ParseError> {
         tokens,
         pos: 0,
         nodes: 0,
+        stop_comma: false,
     };
     let statements = parser.statements()?;
     Ok(ScriptBlockAst {
@@ -32,6 +33,9 @@ struct Parser {
     pos: usize,
     /// Expression nodes created for the statement being parsed.
     nodes: usize,
+    /// In a method argument list a top-level comma separates arguments, so
+    /// `comma()` must not build an array. Parenthesized expressions reset it.
+    stop_comma: bool,
 }
 
 impl Parser {
@@ -104,7 +108,7 @@ impl Parser {
             let name = name.clone();
             let start = self.peek().span;
             self.pos += 2;
-            let value = self.expression()?;
+            let value = self.nested_expression()?;
             let span = start.to(value.span);
             if !self.at_statement_end() {
                 return self.refuse(SYNTAX_ERRORS);
@@ -136,7 +140,34 @@ impl Parser {
             TokenKind::Break => self.break_statement(false),
             TokenKind::Continue => self.break_statement(true),
             TokenKind::Exit => self.exit_statement(),
-            _ => Ok(Statement::Expression(self.expression()?)),
+            _ => {
+                let expression = self.expression()?;
+                if self.peek().kind != TokenKind::Equals {
+                    return Ok(Statement::Expression(expression));
+                }
+                let span = expression.span;
+                self.pos += 1;
+                let value = self.nested_expression()?;
+                let span = span.to(value.span);
+                if !self.at_statement_end() {
+                    return self.refuse(SYNTAX_ERRORS);
+                }
+                match expression.kind {
+                    ExprKind::Member { target, name } => Ok(Statement::MemberAssign {
+                        target: *target,
+                        name,
+                        value,
+                        span,
+                    }),
+                    ExprKind::Index { target, index } => Ok(Statement::IndexAssign {
+                        target: *target,
+                        index: *index,
+                        value,
+                        span,
+                    }),
+                    _ => self.refuse(SYNTAX_ERRORS),
+                }
+            }
         }
     }
 
@@ -239,13 +270,41 @@ impl Parser {
         }
         self.pos += 1;
         self.skip_newlines();
-        let condition = self.expression()?;
+        let condition = self.nested_expression()?;
         self.skip_newlines();
         if self.peek().kind != TokenKind::RParen {
             return self.refuse(SYNTAX_ERRORS);
         }
         self.pos += 1;
         Ok(condition)
+    }
+
+    /// Parses `( argument, ... )` for a method call.
+    fn arguments(&mut self) -> Result<(Vec<Expr>, Span), ParseError> {
+        self.pos += 1;
+        let stop_comma = self.stop_comma;
+        self.stop_comma = true;
+        let mut arguments = Vec::new();
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::RParen {
+            loop {
+                arguments.push(self.expression()?);
+                self.skip_newlines();
+                if self.peek().kind == TokenKind::Comma {
+                    self.pos += 1;
+                    self.skip_newlines();
+                    continue;
+                }
+                break;
+            }
+        }
+        self.stop_comma = stop_comma;
+        if self.peek().kind != TokenKind::RParen {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        let close = self.peek().span;
+        self.pos += 1;
+        Ok((arguments, close))
     }
 
     fn if_statement(&mut self) -> Result<Statement, ParseError> {
@@ -329,7 +388,7 @@ impl Parser {
         let condition = if self.peek().kind == TokenKind::Semi {
             None
         } else {
-            Some(self.expression()?)
+            Some(self.nested_expression()?)
         };
         if self.peek().kind != TokenKind::Semi {
             return self.refuse(SYNTAX_ERRORS);
@@ -378,7 +437,7 @@ impl Parser {
         }
         self.pos += 1;
         self.skip_newlines();
-        let collection = self.expression()?;
+        let collection = self.nested_expression()?;
         self.skip_newlines();
         if self.peek().kind != TokenKind::RParen {
             return self.refuse(SYNTAX_ERRORS);
@@ -505,7 +564,7 @@ impl Parser {
         if self.at_statement_end() {
             return self.refuse("throw without an expression");
         }
-        let value = self.expression()?;
+        let value = self.nested_expression()?;
         let span = start.to(value.span);
         Ok(Statement::Throw { value, span })
     }
@@ -519,7 +578,7 @@ impl Parser {
                 span: start,
             });
         }
-        let value = self.expression()?;
+        let value = self.nested_expression()?;
         let span = start.to(value.span);
         Ok(Statement::Return {
             value: Some(value),
@@ -555,7 +614,7 @@ impl Parser {
                 span: exit,
             });
         }
-        let code = self.expression()?;
+        let code = self.nested_expression()?;
         let span = exit.to(code.span);
         Ok(Statement::Exit {
             code: Some(code),
@@ -565,6 +624,15 @@ impl Parser {
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
         self.ternary()
+    }
+
+    /// An expression in a nested context, where a comma builds an array again.
+    fn nested_expression(&mut self) -> Result<Expr, ParseError> {
+        let stop_comma = self.stop_comma;
+        self.stop_comma = false;
+        let result = self.expression();
+        self.stop_comma = stop_comma;
+        result
     }
 
     fn ternary(&mut self) -> Result<Expr, ParseError> {
@@ -736,7 +804,7 @@ impl Parser {
 
     fn comma(&mut self) -> Result<Expr, ParseError> {
         let first = self.unary()?;
-        if self.peek().kind != TokenKind::Comma {
+        if self.stop_comma || self.peek().kind != TokenKind::Comma {
             return Ok(first);
         }
         let span = first.span;
@@ -848,15 +916,12 @@ impl Parser {
                     self.pos += 1;
                     let mut span = expression.span.to(span);
                     let kind = if self.peek().kind == TokenKind::LParen {
-                        self.pos += 1;
-                        if self.peek().kind != TokenKind::RParen {
-                            return self.refuse("method arguments");
-                        }
-                        span = span.to(self.peek().span);
-                        self.pos += 1;
+                        let (arguments, close) = self.arguments()?;
+                        span = span.to(close);
                         ExprKind::InvokeMember {
                             target: Box::new(expression),
                             name,
+                            arguments,
                         }
                     } else {
                         ExprKind::Member {
@@ -868,7 +933,7 @@ impl Parser {
                 }
                 TokenKind::LBracket => {
                     self.pos += 1;
-                    let index = self.expression()?;
+                    let index = self.nested_expression()?;
                     let close = match self.peek().kind {
                         TokenKind::RBracket => self.peek().span,
                         _ => return self.refuse(SYNTAX_ERRORS),
@@ -958,7 +1023,7 @@ impl Parser {
                     self.pos += 1;
                     self.expr(ExprKind::Array(Vec::new()), span.to(close))
                 } else {
-                    let inner = self.expression()?;
+                    let inner = self.nested_expression()?;
                     let close = match self.peek().kind {
                         TokenKind::RParen => self.peek().span,
                         _ => return self.refuse(SYNTAX_ERRORS),
@@ -973,7 +1038,7 @@ impl Parser {
             }
             TokenKind::DollarParen => {
                 self.pos += 1;
-                let inner = self.expression()?;
+                let inner = self.nested_expression()?;
                 let close = match self.peek().kind {
                     TokenKind::RParen => self.peek().span,
                     _ => return self.refuse(SYNTAX_ERRORS),
@@ -1049,7 +1114,7 @@ impl Parser {
                         return self.refuse(SYNTAX_ERRORS);
                     }
                     self.pos += 1;
-                    let value = self.expression()?;
+                    let value = self.nested_expression()?;
                     let _ = key_span;
                     entries.push((key, value));
                     while matches!(self.peek().kind, TokenKind::NewLine) {
@@ -1071,7 +1136,7 @@ impl Parser {
                 if self.peek().kind == TokenKind::NewLine {
                     return self.refuse("newlines inside parentheses");
                 }
-                let inner = self.expression()?;
+                let inner = self.nested_expression()?;
                 match self.peek().kind {
                     TokenKind::RParen => {
                         let close = self.peek().span;
@@ -1399,7 +1464,16 @@ mod tests {
             ),
             ExprKind::Cast { type_name, value } => format!("[{type_name}]{}", show(value)),
             ExprKind::Member { target, name } => format!("{}.{}", show(target), name),
-            ExprKind::InvokeMember { target, name } => format!("{}.{}()", show(target), name),
+            ExprKind::InvokeMember {
+                target,
+                name,
+                arguments,
+            } => format!(
+                "{}.{}({})",
+                show(target),
+                name,
+                arguments.iter().map(show).collect::<Vec<_>>().join(",")
+            ),
             ExprKind::ScriptBlock(_) => "{...}".to_owned(),
         }
     }
@@ -1542,6 +1616,18 @@ mod tests {
                 }
                 text
             }
+            Statement::MemberAssign {
+                target,
+                name,
+                value,
+                ..
+            } => format!("{}.{name} = {}", show(target), show(value)),
+            Statement::IndexAssign {
+                target,
+                index,
+                value,
+                ..
+            } => format!("{}[{}] = {}", show(target), show(index), show(value)),
             Statement::Throw { value, .. } => format!("throw {}", show(value)),
             Statement::Return { value, .. } => match value {
                 Some(value) => format!("return {}", show(value)),

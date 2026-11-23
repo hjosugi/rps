@@ -38,6 +38,7 @@ pub fn tokenize_full(source: &str) -> Result<Vec<FullToken>, ParseError> {
         command_seen: false,
         statement_start: true,
         ternary_depth: 0,
+        hashtable_depth: 0,
     };
     tokenizer.run()?;
     let lines = Lines::new(source);
@@ -115,6 +116,7 @@ struct Tokenizer<'a> {
     command_seen: bool,
     statement_start: bool,
     ternary_depth: usize,
+    hashtable_depth: usize,
 }
 
 impl Tokenizer<'_> {
@@ -363,6 +365,11 @@ impl Tokenizer<'_> {
         };
         self.pos += len;
         self.push(kind, start, self.pos);
+        match kind {
+            FullTokenKind::AtCurly => self.hashtable_depth += 1,
+            FullTokenKind::RCurly if self.hashtable_depth > 0 => self.hashtable_depth -= 1,
+            _ => {}
+        }
         match kind {
             FullTokenKind::LCurly | FullTokenKind::RCurly | FullTokenKind::Semi => {
                 self.mode = Mode::Command;
@@ -634,7 +641,7 @@ impl Tokenizer<'_> {
         if let Some(next) = self.source[at..].chars().next()
             && (next.is_alphabetic() || next == '_' || next == '?')
         {
-            if self.mode == Mode::Command {
+            if self.mode == Mode::Command && !self.after_member() {
                 while let Some(ch) = self.source[at..].chars().next() {
                     if ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '?' {
                         at += ch.len_utf8();
@@ -674,7 +681,10 @@ impl Tokenizer<'_> {
     }
 
     fn parameter(&mut self) -> bool {
-        if self.mode != Mode::Command || self.bytes.get(self.pos) != Some(&b'-') {
+        if self.mode != Mode::Command
+            || self.bytes.get(self.pos) != Some(&b'-')
+            || self.after_member()
+        {
             return false;
         }
         let start = self.pos;
@@ -757,11 +767,20 @@ impl Tokenizer<'_> {
         true
     }
 
+    /// True when the cursor follows `.$name`, the target of `$o.name = value`.
+    fn after_member(&self) -> bool {
+        let tokens = &self.tokens;
+        tokens.len() >= 2
+            && tokens[tokens.len() - 1].kind == FullTokenKind::Identifier
+            && tokens[tokens.len() - 2].kind == FullTokenKind::Dot
+    }
+
     fn operator(&mut self) -> bool {
         if self.mode == Mode::Command
             && self.bytes.get(self.pos) == Some(&b'-')
             && let Some(ch) = self.peek_char(1)
             && (ch.is_alphabetic() || ch == '?')
+            && !self.after_member()
             && !is_unary_dash_operator(&self.source[self.pos..])
         {
             return false;
@@ -784,6 +803,8 @@ impl Tokenizer<'_> {
                             | FullTokenKind::Ampersand
                             | FullTokenKind::Comma
                     )
+                    && !(self.hashtable_depth > 0 && *kind == FullTokenKind::Equals)
+                    && !self.after_member()
                 {
                     continue;
                 }

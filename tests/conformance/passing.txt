@@ -6,6 +6,7 @@ lang/comparison-basic
 lang/comparison-filter
 lang/division
 lang/double-format
+lang/hashtable
 lang/if-else
 lang/int-overflow
 lang/loops

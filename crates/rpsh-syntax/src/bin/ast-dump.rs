@@ -34,9 +34,11 @@ fn format_expr(expr: &Expr) -> String {
         ),
         ExprKind::Paren(inner) => format!("(paren {})", format_expr(inner)),
         ExprKind::Member { target, name } => format!("(member {} {name})", format_expr(target)),
-        ExprKind::InvokeMember { target, name } => {
-            format!("(invoke {} {name})", format_expr(target))
-        }
+        ExprKind::InvokeMember {
+            target,
+            name,
+            arguments: _,
+        } => format!("(invoke {} {name})", format_expr(target)),
         ExprKind::Array(items) => format!(
             "(array {})",
             items.iter().map(format_expr).collect::<Vec<_>>().join(" ")

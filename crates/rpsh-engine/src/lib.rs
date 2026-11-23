@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
 
-use rpsh_runtime::{RuntimeError, Value, ops};
+use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
     BinaryOp, Expr, ExprKind, NumberLiteral, ParseError, ScriptBlockAst, Statement, UnaryOp, parse,
 };
@@ -198,6 +198,68 @@ impl Engine {
                 let value = evaluate(value, &mut self.variables, self.last_success)?;
                 let key = strip_scope(name);
                 self.variables.insert(key.to_owned(), value);
+                self.last_success = true;
+                Ok(Flow::Normal)
+            }
+            Statement::MemberAssign {
+                target,
+                name,
+                value,
+                ..
+            } => {
+                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let key = assignment_key(target)?;
+                let mut entries = match self.variables.get(key) {
+                    Some(Value::Object(entries)) => entries.as_ref().clone(),
+                    _ => {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "member assignment on a value that is not an object",
+                        }
+                        .into());
+                    }
+                };
+                if let Some(entry) = entries
+                    .iter_mut()
+                    .find(|(entry, _)| entry.eq_ignore_ascii_case(name))
+                {
+                    entry.1 = value;
+                } else {
+                    entries.push((name.clone(), value));
+                }
+                self.variables
+                    .insert(key.to_owned(), Value::object(entries));
+                self.last_success = true;
+                Ok(Flow::Normal)
+            }
+            Statement::IndexAssign {
+                target,
+                index,
+                value,
+                ..
+            } => {
+                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let index = evaluate(index, &mut self.variables, self.last_success)?;
+                let key = assignment_key(target)?;
+                let mut entries = match self.variables.get(key) {
+                    Some(Value::Object(entries)) => entries.as_ref().clone(),
+                    _ => {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "index assignment on a value that is not an object",
+                        }
+                        .into());
+                    }
+                };
+                let index = index.to_string();
+                if let Some(entry) = entries
+                    .iter_mut()
+                    .find(|(entry, _)| entry.eq_ignore_ascii_case(&index))
+                {
+                    entry.1 = value;
+                } else {
+                    entries.push((index, value));
+                }
+                self.variables
+                    .insert(key.to_owned(), Value::object(entries));
                 self.last_success = true;
                 Ok(Flow::Normal)
             }
@@ -394,6 +456,20 @@ impl Engine {
     }
 
     fn write_value(&self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
+        // The host's default object formatting (Format-Table) is M6; until
+        // then an object on the output stream is refused, never printed as
+        // `@{...}` where pwsh would draw a table.
+        let has_object = match &value {
+            Value::Object(_) => true,
+            Value::Array(items) => items.iter().any(|item| matches!(item, Value::Object(_))),
+            _ => false,
+        };
+        if has_object {
+            return Err(RuntimeError::NotImplemented {
+                feature: "default object formatting",
+            }
+            .into());
+        }
         match value {
             Value::Array(items) => {
                 for item in items.iter() {
@@ -516,19 +592,17 @@ fn evaluate(
         ExprKind::Member { target, name } => {
             member(&evaluate(target, variables, last_success)?, name)
         }
-        ExprKind::InvokeMember { target, name } => {
-            if name == "GetType" {
-                Ok(Value::Type(
-                    evaluate(target, variables, last_success)?
-                        .type_name()
-                        .to_owned()
-                        .into(),
-                ))
-            } else {
-                Err(RuntimeError::NotImplemented {
-                    feature: "method invocation other than GetType()",
-                })
+        ExprKind::InvokeMember {
+            target,
+            name,
+            arguments,
+        } => {
+            let target = evaluate(target, variables, last_success)?;
+            let mut values = Vec::with_capacity(arguments.len());
+            for argument in arguments {
+                values.push(evaluate(argument, variables, last_success)?);
             }
+            invoke_member(&target, name, &values)
         }
         ExprKind::Unary {
             op:
@@ -685,6 +759,13 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
                     feature: "index out of range",
                 })
         }
+        (Value::Object(entries), Value::String(key)) => {
+            let key = key.to_string_lossy();
+            Ok(entries
+                .iter()
+                .find(|(entry, _)| entry.eq_ignore_ascii_case(&key))
+                .map_or(Value::Null, |(_, value)| value.clone()))
+        }
         (Value::Object(entries), Value::Int32(index)) => {
             let key = index.to_string();
             entries
@@ -697,6 +778,15 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
         }
         _ => Err(RuntimeError::NotImplemented {
             feature: "indexing other than arrays",
+        }),
+    }
+}
+
+fn assignment_key(target: &Expr) -> Result<&str, RuntimeError> {
+    match &target.kind {
+        ExprKind::Variable(name) => Ok(strip_scope(name)),
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "assignment through a non-variable target",
         }),
     }
 }
@@ -754,7 +844,13 @@ fn type_full_name(name: &str) -> &'static str {
 /// needs. Failing conversions are refused rather than approximated.
 fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
     match type_name.to_ascii_lowercase().as_str() {
-        "pscustomobject" | "system.management.automation.pscustomobject" => Ok(value),
+        "pscustomobject"
+        | "system.management.automation.pscustomobject"
+        | "ordered"
+        | "hashtable"
+        | "system.collections.hashtable"
+        | "ordereddictionary"
+        | "system.collections.specialized.ordereddictionary" => Ok(value),
         "int" | "int32" | "system.int32" => Ok(Value::Int32(convert_int32(&value)?)),
         "long" | "int64" | "system.int64" => Ok(Value::Int64(convert_int64(&value)?)),
         "double" | "system.double" => Ok(Value::Double(convert_double(&value)?)),
@@ -1035,6 +1131,146 @@ fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
     ])
 }
 
+fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
+    if name.eq_ignore_ascii_case("GetType") && arguments.is_empty() {
+        return Ok(Value::Type(target.type_name().to_owned().into()));
+    }
+    match target {
+        Value::String(text) => string_method(text, name, arguments),
+        Value::Object(entries) => object_method(entries, name, arguments),
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "method invocation on this type",
+        }),
+    }
+}
+
+fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
+    let units: Vec<u16> = text.units().collect();
+    match name.to_ascii_lowercase().as_str() {
+        "substring" => {
+            let start = int_argument(arguments.first())?;
+            let start = usize::try_from(start).map_err(|_| RuntimeError::NotImplemented {
+                feature: "Substring out of range",
+            })?;
+            let length = match arguments.get(1) {
+                Some(value) => usize::try_from(int_argument(Some(value))?).map_err(|_| {
+                    RuntimeError::NotImplemented {
+                        feature: "Substring out of range",
+                    }
+                })?,
+                None => units.len().saturating_sub(start),
+            };
+            let end = start
+                .checked_add(length)
+                .filter(|end| *end <= units.len())
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "Substring out of range",
+                })?;
+            Ok(Value::String(PsString::from_units(
+                units[start..end].to_vec(),
+            )))
+        }
+        "indexof" => {
+            let needle = needle_units(arguments.first())?;
+            Ok(Value::Int32(
+                find_units(&units, &needle).map_or(-1, |at| at as i32),
+            ))
+        }
+        "contains" => {
+            let needle = needle_units(arguments.first())?;
+            Ok(Value::Bool(find_units(&units, &needle).is_some()))
+        }
+        "toupper" | "tolower" => {
+            let ascii = text.as_ascii().ok_or(RuntimeError::NotImplemented {
+                feature: "culture-aware case conversion (ICU)",
+            })?;
+            let result = if name.eq_ignore_ascii_case("toupper") {
+                ascii.to_ascii_uppercase()
+            } else {
+                ascii.to_ascii_lowercase()
+            };
+            Ok(Value::String(result.into()))
+        }
+        "replace" => {
+            let old = needle_units(arguments.first())?;
+            let new = needle_units(arguments.get(1))?;
+            Ok(Value::String(replace_units(&units, &old, &new)))
+        }
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "this string method",
+        }),
+    }
+}
+
+fn object_method(
+    entries: &[(String, Value)],
+    name: &str,
+    arguments: &[Value],
+) -> Result<Value, RuntimeError> {
+    match name.to_ascii_lowercase().as_str() {
+        "containskey" => {
+            let Some(key) = arguments.first() else {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "ContainsKey without an argument",
+                });
+            };
+            let key = key.to_string();
+            Ok(Value::Bool(
+                entries
+                    .iter()
+                    .any(|(entry, _)| entry.eq_ignore_ascii_case(&key)),
+            ))
+        }
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "this object method",
+        }),
+    }
+}
+
+fn int_argument(value: Option<&Value>) -> Result<i32, RuntimeError> {
+    let value = value.ok_or(RuntimeError::NotImplemented {
+        feature: "method argument missing",
+    })?;
+    convert_int32(value)
+}
+
+fn needle_units(value: Option<&Value>) -> Result<Vec<u16>, RuntimeError> {
+    match value {
+        Some(Value::Char(unit)) => Ok(vec![*unit]),
+        Some(Value::String(text)) => Ok(text.units().collect()),
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "string method argument",
+        }),
+    }
+}
+
+fn find_units(haystack: &[u16], needle: &[u16]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
+}
+
+fn replace_units(haystack: &[u16], needle: &[u16], replacement: &[u16]) -> PsString {
+    if needle.is_empty() {
+        return PsString::from_units(haystack.to_vec());
+    }
+    let mut result = Vec::new();
+    let mut at = 0;
+    while at < haystack.len() {
+        if haystack[at..].starts_with(needle) {
+            result.extend_from_slice(replacement);
+            at += needle.len();
+        } else {
+            result.push(haystack[at]);
+            at += 1;
+        }
+    }
+    PsString::from_units(result)
+}
+
 /// Member enumeration: `$array.Name` yields `Name` from every element.
 fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError> {
     let mut values = Vec::new();
@@ -1055,9 +1291,7 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
     if found {
         Ok(Value::array(values))
     } else {
-        Err(RuntimeError::NotImplemented {
-            feature: "missing object property",
-        })
+        Ok(Value::Null)
     }
 }
 
@@ -1093,13 +1327,26 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
             if name.eq_ignore_ascii_case("pstypenames") {
                 return Ok(pstypenames());
             }
-            entries
+            if name.eq_ignore_ascii_case("Count") {
+                return Ok(Value::Int32(entries.len() as i32));
+            }
+            if name.eq_ignore_ascii_case("Keys") {
+                return Ok(Value::array(
+                    entries
+                        .iter()
+                        .map(|(key, _)| Value::String(key.clone().into()))
+                        .collect(),
+                ));
+            }
+            if name.eq_ignore_ascii_case("Values") {
+                return Ok(Value::array(
+                    entries.iter().map(|(_, value)| value.clone()).collect(),
+                ));
+            }
+            Ok(entries
                 .iter()
                 .find(|(key, _)| key.eq_ignore_ascii_case(name))
-                .map(|(_, value)| value.clone())
-                .ok_or(RuntimeError::NotImplemented {
-                    feature: "missing object property",
-                })
+                .map_or(Value::Null, |(_, value)| value.clone()))
         }
         _ => Err(RuntimeError::NotImplemented {
             feature: "member access other than GetType().FullName / .Name",
@@ -1151,6 +1398,14 @@ mod tests {
             Some("statement keywords (if, foreach, function, ...)")
         );
         assert_eq!(out, "");
+    }
+
+    #[test]
+    fn hashtables_index_assign_and_call_methods() {
+        let (result, out) =
+            run("$h = @{ a = 1 }; $h['a']; $h.b = 2; $h.ContainsKey('B'); $h.Keys -join ','");
+        assert_eq!(result.unwrap(), 0);
+        assert_eq!(out, "1\nTrue\na,b\n");
     }
 
     #[test]

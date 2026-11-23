@@ -43,6 +43,20 @@ pub enum Statement {
         value: Expr,
         span: Span,
     },
+    /// `$object.property = expression`.
+    MemberAssign {
+        target: Expr,
+        name: String,
+        value: Expr,
+        span: Span,
+    },
+    /// `$object[index] = expression`.
+    IndexAssign {
+        target: Expr,
+        index: Expr,
+        value: Expr,
+        span: Span,
+    },
     /// `if` / `elseif` / `else`. Upstream: `IfStatementAst`.
     If {
         condition: Expr,
@@ -164,8 +178,12 @@ pub enum ExprKind {
     Cast { type_name: String, value: Box<Expr> },
     /// Upstream: `MemberExpressionAst`.
     Member { target: Box<Expr>, name: String },
-    /// Upstream: `InvokeMemberExpressionAst` with no arguments.
-    InvokeMember { target: Box<Expr>, name: String },
+    /// Upstream: `InvokeMemberExpressionAst`.
+    InvokeMember {
+        target: Box<Expr>,
+        name: String,
+        arguments: Vec<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
