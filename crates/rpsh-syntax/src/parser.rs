@@ -541,7 +541,13 @@ impl Parser {
         let start = self.peek().span;
         self.pos += 1;
         let mut arguments = Vec::new();
-        while !self.at_statement_end() && self.peek().kind != TokenKind::Pipe {
+        while (!self.at_statement_end() || self.peek().kind == TokenKind::Comma)
+            && self.peek().kind != TokenKind::Pipe
+        {
+            if self.peek().kind == TokenKind::Comma {
+                self.pos += 1;
+                continue;
+            }
             if matches!(self.peek().kind, TokenKind::Redirection(_)) {
                 self.pos += 1;
                 continue;
@@ -593,6 +599,37 @@ impl Parser {
                     }
                     _ if self.argument_starts() => Some(self.unary()?),
                     _ => None,
+                };
+                let value = if self.peek().kind == TokenKind::Comma {
+                    match value {
+                        Some(first) => {
+                            let span = first.span;
+                            let mut items = vec![first];
+                            while self.peek().kind == TokenKind::Comma {
+                                self.pos += 1;
+                                let item = match &self.peek().kind {
+                                    TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
+                                        let word = word.clone();
+                                        let span = self.peek().span;
+                                        self.pos += 1;
+                                        Expr {
+                                            kind: ExprKind::String(word),
+                                            span,
+                                        }
+                                    }
+                                    _ => self.unary()?,
+                                };
+                                items.push(item);
+                            }
+                            Some(Expr {
+                                kind: ExprKind::Array(items),
+                                span,
+                            })
+                        }
+                        None => None,
+                    }
+                } else {
+                    value
                 };
                 arguments.push(CommandArgument::Parameter {
                     name: parameter,
