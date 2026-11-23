@@ -1755,15 +1755,24 @@ impl Engine {
                     }
                     .into());
                 };
-                let target = std::path::Path::new(&path);
-                if target.is_dir() {
-                    std::fs::remove_dir_all(target).map_err(|_| RuntimeError::NotImplemented {
-                        feature: "Remove-Item cannot remove this directory",
-                    })?;
-                } else if target.exists() {
-                    std::fs::remove_file(target).map_err(|_| RuntimeError::NotImplemented {
-                        feature: "Remove-Item cannot remove this file",
-                    })?;
+                let targets = if path.contains(['*', '?']) {
+                    expand_glob(&path)
+                } else {
+                    vec![path.clone()]
+                };
+                for path in targets {
+                    let target = std::path::Path::new(&path);
+                    if target.is_dir() {
+                        std::fs::remove_dir_all(target).map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "Remove-Item cannot remove this directory",
+                            }
+                        })?;
+                    } else if target.exists() {
+                        std::fs::remove_file(target).map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Remove-Item cannot remove this file",
+                        })?;
+                    }
                 }
                 Ok(Some(Vec::new()))
             }
