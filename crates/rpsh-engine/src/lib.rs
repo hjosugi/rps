@@ -148,6 +148,7 @@ type BoundArguments = (Vec<Value>, Vec<(String, Value)>);
 
 #[derive(Debug, Clone)]
 struct FunctionDef {
+    name: String,
     parameters: Vec<Parameter>,
     begin: Vec<Statement>,
     process: Vec<Statement>,
@@ -496,6 +497,7 @@ impl Engine {
                 self.functions.insert(
                     name.to_ascii_lowercase(),
                     FunctionDef {
+                        name: name.clone(),
                         parameters: parameters.clone(),
                         begin: begin.clone(),
                         process: process.clone(),
@@ -1756,6 +1758,36 @@ impl Engine {
                     self.globals.remove(key);
                 }
                 Ok(Some(Vec::new()))
+            }
+            "get-command" | "gcm" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let wanted = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let mut names: Vec<(String, &'static str)> = self
+                    .functions
+                    .values()
+                    .map(|function| (function.name.clone(), "Function"))
+                    .collect();
+                for builtin in BUILTIN_COMMANDS {
+                    names.push(((*builtin).to_owned(), "Cmdlet"));
+                }
+                let mut outputs = Vec::new();
+                for (name, kind) in names {
+                    let matches = wanted
+                        .as_deref()
+                        .is_none_or(|wanted| ops::wildcard_match(&name, wanted, false));
+                    if matches {
+                        outputs.push(Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.into())),
+                            ("CommandType".to_owned(), Value::String(kind.into())),
+                        ]));
+                    }
+                }
+                outputs.sort_by_key(|value| value.to_string());
+                Ok(Some(outputs))
             }
             "get-unique" => {
                 let mut outputs = Vec::new();
@@ -3363,6 +3395,51 @@ fn sort_key(value: &Value, property: &Value) -> String {
         Err(_) => String::new(),
     }
 }
+
+const BUILTIN_COMMANDS: &[&str] = &[
+    "Add-Content",
+    "ConvertFrom-Json",
+    "ConvertTo-Json",
+    "Copy-Item",
+    "ForEach-Object",
+    "Get-ChildItem",
+    "Get-Command",
+    "Get-Content",
+    "Get-Culture",
+    "Get-Item",
+    "Get-Location",
+    "Get-Random",
+    "Get-Unique",
+    "Get-UICulture",
+    "Get-Variable",
+    "Import-Module",
+    "Invoke-Expression",
+    "Join-Path",
+    "Measure-Object",
+    "Move-Item",
+    "New-Item",
+    "Out-File",
+    "Out-Null",
+    "Out-String",
+    "Remove-Item",
+    "Remove-Variable",
+    "Select-Object",
+    "Set-Content",
+    "Set-Location",
+    "Set-Variable",
+    "Sort-Object",
+    "Split-Path",
+    "Start-Sleep",
+    "Test-Path",
+    "Where-Object",
+    "Write-Debug",
+    "Write-Error",
+    "Write-Host",
+    "Write-Information",
+    "Write-Output",
+    "Write-Verbose",
+    "Write-Warning",
+];
 
 fn culture_rank(text: &str) -> u8 {
     match text.chars().next() {
