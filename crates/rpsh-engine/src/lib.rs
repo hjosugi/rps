@@ -38,6 +38,8 @@ pub struct Engine {
     host_objects: Vec<Value>,
     /// The generator Get-Random draws from; -SetSeed replaces it.
     random: Option<RandomGenerator>,
+    /// `$global:`/`$script:` variables, kept across function calls.
+    globals: HashMap<String, Value>,
 }
 
 /// .NET's seeded `System.Random` (the subtractive generator).
@@ -252,6 +254,13 @@ impl Engine {
         }
     }
 
+    fn restore_variables(&mut self, saved: HashMap<String, Value>) {
+        self.variables = saved;
+        for (key, value) in &self.globals {
+            self.variables.insert(key.clone(), value.clone());
+        }
+    }
+
     fn exec_block(
         &mut self,
         statements: &[Statement],
@@ -323,6 +332,9 @@ impl Engine {
                 let key = strip_scope(name);
                 if matches!(self.variables.get(key), None | Some(Value::Null)) {
                     let value = evaluate(value, &mut self.variables, self.last_success)?;
+                    if is_global_scope(name) {
+                        self.globals.insert(key.to_owned(), value.clone());
+                    }
                     self.variables.insert(key.to_owned(), value);
                 }
                 self.last_success = true;
@@ -333,6 +345,9 @@ impl Engine {
                 let key = strip_scope(name);
                 let old = self.variables.get(key).cloned().unwrap_or(Value::Null);
                 let updated = ops::add(&old, &value)?;
+                if is_global_scope(name) {
+                    self.globals.insert(key.to_owned(), updated.clone());
+                }
                 self.variables.insert(key.to_owned(), updated);
                 self.last_success = true;
                 Ok(Flow::Normal)
@@ -355,14 +370,21 @@ impl Engine {
                         .into());
                     }
                 };
+                if is_global_scope(name) {
+                    self.globals.insert(key.to_owned(), updated.clone());
+                }
                 self.variables.insert(key.to_owned(), updated);
                 self.last_success = true;
                 Ok(Flow::Normal)
             }
             Statement::Assign { name, value, .. } => {
                 let value = evaluate(value, &mut self.variables, self.last_success)?;
-                let key = strip_scope(name);
-                self.variables.insert(key.to_owned(), value);
+                let global = is_global_scope(name);
+                let key = strip_scope(name).to_owned();
+                if global {
+                    self.globals.insert(key.clone(), value.clone());
+                }
+                self.variables.insert(key, value);
                 self.last_success = true;
                 Ok(Flow::Normal)
             }
@@ -700,7 +722,7 @@ impl Engine {
         } else {
             self.exec_block(&function.body, out)
         };
-        self.variables = saved;
+        self.restore_variables(saved);
         self.trap = saved_trap;
         Ok(match flow? {
             Flow::Return(value) => {
@@ -918,7 +940,7 @@ impl Engine {
                 self.capture = Some(Vec::new());
                 let flow = self.exec_block(&function.body, &mut capture_sink());
                 let captured = self.capture.take().unwrap_or_default();
-                self.variables = saved;
+                self.restore_variables(saved);
                 outputs.extend(captured);
                 match flow? {
                     Flow::Return(Some(value)) => outputs.extend(flatten_value(value)),
@@ -952,7 +974,7 @@ impl Engine {
                 self.exec_block(&function.body, &mut capture_sink())
             };
             let captured = self.capture.take().unwrap_or_default();
-            self.variables = saved;
+            self.restore_variables(saved);
             outputs.extend(captured);
             match flow? {
                 Flow::Return(Some(value)) => outputs.extend(flatten_value(value)),
@@ -2774,6 +2796,10 @@ fn assignment_key(target: &Expr) -> Result<&str, RuntimeError> {
     }
 }
 
+fn is_global_scope(name: &str) -> bool {
+    name.starts_with("global:") || name.starts_with("script:")
+}
+
 fn strip_scope(name: &str) -> &str {
     for scope in ["global:", "script:", "local:", "private:", "using:"] {
         if let Some(rest) = name.strip_prefix(scope) {
@@ -2790,6 +2816,7 @@ fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) ->
         "false" => return Some(Value::Bool(false)),
         "?" => return Some(Value::Bool(last_success)),
         "_" => return variables.get("_").cloned().or(Some(Value::Null)),
+        "PSItem" => return variables.get("_").cloned().or(Some(Value::Null)),
         _ => {}
     }
     if let Some(rest) = name.strip_prefix("env:") {
@@ -2885,6 +2912,16 @@ fn automatic_variable(name: &str) -> Option<Value> {
         "IsWindows" | "IsMacOS" => Some(Value::Bool(false)),
         "IsCoreCLR" => Some(Value::Bool(true)),
         "PSEdition" => Some(Value::String("Core".into())),
+        "ErrorActionPreference"
+        | "VerbosePreference"
+        | "DebugPreference"
+        | "WarningPreference"
+        | "InformationPreference"
+        | "ProgressPreference" => Some(Value::String("SilentlyContinue".into())),
+        "PID" => Some(Value::Int32(std::process::id() as i32)),
+        "HOME" => std::env::var("HOME")
+            .ok()
+            .map(|value| Value::String(value.into())),
         _ => None,
     }
 }

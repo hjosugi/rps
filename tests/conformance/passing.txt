@@ -32,6 +32,7 @@ lang/numeric-promotion
 lang/operators
 lang/pipeline-basic
 lang/psobject
+lang/scopes
 lang/scriptblock
 lang/static-members
 lang/string-escapes
