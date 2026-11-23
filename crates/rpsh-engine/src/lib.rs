@@ -2650,9 +2650,12 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("property"))
                     .map(|(_, value)| value.clone());
-                Ok(Some(mark_format(input, "Table", property)))
+                let hide_headers = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("hidetableheaders") && ops::is_true(value)
+                });
+                Ok(Some(mark_format(input, "Table", property, hide_headers)))
             }
-            "format-list" | "fl" => Ok(Some(mark_format(input, "List", None))),
+            "format-list" | "fl" => Ok(Some(mark_format(input, "List", None, false))),
             "compare-object" | "diff" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let include_equal = named.iter().any(|(name, value)| {
@@ -4504,7 +4507,12 @@ fn hidden_type(value: &Value) -> Option<String> {
 
 /// The text `Out-String` returns for one pipeline, following the host's
 /// default table and list views for the shapes the conformance cases use.
-fn mark_format(input: &[Value], kind: &str, properties: Option<Value>) -> Vec<Value> {
+fn mark_format(
+    input: &[Value],
+    kind: &str,
+    properties: Option<Value>,
+    hide_headers: bool,
+) -> Vec<Value> {
     input
         .iter()
         .map(|item| match item {
@@ -4513,6 +4521,9 @@ fn mark_format(input: &[Value], kind: &str, properties: Option<Value>) -> Vec<Va
                 entries.push(("__Format".to_owned(), Value::String(kind.into())));
                 if let Some(properties) = &properties {
                     entries.push(("__TableProperty".to_owned(), properties.clone()));
+                }
+                if hide_headers {
+                    entries.push(("__HideHeaders".to_owned(), Value::Bool(true)));
                 }
                 Value::object(entries)
             }
@@ -4641,25 +4652,32 @@ fn format_out_string(input: &[Value]) -> String {
                 .unwrap_or(0)
         })
         .collect();
+    let hide_headers = matches!(
+        first,
+        Value::Object(entries)
+            if entries.iter().any(|(key, value)| key == "__HideHeaders" && ops::is_true(value))
+    );
     let mut text = String::from("\n");
-    text.push_str(
-        &columns
-            .iter()
-            .zip(&widths)
-            .map(|(column, width)| format!("{column:<width$}"))
-            .collect::<Vec<_>>()
-            .join(" "),
-    );
-    text.push('\n');
-    text.push_str(
-        &columns
-            .iter()
-            .zip(&widths)
-            .map(|(column, width)| format!("{:<width$}", "-".repeat(column.chars().count())))
-            .collect::<Vec<_>>()
-            .join(" "),
-    );
-    text.push('\n');
+    if !hide_headers {
+        text.push_str(
+            &columns
+                .iter()
+                .zip(&widths)
+                .map(|(column, width)| format!("{column:<width$}"))
+                .collect::<Vec<_>>()
+                .join(" "),
+        );
+        text.push('\n');
+        text.push_str(
+            &columns
+                .iter()
+                .zip(&widths)
+                .map(|(column, width)| format!("{:<width$}", "-".repeat(column.chars().count())))
+                .collect::<Vec<_>>()
+                .join(" "),
+        );
+        text.push('\n');
+    }
     for (row, _) in rows.iter().enumerate() {
         let cells: Vec<String> = columns
             .iter()
