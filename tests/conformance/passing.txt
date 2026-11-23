@@ -76,6 +76,7 @@ ops/comparison
 pipeline/compare-object
 pipeline/csv
 pipeline/foreach-blocks
+pipeline/get-member
 pipeline/group-measure-property
 pipeline/group-select
 pipeline/measure-select

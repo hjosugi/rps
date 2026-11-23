@@ -2347,6 +2347,36 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
+            "get-member" | "gm" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let member_type = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("membertype"))
+                    .map(|(_, value)| value.to_string());
+                let mut outputs = Vec::new();
+                for item in input {
+                    let Value::Object(entries) = item else {
+                        continue;
+                    };
+                    for (name, _) in visible_entries(entries) {
+                        if member_type
+                            .as_deref()
+                            .is_some_and(|wanted| !wanted.eq_ignore_ascii_case("NoteProperty"))
+                        {
+                            continue;
+                        }
+                        outputs.push(Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.clone().into())),
+                            (
+                                "MemberType".to_owned(),
+                                Value::String("NoteProperty".into()),
+                            ),
+                        ]));
+                    }
+                    break;
+                }
+                Ok(Some(outputs))
+            }
             "format-table" | "ft" => Ok(Some(input.to_vec())),
             "compare-object" | "diff" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
