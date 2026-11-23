@@ -9,5 +9,7 @@ Test-Path rpsh-files-test/b.txt
 Get-ChildItem rpsh-files-test | ForEach-Object Name
 Remove-Item rpsh-files-test/b.txt
 Test-Path rpsh-files-test/b.txt
+Rename-Item rpsh-files-test/a.txt -NewName c.txt
+(Get-ChildItem rpsh-files-test | ForEach-Object Name) -join ','
 Remove-Item rpsh-files-test -Recurse -Force
 Test-Path rpsh-files-test

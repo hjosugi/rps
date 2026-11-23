@@ -1653,6 +1653,41 @@ impl Engine {
                 }
                 Ok(Some(vec![item_value(&path)]))
             }
+            "rename-item" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let new_name = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("newname"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.get(1).map(ToString::to_string));
+                let (Some(path), Some(new_name)) = (path, new_name) else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Rename-Item without a path and new name",
+                    }
+                    .into());
+                };
+                let target = std::path::Path::new(&path).parent().map_or_else(
+                    || std::path::PathBuf::from(&new_name),
+                    |parent| parent.join(&new_name),
+                );
+                std::fs::rename(&path, &target).map_err(|_| RuntimeError::Script {
+                    id: "PathNotFound,Microsoft.PowerShell.Commands.RenameItemCommand",
+                    category: format!(
+                        "ObjectNotFound: ({path}:String) [Rename-Item], ItemNotFoundException"
+                    ),
+                    exception_type: "System.Management.Automation.ItemNotFoundException",
+                    message: format!("Cannot find path '{path}' because it does not exist."),
+                })?;
+                Ok(Some(Vec::new()))
+            }
             "new-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
