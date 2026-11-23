@@ -19,7 +19,7 @@ use std::process::Stdio;
 
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
-    BinaryOp, CommandArgument, Expr, ExprKind, NumberLiteral, Parameter, ParseError,
+    BinaryOp, CommandArgument, Expr, ExprKind, MethodDef, NumberLiteral, Parameter, ParseError,
     PipelineCommand, ScriptBlockAst, Statement, SwitchClause, UnaryOp, parse,
 };
 
@@ -40,6 +40,16 @@ pub struct Engine {
     random: Option<RandomGenerator>,
     /// `$global:`/`$script:` variables, kept across function calls.
     globals: HashMap<String, Value>,
+    /// User-defined PowerShell classes.
+    classes: HashMap<String, ClassDef>,
+}
+
+#[derive(Debug, Clone)]
+struct ClassDef {
+    name: String,
+    properties: Vec<(String, String)>,
+    constructors: Vec<MethodDef>,
+    methods: Vec<MethodDef>,
 }
 
 /// .NET's seeded `System.Random` (the subtractive generator).
@@ -288,6 +298,117 @@ impl Engine {
         }
     }
 
+    fn construct_class(
+        &mut self,
+        type_name: &str,
+        arguments: &[Value],
+    ) -> Result<Value, EngineError> {
+        let Some(class) = self.classes.get(&type_name.to_ascii_lowercase()).cloned() else {
+            return Err(RuntimeError::NotImplemented {
+                feature: "construction of this class",
+            }
+            .into());
+        };
+        let mut entries: Vec<(String, Value)> = class
+            .properties
+            .iter()
+            .map(|(kind, name)| {
+                let value = match normalize_type(kind).as_str() {
+                    "int32" | "int" | "int64" | "long" | "double" | "uint32" | "uint64"
+                    | "int16" | "uint16" | "byte" | "sbyte" => Value::Int32(0),
+                    "string" => Value::String("".into()),
+                    "bool" | "boolean" | "switch" => Value::Bool(false),
+                    _ => Value::Null,
+                };
+                (name.clone(), value)
+            })
+            .collect();
+        entries.push((
+            "__Class".to_owned(),
+            Value::String(class.name.clone().into()),
+        ));
+        entries.push((
+            "__TypeName".to_owned(),
+            Value::String(class.name.clone().into()),
+        ));
+        let mut object = Value::object(entries);
+        if let Some(constructor) = class
+            .constructors
+            .iter()
+            .find(|constructor| constructor.parameters.len() == arguments.len())
+        {
+            let saved = std::mem::take(&mut self.variables);
+            let mut local = saved.clone();
+            for (parameter, value) in constructor.parameters.iter().zip(arguments) {
+                let value = match &parameter.type_name {
+                    Some(type_name) => cast_to(type_name, value.clone())?,
+                    None => value.clone(),
+                };
+                local.insert(parameter.name.clone(), value);
+            }
+            local.insert("this".to_owned(), object.clone());
+            self.variables = local;
+            let flow = self.exec_block(&constructor.body, &mut capture_sink());
+            if let Value::Object(entries) =
+                self.variables.get("this").cloned().unwrap_or(Value::Null)
+            {
+                object = Value::Object(entries);
+            }
+            self.restore_variables(saved);
+            flow?;
+        }
+        Ok(object)
+    }
+
+    fn call_method(
+        &mut self,
+        class_name: &str,
+        method: &str,
+        target: &Value,
+        arguments: &[Value],
+    ) -> Result<Value, EngineError> {
+        let Some(class) = self.classes.get(&class_name.to_ascii_lowercase()).cloned() else {
+            return Err(RuntimeError::NotImplemented {
+                feature: "this class method",
+            }
+            .into());
+        };
+        let Some(definition) = class
+            .methods
+            .iter()
+            .find(|definition| definition.name.eq_ignore_ascii_case(method))
+            .cloned()
+        else {
+            return Ok(Value::Null);
+        };
+        let saved = std::mem::take(&mut self.variables);
+        let mut local = saved.clone();
+        for (parameter, value) in definition.parameters.iter().zip(arguments) {
+            let value = match &parameter.type_name {
+                Some(type_name) => cast_to(type_name, value.clone())?,
+                None => value.clone(),
+            };
+            local.insert(parameter.name.clone(), value);
+        }
+        local.insert("this".to_owned(), target.clone());
+        self.variables = local;
+        let saved_capture = self.capture.take();
+        self.capture = Some(Vec::new());
+        let flow = self.exec_block(&definition.body, &mut capture_sink());
+        let mut outputs = self.capture.take().unwrap_or_default();
+        self.capture = saved_capture;
+        self.restore_variables(saved);
+        match flow? {
+            Flow::Return(Some(value)) => Ok(value),
+            Flow::Return(None) => Ok(Value::Null),
+            _ => Ok(match outputs.len() {
+                0 => Value::Null,
+                1 => outputs.pop().unwrap_or(Value::Null),
+                _ => Value::array(outputs),
+            }),
+        }
+    }
+
     fn restore_variables(&mut self, saved: HashMap<String, Value>) {
         self.variables = saved;
         for (key, value) in &self.globals {
@@ -365,7 +486,7 @@ impl Engine {
             Statement::CoalesceAssign { name, value, .. } => {
                 let key = strip_scope(name);
                 if matches!(self.variables.get(key), None | Some(Value::Null)) {
-                    let value = evaluate(value, &mut self.variables, self.last_success)?;
+                    let value = self.eval_expression(value)?;
                     if is_global_scope(name) {
                         self.globals.insert(key.to_owned(), value.clone());
                     }
@@ -375,7 +496,7 @@ impl Engine {
                 Ok(Flow::Normal)
             }
             Statement::AppendAssign { name, value, .. } => {
-                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(value)?;
                 let key = strip_scope(name);
                 let old = self.variables.get(key).cloned().unwrap_or(Value::Null);
                 let updated = ops::add(&old, &value)?;
@@ -389,7 +510,7 @@ impl Engine {
             Statement::CompoundAssign {
                 name, op, value, ..
             } => {
-                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(value)?;
                 let key = strip_scope(name);
                 let old = self.variables.get(key).cloned().unwrap_or(Value::Null);
                 let updated = match op {
@@ -412,7 +533,7 @@ impl Engine {
                 Ok(Flow::Normal)
             }
             Statement::Assign { name, value, .. } => {
-                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(value)?;
                 let global = is_global_scope(name);
                 let key = strip_scope(name).to_owned();
                 if global {
@@ -428,7 +549,7 @@ impl Engine {
                 value,
                 ..
             } => {
-                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(value)?;
                 let key = assignment_key(target)?;
                 let mut entries = match self.variables.get(key) {
                     Some(Value::Object(entries)) => entries.as_ref().clone(),
@@ -458,8 +579,8 @@ impl Engine {
                 value,
                 ..
             } => {
-                let value = evaluate(value, &mut self.variables, self.last_success)?;
-                let index = evaluate(index, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(value)?;
+                let index = self.eval_expression(index)?;
                 let key = assignment_key(target)?;
                 let mut entries = match self.variables.get(key) {
                     Some(Value::Object(entries)) => entries.as_ref().clone(),
@@ -582,7 +703,7 @@ impl Engine {
                 body,
                 ..
             } => {
-                let value = evaluate(collection, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(collection)?;
                 let items = match value {
                     Value::Array(items) => (*items).clone(),
                     Value::Null => Vec::new(),
@@ -685,6 +806,24 @@ impl Engine {
                 }
                 Ok(flow)
             }
+            Statement::Class {
+                name,
+                properties,
+                constructors,
+                methods,
+                ..
+            } => {
+                self.classes.insert(
+                    name.to_ascii_lowercase(),
+                    ClassDef {
+                        name: name.clone(),
+                        properties: properties.clone(),
+                        constructors: constructors.clone(),
+                        methods: methods.clone(),
+                    },
+                );
+                Ok(Flow::Normal)
+            }
             Statement::Enum { name, members, .. } => {
                 let mut next = 0i64;
                 for (member, value) in members {
@@ -744,12 +883,12 @@ impl Engine {
                 Ok(Flow::Normal)
             }
             Statement::Throw { value, .. } => {
-                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(value)?;
                 Ok(Flow::Throw(value))
             }
             Statement::Return { value, .. } => {
                 let value = match value {
-                    Some(value) => Some(evaluate(value, &mut self.variables, self.last_success)?),
+                    Some(value) => Some(self.eval_expression(value)?),
                     None => None,
                 };
                 Ok(Flow::Return(value))
@@ -759,7 +898,7 @@ impl Engine {
             Statement::Exit { code: None, .. } => Ok(Flow::Exit(0)),
             Statement::Exit {
                 code: Some(code), ..
-            } => match evaluate(code, &mut self.variables, self.last_success)? {
+            } => match self.eval_expression(code)? {
                 Value::Int32(code) => Ok(Flow::Exit(code)),
                 _ => Err(RuntimeError::NotImplemented {
                     feature: "exit with a value other than Int32",
@@ -2239,6 +2378,39 @@ impl Engine {
     }
 
     fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
+        if let ExprKind::InvokeStatic {
+            type_name,
+            name,
+            arguments,
+        } = &expr.kind
+            && name.eq_ignore_ascii_case("new")
+            && self.classes.contains_key(&type_name.to_ascii_lowercase())
+        {
+            let mut values = Vec::with_capacity(arguments.len());
+            for argument in arguments {
+                values.push(self.eval_expression(argument)?);
+            }
+            return self.construct_class(type_name, &values);
+        }
+        if let ExprKind::InvokeMember {
+            target,
+            name,
+            arguments,
+        } = &expr.kind
+        {
+            let target = self.eval_expression(target)?;
+            let mut values = Vec::with_capacity(arguments.len());
+            for argument in arguments {
+                values.push(self.eval_expression(argument)?);
+            }
+            if let Value::Object(entries) = &target
+                && let Some(class) = object_class(entries)
+                && self.classes.contains_key(&class.to_ascii_lowercase())
+            {
+                return self.call_method(&class, name, &target, &values);
+            }
+            return Ok(invoke_member(&target, name, &values)?);
+        }
         if let ExprKind::Group(statements) = &expr.kind {
             return self.eval_group(statements);
         }
@@ -2271,7 +2443,7 @@ impl Engine {
             && let ExprKind::Group(statements) = &target.kind
         {
             let target = self.eval_group(statements)?;
-            let index = evaluate(index, &mut self.variables, self.last_success)?;
+            let index = self.eval_expression(index)?;
             return Ok(index_value(&target, &index)?);
         }
         if let ExprKind::Binary {
@@ -3201,6 +3373,19 @@ fn visible_entries(entries: &[(String, Value)]) -> Vec<(&String, &Value)> {
         .filter(|(key, _)| !is_hidden(key))
         .map(|(key, value)| (key, value))
         .collect()
+}
+
+fn object_class(entries: &[(String, Value)]) -> Option<String> {
+    entries.iter().find_map(|(key, value)| {
+        if key == "__Class" {
+            match value {
+                Value::String(text) => Some(text.to_string_lossy()),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    })
 }
 
 fn hidden_type(value: &Value) -> Option<String> {
@@ -4874,7 +5059,7 @@ mod tests {
 
     #[test]
     fn an_unparsable_script_runs_nothing() {
-        let (result, out) = run("1\n2\nclass Foo { }");
+        let (result, out) = run("1\n2\nworkflow Foo { }");
         assert_eq!(
             result.unwrap_err().missing_feature(),
             Some("statement keywords (if, foreach, function, ...)")

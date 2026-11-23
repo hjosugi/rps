@@ -142,6 +142,14 @@ pub enum Statement {
         finally: Option<Vec<Statement>>,
         span: Span,
     },
+    /// `class Name { ... }`.
+    Class {
+        name: String,
+        properties: Vec<(String, String)>,
+        constructors: Vec<MethodDef>,
+        methods: Vec<MethodDef>,
+        span: Span,
+    },
     /// `enum Name { A; B = 2 }`.
     Enum {
         name: String,
@@ -206,6 +214,14 @@ pub enum CommandArgument {
     Parameter { name: String, value: Option<Expr> },
     /// A bare word such as `Add hello`.
     Bareword(String),
+}
+
+/// A constructor or method of a PowerShell class.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MethodDef {
+    pub name: String,
+    pub parameters: Vec<Parameter>,
+    pub body: Vec<Statement>,
 }
 
 /// One `catch` clause of a `try` statement. Upstream: `CatchClauseAst`.

@@ -17,6 +17,7 @@ contract/version-table
 expr/int-arithmetic
 expr/string-literals
 lang/array
+lang/class
 lang/comparison-basic
 lang/comparison-filter
 lang/comparison-insensitive

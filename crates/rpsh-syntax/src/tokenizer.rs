@@ -169,6 +169,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::If => TokenKind::If,
             FullTokenKind::Function => TokenKind::Function,
             FullTokenKind::Enum => TokenKind::Enum,
+            FullTokenKind::Class => TokenKind::Class,
             FullTokenKind::Filter => TokenKind::Filter,
             FullTokenKind::Param => TokenKind::Param,
             FullTokenKind::Begin => TokenKind::Begin,
@@ -393,7 +394,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            refused("class Foo { }"),
+            refused("workflow Foo { }"),
             "statement keywords (if, foreach, function, ...)"
         );
         assert_eq!(

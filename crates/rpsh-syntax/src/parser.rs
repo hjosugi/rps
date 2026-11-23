@@ -1,6 +1,7 @@
 use crate::{
-    BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, Parameter, ParseError, PipelineCommand,
-    ScriptBlockAst, Span, Statement, StringPart, SwitchClause, Token, TokenKind, UnaryOp, tokenize,
+    BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, MethodDef, Parameter, ParseError,
+    PipelineCommand, ScriptBlockAst, Span, Statement, StringPart, SwitchClause, Token, TokenKind,
+    UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -207,6 +208,7 @@ impl Parser {
             TokenKind::Continue => self.break_statement(true),
             TokenKind::Function => self.function_statement(false),
             TokenKind::Enum => self.enum_statement(),
+            TokenKind::Class => self.class_statement(),
             TokenKind::Filter => self.function_statement(true),
             TokenKind::Identifier(name) | TokenKind::Bareword(name) => {
                 let statement = self.command_statement(name.clone())?;
@@ -649,6 +651,73 @@ impl Parser {
                 | TokenKind::Not
                 | TokenKind::Bnot
         )
+    }
+
+    fn class_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let name = match &self.peek().kind {
+            TokenKind::Identifier(name) | TokenKind::Bareword(name) => name.clone(),
+            _ => return self.refuse(SYNTAX_ERRORS),
+        };
+        self.pos += 1;
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::LCurly {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        let mut properties = Vec::new();
+        let mut constructors = Vec::new();
+        let mut methods = Vec::new();
+        loop {
+            while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
+                self.pos += 1;
+            }
+            if self.peek().kind == TokenKind::RCurly {
+                self.pos += 1;
+                break;
+            }
+            if self.peek().kind == TokenKind::EndOfInput {
+                return self.refuse(SYNTAX_ERRORS);
+            }
+            let mut type_name = None;
+            if self.peek().kind == TokenKind::LBracket {
+                type_name = Some(self.exception_type()?);
+            }
+            self.skip_newlines();
+            match &self.peek().kind {
+                TokenKind::Variable(property) => {
+                    let property = property.clone();
+                    self.pos += 1;
+                    properties.push((type_name.unwrap_or_else(|| "object".to_owned()), property));
+                }
+                TokenKind::Identifier(member) | TokenKind::Bareword(member) => {
+                    let member = member.clone();
+                    self.pos += 1;
+                    let parameters = self.parameter_list()?;
+                    let body = self.block()?.0;
+                    let definition = MethodDef {
+                        name: member.clone(),
+                        parameters,
+                        body,
+                    };
+                    if member.eq_ignore_ascii_case(&name) {
+                        constructors.push(definition);
+                    } else {
+                        methods.push(definition);
+                    }
+                }
+                _ => return self.refuse(SYNTAX_ERRORS),
+            }
+        }
+        let span = start.to(self.previous_span());
+        Ok(Statement::Class {
+            name,
+            properties,
+            constructors,
+            methods,
+            span,
+        })
     }
 
     fn enum_statement(&mut self) -> Result<Statement, ParseError> {
@@ -2399,6 +2468,7 @@ mod tests {
                 value,
                 ..
             } => format!("{}[{}] = {}", show(target), show(index), show(value)),
+            Statement::Class { name, .. } => format!("class {name}"),
             Statement::Enum { name, members, .. } => format!(
                 "enum {name} {{ {} }}",
                 members
@@ -2480,7 +2550,7 @@ mod tests {
         assert_eq!(refused("+1"), "unary plus");
         assert_eq!(refused("(1\n)"), "newlines inside parentheses");
         assert_eq!(
-            refused("class Foo { }"),
+            refused("workflow Foo { }"),
             "statement keywords (if, foreach, function, ...)"
         );
     }

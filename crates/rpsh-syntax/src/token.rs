@@ -114,6 +114,7 @@ pub enum TokenKind {
     ElseIf,
     Function,
     Enum,
+    Class,
     Filter,
     Param,
     Begin,
