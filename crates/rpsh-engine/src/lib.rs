@@ -1526,6 +1526,32 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "get-culture" | "get-uiculture" => Ok(Some(vec![culture_value()])),
+            "resolve-path" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Resolve-Path without a path",
+                    }
+                    .into());
+                };
+                let resolved = std::fs::canonicalize(&path).map_err(|_| RuntimeError::Script {
+                    id: "PathNotFound,Microsoft.PowerShell.Commands.ResolvePathCommand",
+                    category: format!(
+                        "ObjectNotFound: ({path}:String) [Resolve-Path], ItemNotFoundException"
+                    ),
+                    exception_type: "System.Management.Automation.ItemNotFoundException",
+                    message: format!("Cannot find path '{path}' because it does not exist."),
+                })?;
+                Ok(Some(vec![Value::object(vec![(
+                    "Path".to_owned(),
+                    Value::String(resolved.to_string_lossy().to_string().into()),
+                )])]))
+            }
             "get-item" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
                 let Some(path) = positional.first() else {
@@ -1817,16 +1843,25 @@ impl Engine {
                 Ok(Some(lines))
             }
             "test-path" => {
-                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let (positional, named) = self.evaluate_arguments(arguments)?;
                 let Some(path) = positional.first() else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Test-Path without a path",
                     }
                     .into());
                 };
-                Ok(Some(vec![Value::Bool(
-                    std::path::Path::new(&path.to_string()).exists(),
-                )]))
+                let path_text = path.to_string();
+                let target = std::path::Path::new(&path_text);
+                let matches = match named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("pathtype"))
+                    .map(|(_, value)| value.to_string())
+                {
+                    Some(kind) if kind.eq_ignore_ascii_case("leaf") => target.is_file(),
+                    Some(kind) if kind.eq_ignore_ascii_case("container") => target.is_dir(),
+                    _ => target.exists(),
+                };
+                Ok(Some(vec![Value::Bool(matches)]))
             }
             "join-path" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
@@ -2807,15 +2842,32 @@ impl Engine {
             let index = self.eval_expression(index)?;
             return Ok(index_value(&target, &index)?);
         }
-        if let ExprKind::Binary {
-            op: BinaryOp::Join,
-            left,
-            right,
-        } = &expr.kind
+        if let ExprKind::Binary { op, left, right } = &expr.kind
+            && (contains_group(left) || contains_group(right))
         {
             let left = self.eval_expression(left)?;
-            let right = evaluate(right, &mut self.variables, self.last_success)?;
-            return Ok(ops::join(&left, &right)?);
+            let right = self.eval_expression(right)?;
+            let result = match op {
+                BinaryOp::Join => ops::join(&left, &right)?,
+                BinaryOp::Add => ops::add(&left, &right)?,
+                BinaryOp::Subtract => ops::subtract(&left, &right)?,
+                BinaryOp::Multiply => ops::multiply(&left, &right)?,
+                BinaryOp::Divide => ops::divide(&left, &right)?,
+                BinaryOp::Remainder => ops::remainder(&left, &right)?,
+                BinaryOp::Eq => ops::compare(&left, &right, ops::Comparison::Eq, false)?,
+                BinaryOp::Ne => ops::compare(&left, &right, ops::Comparison::Ne, false)?,
+                BinaryOp::Gt => ops::compare(&left, &right, ops::Comparison::Gt, false)?,
+                BinaryOp::Ge => ops::compare(&left, &right, ops::Comparison::Ge, false)?,
+                BinaryOp::Lt => ops::compare(&left, &right, ops::Comparison::Lt, false)?,
+                BinaryOp::Le => ops::compare(&left, &right, ops::Comparison::Le, false)?,
+                _ => {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "this operator on a group expression",
+                    }
+                    .into());
+                }
+            };
+            return Ok(result);
         }
         Ok(evaluate(expr, &mut self.variables, self.last_success)?)
     }
@@ -4246,6 +4298,23 @@ fn culture_case(text: &str) -> u8 {
         Some(ch) if ch.is_lowercase() => 0,
         Some(ch) if ch.is_uppercase() => 1,
         _ => 0,
+    }
+}
+
+fn contains_group(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::Group(_) => true,
+        ExprKind::Member { target, .. } => contains_group(target),
+        ExprKind::Index { target, index } => contains_group(target) || contains_group(index),
+        ExprKind::Binary { left, right, .. } => contains_group(left) || contains_group(right),
+        ExprKind::Unary { operand, .. } => contains_group(operand),
+        ExprKind::Paren(inner) | ExprKind::Subexpression(inner) => contains_group(inner),
+        ExprKind::Ternary {
+            condition,
+            when_true,
+            when_false,
+        } => contains_group(condition) || contains_group(when_true) || contains_group(when_false),
+        _ => false,
     }
 }
 

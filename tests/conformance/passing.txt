@@ -10,6 +10,7 @@ cmdlets/files
 cmdlets/format-mixed-stream
 cmdlets/json
 cmdlets/json-pretty
+cmdlets/path-ops
 cmdlets/write-output
 contract/collection-order
 contract/console
