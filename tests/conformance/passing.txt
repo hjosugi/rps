@@ -35,6 +35,7 @@ lang/wildcard
 native/capture
 native/environment
 native/exit-code
+native/glob
 native/pipe
 ops/comparison
 pipeline/where-foreach

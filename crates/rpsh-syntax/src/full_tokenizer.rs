@@ -596,6 +596,9 @@ impl Tokenizer<'_> {
         } else {
             close
         };
+        // A string in a command's argument list keeps command mode for the
+        // arguments that follow it.
+        let command_argument = self.mode == Mode::Command && self.command_seen;
         let start = self.pos;
         self.pos += quote.len_utf8();
         while let Some(ch) = self.char() {
@@ -606,7 +609,11 @@ impl Tokenizer<'_> {
                     continue;
                 }
                 self.push(kind, start, self.pos);
-                self.mode = Mode::Expression;
+                self.mode = if command_argument {
+                    Mode::Command
+                } else {
+                    Mode::Expression
+                };
                 self.statement_start = false;
                 return Ok(true);
             }
@@ -624,7 +631,11 @@ impl Tokenizer<'_> {
         }
         // Unterminated: the parser reports the missing quote.
         self.push(kind, start, self.pos);
-        self.mode = Mode::Expression;
+        self.mode = if command_argument {
+            Mode::Command
+        } else {
+            Mode::Expression
+        };
         self.statement_start = false;
         Ok(true)
     }
@@ -917,7 +928,7 @@ impl Tokenizer<'_> {
                 ch.is_alphanumeric()
                     || matches!(
                         ch,
-                        '_' | '-' | '.' | '/' | '\\' | ':' | '+' | '~' | '@' | '%' | '?'
+                        '_' | '-' | '.' | '/' | '\\' | ':' | '+' | '~' | '@' | '%' | '?' | '*'
                     )
                     || (self.command_seen && (ch == '[' || ch == ']'))
             } else {
