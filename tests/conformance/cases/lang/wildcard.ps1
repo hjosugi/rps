@@ -1,0 +1,12 @@
+# rpsh-conformance: level=c2
+'a' -like 'a'
+'abc' -like 'a*'
+'abc' -like 'a?c'
+'abc' -like 'a[bx]c'
+'abc' -like 'a[a-c]c'
+'abc' -like 'a[d]c'
+'ABC' -like 'a*'
+'ABC' -clike 'A*'
+'a*c' -like 'a`*c'
+'a[bc]' -like 'a`[bc`]'
+'abc' -notlike 'a?d'

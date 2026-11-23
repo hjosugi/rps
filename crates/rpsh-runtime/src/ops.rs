@@ -450,6 +450,16 @@ fn compare_strings(
     }
 }
 
+#[derive(Debug, Clone)]
+enum WildcardAtom {
+    Star,
+    Any,
+    Char(char),
+    Class(Vec<(char, char)>),
+}
+
+/// `.NET`'s wildcard matching: `*`, `?`, `[abc]`, `[a-z]` and a backtick that
+/// escapes the next character. A malformed class (`[` with no `]`) is literal.
 fn wildcard(text: &str, pattern: &str, case_sensitive: bool) -> bool {
     let text: Vec<char> = if case_sensitive {
         text.chars().collect()
@@ -461,15 +471,25 @@ fn wildcard(text: &str, pattern: &str, case_sensitive: bool) -> bool {
     } else {
         pattern.to_lowercase().chars().collect()
     };
+    let atoms = wildcard_atoms(&pattern);
     let mut ti = 0;
     let mut pi = 0;
     let mut star = None;
     let mut match_at = 0;
     while ti < text.len() {
-        if pi < pattern.len() && (pattern[pi] == '?' || pattern[pi] == text[ti]) {
+        let matches = pi < atoms.len()
+            && match &atoms[pi] {
+                WildcardAtom::Star => false,
+                WildcardAtom::Any => true,
+                WildcardAtom::Char(ch) => *ch == text[ti],
+                WildcardAtom::Class(ranges) => ranges
+                    .iter()
+                    .any(|(low, high)| (*low..=*high).contains(&text[ti])),
+            };
+        if matches {
             ti += 1;
             pi += 1;
-        } else if pi < pattern.len() && pattern[pi] == '*' {
+        } else if pi < atoms.len() && matches!(&atoms[pi], WildcardAtom::Star) {
             star = Some(pi);
             match_at = ti;
             pi += 1;
@@ -481,10 +501,64 @@ fn wildcard(text: &str, pattern: &str, case_sensitive: bool) -> bool {
             return false;
         }
     }
-    while pi < pattern.len() && pattern[pi] == '*' {
+    while pi < atoms.len() && matches!(&atoms[pi], WildcardAtom::Star) {
         pi += 1;
     }
-    pi == pattern.len()
+    pi == atoms.len()
+}
+
+fn wildcard_atoms(pattern: &[char]) -> Vec<WildcardAtom> {
+    let mut atoms = Vec::new();
+    let mut at = 0;
+    while at < pattern.len() {
+        match pattern[at] {
+            '*' => {
+                atoms.push(WildcardAtom::Star);
+                at += 1;
+            }
+            '?' => {
+                atoms.push(WildcardAtom::Any);
+                at += 1;
+            }
+            '`' => {
+                if let Some(ch) = pattern.get(at + 1) {
+                    atoms.push(WildcardAtom::Char(*ch));
+                    at += 2;
+                } else {
+                    atoms.push(WildcardAtom::Char('`'));
+                    at += 1;
+                }
+            }
+            '[' => {
+                let Some(end) = pattern[at + 1..].iter().position(|ch| *ch == ']') else {
+                    atoms.push(WildcardAtom::Char('['));
+                    at += 1;
+                    continue;
+                };
+                let inner = &pattern[at + 1..at + 1 + end];
+                let mut ranges = Vec::new();
+                let mut index = 0;
+                while index < inner.len() {
+                    if inner.get(index + 1) == Some(&'-')
+                        && let Some(high) = inner.get(index + 2)
+                    {
+                        ranges.push((inner[index], *high));
+                        index += 3;
+                    } else {
+                        ranges.push((inner[index], inner[index]));
+                        index += 1;
+                    }
+                }
+                atoms.push(WildcardAtom::Class(ranges));
+                at = at + 1 + end + 1;
+            }
+            ch => {
+                atoms.push(WildcardAtom::Char(ch));
+                at += 1;
+            }
+        }
+    }
+    atoms
 }
 
 /// `-contains` / `-in`.
@@ -786,6 +860,18 @@ mod tests {
         assert_eq!(divide(&int(7), &int(2)), Ok(Value::Double(3.5)));
         assert_eq!(divide(&Value::Int64(6), &int(2)), Ok(Value::Int64(3)));
         assert_eq!(divide(&Value::UInt32(7), &int(2)), Ok(Value::Double(3.5)));
+    }
+
+    #[test]
+    fn wildcards_match_classes_and_escapes() {
+        assert!(wildcard("abc", "a?c", true));
+        assert!(wildcard("abc", "a[bx]c", true));
+        assert!(wildcard("abc", "a[a-c]c", true));
+        assert!(!wildcard("abc", "a[d]c", true));
+        assert!(wildcard("ABC", "a*", false));
+        assert!(!wildcard("ABC", "a*", true));
+        assert!(wildcard("a*c", "a`*c", true));
+        assert!(wildcard("a[bc]", "a`[bc`]", true));
     }
 
     #[test]

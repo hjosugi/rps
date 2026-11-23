@@ -21,6 +21,7 @@ lang/ternary
 lang/type-conversion
 lang/type-ops
 lang/variable-paths
+lang/wildcard
 ops/comparison
 stmt/crlf
 stmt/empty
