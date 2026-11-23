@@ -783,8 +783,7 @@ impl Tokenizer<'_> {
         {
             return false;
         }
-        if self.mode == Mode::Command
-            && let Some(next) = self.source[end..].chars().next()
+        if let Some(next) = self.source[end..].chars().next()
             && !next.is_whitespace()
             && !matches!(
                 next,
@@ -992,7 +991,7 @@ impl Tokenizer<'_> {
             } else if after_dot {
                 ch.is_alphanumeric() || ch == '_'
             } else {
-                ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '.'
+                ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '.' || ch == '/'
             };
             if accepted {
                 at += ch.len_utf8();

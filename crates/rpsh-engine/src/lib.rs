@@ -1587,14 +1587,19 @@ impl Engine {
                 )])]))
             }
             "get-item" => {
-                let (positional, _) = self.evaluate_arguments(arguments)?;
-                let Some(path) = positional.first() else {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-Item without a path",
                     }
                     .into());
                 };
-                let text = path.to_string();
+                let text = path;
                 if !std::path::Path::new(&text).exists() {
                     return Err(RuntimeError::Script {
                         id: "PathNotFound,Microsoft.PowerShell.Commands.GetItemCommand",
@@ -1666,6 +1671,14 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("itemtype"))
                     .map_or_else(|| "file".to_owned(), |(_, value)| value.to_string());
+                let path = match named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                {
+                    Some(name) => format!("{path}/{name}"),
+                    None => path,
+                };
                 let target = std::path::Path::new(&path);
                 if item_type.eq_ignore_ascii_case("directory") {
                     std::fs::create_dir_all(target).map_err(|_| RuntimeError::NotImplemented {
@@ -1727,12 +1740,17 @@ impl Engine {
             }
             "copy-item" | "cp" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
+                let source = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
                 let destination = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("destination"))
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.get(1).map(ToString::to_string));
-                let (Some(source), Some(destination)) = (positional.first(), destination) else {
+                let (Some(source), Some(destination)) = (source, destination) else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Copy-Item without source and destination",
                     }
@@ -1741,7 +1759,6 @@ impl Engine {
                 let recurse = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("recurse") && ops::is_true(value)
                 });
-                let source = source.to_string();
                 if std::path::Path::new(&source).is_dir() && recurse {
                     copy_directory(&source, &destination).map_err(|_| {
                         RuntimeError::NotImplemented {
@@ -1749,7 +1766,7 @@ impl Engine {
                         }
                     })?;
                 } else {
-                    std::fs::copy(source, &destination).map_err(|_| {
+                    std::fs::copy(&source, &destination).map_err(|_| {
                         RuntimeError::NotImplemented {
                             feature: "Copy-Item cannot copy this file",
                         }
@@ -1759,18 +1776,23 @@ impl Engine {
             }
             "move-item" | "mv" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
+                let source = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
                 let destination = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("destination"))
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.get(1).map(ToString::to_string));
-                let (Some(source), Some(destination)) = (positional.first(), destination) else {
+                let (Some(source), Some(destination)) = (source, destination) else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Move-Item without source and destination",
                     }
                     .into());
                 };
-                std::fs::rename(source.to_string(), &destination).map_err(|_| {
+                std::fs::rename(&source, &destination).map_err(|_| {
                     RuntimeError::NotImplemented {
                         feature: "Move-Item cannot move this file",
                     }
@@ -5957,10 +5979,10 @@ mod tests {
 
     #[test]
     fn an_unparsable_script_runs_nothing() {
-        let (result, out) = run("1\n2\nworkflow Foo { }");
+        let (result, out) = run("1\n2\n1 2");
         assert_eq!(
             result.unwrap_err().missing_feature(),
-            Some("statement keywords (if, foreach, function, ...)")
+            Some("syntax error reporting")
         );
         assert_eq!(out, "");
     }

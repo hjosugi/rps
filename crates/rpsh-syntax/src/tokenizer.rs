@@ -193,6 +193,30 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::Return => TokenKind::Return,
             FullTokenKind::Break => TokenKind::Break,
             FullTokenKind::Continue => TokenKind::Continue,
+            FullTokenKind::Base
+            | FullTokenKind::From
+            | FullTokenKind::Data
+            | FullTokenKind::Define
+            | FullTokenKind::Dynamicparam
+            | FullTokenKind::Hidden
+            | FullTokenKind::Using
+            | FullTokenKind::Var
+            | FullTokenKind::Workflow
+            | FullTokenKind::Parallel
+            | FullTokenKind::Sequence
+            | FullTokenKind::InlineScript
+            | FullTokenKind::Configuration
+            | FullTokenKind::DynamicKeyword
+            | FullTokenKind::Public
+            | FullTokenKind::Private
+            | FullTokenKind::Static
+            | FullTokenKind::Interface
+            | FullTokenKind::Namespace
+            | FullTokenKind::Module
+            | FullTokenKind::Type
+            | FullTokenKind::Assembly
+            | FullTokenKind::Command
+            | FullTokenKind::Clean => TokenKind::Bareword(span.text(source).to_owned()),
             FullTokenKind::EndOfInput => TokenKind::EndOfInput,
             FullTokenKind::Comment => {
                 let text = span.text(source);
@@ -394,8 +418,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            refused("workflow Foo { }"),
-            "statement keywords (if, foreach, function, ...)"
+            refused("& foo"),
+            "call operator, background operator and && chains"
         );
         assert_eq!(
             kinds(

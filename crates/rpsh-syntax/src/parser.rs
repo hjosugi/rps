@@ -2555,10 +2555,7 @@ mod tests {
         assert_eq!(refused("1 +"), SYNTAX_ERRORS);
         assert_eq!(refused("+1"), "unary plus");
         assert_eq!(refused("(1\n)"), "newlines inside parentheses");
-        assert_eq!(
-            refused("workflow Foo { }"),
-            "statement keywords (if, foreach, function, ...)"
-        );
+        assert_eq!(refused("1 2"), "syntax error reporting");
     }
 
     #[test]

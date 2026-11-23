@@ -14,6 +14,7 @@ cmdlets/format-table
 cmdlets/item-props
 cmdlets/json
 cmdlets/json-pretty
+cmdlets/named-paths
 cmdlets/path-ops
 cmdlets/write-output
 contract/collection-order
