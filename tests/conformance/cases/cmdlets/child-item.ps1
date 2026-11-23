@@ -3,3 +3,5 @@
 (Get-ChildItem fixtures/tree -Filter '*.txt' -Name | Sort-Object) -join ','
 (Get-ChildItem fixtures/tree -Recurse -File | ForEach-Object Length | Measure-Object -Sum).Sum
 (Get-ChildItem fixtures/tree -Recurse -Name | Sort-Object) -join ','
+(Get-ChildItem fixtures/tree -Directory -Name | Sort-Object) -join ','
+(Get-ChildItem fixtures/tree -File -Name | Sort-Object) -join ','
