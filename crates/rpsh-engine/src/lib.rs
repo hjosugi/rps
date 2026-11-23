@@ -2894,21 +2894,9 @@ impl Engine {
             "select-object" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
                 let mut items = input.to_vec();
-                if named
-                    .iter()
-                    .any(|(name, value)| name.eq_ignore_ascii_case("unique") && ops::is_true(value))
-                {
-                    let mut seen: Vec<String> = Vec::new();
-                    items.retain(|item| {
-                        let key = item.to_string();
-                        if seen.contains(&key) {
-                            false
-                        } else {
-                            seen.push(key);
-                            true
-                        }
-                    });
-                }
+                let unique = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("unique") && ops::is_true(value)
+                });
                 let property = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("property"))
@@ -2940,6 +2928,18 @@ impl Engine {
                             }
                         })
                         .collect();
+                }
+                if unique {
+                    let mut seen: Vec<String> = Vec::new();
+                    items.retain(|item| {
+                        let key = item.to_string();
+                        if seen.contains(&key) {
+                            false
+                        } else {
+                            seen.push(key);
+                            true
+                        }
+                    });
                 }
                 if let Some((_, skip)) = named
                     .iter()
