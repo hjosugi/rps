@@ -94,6 +94,7 @@ pipeline/measure-text
 pipeline/random-pipeline
 pipeline/select-sort
 pipeline/select-string
+pipeline/sort-multi-property
 pipeline/tee-sort
 pipeline/where-foreach
 pipeline/where-property

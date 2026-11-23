@@ -4824,6 +4824,13 @@ fn collect_children(
 }
 
 fn sort_key(value: &Value, property: &Value) -> String {
+    if let Value::Array(properties) = property {
+        return properties
+            .iter()
+            .map(|property| sort_key(value, property))
+            .collect::<Vec<_>>()
+            .join("\u{0}");
+    }
     let name = property.to_string();
     match member(value, &name) {
         Ok(value) => value.to_string(),
