@@ -1852,7 +1852,7 @@ impl Engine {
                 Ok(Some(
                     entries
                         .into_iter()
-                        .map(|(name, is_dir, _)| {
+                        .map(|(name, is_dir, length)| {
                             if names_only {
                                 Value::String(name.into())
                             } else {
@@ -1869,6 +1869,7 @@ impl Engine {
                                         ),
                                     ),
                                     ("Name".to_owned(), Value::String(name.into())),
+                                    ("Length".to_owned(), Value::Int64(length as i64)),
                                 ])
                             }
                         })
