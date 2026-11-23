@@ -3051,6 +3051,16 @@ impl Engine {
                                         .ok()
                                         .filter(|value| !value.is_null_like())
                                 })
+                            } else if names.iter().any(|name| name.to_string() == "*") {
+                                match &item {
+                                    Value::Object(entries) => Some(Value::object(
+                                        visible_entries(entries)
+                                            .into_iter()
+                                            .map(|(name, value)| (name.clone(), value.clone()))
+                                            .collect(),
+                                    )),
+                                    _ => Some(item),
+                                }
                             } else {
                                 let mut entries = Vec::new();
                                 for name in &names {

@@ -5,3 +5,4 @@ $people = [pscustomobject]@{ Name = 'b'; Age = 30 }, [pscustomobject]@{ Name = '
 ($people | Select-Object -ExpandProperty Name) -join ','
 $people = [pscustomobject]@{ Name = 'a'; Age = 30 }, [pscustomobject]@{ Name = 'b'; Age = 20 }, [pscustomobject]@{ Name = 'c'; Age = 30 }
 ($people | Select-Object -Property Age -Unique | ForEach-Object Age) -join ','
+([pscustomobject]@{ A = 1; B = 2 } | Select-Object * | ForEach-Object { "$($_.A)$($_.B)" })
