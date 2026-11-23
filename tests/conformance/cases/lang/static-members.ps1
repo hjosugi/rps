@@ -14,3 +14,5 @@
 [math]::Round(3.5)
 [math]::Floor(3.7)
 [math]::Ceiling(3.2)
+[string]::IsNullOrWhiteSpace('   ')
+[string]::Concat('a', 'b', 'c')

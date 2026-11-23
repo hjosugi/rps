@@ -5444,6 +5444,19 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
                     .is_some_and(|value| value.to_string().is_empty());
             Ok(Value::Bool(empty))
         }
+        ("string", "isnullorwhitespace") => {
+            let empty = arguments
+                .first()
+                .is_none_or(|value| value.is_null_like() || value.to_string().trim().is_empty());
+            Ok(Value::Bool(empty))
+        }
+        ("string", "concat") => Ok(Value::String(
+            arguments
+                .iter()
+                .map(ToString::to_string)
+                .collect::<String>()
+                .into(),
+        )),
         ("string", "join") => {
             let Some(separator) = arguments.first() else {
                 return Err(RuntimeError::NotImplemented {
