@@ -2399,8 +2399,21 @@ impl Engine {
                 if is_global_scope(&name) {
                     self.globals.insert(key.clone(), value.clone());
                 }
-                self.variables.insert(key, value);
-                Ok(Some(Vec::new()))
+                self.variables.insert(key, value.clone());
+                let pass_thru = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("passthru") && ops::is_true(value)
+                });
+                Ok(Some(if pass_thru {
+                    vec![Value::object(vec![
+                        (
+                            "Name".to_owned(),
+                            Value::String(strip_scope(&name).to_owned().into()),
+                        ),
+                        ("Value".to_owned(), value),
+                    ])]
+                } else {
+                    Vec::new()
+                }))
             }
             "remove-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;

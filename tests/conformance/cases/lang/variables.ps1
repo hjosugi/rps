@@ -7,3 +7,6 @@ $name = 'world'
 $a += 10
 $a
 $undefined -eq $null
+(Set-Variable temp 7 -PassThru).Name
+(Set-Variable temp 8 -PassThru).Value
+$temp
