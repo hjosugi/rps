@@ -44,6 +44,8 @@ pub struct Engine {
     classes: HashMap<String, ClassDef>,
     /// `Set-Alias` definitions.
     aliases: HashMap<String, String>,
+    /// Names of the modules loaded by Import-Module.
+    modules: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -2133,6 +2135,12 @@ impl Engine {
                 })?;
                 let script = parse(&source)?;
                 self.exec_block(&script.statements, &mut capture_sink())?;
+                let module_name = std::path::Path::new(&path)
+                    .file_stem()
+                    .map_or_else(|| path.clone(), |stem| stem.to_string_lossy().to_string());
+                if !self.modules.contains(&module_name) {
+                    self.modules.push(module_name);
+                }
                 Ok(Some(Vec::new()))
             }
             "invoke-expression" | "iex" => {
@@ -2622,6 +2630,27 @@ impl Engine {
                         Ok(Some(vec![value]))
                     }
                 }
+            }
+            "get-module" | "gmo" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let wanted = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let mut outputs = Vec::new();
+                for name in &self.modules {
+                    let matches = wanted
+                        .as_deref()
+                        .is_none_or(|wanted| ops::wildcard_match(name, wanted, false));
+                    if matches {
+                        outputs.push(Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.clone().into())),
+                            ("ModuleType".to_owned(), Value::String("Script".into())),
+                        ]));
+                    }
+                }
+                Ok(Some(outputs))
             }
             "get-alias" | "gal" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
