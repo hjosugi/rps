@@ -20,7 +20,10 @@ fn refused(args: &[&str]) -> bool {
 }
 
 fn file(path: &str) -> Result<Invocation, CliError> {
-    Ok(Invocation::File(PathBuf::from(path)))
+    Ok(Invocation::File {
+        path: PathBuf::from(path),
+        args: Vec::new(),
+    })
 }
 
 #[test]

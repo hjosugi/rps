@@ -142,6 +142,11 @@ pub enum Statement {
         finally: Option<Vec<Statement>>,
         span: Span,
     },
+    /// A script-level `param(...)` declaration.
+    Param {
+        parameters: Vec<Parameter>,
+        span: Span,
+    },
     /// `trap { ... }`. Upstream: `TrapStatementAst`.
     Trap { body: Vec<Statement>, span: Span },
     /// `throw expression`. Upstream: `ThrowStatementAst`.

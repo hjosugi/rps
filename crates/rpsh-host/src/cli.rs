@@ -11,8 +11,9 @@ pub enum Invocation {
     Help,
     /// `-Command <text>`: the rest of the command line, joined with spaces.
     Command(String),
-    /// `-File <path>`, or the first argument that is not a switch.
-    File(PathBuf),
+    /// `-File <path>`, or the first argument that is not a switch, plus the
+    /// arguments that follow it.
+    File { path: PathBuf, args: Vec<String> },
     /// No script given: an interactive session.
     Interactive,
 }
@@ -40,6 +41,7 @@ const SWITCHES: &[(&str, &str)] = &[
     ("nologo", "nol"),
     ("noninteractive", "noni"),
     ("socketservermode", "so"),
+    ("v2socketservermode", "v2so"),
     ("servermode", "s"),
     ("namedpipeservermode", "nam"),
     ("sshservermode", "sshs"),
@@ -139,10 +141,10 @@ fn file(path: &str, script_args: &[String]) -> Result<Invocation, CliError> {
     if path == "-" {
         return Err(CliError::NotImplemented("-File - (script from stdin)"));
     }
-    if !script_args.is_empty() {
-        return Err(CliError::NotImplemented("script arguments"));
-    }
-    Ok(Invocation::File(PathBuf::from(path)))
+    Ok(Invocation::File {
+        path: PathBuf::from(path),
+        args: script_args.to_vec(),
+    })
 }
 
 #[cfg(test)]
@@ -171,7 +173,13 @@ mod tests {
     fn a_prefix_shorter_than_the_shortest_accepted_one_is_a_file_name() {
         // `-no` is ambiguous between -NoProfile, -NoLogo and friends, so
         // upstream does not treat it as a switch at all.
-        assert_eq!(parse(&["-no"]), Ok(Invocation::File(PathBuf::from("-no"))));
+        assert_eq!(
+            parse(&["-no"]),
+            Ok(Invocation::File {
+                path: PathBuf::from("-no"),
+                args: Vec::new()
+            })
+        );
     }
 
     #[test]
@@ -185,7 +193,10 @@ mod tests {
 
     #[test]
     fn the_first_non_switch_argument_is_the_script() {
-        let script = Ok(Invocation::File(PathBuf::from("a.ps1")));
+        let script = Ok(Invocation::File {
+            path: PathBuf::from("a.ps1"),
+            args: Vec::new(),
+        });
         assert_eq!(parse(&["a.ps1"]), script);
         assert_eq!(parse(&["-nop", "-File", "a.ps1"]), script);
         assert_eq!(parse(&["-f"]), Err(CliError::MissingFile));
@@ -204,7 +215,6 @@ mod tests {
             &["-EncodedCommand", "MQ=="],
             &["-wd", "/tmp"],
             &["-Login"],
-            &["a.ps1", "arg"],
             &["-c", "-"],
         ] {
             assert!(

@@ -73,7 +73,7 @@ pub fn run(args: &[String]) -> i32 {
             0
         }
         Invocation::Command(source) => run_source(&source),
-        Invocation::File(path) => run_file(&path),
+        Invocation::File { path, args } => run_file(&path, &args),
         Invocation::Interactive => not_implemented("interactive sessions"),
     }
 }
@@ -90,7 +90,7 @@ fn not_implemented(feature: &str) -> i32 {
     EXIT_NOT_IMPLEMENTED
 }
 
-fn run_file(path: &Path) -> i32 {
+fn run_file(path: &Path, args: &[String]) -> i32 {
     let bytes = match fs::read(path) {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -104,14 +104,18 @@ fn run_file(path: &Path) -> i32 {
     };
     let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes);
     match std::str::from_utf8(bytes) {
-        Ok(source) => run_source(source),
+        Ok(source) => run_source_with(source, args, Some(path)),
         Err(_) => not_implemented("script files that are not UTF-8"),
     }
 }
 
 fn run_source(source: &str) -> i32 {
+    run_source_with(source, &[], None)
+}
+
+fn run_source_with(source: &str, args: &[String], path: Option<&Path>) -> i32 {
     let mut out = BufWriter::new(io::stdout().lock());
-    let result = Engine::new().run_script(source, &mut out);
+    let result = Engine::new().run_script_with(source, args, path, &mut out);
     let flushed = out.flush();
     match (result, flushed) {
         (Ok(code), Ok(())) => code,

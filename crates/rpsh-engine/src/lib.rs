@@ -222,7 +222,40 @@ impl Engine {
     /// the pipeline to `out`. Returns the process exit code: the argument of
     /// `exit`, or 0 when the script runs to its end.
     pub fn run_script(&mut self, source: &str, out: &mut dyn Write) -> Result<i32, EngineError> {
+        self.run_script_with(source, &[], None, out)
+    }
+
+    /// Runs a script file or command with its arguments and path, so `param`,
+    /// `$args`, `$PSScriptRoot` and `$PSCommandPath` work.
+    pub fn run_script_with(
+        &mut self,
+        source: &str,
+        args: &[String],
+        script_path: Option<&std::path::Path>,
+        out: &mut dyn Write,
+    ) -> Result<i32, EngineError> {
         let script = parse(source)?;
+        self.variables.insert(
+            "args".to_owned(),
+            Value::array(
+                args.iter()
+                    .map(|arg| Value::String(arg.clone().into()))
+                    .collect(),
+            ),
+        );
+        if let Some(path) = script_path {
+            let full = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+            self.variables.insert(
+                "PSCommandPath".to_owned(),
+                Value::String(full.to_string_lossy().to_string().into()),
+            );
+            if let Some(parent) = full.parent() {
+                self.variables.insert(
+                    "PSScriptRoot".to_owned(),
+                    Value::String(parent.to_string_lossy().to_string().into()),
+                );
+            }
+        }
         self.run_ast(&script, out)
     }
 
@@ -649,6 +682,33 @@ impl Engine {
                     }
                 }
                 Ok(flow)
+            }
+            Statement::Param { parameters, .. } => {
+                let positional = match self.variables.get("args") {
+                    Some(Value::Array(items)) => items.as_ref().clone(),
+                    _ => Vec::new(),
+                };
+                let mut bound = 0;
+                for parameter in parameters {
+                    let value = if let Some(value) = positional.get(bound) {
+                        bound += 1;
+                        value.clone()
+                    } else if let Some(default) = &parameter.default {
+                        evaluate(default, &mut self.variables, self.last_success)?
+                    } else {
+                        Value::Null
+                    };
+                    let value = match &parameter.type_name {
+                        Some(type_name) => cast_to(type_name, value)?,
+                        None => value,
+                    };
+                    self.variables.insert(parameter.name.clone(), value);
+                }
+                self.variables.insert(
+                    "args".to_owned(),
+                    Value::array(positional[bound..].to_vec()),
+                );
+                Ok(Flow::Normal)
             }
             Statement::Trap { body, .. } => {
                 self.trap = Some(body.clone());
