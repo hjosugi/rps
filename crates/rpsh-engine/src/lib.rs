@@ -101,7 +101,7 @@ impl Engine {
         for statement in &script.statements {
             match statement {
                 Statement::Expression(expr) => {
-                    let value = evaluate(expr, &self.variables, self.last_success)?;
+                    let value = evaluate(expr, &mut self.variables, self.last_success)?;
                     match value {
                         Value::Array(items) => {
                             for item in items {
@@ -118,20 +118,20 @@ impl Engine {
                 Statement::CoalesceAssign { name, value, .. } => {
                     let key = strip_scope(name);
                     if matches!(self.variables.get(key), None | Some(Value::Null)) {
-                        let value = evaluate(value, &self.variables, self.last_success)?;
+                        let value = evaluate(value, &mut self.variables, self.last_success)?;
                         self.variables.insert(key.to_owned(), value);
                     }
                     self.last_success = true;
                 }
                 Statement::AppendAssign { name, value, .. } => {
-                    let value = evaluate(value, &self.variables, self.last_success)?;
+                    let value = evaluate(value, &mut self.variables, self.last_success)?;
                     let key = strip_scope(name);
                     let updated = append(self.variables.get(key), value)?;
                     self.variables.insert(key.to_owned(), updated);
                     self.last_success = true;
                 }
                 Statement::Assign { name, value, .. } => {
-                    let value = evaluate(value, &self.variables, self.last_success)?;
+                    let value = evaluate(value, &mut self.variables, self.last_success)?;
                     let key = strip_scope(name);
                     self.variables.insert(key.to_owned(), value);
                     self.last_success = true;
@@ -140,7 +140,7 @@ impl Engine {
                 Statement::Exit {
                     code: Some(code), ..
                 } => {
-                    return match evaluate(code, &self.variables, self.last_success)? {
+                    return match evaluate(code, &mut self.variables, self.last_success)? {
                         Value::Int32(code) => Ok(code),
                         _ => Err(RuntimeError::NotImplemented {
                             feature: "exit with a value other than Int32",
@@ -156,7 +156,7 @@ impl Engine {
 
 fn evaluate(
     expr: &Expr,
-    variables: &HashMap<String, Value>,
+    variables: &mut HashMap<String, Value>,
     last_success: bool,
 ) -> Result<Value, RuntimeError> {
     match &expr.kind {
@@ -208,6 +208,9 @@ fn evaluate(
             } else {
                 Ok(value)
             }
+        }
+        ExprKind::ScriptBlock(statements) => {
+            Ok(Value::ScriptBlock(format!("{{ {} }}", statements.len())))
         }
         ExprKind::Array(items) => {
             let mut values = Vec::with_capacity(items.len());
@@ -326,19 +329,22 @@ fn evaluate(
                         Value::Null
                     }
                 }),
+                BinaryOp::Match => regex_match(&left, &right, false, false, variables),
+                BinaryOp::NotMatch => regex_match(&left, &right, false, true, variables),
+                BinaryOp::CMatch => regex_match(&left, &right, true, false, variables),
+                BinaryOp::CNotMatch => regex_match(&left, &right, true, true, variables),
+                BinaryOp::Replace => regex_replace(&left, &right, false),
+                BinaryOp::CReplace => regex_replace(&left, &right, true),
+                BinaryOp::Split => regex_split(&left, &right, false),
+                BinaryOp::CSplit => regex_split(&left, &right, true),
             }
         }
     }
 }
 
 fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
-    let Value::Array(items) = target else {
-        return Err(RuntimeError::NotImplemented {
-            feature: "indexing other than arrays",
-        });
-    };
-    match index {
-        Value::Int32(at) => {
+    match (target, index) {
+        (Value::Array(items), Value::Int32(at)) => {
             let at = if *at < 0 {
                 items.len() as i32 + *at
             } else {
@@ -351,15 +357,25 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
                     feature: "index out of range",
                 })
         }
-        Value::Array(indices) => {
+        (Value::Array(items), Value::Array(indices)) => {
             let mut values = Vec::new();
             for index in indices {
-                values.push(index_value(target, index)?);
+                values.push(index_value(&Value::Array(items.clone()), index)?);
             }
             Ok(Value::Array(values))
         }
+        (Value::Object(entries), Value::Int32(index)) => {
+            let key = index.to_string();
+            entries
+                .iter()
+                .find(|(name, _)| name == &key)
+                .map(|(_, value)| value.clone())
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "missing object key",
+                })
+        }
         _ => Err(RuntimeError::NotImplemented {
-            feature: "index of this type",
+            feature: "indexing other than arrays",
         }),
     }
 }
@@ -445,6 +461,66 @@ fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeEr
     };
     let same = left.type_name() == full;
     Ok(Value::Bool(if negate { !same } else { same }))
+}
+
+fn regex_match(
+    left: &Value,
+    right: &Value,
+    case_sensitive: bool,
+    negate: bool,
+    variables: &mut HashMap<String, Value>,
+) -> Result<Value, RuntimeError> {
+    let regex = rpsh_runtime::regex::Regex::new(&right.to_string(), case_sensitive)
+        .map_err(|feature| RuntimeError::NotImplemented { feature })?;
+    let text = left.to_string();
+    let matches = regex.find(&text);
+    let mut object = Vec::new();
+    if let Some(found) = &matches {
+        let chars: Vec<char> = text.chars().collect();
+        for (index, capture) in found.groups.iter().enumerate() {
+            if let Some((start, end)) = capture {
+                let value: String = chars[*start..*end].iter().collect();
+                object.push((index.to_string(), Value::String(value)));
+            }
+        }
+    }
+    variables.insert(
+        "Matches".to_owned(),
+        if object.is_empty() {
+            Value::Null
+        } else {
+            Value::Object(object)
+        },
+    );
+    let matched = matches.is_some();
+    Ok(Value::Bool(if negate { !matched } else { matched }))
+}
+
+fn regex_replace(left: &Value, right: &Value, case_sensitive: bool) -> Result<Value, RuntimeError> {
+    let (pattern, replacement) = match right {
+        Value::Array(items) => (
+            items.first().map_or_else(String::new, ToString::to_string),
+            items.get(1).map_or_else(String::new, ToString::to_string),
+        ),
+        other => (other.to_string(), String::new()),
+    };
+    let regex = rpsh_runtime::regex::Regex::new(&pattern, case_sensitive)
+        .map_err(|feature| RuntimeError::NotImplemented { feature })?;
+    Ok(Value::String(
+        regex.replace_all(&left.to_string(), &replacement),
+    ))
+}
+
+fn regex_split(left: &Value, right: &Value, case_sensitive: bool) -> Result<Value, RuntimeError> {
+    let regex = rpsh_runtime::regex::Regex::new(&right.to_string(), case_sensitive)
+        .map_err(|feature| RuntimeError::NotImplemented { feature })?;
+    Ok(Value::Array(
+        regex
+            .split(&left.to_string())
+            .into_iter()
+            .map(Value::String)
+            .collect(),
+    ))
 }
 
 fn number_value(value: &NumberLiteral) -> Value {

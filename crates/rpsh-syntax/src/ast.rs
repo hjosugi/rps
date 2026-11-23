@@ -74,6 +74,8 @@ pub enum ExprKind {
     TypeLiteral(String),
     /// Upstream: `ArrayLiteralAst`.
     Array(Vec<Expr>),
+    /// Upstream: `ScriptBlockExpressionAst`.
+    ScriptBlock(Vec<Statement>),
     /// Upstream: `IndexExpressionAst`.
     Index { target: Box<Expr>, index: Box<Expr> },
     /// Upstream: `TernaryExpressionAst`.
@@ -153,4 +155,12 @@ pub enum BinaryOp {
     Is,
     IsNot,
     As,
+    Match,
+    NotMatch,
+    CMatch,
+    CNotMatch,
+    Replace,
+    CReplace,
+    Split,
+    CSplit,
 }

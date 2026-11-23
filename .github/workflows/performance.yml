@@ -35,6 +35,7 @@ jobs:
         run: |
           python3 scripts/token-diff.py
           python3 scripts/token-diff.py --cases tests/tokenizer/kinds.json
+          python3 scripts/ast-diff.py
       - run: cargo harness bench --filter startup --budget-scale 2 --out startup-result.json | tee -a "$GITHUB_STEP_SUMMARY"
 
   benchmark:

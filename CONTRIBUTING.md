@@ -116,7 +116,15 @@ python3 scripts/token-diff.py --cases tests/tokenizer/kinds.json
 ```
 
 The comparison is kind and UTF-16 offset (`tests/tokenizer/cases.json` has the
-hand-picked cases; `kinds.json` covers every token kind).
+hand-picked cases; `kinds.json` covers every token kind). Expression ASTs are
+compared the same way:
+
+```bash
+python3 scripts/ast-diff.py
+```
+
+`tests/tokenizer/ast-cases.json` holds the covered expressions; both sides print
+the same normalized S-expression.
 
 ## PTY cases
 

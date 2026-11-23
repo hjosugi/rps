@@ -13,6 +13,7 @@
 //! here it is refused until `Double` exists.
 
 pub mod ops;
+pub mod regex;
 
 use std::fmt;
 
@@ -50,6 +51,8 @@ pub enum Value {
     Double(f64),
     /// `System.Numerics.BigInteger`
     BigInteger(String),
+    /// A script block literal.
+    ScriptBlock(String),
     /// A PowerShell array.
     Array(Vec<Value>),
     /// A PowerShell object/hashtable with ordered keys.
@@ -77,6 +80,7 @@ impl Value {
             Value::Decimal(_) => "System.Decimal",
             Value::Double(_) => "System.Double",
             Value::BigInteger(_) => "System.Numerics.BigInteger",
+            Value::ScriptBlock(_) => "System.Management.Automation.ScriptBlock",
             Value::Array(_) => "System.Object[]",
             Value::Object(_) => "System.Management.Automation.PSCustomObject",
             Value::Type(_) => "System.RuntimeType",
@@ -104,6 +108,7 @@ impl fmt::Display for Value {
                 f.write_str(value)
             }
             Value::Double(value) => f.write_str(&format_double(*value)),
+            Value::ScriptBlock(text) => f.write_str(text),
             Value::Array(items) => {
                 for (index, item) in items.iter().enumerate() {
                     if index > 0 {

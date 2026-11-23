@@ -225,6 +225,14 @@ impl Parser {
                 TokenKind::Is => BinaryOp::Is,
                 TokenKind::IsNot => BinaryOp::IsNot,
                 TokenKind::As => BinaryOp::As,
+                TokenKind::Match => BinaryOp::Match,
+                TokenKind::NotMatch => BinaryOp::NotMatch,
+                TokenKind::CMatch => BinaryOp::CMatch,
+                TokenKind::CNotMatch => BinaryOp::CNotMatch,
+                TokenKind::Replace => BinaryOp::Replace,
+                TokenKind::CReplace => BinaryOp::CReplace,
+                TokenKind::Split => BinaryOp::Split,
+                TokenKind::CSplit => BinaryOp::CSplit,
                 _ => return Ok(left),
             };
             self.pos += 1;
@@ -440,6 +448,21 @@ impl Parser {
                     vec![StringPart::Literal(content.to_owned())]
                 };
                 self.expr(ExprKind::ExpandableString(parts), span)
+            }
+            TokenKind::LCurly => {
+                self.pos += 1;
+                let mut statements = Vec::new();
+                loop {
+                    while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
+                        self.pos += 1;
+                    }
+                    if self.peek().kind == TokenKind::RCurly {
+                        let close = self.peek().span;
+                        self.pos += 1;
+                        return self.expr(ExprKind::ScriptBlock(statements), span.to(close));
+                    }
+                    statements.push(self.statement()?);
+                }
             }
             TokenKind::AtParen => {
                 self.pos += 1;
@@ -834,6 +857,14 @@ mod tests {
                     BinaryOp::Is => "-is",
                     BinaryOp::IsNot => "-isnot",
                     BinaryOp::As => "-as",
+                    BinaryOp::Match => "-match",
+                    BinaryOp::NotMatch => "-notmatch",
+                    BinaryOp::CMatch => "-cmatch",
+                    BinaryOp::CNotMatch => "-cnotmatch",
+                    BinaryOp::Replace => "-replace",
+                    BinaryOp::CReplace => "-creplace",
+                    BinaryOp::Split => "-split",
+                    BinaryOp::CSplit => "-csplit",
                 };
                 format!("({} {symbol} {})", show(left), show(right))
             }
@@ -878,6 +909,7 @@ mod tests {
             ExprKind::Cast { type_name, value } => format!("[{type_name}]{}", show(value)),
             ExprKind::Member { target, name } => format!("{}.{}", show(target), name),
             ExprKind::InvokeMember { target, name } => format!("{}.{}()", show(target), name),
+            ExprKind::ScriptBlock(_) => "{...}".to_owned(),
         }
     }
 

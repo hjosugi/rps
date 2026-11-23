@@ -301,7 +301,11 @@ pub fn is_true(value: &Value) -> bool {
         Value::Double(value) => *value != 0.0,
         Value::String(value) => !value.is_empty(),
         Value::Array(items) => !items.is_empty(),
-        Value::Object(_) | Value::Type(_) | Value::Decimal(_) | Value::BigInteger(_) => true,
+        Value::Object(_)
+        | Value::Type(_)
+        | Value::Decimal(_)
+        | Value::BigInteger(_)
+        | Value::ScriptBlock(_) => true,
     }
 }
 
