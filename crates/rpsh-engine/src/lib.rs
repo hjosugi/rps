@@ -1876,7 +1876,7 @@ impl Engine {
                     .iter()
                     .any(|(name, value)| name.eq_ignore_ascii_case("force") && ops::is_true(value));
                 let mut entries: Vec<(String, bool, u64)> = Vec::new();
-                collect_children(&path, recurse, force, &mut entries);
+                collect_children(&path, recurse, force, "", &mut entries);
                 entries.retain(|(name, is_dir, _)| {
                     if files_only && *is_dir {
                         return false;
@@ -1885,7 +1885,11 @@ impl Engine {
                         return false;
                     }
                     match &filter {
-                        Some(filter) => ops::wildcard_match(name, filter, false),
+                        Some(filter) => ops::wildcard_match(
+                            name.rsplit('/').next().unwrap_or(name),
+                            filter,
+                            false,
+                        ),
                         None => true,
                     }
                 });
@@ -1897,6 +1901,7 @@ impl Engine {
                             if names_only {
                                 Value::String(name.into())
                             } else {
+                                let leaf = name.rsplit('/').next().unwrap_or(&name).to_owned();
                                 Value::object(vec![
                                     (
                                         "__TypeName".to_owned(),
@@ -1909,7 +1914,8 @@ impl Engine {
                                             .into(),
                                         ),
                                     ),
-                                    ("Name".to_owned(), Value::String(name.into())),
+                                    ("Name".to_owned(), Value::String(leaf.into())),
+                                    ("FullName".to_owned(), Value::String(name.into())),
                                     ("Length".to_owned(), Value::Int64(length as i64)),
                                 ])
                             }
@@ -4621,6 +4627,7 @@ fn collect_children(
     path: &str,
     recurse: bool,
     force: bool,
+    prefix: &str,
     entries: &mut Vec<(String, bool, u64)>,
 ) {
     if let Ok(read) = std::fs::read_dir(path) {
@@ -4631,9 +4638,16 @@ fn collect_children(
                 if !force && name.starts_with('.') {
                     continue;
                 }
-                entries.push((name.to_owned(), is_dir, length));
+                let relative = format!("{prefix}{name}");
+                entries.push((relative.clone(), is_dir, length));
                 if recurse && is_dir {
-                    collect_children(&entry.path().to_string_lossy(), recurse, force, entries);
+                    collect_children(
+                        &entry.path().to_string_lossy(),
+                        recurse,
+                        force,
+                        &format!("{relative}/"),
+                        entries,
+                    );
                 }
             }
         }
