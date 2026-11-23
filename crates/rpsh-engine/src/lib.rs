@@ -2970,7 +2970,16 @@ impl Engine {
                     .find(|(name, _)| name.eq_ignore_ascii_case("maximum"))
                 {
                     let maximum = convert_int32(maximum)?;
-                    return Ok(Some(vec![Value::Int32(generator.next_max(maximum))]));
+                    let minimum = named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("minimum"))
+                        .map_or(Ok(0), |(_, value)| convert_int32(value))?;
+                    let value = if minimum == 0 {
+                        generator.next_max(maximum)
+                    } else {
+                        generator.next_range(minimum, maximum)
+                    };
+                    return Ok(Some(vec![Value::Int32(value)]));
                 }
                 let input = named
                     .iter()
