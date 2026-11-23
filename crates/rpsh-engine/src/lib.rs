@@ -231,7 +231,7 @@ impl Engine {
             } => {
                 let value = evaluate(collection, &mut self.variables, self.last_success)?;
                 let items = match value {
-                    Value::Array(items) => items,
+                    Value::Array(items) => (*items).clone(),
                     Value::Null => Vec::new(),
                     value => vec![value],
                 };
@@ -373,13 +373,13 @@ impl Engine {
     fn write_value(&self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
         match value {
             Value::Array(items) => {
-                for item in items {
-                    if !matches!(item, Value::Null) {
+                for item in items.iter() {
+                    if !item.is_null_like() {
                         writeln!(out, "{item}")?;
                     }
                 }
             }
-            Value::Null => {}
+            Value::Null | Value::AutomationNull => {}
             value => writeln!(out, "{value}")?,
         }
         Ok(())
@@ -417,7 +417,7 @@ fn evaluate(
     match &expr.kind {
         ExprKind::Int32(value) => Ok(Value::Int32(*value)),
         ExprKind::Number(value) => Ok(number_value(value)),
-        ExprKind::String(value) => Ok(Value::String(value.clone())),
+        ExprKind::String(value) => Ok(Value::String(value.clone().into())),
         ExprKind::Paren(inner) => evaluate(inner, variables, last_success),
         ExprKind::Variable(name) => {
             lookup(name, variables, last_success).ok_or(RuntimeError::NotImplemented {
@@ -441,7 +441,7 @@ fn evaluate(
                     }
                 }
             }
-            Ok(Value::String(text))
+            Ok(Value::String(text.into()))
         }
         ExprKind::Subexpression(expr) => evaluate(expr, variables, last_success),
         ExprKind::Ternary {
@@ -455,7 +455,7 @@ fn evaluate(
                 evaluate(when_false, variables, last_success)
             }
         }
-        ExprKind::TypeLiteral(name) => Ok(Value::Type(type_full_name(name).to_owned())),
+        ExprKind::TypeLiteral(name) => Ok(Value::Type(type_full_name(name).to_owned().into())),
         ExprKind::Coalesce { left, right } => {
             let value = evaluate(left, variables, last_success)?;
             if matches!(value, Value::Null) {
@@ -464,15 +464,15 @@ fn evaluate(
                 Ok(value)
             }
         }
-        ExprKind::ScriptBlock(statements) => {
-            Ok(Value::ScriptBlock(format!("{{ {} }}", statements.len())))
-        }
+        ExprKind::ScriptBlock(statements) => Ok(Value::ScriptBlock(
+            format!("{{ {} }}", statements.len()).into(),
+        )),
         ExprKind::Array(items) => {
             let mut values = Vec::with_capacity(items.len());
             for item in items {
                 values.push(evaluate(item, variables, last_success)?);
             }
-            Ok(Value::Array(values))
+            Ok(Value::array(values))
         }
         ExprKind::Index { target, index } => {
             let target = evaluate(target, variables, last_success)?;
@@ -484,7 +484,7 @@ fn evaluate(
             for (name, value) in entries {
                 object.push((name.clone(), evaluate(value, variables, last_success)?));
             }
-            Ok(Value::Object(object))
+            Ok(Value::object(object))
         }
         ExprKind::Cast { type_name, value } => {
             let value = evaluate(value, variables, last_success)?;
@@ -504,7 +504,8 @@ fn evaluate(
                 Ok(Value::Type(
                     evaluate(target, variables, last_success)?
                         .type_name()
-                        .to_owned(),
+                        .to_owned()
+                        .into(),
                 ))
             } else {
                 Err(RuntimeError::NotImplemented {
@@ -651,10 +652,24 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
         }
         (Value::Array(items), Value::Array(indices)) => {
             let mut values = Vec::new();
-            for index in indices {
+            for index in indices.iter() {
                 values.push(index_value(&Value::Array(items.clone()), index)?);
             }
-            Ok(Value::Array(values))
+            Ok(Value::array(values))
+        }
+        (Value::String(text), Value::Int32(at)) => {
+            let at = if *at < 0 {
+                text.len() as i32 + *at
+            } else {
+                *at
+            };
+            usize::try_from(at)
+                .ok()
+                .and_then(|at| text.unit(at))
+                .map(Value::Char)
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "index out of range",
+                })
         }
         (Value::Object(entries), Value::Int32(index)) => {
             let key = index.to_string();
@@ -674,16 +689,16 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
 
 fn append(old: Option<&Value>, value: Value) -> Result<Value, RuntimeError> {
     match (old, value) {
-        (None, value) => Ok(Value::Array(vec![value])),
-        (Some(Value::Array(items)), Value::Array(mut more)) => {
-            let mut items = items.clone();
-            items.append(&mut more);
-            Ok(Value::Array(items))
+        (None, value) => Ok(Value::array(vec![value])),
+        (Some(Value::Array(items)), Value::Array(more)) => {
+            let mut items = items.as_ref().clone();
+            items.extend(more.iter().cloned());
+            Ok(Value::array(items))
         }
         (Some(Value::Array(items)), value) => {
-            let mut items = items.clone();
+            let mut items = items.as_ref().clone();
             items.push(value);
-            Ok(Value::Array(items))
+            Ok(Value::array(items))
         }
         (Some(Value::Int32(a)), Value::Int32(b)) => a.checked_add(b).map_or(
             Err(RuntimeError::NotImplemented {
@@ -691,7 +706,7 @@ fn append(old: Option<&Value>, value: Value) -> Result<Value, RuntimeError> {
             }),
             |value| Ok(Value::Int32(value)),
         ),
-        (Some(Value::String(a)), Value::String(b)) => Ok(Value::String(format!("{a}{b}"))),
+        (Some(Value::String(a)), Value::String(b)) => Ok(Value::String(a.concat(&b))),
         _ => Err(RuntimeError::NotImplemented {
             feature: "compound assignment on these values",
         }),
@@ -720,7 +735,9 @@ fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) ->
         if let Some(value) = variables.get(name) {
             return Some(value.clone());
         }
-        return std::env::var(rest).ok().map(Value::String);
+        return std::env::var(rest)
+            .ok()
+            .map(|value| Value::String(value.into()));
     }
     let key = strip_scope(name);
     variables.get(key).cloned()
@@ -751,7 +768,7 @@ fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeEr
             feature: "-is / -as with a non-type right operand",
         });
     };
-    let same = left.type_name() == full;
+    let same = full.as_ascii() == Some(left.type_name());
     Ok(Value::Bool(if negate { !same } else { same }))
 }
 
@@ -772,7 +789,7 @@ fn regex_match(
         for (index, capture) in found.groups.iter().enumerate() {
             if let Some((start, end)) = capture {
                 let value: String = chars[*start..*end].iter().collect();
-                object.push((index.to_string(), Value::String(value)));
+                object.push((index.to_string(), Value::String(value.into())));
             }
         }
     }
@@ -781,7 +798,7 @@ fn regex_match(
         if object.is_empty() {
             Value::Null
         } else {
-            Value::Object(object)
+            Value::object(object)
         },
     );
     let matched = matches.is_some();
@@ -799,18 +816,18 @@ fn regex_replace(left: &Value, right: &Value, case_sensitive: bool) -> Result<Va
     let regex = rpsh_runtime::regex::Regex::new(&pattern, case_sensitive)
         .map_err(|feature| RuntimeError::NotImplemented { feature })?;
     Ok(Value::String(
-        regex.replace_all(&left.to_string(), &replacement),
+        regex.replace_all(&left.to_string(), &replacement).into(),
     ))
 }
 
 fn regex_split(left: &Value, right: &Value, case_sensitive: bool) -> Result<Value, RuntimeError> {
     let regex = rpsh_runtime::regex::Regex::new(&right.to_string(), case_sensitive)
         .map_err(|feature| RuntimeError::NotImplemented { feature })?;
-    Ok(Value::Array(
+    Ok(Value::array(
         regex
             .split(&left.to_string())
             .into_iter()
-            .map(Value::String)
+            .map(|text| Value::String(text.into()))
             .collect(),
     ))
 }
@@ -825,27 +842,110 @@ fn number_value(value: &NumberLiteral) -> Value {
         NumberLiteral::UInt16(value) => Value::UInt16(*value),
         NumberLiteral::Byte(value) => Value::Byte(*value),
         NumberLiteral::SByte(value) => Value::SByte(*value),
-        NumberLiteral::Decimal(value) => Value::Decimal(value.clone()),
+        NumberLiteral::Decimal(value) => Value::Decimal(value.clone().into()),
         NumberLiteral::Double(value) => Value::Double(*value),
-        NumberLiteral::BigInteger(value) => Value::BigInteger(value.clone()),
+        NumberLiteral::BigInteger(value) => Value::BigInteger(value.clone().into()),
+    }
+}
+
+/// The type names of a PowerShell object, most specific first. Upstream's
+/// `PSObject.TypeNames`. A `[pscustomobject]` is a `PSCustomObject` backed by
+/// `System.Object`.
+fn pstypenames() -> Value {
+    Value::array(vec![
+        Value::String("System.Management.Automation.PSCustomObject".into()),
+        Value::String("System.Object".into()),
+    ])
+}
+
+/// The `PSObject` view of an ordered object: `$o.psobject`.
+fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
+    let properties = entries
+        .iter()
+        .map(|(name, property)| {
+            Value::object(vec![
+                ("Name".to_owned(), Value::String(name.clone().into())),
+                ("Value".to_owned(), property.clone()),
+            ])
+        })
+        .collect();
+    Value::object(vec![
+        ("TypeNames".to_owned(), pstypenames()),
+        ("BaseObject".to_owned(), value.clone()),
+        ("Properties".to_owned(), Value::array(properties)),
+        ("Members".to_owned(), Value::array(Vec::new())),
+        ("Methods".to_owned(), Value::array(Vec::new())),
+        ("ExtendedMembers".to_owned(), Value::array(Vec::new())),
+        ("AdaptedMembers".to_owned(), Value::array(Vec::new())),
+    ])
+}
+
+/// Member enumeration: `$array.Name` yields `Name` from every element.
+fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError> {
+    let mut values = Vec::new();
+    let mut found = false;
+    for item in items {
+        match member(item, name) {
+            Ok(Value::Array(more)) => {
+                values.extend(more.iter().cloned());
+                found = true;
+            }
+            Ok(value) => {
+                values.push(value);
+                found = true;
+            }
+            Err(_) => {}
+        }
+    }
+    if found {
+        Ok(Value::array(values))
+    } else {
+        Err(RuntimeError::NotImplemented {
+            feature: "missing object property",
+        })
     }
 }
 
 fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
-    match (value, name) {
-        (_, "GetType") => Ok(Value::Type(value.type_name().to_owned())),
-        (Value::Type(full), "FullName") => Ok(Value::String(full.clone())),
-        (Value::Type(full), "Name") => Ok(Value::String(
-            full.rsplit('.').next().unwrap_or(full).to_owned(),
-        )),
-        (Value::Array(items), "Count" | "Length") => Ok(Value::Int32(items.len() as i32)),
-        (Value::Object(entries), name) => entries
-            .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))
-            .map(|(_, value)| value.clone())
-            .ok_or(RuntimeError::NotImplemented {
-                feature: "missing object property",
-            }),
+    if name.eq_ignore_ascii_case("GetType") {
+        return Ok(Value::Type(value.type_name().to_owned().into()));
+    }
+    match value {
+        Value::Type(full) if name.eq_ignore_ascii_case("FullName") => {
+            Ok(Value::String(full.clone()))
+        }
+        Value::Type(full) if name.eq_ignore_ascii_case("Name") => {
+            let text = full.to_string_lossy();
+            Ok(Value::String(
+                text.rsplit('.').next().unwrap_or(&text).to_owned().into(),
+            ))
+        }
+        Value::String(text) if name.eq_ignore_ascii_case("Length") => {
+            Ok(Value::Int32(text.len() as i32))
+        }
+        Value::Array(items) if name.eq_ignore_ascii_case("Count") => {
+            Ok(Value::Int32(items.len() as i32))
+        }
+        Value::Array(items) if name.eq_ignore_ascii_case("Length") => {
+            Ok(Value::Int32(items.len() as i32))
+        }
+        Value::Array(items) => member_enumeration(items.as_slice(), name),
+        Value::Object(entries) => {
+            if name.eq_ignore_ascii_case("psobject") || name.eq_ignore_ascii_case("pscustomobject")
+            {
+                return Ok(psobject_view(value, entries.as_slice()));
+            }
+            if name.eq_ignore_ascii_case("pstypenames") {
+                return Ok(pstypenames());
+            }
+            entries
+                .iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                .map(|(_, value)| value.clone())
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "missing object property",
+                })
+        }
         _ => Err(RuntimeError::NotImplemented {
             feature: "member access other than GetType().FullName / .Name",
         }),

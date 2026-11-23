@@ -7,8 +7,10 @@ lang/division
 lang/if-else
 lang/loops
 lang/numeric-literals
+lang/psobject
 lang/scriptblock
 lang/string-escapes
+lang/string-index
 lang/string-interpolation
 lang/ternary
 lang/type-ops

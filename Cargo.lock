@@ -61,6 +61,7 @@ name = "rpsh-research"
 version = "0.0.14"
 dependencies = [
  "rpsh-engine",
+ "rpsh-runtime",
  "rpsh-syntax",
 ]
 

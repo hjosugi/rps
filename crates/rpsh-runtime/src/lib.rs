@@ -14,8 +14,12 @@
 
 pub mod ops;
 pub mod regex;
+mod string;
 
 use std::fmt;
+use std::rc::Rc;
+
+pub use string::PsString;
 
 /// A PowerShell value.
 ///
@@ -27,8 +31,14 @@ use std::fmt;
 pub enum Value {
     /// `$null`
     Null,
+    /// The value of an empty pipeline, `& {}`. Distinct from [`Value::Null`]:
+    /// it does not flow to output, so `@(& {}).Count` is 0 while
+    /// `@($null).Count` is 1.
+    AutomationNull,
     /// `System.Boolean`
     Bool(bool),
+    /// `System.Char`, kept as a UTF-16 code unit so a lone surrogate is exact.
+    Char(u16),
     /// `System.Int32`
     Int32(i32),
     /// `System.Int64`
@@ -46,29 +56,35 @@ pub enum Value {
     /// `System.SByte`
     SByte(i8),
     /// `System.Decimal`, with its scale preserved as text.
-    Decimal(String),
+    Decimal(PsString),
     /// `System.Double`
     Double(f64),
     /// `System.Numerics.BigInteger`
-    BigInteger(String),
+    BigInteger(PsString),
     /// A script block literal.
-    ScriptBlock(String),
-    /// A PowerShell array.
-    Array(Vec<Value>),
-    /// A PowerShell object/hashtable with ordered keys.
-    Object(Vec<(String, Value)>),
+    ScriptBlock(PsString),
+    /// A PowerShell array. The `Rc` keeps `Value` 16 bytes.
+    Array(Rc<Vec<Value>>),
+    /// A PowerShell object/hashtable with ordered keys. The `Rc` is the
+    /// object's identity, so `$o -eq $o` compares the same object, not its
+    /// contents.
+    Object(Rc<Vec<(String, Value)>>),
     /// The result of `.GetType()`, holding the full .NET type name.
-    Type(String),
+    Type(PsString),
     /// `System.String`
-    String(String),
+    String(PsString),
 }
+
+// DESIGN.md §3.3: a tag and an 8-byte payload.
+const _: () = assert!(std::mem::size_of::<Value>() == 16);
 
 impl Value {
     /// The .NET type name scripts see through `.GetType().FullName`.
     pub fn type_name(&self) -> &'static str {
         match self {
-            Value::Null => "System.Object",
+            Value::Null | Value::AutomationNull => "System.Object",
             Value::Bool(_) => "System.Boolean",
+            Value::Char(_) => "System.Char",
             Value::Int32(_) => "System.Int32",
             Value::Int64(_) => "System.Int64",
             Value::UInt32(_) => "System.UInt32",
@@ -89,13 +105,34 @@ impl Value {
     }
 }
 
+impl Value {
+    /// Builds a PowerShell array.
+    pub fn array(items: Vec<Value>) -> Value {
+        Value::Array(Rc::new(items))
+    }
+
+    /// Builds an ordered object from its properties.
+    pub fn object(properties: Vec<(String, Value)>) -> Value {
+        Value::Object(Rc::new(properties))
+    }
+
+    /// `$null` and the empty-pipeline value both compare as null.
+    pub fn is_null_like(&self) -> bool {
+        matches!(self, Value::Null | Value::AutomationNull)
+    }
+}
+
 /// How the value appears when it reaches the end of the pipeline and the
 /// host writes it as text.
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Null => Ok(()),
+            Value::Null | Value::AutomationNull => Ok(()),
             Value::Bool(value) => write!(f, "{}", if *value { "True" } else { "False" }),
+            Value::Char(unit) => {
+                let ch = char::from_u32(u32::from(*unit)).unwrap_or(char::REPLACEMENT_CHARACTER);
+                write!(f, "{ch}")
+            }
             Value::Int32(value) => write!(f, "{value}"),
             Value::Int64(value) => write!(f, "{value}"),
             Value::UInt32(value) => write!(f, "{value}"),
@@ -105,10 +142,10 @@ impl fmt::Display for Value {
             Value::Byte(value) => write!(f, "{value}"),
             Value::SByte(value) => write!(f, "{value}"),
             Value::Decimal(value) | Value::BigInteger(value) | Value::Type(value) => {
-                f.write_str(value)
+                fmt::Display::fmt(value, f)
             }
             Value::Double(value) => f.write_str(&format_double(*value)),
-            Value::ScriptBlock(text) => f.write_str(text),
+            Value::ScriptBlock(text) => fmt::Display::fmt(text, f),
             Value::Array(items) => {
                 for (index, item) in items.iter().enumerate() {
                     if index > 0 {
@@ -128,7 +165,7 @@ impl fmt::Display for Value {
                 }
                 f.write_str("}")
             }
-            Value::String(value) => f.write_str(value),
+            Value::String(value) => fmt::Display::fmt(value, f),
         }
     }
 }

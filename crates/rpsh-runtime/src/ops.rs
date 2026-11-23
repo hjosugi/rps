@@ -1,7 +1,9 @@
 //! Operators. Upstream: `engine/runtime/Operations` (`NumericOps.cs`,
 //! `StringOps.cs`) and the binders in `engine/runtime/Binding/Binders.cs`.
 
-use crate::{RuntimeError, Value};
+use std::rc::Rc;
+
+use crate::{PsString, RuntimeError, Value};
 
 const INT32_OVERFLOW: &str = "Int32 overflow (promotion to Double)";
 const MIXED_OPERANDS: &str = "operators on operand types other than Int32 and String";
@@ -17,12 +19,7 @@ pub fn add(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
             Some(sum) => Ok(Value::Int32(sum)),
             None => refuse(INT32_OVERFLOW),
         },
-        (Value::String(a), Value::String(b)) => {
-            let mut joined = String::with_capacity(a.len() + b.len());
-            joined.push_str(a);
-            joined.push_str(b);
-            Ok(Value::String(joined))
-        }
+        (Value::String(a), Value::String(b)) => Ok(Value::String(a.concat(b))),
         _ => refuse(MIXED_OPERANDS),
     }
 }
@@ -95,12 +92,12 @@ pub fn compare(
 ) -> Result<Value, RuntimeError> {
     if let Value::Array(items) = left {
         let mut kept = Vec::new();
-        for item in items {
+        for item in items.iter() {
             if compare_scalar(item, right, op, case_sensitive)? {
                 kept.push(item.clone());
             }
         }
-        return Ok(Value::Array(kept));
+        return Ok(Value::array(kept));
     }
     Ok(Value::Bool(compare_scalar(
         left,
@@ -128,21 +125,33 @@ fn compare_scalar(
             })
         }
         _ => {
+            if let (Value::Object(a), Value::Object(b)) = (left, right) {
+                return match op {
+                    Comparison::Eq => Ok(Rc::ptr_eq(a, b)),
+                    Comparison::Ne => Ok(!Rc::ptr_eq(a, b)),
+                    _ => refuse("ordering comparison on objects"),
+                };
+            }
+            if let Value::Char(unit) = left {
+                let left = Value::String(PsString::from_units(vec![*unit]));
+                return compare_scalar(&left, right, op, case_sensitive);
+            }
+            if let Value::Char(unit) = right {
+                let right = Value::String(PsString::from_units(vec![*unit]));
+                return compare_scalar(left, &right, op, case_sensitive);
+            }
             let ordering =
                 match (left, right) {
-                    (Value::Null, Value::Null) => 0,
-                    (Value::Null, _) => -1,
-                    (_, Value::Null) => 1,
+                    (Value::Null | Value::AutomationNull, Value::Null | Value::AutomationNull) => 0,
+                    (Value::Null | Value::AutomationNull, _) => -1,
+                    (_, Value::Null | Value::AutomationNull) => 1,
                     (Value::Int32(a), Value::Int32(b)) => a.cmp(b) as i8,
                     (Value::String(a), b) => {
-                        let b = b.to_string();
-                        let a = if case_sensitive {
-                            a.clone()
-                        } else {
-                            a.to_lowercase()
+                        let b = match b {
+                            Value::String(b) => b.clone(),
+                            other => PsString::from(other.to_string()),
                         };
-                        let b = if case_sensitive { b } else { b.to_lowercase() };
-                        a.cmp(&b) as i8
+                        compare_strings(a, &b, case_sensitive)?
                     }
                     (a, b) => {
                         let a = a.to_string().parse::<f64>().map_err(|_| {
@@ -176,6 +185,26 @@ fn compare_scalar(
                 Comparison::Like | Comparison::NotLike => unreachable!(),
             })
         }
+    }
+}
+
+/// Ordinal comparison for `-ceq` and friends. Case-insensitive comparison is
+/// ASCII for now: culture-aware folding (`'ﬀ' -eq 'ff'`) needs ICU, which is
+/// its own dependency decision, so anything else is refused rather than
+/// approximated.
+fn compare_strings(
+    left: &PsString,
+    right: &PsString,
+    case_sensitive: bool,
+) -> Result<i8, RuntimeError> {
+    if case_sensitive {
+        return Ok(left.units().cmp(right.units()) as i8);
+    }
+    match (left.as_ascii(), right.as_ascii()) {
+        (Some(left), Some(right)) => {
+            Ok(left.to_ascii_lowercase().cmp(&right.to_ascii_lowercase()) as i8)
+        }
+        _ => refuse("culture-aware string comparison (ICU)"),
     }
 }
 
@@ -227,7 +256,7 @@ pub fn contains(
             feature: "contains on a non-array",
         });
     };
-    for item in items {
+    for item in items.iter() {
         if compare_scalar(item, needle, Comparison::Eq, case_sensitive)? {
             return Ok(Value::Bool(true));
         }
@@ -288,8 +317,9 @@ pub fn bnot(operand: &Value) -> Result<Value, RuntimeError> {
 
 pub fn is_true(value: &Value) -> bool {
     match value {
-        Value::Null => false,
+        Value::Null | Value::AutomationNull => false,
         Value::Bool(value) => *value,
+        Value::Char(unit) => *unit != 0,
         Value::Int32(value) => *value != 0,
         Value::Int64(value) => *value != 0,
         Value::UInt32(value) => *value != 0,
@@ -323,7 +353,7 @@ pub fn range(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
                     values.push(Value::Int32(value));
                 }
             }
-            Ok(Value::Array(values))
+            Ok(Value::array(values))
         }
         _ => refuse("range on non-Int32 operands"),
     }
@@ -332,8 +362,8 @@ pub fn range(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
 /// Binary and unary `-join`.
 pub fn join(left: &Value, separator: &Value) -> Result<Value, RuntimeError> {
     let separator = match separator {
-        Value::String(text) => text.as_str(),
-        Value::Int32(value) => return join(left, &Value::String(value.to_string())),
+        Value::String(text) => text.to_string_lossy(),
+        Value::Int32(value) => return join(left, &Value::String(value.to_string().into())),
         _ => return refuse("join separator other than a string"),
     };
     let text = match left {
@@ -341,15 +371,15 @@ pub fn join(left: &Value, separator: &Value) -> Result<Value, RuntimeError> {
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>()
-            .join(separator),
+            .join(&separator),
         other => other.to_string(),
     };
-    Ok(Value::String(text))
+    Ok(Value::String(text.into()))
 }
 
 /// Unary `-join`: join an array with no separator.
 pub fn unary_join(operand: &Value) -> Result<Value, RuntimeError> {
-    join(operand, &Value::String(String::new()))
+    join(operand, &Value::String(Default::default()))
 }
 
 /// Unary `-`.
@@ -372,7 +402,7 @@ mod tests {
     }
 
     fn string(value: &str) -> Value {
-        Value::String(value.to_owned())
+        Value::String(value.into())
     }
 
     #[test]
@@ -390,6 +420,65 @@ mod tests {
     #[test]
     fn string_concatenation() {
         assert_eq!(add(&string("ab"), &string("cd")), Ok(string("abcd")));
+    }
+
+    #[test]
+    fn ascii_string_comparison_folds_case() {
+        assert_eq!(
+            compare(&string("a"), &string("A"), Comparison::Eq, false),
+            Ok(Value::Bool(true))
+        );
+        assert_eq!(
+            compare(&string("a"), &string("A"), Comparison::Eq, true),
+            Ok(Value::Bool(false))
+        );
+    }
+
+    #[test]
+    fn culture_aware_comparison_is_refused_until_icu() {
+        let result = compare(&string("é"), &string("É"), Comparison::Eq, false);
+        assert_eq!(
+            result.unwrap_err().feature(),
+            "culture-aware string comparison (ICU)"
+        );
+        // Case-sensitive comparison is ordinal and exact in both forms.
+        assert_eq!(
+            compare(&string("é"), &string("É"), Comparison::Eq, true),
+            Ok(Value::Bool(false))
+        );
+    }
+
+    #[test]
+    fn chars_compare_as_strings_and_keep_surrogates() {
+        assert_eq!(
+            compare(
+                &Value::Char(0x61),
+                &Value::Char(0x41),
+                Comparison::Eq,
+                false
+            ),
+            Ok(Value::Bool(true))
+        );
+        assert_eq!(
+            compare(
+                &Value::Char(0xD83D),
+                &Value::Char(0xDE00),
+                Comparison::Eq,
+                true
+            ),
+            Ok(Value::Bool(false))
+        );
+        assert_eq!(
+            compare(
+                &Value::Char(0xD83D),
+                &Value::Char(0xD83D),
+                Comparison::Eq,
+                true
+            ),
+            Ok(Value::Bool(true))
+        );
+        assert!(!is_true(&Value::Char(0)));
+        assert!(is_true(&Value::Char(0x61)));
     }
 
     #[test]

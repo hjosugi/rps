@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dev-dependencies]
 rpsh-engine.workspace = true
+rpsh-runtime.workspace = true
 rpsh-syntax.workspace = true
 
 # Every bench is a plain program (`harness = false`) that prints a table and
@@ -38,6 +39,10 @@ harness = false
 
 [[bench]]
 name = "engine_micro"
+harness = false
+
+[[bench]]
+name = "value_layout"
 harness = false
 
 [lints]
