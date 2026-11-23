@@ -16,6 +16,7 @@ cmdlets/json
 cmdlets/json-pretty
 cmdlets/named-paths
 cmdlets/path-ops
+cmdlets/write-input
 cmdlets/write-output
 contract/collection-order
 contract/console

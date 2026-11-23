@@ -1237,8 +1237,15 @@ impl Engine {
                 let no_enumerate = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("noenumerate") && ops::is_true(value)
                 });
+                let mut values: Vec<Value> = positional;
+                values.extend(
+                    named
+                        .iter()
+                        .filter(|(name, _)| name.eq_ignore_ascii_case("inputobject"))
+                        .map(|(_, value)| value.clone()),
+                );
                 let mut outputs = Vec::new();
-                for value in positional {
+                for value in values {
                     if no_enumerate {
                         outputs.push(value);
                     } else {
@@ -1871,7 +1878,11 @@ impl Engine {
             "out-null" => Ok(Some(Vec::new())),
             "add-content" | "ac" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = positional.first().map(ToString::to_string);
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
                 let Some(path) = path else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Add-Content without a path",
@@ -1887,10 +1898,15 @@ impl Engine {
                 } else {
                     input.to_vec()
                 };
+                let no_newline = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("nonewline") && ops::is_true(value)
+                });
                 let mut text = String::new();
                 for value in values {
                     text.push_str(&value.to_string());
-                    text.push('\n');
+                    if !no_newline {
+                        text.push('\n');
+                    }
                 }
                 use std::io::Write as _;
                 let mut file = std::fs::OpenOptions::new()
