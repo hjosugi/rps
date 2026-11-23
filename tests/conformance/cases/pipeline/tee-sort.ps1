@@ -6,5 +6,7 @@ if (Test-Path rpsh-no-nl.txt) { Remove-Item rpsh-no-nl.txt }
 (Get-Content rpsh-tee.txt) -join ','
 Set-Content rpsh-no-nl.txt -Value 'abc' -NoNewline
 Get-Content rpsh-no-nl.txt -Raw
+2, 3 | Tee-Object -FilePath rpsh-tee.txt -Append | Out-Null
+(Get-Content rpsh-tee.txt) -join ','
 Remove-Item rpsh-tee.txt
 Remove-Item rpsh-no-nl.txt

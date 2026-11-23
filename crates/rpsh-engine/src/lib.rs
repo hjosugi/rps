@@ -2326,9 +2326,27 @@ impl Engine {
                         text.push_str(&item.to_string());
                         text.push('\n');
                     }
-                    std::fs::write(&path, text).map_err(|_| RuntimeError::NotImplemented {
-                        feature: "Tee-Object cannot write this file",
-                    })?;
+                    if named.iter().any(|(name, value)| {
+                        name.eq_ignore_ascii_case("append") && ops::is_true(value)
+                    }) {
+                        use std::io::Write as _;
+                        let mut file = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(&path)
+                            .map_err(|_| RuntimeError::NotImplemented {
+                                feature: "Tee-Object cannot open this file",
+                            })?;
+                        file.write_all(text.as_bytes()).map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "Tee-Object cannot write this file",
+                            }
+                        })?;
+                    } else {
+                        std::fs::write(&path, text).map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Tee-Object cannot write this file",
+                        })?;
+                    }
                 }
                 Ok(Some(input.to_vec()))
             }
