@@ -34,6 +34,8 @@ pub struct Engine {
     capture: Option<Vec<Value>>,
     /// The active `trap` block of the function being run.
     trap: Option<Vec<Statement>>,
+    /// Objects written to the host, formatted as one table at the end.
+    host_objects: Vec<Value>,
 }
 
 /// .NET's seeded `System.Random` (the subtractive generator).
@@ -197,7 +199,9 @@ impl Engine {
         script: &ScriptBlockAst,
         out: &mut dyn Write,
     ) -> Result<i32, EngineError> {
-        match self.exec_block(&script.statements, out)? {
+        let flow = self.exec_block(&script.statements, out)?;
+        self.flush_host(out)?;
+        match flow {
             Flow::Normal => Ok(0),
             Flow::Exit(code) => Ok(code),
             Flow::Return(value) => {
@@ -1509,6 +1513,16 @@ impl Engine {
         Ok(Flow::Normal)
     }
 
+    fn flush_host(&mut self, out: &mut dyn Write) -> Result<(), EngineError> {
+        if self.host_objects.is_empty() {
+            return Ok(());
+        }
+        let text = format_host_stream(&self.host_objects);
+        self.host_objects.clear();
+        out.write_all(text.as_bytes())?;
+        Ok(())
+    }
+
     fn write_value(&mut self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
         if let Some(capture) = &mut self.capture {
             match value {
@@ -1518,19 +1532,15 @@ impl Engine {
             }
             return Ok(());
         }
-        // The host's default object formatting (Format-Table) is M6; until
-        // then an object on the output stream is refused, never printed as
-        // `@{...}` where pwsh would draw a table.
-        let has_object = match &value {
-            Value::Object(_) => true,
-            Value::Array(items) => items.iter().any(|item| matches!(item, Value::Object(_))),
-            _ => false,
-        };
-        if has_object {
-            return Err(RuntimeError::NotImplemented {
-                feature: "default object formatting",
-            }
-            .into());
+        if matches!(value, Value::Object(_)) {
+            self.host_objects.push(value);
+            return Ok(());
+        }
+        if let Value::Array(items) = &value
+            && items.iter().any(|item| matches!(item, Value::Object(_)))
+        {
+            self.host_objects.extend(items.iter().cloned());
+            return Ok(());
         }
         match value {
             Value::Array(items) => {
@@ -2410,6 +2420,106 @@ fn next_prime(mut value: usize) -> usize {
         }
         value += 1;
     }
+}
+
+fn format_host_stream(objects: &[Value]) -> String {
+    let Some(first) = objects.first() else {
+        return String::new();
+    };
+    let columns: Vec<String> = match first {
+        Value::Object(entries) => visible_entries(entries)
+            .iter()
+            .map(|(name, _)| (*name).clone())
+            .collect(),
+        _ => return String::new(),
+    };
+    let mut rows: Vec<Vec<(String, bool)>> = Vec::new();
+    for object in objects {
+        let Value::Object(entries) = object else {
+            continue;
+        };
+        let hashtable = hidden_type(object)
+            .is_some_and(|name| name.contains("Dictionary") || name.contains("Hashtable"));
+        if hashtable {
+            for (key, value) in visible_entries(entries) {
+                rows.push(
+                    columns
+                        .iter()
+                        .map(|column| {
+                            if column.eq_ignore_ascii_case("Name") {
+                                ((*key).clone(), false)
+                            } else if column.eq_ignore_ascii_case("Value") {
+                                (value.to_string(), is_numeric_value(value))
+                            } else {
+                                (String::new(), false)
+                            }
+                        })
+                        .collect(),
+                );
+            }
+        } else {
+            rows.push(
+                columns
+                    .iter()
+                    .map(|column| {
+                        entries
+                            .iter()
+                            .find(|(key, _)| !is_hidden(key) && key.eq_ignore_ascii_case(column))
+                            .map_or((String::new(), false), |(_, value)| {
+                                (value.to_string(), is_numeric_value(value))
+                            })
+                    })
+                    .collect(),
+            );
+        }
+    }
+    let widths: Vec<usize> = columns
+        .iter()
+        .enumerate()
+        .map(|(index, column)| {
+            rows.iter()
+                .map(|row| row[index].0.chars().count())
+                .chain(std::iter::once(column.chars().count()))
+                .max()
+                .unwrap_or(0)
+        })
+        .collect();
+    let mut text = String::from("\n");
+    text.push_str(
+        &columns
+            .iter()
+            .zip(&widths)
+            .map(|(column, width)| format!("{column:<width$}"))
+            .collect::<Vec<_>>()
+            .join(" "),
+    );
+    text.push('\n');
+    text.push_str(
+        &columns
+            .iter()
+            .zip(&widths)
+            .map(|(column, width)| format!("{:<width$}", "-".repeat(column.chars().count())))
+            .collect::<Vec<_>>()
+            .join(" "),
+    );
+    text.push('\n');
+    for row in &rows {
+        let cells: Vec<String> = row
+            .iter()
+            .enumerate()
+            .map(|(index, (value, numeric))| {
+                if *numeric {
+                    format!("{:>width$}", value, width = widths[index])
+                } else {
+                    format!("{:<width$}", value, width = widths[index])
+                }
+            })
+            .collect();
+        text.push_str(&cells.join(" "));
+        text.push('\n');
+    }
+    text.push('\n');
+    text
 }
 
 fn flatten_value(value: Value) -> Vec<Value> {
