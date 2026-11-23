@@ -2346,6 +2346,7 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
+            "format-table" | "ft" => Ok(Some(input.to_vec())),
             "compare-object" | "diff" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
                 let (Some(left), Some(right)) = (positional.first(), positional.get(1)) else {
