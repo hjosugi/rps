@@ -1109,6 +1109,10 @@ impl Engine {
                 })?;
                 Ok(Some(Vec::new()))
             }
+            "out-string" => {
+                let text = format_out_string(input);
+                Ok(Some(vec![Value::String(text.into())]))
+            }
             "convertto-json" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let compress = named.iter().any(|(name, value)| {
@@ -1761,6 +1765,9 @@ fn json_stringify(value: &Value) -> Result<String, RuntimeError> {
         Value::Object(entries) => {
             let mut parts = Vec::with_capacity(entries.len());
             for (name, value) in entries.iter() {
+                if is_hidden(name) {
+                    continue;
+                }
                 parts.push(format!("{}:{}", json_quote(name), json_stringify(value)?));
             }
             Ok(format!("{{{}}}", parts.join(",")))
@@ -2073,6 +2080,183 @@ fn get_type(value: &Value) -> Value {
     Value::Type(value.type_name().to_owned().into())
 }
 
+fn is_numeric_value(value: &Value) -> bool {
+    matches!(
+        value,
+        Value::Int32(_)
+            | Value::Int64(_)
+            | Value::UInt32(_)
+            | Value::UInt64(_)
+            | Value::Int16(_)
+            | Value::UInt16(_)
+            | Value::Byte(_)
+            | Value::SByte(_)
+            | Value::Double(_)
+            | Value::Decimal(_)
+    )
+}
+
+fn visible_entries(entries: &[(String, Value)]) -> Vec<(&String, &Value)> {
+    entries
+        .iter()
+        .filter(|(key, _)| !is_hidden(key))
+        .map(|(key, value)| (key, value))
+        .collect()
+}
+
+fn hidden_type(value: &Value) -> Option<String> {
+    let Value::Object(entries) = value else {
+        return None;
+    };
+    entries.iter().find_map(|(key, value)| {
+        if key == "__TypeName" {
+            match value {
+                Value::String(text) => Some(text.to_string_lossy()),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    })
+}
+
+/// The text `Out-String` returns for one pipeline, following the host's
+/// default table and list views for the shapes the conformance cases use.
+fn format_out_string(input: &[Value]) -> String {
+    let Some(first) = input.first() else {
+        return String::new();
+    };
+    let Value::Object(entries) = first else {
+        let mut text = String::new();
+        for value in input {
+            text.push_str(&value.to_string());
+            text.push('\n');
+        }
+        return text;
+    };
+    let hashtable = hidden_type(first)
+        .is_some_and(|name| name.contains("Dictionary") || name.contains("Hashtable"));
+    let entries = entries.as_ref();
+    if hashtable {
+        let visible = visible_entries(entries);
+        let rows: Vec<(String, String)> = visible
+            .iter()
+            .map(|(key, value)| ((*key).clone(), value.to_string()))
+            .collect();
+        let value_width = rows
+            .iter()
+            .map(|(_, value)| value.chars().count())
+            .chain(std::iter::once("Value".len()))
+            .max()
+            .unwrap_or(5);
+        let mut text = String::from("\n");
+        text.push_str(&format!("{:<30} {}", "Name", "Value"));
+        text.push('\n');
+        text.push_str(&format!("{:<30} {}", "----", "-".repeat(5)));
+        text.push('\n');
+        let _ = value_width;
+        for (name, value) in &rows {
+            text.push_str(format!("{:<30} {}", name, value).trim_end());
+            text.push('\n');
+        }
+        text.push('\n');
+        return text;
+    }
+    let visible = visible_entries(entries);
+    if visible.len() > 4 {
+        let width = visible
+            .iter()
+            .map(|(name, _)| name.chars().count())
+            .max()
+            .unwrap_or(0);
+        let mut text = String::from("\n");
+        for (name, value) in &visible {
+            text.push_str(&format!("{:<width$} : {}", name, value, width = width));
+            text.push('\n');
+        }
+        text.push('\n');
+        return text;
+    }
+    let columns: Vec<String> = visible.iter().map(|(name, _)| (*name).clone()).collect();
+    let rows: Vec<Vec<String>> = input
+        .iter()
+        .map(|item| {
+            let Value::Object(entries) = item else {
+                return Vec::new();
+            };
+            columns
+                .iter()
+                .map(|column| {
+                    entries
+                        .iter()
+                        .find(|(key, _)| !is_hidden(key) && key.eq_ignore_ascii_case(column))
+                        .map_or_else(String::new, |(_, value)| value.to_string())
+                })
+                .collect()
+        })
+        .collect();
+    let widths: Vec<usize> = columns
+        .iter()
+        .enumerate()
+        .map(|(index, column)| {
+            rows.iter()
+                .map(|row| row[index].chars().count())
+                .chain(std::iter::once(column.chars().count()))
+                .max()
+                .unwrap_or(0)
+        })
+        .collect();
+    let mut text = String::from("\n");
+    text.push_str(
+        &columns
+            .iter()
+            .zip(&widths)
+            .map(|(column, width)| format!("{column:<width$}"))
+            .collect::<Vec<_>>()
+            .join(" "),
+    );
+    text.push('\n');
+    text.push_str(
+        &columns
+            .iter()
+            .zip(&widths)
+            .map(|(column, width)| format!("{:<width$}", "-".repeat(column.chars().count())))
+            .collect::<Vec<_>>()
+            .join(" "),
+    );
+    text.push('\n');
+    for (row, _) in rows.iter().enumerate() {
+        let cells: Vec<String> = columns
+            .iter()
+            .enumerate()
+            .map(|(index, _)| {
+                let width = widths[index];
+                let aligns_right = input
+                    .get(row)
+                    .and_then(|item| match item {
+                        Value::Object(entries) => entries
+                            .iter()
+                            .find(|(key, _)| {
+                                !is_hidden(key) && key.eq_ignore_ascii_case(&columns[index])
+                            })
+                            .map(|(_, value)| is_numeric_value(value)),
+                        _ => None,
+                    })
+                    .unwrap_or(false);
+                if aligns_right {
+                    format!("{:>width$}", rows[row][index])
+                } else {
+                    format!("{:<width$}", rows[row][index])
+                }
+            })
+            .collect();
+        text.push_str(&cells.join(" "));
+        text.push('\n');
+    }
+    text.push('\n');
+    text
+}
+
 fn flatten_value(value: Value) -> Vec<Value> {
     match value {
         Value::Array(items) => items.as_ref().clone(),
@@ -2143,17 +2327,34 @@ fn type_full_name(name: &str) -> &'static str {
     }
 }
 
+fn mark_hashtable(value: Value, type_name: &str) -> Value {
+    if let Value::Object(entries) = value {
+        let mut entries = entries.as_ref().clone();
+        entries.push((
+            "__TypeName".to_owned(),
+            Value::String(type_name.to_owned().into()),
+        ));
+        Value::object(entries)
+    } else {
+        value
+    }
+}
+
+fn is_hidden(key: &str) -> bool {
+    key.starts_with("__")
+}
+
 /// `[type]value`, the subset of `LanguagePrimitives.ConvertTo` the skeleton
 /// needs. Failing conversions are refused rather than approximated.
 fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
     match type_name.to_ascii_lowercase().as_str() {
-        "pscustomobject"
-        | "system.management.automation.pscustomobject"
-        | "ordered"
-        | "hashtable"
-        | "system.collections.hashtable"
-        | "ordereddictionary"
-        | "system.collections.specialized.ordereddictionary" => Ok(value),
+        "pscustomobject" | "system.management.automation.pscustomobject" => Ok(value),
+        "ordered" | "ordereddictionary" | "system.collections.specialized.ordereddictionary" => Ok(
+            mark_hashtable(value, "System.Collections.Specialized.OrderedDictionary"),
+        ),
+        "hashtable" | "system.collections.hashtable" => {
+            Ok(mark_hashtable(value, "System.Collections.Hashtable"))
+        }
         "int" | "int32" | "system.int32" => Ok(Value::Int32(convert_int32(&value)?)),
         "long" | "int64" | "system.int64" => Ok(Value::Int64(convert_int64(&value)?)),
         "double" | "system.double" => Ok(Value::Double(convert_double(&value)?)),
@@ -2416,6 +2617,7 @@ fn pstypenames() -> Value {
 fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
     let properties = entries
         .iter()
+        .filter(|(name, _)| !is_hidden(name))
         .map(|(name, property)| {
             Value::object(vec![
                 ("Name".to_owned(), Value::String(name.clone().into())),
@@ -2632,16 +2834,18 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
             }
             if let Some((_, value)) = entries
                 .iter()
-                .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                .find(|(key, _)| !is_hidden(key) && key.eq_ignore_ascii_case(name))
             {
                 return Ok(value.clone());
             }
+            let visible: Vec<&(String, Value)> =
+                entries.iter().filter(|(key, _)| !is_hidden(key)).collect();
             if name.eq_ignore_ascii_case("Count") {
-                return Ok(Value::Int32(entries.len() as i32));
+                return Ok(Value::Int32(visible.len() as i32));
             }
             if name.eq_ignore_ascii_case("Keys") {
                 return Ok(Value::array(
-                    entries
+                    visible
                         .iter()
                         .map(|(key, _)| Value::String(key.clone().into()))
                         .collect(),
@@ -2649,7 +2853,7 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
             }
             if name.eq_ignore_ascii_case("Values") {
                 return Ok(Value::array(
-                    entries.iter().map(|(_, value)| value.clone()).collect(),
+                    visible.iter().map(|(_, value)| value.clone()).collect(),
                 ));
             }
             Ok(Value::Null)
