@@ -2847,7 +2847,14 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("inputobject"))
                     .map(|(_, value)| value.clone())
-                    .or_else(|| positional.first().cloned());
+                    .or_else(|| positional.first().cloned())
+                    .or_else(|| {
+                        if input.is_empty() {
+                            None
+                        } else {
+                            Some(Value::array(input.to_vec()))
+                        }
+                    });
                 if let Some(input) = input {
                     let items = flatten_value(input);
                     let count = named
