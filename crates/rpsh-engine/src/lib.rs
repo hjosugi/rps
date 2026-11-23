@@ -486,6 +486,12 @@ impl Engine {
         arguments: &[CommandArgument],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
+        if let Some(outputs) = self.run_builtin(name, arguments, &[])? {
+            for value in outputs {
+                self.write_value(value, out)?;
+            }
+            return Ok(Flow::Normal);
+        }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
         let saved = std::mem::take(&mut self.variables);
@@ -689,6 +695,9 @@ impl Engine {
         arguments: &[CommandArgument],
         input: Vec<Value>,
     ) -> Result<Vec<Value>, EngineError> {
+        if let Some(outputs) = self.run_builtin(name, arguments, &input)? {
+            return Ok(outputs);
+        }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
         let mut outputs = Vec::new();
@@ -755,6 +764,66 @@ impl Engine {
             }
         }
         Ok(outputs)
+    }
+
+    /// Commands implemented by the engine itself. `Ok(None)` means the name
+    /// is not a builtin and should be resolved as a function.
+    fn run_builtin(
+        &mut self,
+        name: &str,
+        arguments: &[CommandArgument],
+        input: &[Value],
+    ) -> Result<Option<Vec<Value>>, EngineError> {
+        match name.to_ascii_lowercase().as_str() {
+            "write-output" | "echo" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let no_enumerate = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("noenumerate") && ops::is_true(value)
+                });
+                let mut outputs = Vec::new();
+                for value in positional {
+                    if no_enumerate {
+                        outputs.push(value);
+                    } else {
+                        outputs.extend(flatten_value(value));
+                    }
+                }
+                Ok(Some(outputs))
+            }
+            "foreach-object" => {
+                let script = arguments.iter().find_map(|argument| match argument {
+                    CommandArgument::Value(Expr {
+                        kind: ExprKind::ScriptBlock(statements),
+                        ..
+                    }) => Some(statements),
+                    _ => None,
+                });
+                let Some(script) = script else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "ForEach-Object without a script block",
+                    }
+                    .into());
+                };
+                let script = script.clone();
+                let mut outputs = Vec::new();
+                for item in input {
+                    let previous = self.variables.insert("_".to_owned(), item.clone());
+                    let saved = self.capture.take();
+                    self.capture = Some(Vec::new());
+                    let flow = self.exec_block(&script, &mut capture_sink());
+                    let captured = self.capture.take().unwrap_or_default();
+                    self.capture = saved;
+                    match previous {
+                        Some(value) => self.variables.insert("_".to_owned(), value),
+                        None => self.variables.remove("_"),
+                    };
+                    outputs.extend(captured);
+                    flow?;
+                }
+                Ok(Some(outputs))
+            }
+            _ => Ok(None),
+        }
     }
 
     fn function(&self, name: &str) -> Result<FunctionDef, EngineError> {
@@ -932,10 +1001,9 @@ fn evaluate(
         ExprKind::Number(value) => Ok(number_value(value)),
         ExprKind::String(value) => Ok(Value::String(value.clone().into())),
         ExprKind::Paren(inner) => evaluate(inner, variables, last_success),
+        // An undefined variable reads as `$null` outside strict mode.
         ExprKind::Variable(name) => {
-            lookup(name, variables, last_success).ok_or(RuntimeError::NotImplemented {
-                feature: "undefined variable",
-            })
+            Ok(lookup(name, variables, last_success).unwrap_or(Value::Null))
         }
         ExprKind::ExpandableString(parts) => {
             let mut text = String::new();

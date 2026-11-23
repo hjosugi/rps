@@ -366,34 +366,49 @@ impl Parser {
         self.pos += 1;
         let mut arguments = Vec::new();
         while !self.at_statement_end() && self.peek().kind != TokenKind::Pipe {
-            match &self.peek().kind {
+            let parameter = match &self.peek().kind {
                 TokenKind::Parameter(parameter) => {
                     let parameter = parameter.clone();
                     self.pos += 1;
-                    let value = match &self.peek().kind {
-                        TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
-                            let word = word.clone();
-                            let span = self.peek().span;
-                            self.pos += 1;
-                            Some(Expr {
-                                kind: ExprKind::String(word),
-                                span,
-                            })
-                        }
-                        _ if self.argument_starts() => Some(self.nested_expression()?),
-                        _ => None,
-                    };
-                    arguments.push(CommandArgument::Parameter {
-                        name: parameter,
-                        value,
-                    });
+                    Some(parameter)
                 }
+                TokenKind::Minus => match self.tokens.get(self.pos + 1).map(|token| &token.kind) {
+                    Some(TokenKind::Identifier(parameter) | TokenKind::Bareword(parameter)) => {
+                        let parameter = parameter.clone();
+                        self.pos += 2;
+                        Some(parameter)
+                    }
+                    _ => None,
+                },
+                _ => None,
+            };
+            if let Some(parameter) = parameter {
+                let value = match &self.peek().kind {
+                    TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
+                        let word = word.clone();
+                        let span = self.peek().span;
+                        self.pos += 1;
+                        Some(Expr {
+                            kind: ExprKind::String(word),
+                            span,
+                        })
+                    }
+                    _ if self.argument_starts() => Some(self.argument_value()?),
+                    _ => None,
+                };
+                arguments.push(CommandArgument::Parameter {
+                    name: parameter,
+                    value,
+                });
+                continue;
+            }
+            match &self.peek().kind {
                 TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
                     let word = word.clone();
                     self.pos += 1;
                     arguments.push(CommandArgument::Bareword(word));
                 }
-                _ => arguments.push(CommandArgument::Value(self.nested_expression()?)),
+                _ => arguments.push(CommandArgument::Value(self.argument_value()?)),
             }
         }
         let span = start.to(self.previous_span());
@@ -402,6 +417,23 @@ impl Parser {
             arguments,
             span,
         })
+    }
+
+    /// A single command argument. A bracketed value stops at its closing
+    /// bracket so `(1..3) -NoEnumerate` does not read as subtraction.
+    fn argument_value(&mut self) -> Result<Expr, ParseError> {
+        if matches!(
+            self.peek().kind,
+            TokenKind::LParen
+                | TokenKind::AtParen
+                | TokenKind::AtCurly
+                | TokenKind::LBracket
+                | TokenKind::DollarParen
+        ) {
+            self.primary()
+        } else {
+            self.nested_expression()
+        }
     }
 
     fn argument_starts(&self) -> bool {

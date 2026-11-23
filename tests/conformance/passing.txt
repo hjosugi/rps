@@ -1,4 +1,5 @@
 # Conformance cases rpsh passes. Maintained by `cargo harness conform check --bless`.
+cmdlets/write-output
 expr/int-arithmetic
 expr/string-literals
 lang/array
@@ -26,6 +27,7 @@ lang/ternary
 lang/type-conversion
 lang/type-ops
 lang/variable-paths
+lang/variables
 lang/wildcard
 ops/comparison
 stmt/crlf
