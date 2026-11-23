@@ -6,3 +6,4 @@ a.txt
 a.txt,sub,sub/b.txt
 sub
 a.txt
+sub,a.txt

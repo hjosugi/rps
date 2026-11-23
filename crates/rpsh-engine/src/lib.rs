@@ -1934,7 +1934,7 @@ impl Engine {
                         None => true,
                     }
                 });
-                entries.sort_by_key(|(name, _, _)| name.to_lowercase());
+                entries.sort_by_key(|(name, is_dir, _)| (!*is_dir, name.to_lowercase()));
                 Ok(Some(
                     entries
                         .into_iter()
