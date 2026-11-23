@@ -1172,10 +1172,20 @@ impl Engine {
                 let case_sensitive = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
                 });
+                let property = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                    .map(|(_, value)| value.clone());
                 let mut items = input.to_vec();
-                items.sort_by(|left, right| {
-                    let left = left.to_string();
-                    let right = right.to_string();
+                items.sort_by(|a, b| {
+                    let left = match &property {
+                        Some(property) => sort_key(a, property),
+                        None => a.to_string(),
+                    };
+                    let right = match &property {
+                        Some(property) => sort_key(b, property),
+                        None => b.to_string(),
+                    };
                     culture_rank(&left)
                         .cmp(&culture_rank(&right))
                         .then_with(|| left.to_lowercase().cmp(&right.to_lowercase()))
@@ -1667,6 +1677,38 @@ impl Engine {
                             true
                         }
                     });
+                }
+                let property = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                    .map(|(_, value)| value.clone());
+                let expand = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("expandproperty"))
+                    .map(|(_, value)| value.clone());
+                if let Some(property) = property.or(expand.clone()) {
+                    let names = flatten_value(property);
+                    items = items
+                        .into_iter()
+                        .filter_map(|item| {
+                            if expand.is_some() {
+                                names.first().and_then(|name| {
+                                    member(&item, &name.to_string())
+                                        .ok()
+                                        .filter(|value| !value.is_null_like())
+                                })
+                            } else {
+                                let mut entries = Vec::new();
+                                for name in &names {
+                                    let key = name.to_string();
+                                    if let Ok(value) = member(&item, &key) {
+                                        entries.push((key, value));
+                                    }
+                                }
+                                Some(Value::object(entries))
+                            }
+                        })
+                        .collect();
                 }
                 if let Some((_, skip)) = named
                     .iter()
@@ -3033,6 +3075,14 @@ fn format_host_stream(objects: &[Value]) -> String {
     }
     text.push('\n');
     text
+}
+
+fn sort_key(value: &Value, property: &Value) -> String {
+    let name = property.to_string();
+    match member(value, &name) {
+        Ok(value) => value.to_string(),
+        Err(_) => String::new(),
+    }
 }
 
 fn culture_rank(text: &str) -> u8 {

@@ -56,6 +56,7 @@ native/glob
 native/pipe
 ops/comparison
 pipeline/group-select
+pipeline/select-sort
 pipeline/where-foreach
 stmt/crlf
 stmt/empty
