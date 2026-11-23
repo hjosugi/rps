@@ -195,7 +195,7 @@ impl Engine {
     ) -> Result<Flow, EngineError> {
         match statement {
             Statement::Expression(expr) => {
-                let value = evaluate(expr, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(expr)?;
                 if !matches!(
                     expr.kind,
                     ExprKind::Unary {
@@ -1300,6 +1300,23 @@ impl Engine {
             })
     }
 
+    fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
+        if let ExprKind::Group(statements) = &expr.kind {
+            let saved = self.capture.take();
+            self.capture = Some(Vec::new());
+            let flow = self.exec_block(statements, &mut capture_sink());
+            let mut outputs = self.capture.take().unwrap_or_default();
+            self.capture = saved;
+            flow?;
+            return Ok(match outputs.len() {
+                0 => Value::Null,
+                1 => outputs.pop().unwrap_or(Value::Null),
+                _ => Value::array(outputs),
+            });
+        }
+        Ok(evaluate(expr, &mut self.variables, self.last_success)?)
+    }
+
     fn evaluate_arguments(
         &mut self,
         arguments: &[CommandArgument],
@@ -1309,14 +1326,14 @@ impl Engine {
         for argument in arguments {
             match argument {
                 CommandArgument::Value(expr) => {
-                    positional.push(evaluate(expr, &mut self.variables, self.last_success)?);
+                    positional.push(self.eval_expression(expr)?);
                 }
                 CommandArgument::Bareword(word) => {
                     positional.push(Value::String(word.clone().into()));
                 }
                 CommandArgument::Parameter { name, value } => {
                     let value = match value {
-                        Some(expr) => evaluate(expr, &mut self.variables, self.last_success)?,
+                        Some(expr) => self.eval_expression(expr)?,
                         None => Value::Bool(true),
                     };
                     named.push((name.clone(), value));
@@ -1487,6 +1504,9 @@ fn evaluate(
             Ok(Value::String(text.into()))
         }
         ExprKind::Subexpression(expr) => evaluate(expr, variables, last_success),
+        ExprKind::Group(_) => Err(RuntimeError::NotImplemented {
+            feature: "a parenthesized command in this expression",
+        }),
         ExprKind::Ternary {
             condition,
             when_true,

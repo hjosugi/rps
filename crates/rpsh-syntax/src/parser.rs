@@ -47,7 +47,11 @@ impl Parser {
     fn at_statement_end(&self) -> bool {
         matches!(
             self.peek().kind,
-            TokenKind::NewLine | TokenKind::Semi | TokenKind::RCurly | TokenKind::EndOfInput
+            TokenKind::NewLine
+                | TokenKind::Semi
+                | TokenKind::RCurly
+                | TokenKind::RParen
+                | TokenKind::EndOfInput
         )
     }
 
@@ -333,6 +337,27 @@ impl Parser {
         Ok(condition)
     }
 
+    fn paren_statements(&mut self) -> Result<Vec<Statement>, ParseError> {
+        let mut statements = Vec::new();
+        loop {
+            while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
+                self.pos += 1;
+            }
+            if self.peek().kind == TokenKind::RParen {
+                self.pos += 1;
+                return Ok(statements);
+            }
+            if self.peek().kind == TokenKind::EndOfInput {
+                return self.refuse(SYNTAX_ERRORS);
+            }
+            self.nodes = 0;
+            statements.push(self.statement()?);
+            if !self.at_statement_end() {
+                return self.refuse(SYNTAX_ERRORS);
+            }
+        }
+    }
+
     /// Parses `( argument, ... )` for a method call.
     fn arguments(&mut self) -> Result<(Vec<Expr>, Span), ParseError> {
         self.pos += 1;
@@ -415,6 +440,17 @@ impl Parser {
         while !self.at_statement_end() && self.peek().kind != TokenKind::Pipe {
             if matches!(self.peek().kind, TokenKind::Redirection(_)) {
                 self.pos += 1;
+                continue;
+            }
+            if matches!(
+                self.peek().kind,
+                TokenKind::Int32(_) | TokenKind::Numeric(_)
+            ) && self
+                .tokens
+                .get(self.pos + 1)
+                .is_some_and(|token| matches!(token.kind, TokenKind::Redirection(_)))
+            {
+                self.pos += 2;
                 continue;
             }
             let parameter = match &self.peek().kind {
@@ -1557,6 +1593,13 @@ impl Parser {
                 if self.peek().kind == TokenKind::NewLine {
                     return self.refuse("newlines inside parentheses");
                 }
+                if matches!(
+                    self.peek().kind,
+                    TokenKind::Identifier(_) | TokenKind::Bareword(_)
+                ) {
+                    let statements = self.paren_statements()?;
+                    return self.expr(ExprKind::Group(statements), span.to(self.previous_span()));
+                }
                 let inner = self.nested_expression()?;
                 match self.peek().kind {
                     TokenKind::RParen => {
@@ -1860,6 +1903,7 @@ mod tests {
                     .collect::<String>()
             ),
             ExprKind::Subexpression(expr) => format!("$({})", show(expr)),
+            ExprKind::Group(_) => "(...)".to_owned(),
             ExprKind::TypeLiteral(name) => format!("[{name}]"),
             ExprKind::Array(items) => {
                 format!("[{}]", items.iter().map(show).collect::<Vec<_>>().join(","))

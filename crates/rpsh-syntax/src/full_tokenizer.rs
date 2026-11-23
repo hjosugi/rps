@@ -376,8 +376,22 @@ impl Tokenizer<'_> {
                 self.command_seen = false;
                 self.statement_start = true;
             }
-            FullTokenKind::LParen
-            | FullTokenKind::LBracket
+            FullTokenKind::LParen => {
+                let call = self.tokens.len() >= 2
+                    && matches!(
+                        self.tokens[self.tokens.len() - 2].kind,
+                        FullTokenKind::Identifier | FullTokenKind::Generic
+                    );
+                if call {
+                    self.mode = Mode::Expression;
+                    self.statement_start = false;
+                } else {
+                    self.mode = Mode::Command;
+                    self.command_seen = false;
+                    self.statement_start = true;
+                }
+            }
+            FullTokenKind::LBracket
             | FullTokenKind::DollarParen
             | FullTokenKind::AtParen
             | FullTokenKind::AtCurly => {

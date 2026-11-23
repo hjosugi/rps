@@ -234,6 +234,8 @@ pub enum ExprKind {
     ExpandableString(Vec<StringPart>),
     /// Upstream: `SubExpressionAst`.
     Subexpression(Box<Expr>),
+    /// `(command ...)`: a parenthesized statement list that yields its output.
+    Group(Vec<Statement>),
     /// Upstream: `TypeExpressionAst` used as a value.
     TypeLiteral(String),
     /// Upstream: `ArrayLiteralAst`.

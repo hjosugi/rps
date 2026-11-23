@@ -3,6 +3,7 @@ cmdlets/content
 cmdlets/default-formatting
 cmdlets/json
 cmdlets/write-output
+contract/streams
 expr/int-arithmetic
 expr/string-literals
 lang/array

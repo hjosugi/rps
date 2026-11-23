@@ -57,6 +57,7 @@ fn format_expr(expr: &Expr) -> String {
             format_expr(when_false)
         ),
         ExprKind::Subexpression(_) => "(subexpr)".to_owned(),
+        ExprKind::Group(_) => "(group)".to_owned(),
         ExprKind::Cast {
             type_name: cast,
             value,
