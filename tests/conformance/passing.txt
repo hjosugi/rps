@@ -1,5 +1,6 @@
 # Conformance cases rpsh passes. Maintained by `cargo harness conform check --bless`.
 cmdlets/child-item
+cmdlets/clear-content
 cmdlets/content
 cmdlets/content-options
 cmdlets/copy-into-dir

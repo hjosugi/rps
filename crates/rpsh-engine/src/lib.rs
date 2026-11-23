@@ -1895,6 +1895,20 @@ impl Engine {
                 ))
             }
             "out-null" => Ok(Some(Vec::new())),
+            "clear-content" | "clc" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                if let Some(path) = path {
+                    std::fs::write(&path, b"").map_err(|_| RuntimeError::NotImplemented {
+                        feature: "Clear-Content cannot write this file",
+                    })?;
+                }
+                Ok(Some(Vec::new()))
+            }
             "add-content" | "ac" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
