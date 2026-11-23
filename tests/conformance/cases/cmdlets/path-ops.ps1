@@ -12,3 +12,5 @@ Test-Path fixtures/tree/*.txt -PathType Container
 Test-Path -LiteralPath fixtures/data.txt
 Test-Path -Path fixtures/data.txt
 (Get-Item -LiteralPath fixtures/data.txt).Name
+Split-Path /tmp/x -IsAbsolute
+Split-Path fixtures/data.txt -IsAbsolute

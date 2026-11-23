@@ -2135,6 +2135,11 @@ impl Engine {
                 let path = path.to_string();
                 let path = std::path::Path::new(&path);
                 if named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("isabsolute") && ops::is_true(value)
+                }) {
+                    return Ok(Some(vec![Value::Bool(path.is_absolute())]));
+                }
+                if named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("extension") && ops::is_true(value)
                 }) {
                     let extension = path
