@@ -59,6 +59,7 @@ ops/comparison
 pipeline/group-select
 pipeline/select-sort
 pipeline/where-foreach
+pipeline/where-property
 stmt/crlf
 stmt/empty
 stmt/exit-code

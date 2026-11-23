@@ -1122,6 +1122,29 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "where-object" | "where" => {
+                if script_block_argument(arguments).is_none() {
+                    let (positional, named) = self.evaluate_arguments(arguments)?;
+                    if let Some(property) = positional.first() {
+                        let property = property.to_string();
+                        if let Some((comparison, expected)) =
+                            named.iter().find_map(|(name, value)| {
+                                comparison_for(name).map(|comparison| (comparison, value))
+                            })
+                        {
+                            let mut outputs = Vec::new();
+                            for item in input {
+                                let value = member(item, &property).unwrap_or(Value::Null);
+                                if matches!(
+                                    ops::compare(&value, expected, comparison, false)?,
+                                    Value::Bool(true)
+                                ) {
+                                    outputs.push(item.clone());
+                                }
+                            }
+                            return Ok(Some(outputs));
+                        }
+                    }
+                }
                 let Some(script) = script_block_argument(arguments) else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Where-Object without a script block",
@@ -3171,6 +3194,20 @@ fn format_host_stream(objects: &[Value]) -> String {
     }
     text.push('\n');
     text
+}
+
+fn comparison_for(name: &str) -> Option<ops::Comparison> {
+    Some(match name.to_ascii_lowercase().as_str() {
+        "eq" | "ieq" => ops::Comparison::Eq,
+        "ne" | "ine" => ops::Comparison::Ne,
+        "gt" | "igt" => ops::Comparison::Gt,
+        "ge" | "ige" => ops::Comparison::Ge,
+        "lt" | "ilt" => ops::Comparison::Lt,
+        "le" | "ile" => ops::Comparison::Le,
+        "like" | "ilike" => ops::Comparison::Like,
+        "notlike" | "inotlike" => ops::Comparison::NotLike,
+        _ => return None,
+    })
 }
 
 fn sort_key(value: &Value, property: &Value) -> String {
