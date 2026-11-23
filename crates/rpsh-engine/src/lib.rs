@@ -1032,10 +1032,10 @@ mod tests {
 
     #[test]
     fn a_runtime_refusal_keeps_earlier_output() {
-        let (result, out) = run("1; 2147483647 + 1; 3");
+        let (result, out) = run("1; 1 + 'a'; 3");
         assert_eq!(
             result.unwrap_err().missing_feature(),
-            Some("Int32 overflow (promotion to Double)")
+            Some("operators on operand types other than numbers and strings")
         );
         assert_eq!(out, "1\n");
     }

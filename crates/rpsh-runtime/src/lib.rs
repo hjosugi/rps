@@ -170,23 +170,51 @@ impl fmt::Display for Value {
     }
 }
 
+/// The host's default `Double` formatting: 15 significant digits (`.NET`'s
+/// `G15`), fixed notation for exponents from -4 to 14 and scientific outside
+/// that, with a two-digit exponent (`1E+20`, `1E-07`).
 fn format_double(value: f64) -> String {
+    if value.is_nan() {
+        return "NaN".to_owned();
+    }
+    if value.is_infinite() {
+        return if value.is_sign_negative() {
+            "-∞"
+        } else {
+            "∞"
+        }
+        .to_owned();
+    }
     if value == 0.0 {
-        return "0".to_owned();
+        return if value.is_sign_negative() { "-0" } else { "0" }.to_owned();
     }
-    if !value.is_finite() {
-        return value.to_string();
+    let mut exponent = value.abs().log10().floor() as i32;
+    // log10 is not exact at powers of ten; nudge to the true decimal exponent.
+    while value.abs() >= 10f64.powi(exponent + 1) {
+        exponent += 1;
     }
-    let mut text = format!("{value:.15}");
-    if let Some(dot) = text.find('.') {
-        while text.ends_with('0') {
-            text.pop();
-        }
-        if text.len() == dot + 1 {
-            text.pop();
-        }
+    while value.abs() < 10f64.powi(exponent) {
+        exponent -= 1;
     }
-    text
+    if !(-4..15).contains(&exponent) {
+        let text = format!("{value:.14e}");
+        let (mantissa, exponent) = text.split_once('e').unwrap_or((&text, "0"));
+        let mantissa = trim_fraction(mantissa);
+        let exponent: i32 = exponent.parse().unwrap_or(0);
+        let sign = if exponent < 0 { '-' } else { '+' };
+        return format!("{mantissa}E{sign}{:02}", exponent.unsigned_abs());
+    }
+    let decimals = (14 - exponent).max(0) as usize;
+    trim_fraction(&format!("{value:.decimals$}"))
+}
+
+/// Removes trailing fractional zeros and a trailing decimal point.
+fn trim_fraction(text: &str) -> String {
+    if !text.contains('.') {
+        return text.to_owned();
+    }
+    let trimmed = text.trim_end_matches('0');
+    trimmed.trim_end_matches('.').to_owned()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

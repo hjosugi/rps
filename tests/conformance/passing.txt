@@ -4,9 +4,12 @@ expr/string-literals
 lang/array
 lang/comparison-basic
 lang/division
+lang/double-format
 lang/if-else
+lang/int-overflow
 lang/loops
 lang/numeric-literals
+lang/numeric-promotion
 lang/psobject
 lang/scriptblock
 lang/string-escapes

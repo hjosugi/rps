@@ -5,69 +5,196 @@ use std::rc::Rc;
 
 use crate::{PsString, RuntimeError, Value};
 
-const INT32_OVERFLOW: &str = "Int32 overflow (promotion to Double)";
-const MIXED_OPERANDS: &str = "operators on operand types other than Int32 and String";
+const MIXED_OPERANDS: &str = "operators on operand types other than numbers and strings";
 
 fn refuse<T>(feature: &'static str) -> Result<T, RuntimeError> {
     Err(RuntimeError::NotImplemented { feature })
 }
 
-/// Binary `+`.
-pub fn add(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    match (left, right) {
-        (Value::Int32(a), Value::Int32(b)) => match a.checked_add(*b) {
-            Some(sum) => Ok(Value::Int32(sum)),
-            None => refuse(INT32_OVERFLOW),
+/// The integer types that share a result kind. Anything narrower than `Int32`
+/// promotes to `Int32`, as upstream's binder does.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum IntKind {
+    I32,
+    I64,
+    U32,
+    U64,
+}
+
+#[derive(Clone, Copy)]
+enum NumericKind {
+    Int(IntKind),
+    Double,
+}
+
+fn int_kind(value: &Value) -> Option<IntKind> {
+    match value {
+        Value::Int32(_) | Value::Int16(_) | Value::UInt16(_) | Value::Byte(_) | Value::SByte(_) => {
+            Some(IntKind::I32)
+        }
+        Value::UInt32(_) => Some(IntKind::U32),
+        Value::Int64(_) => Some(IntKind::I64),
+        Value::UInt64(_) => Some(IntKind::U64),
+        _ => None,
+    }
+}
+
+fn int_value(value: &Value) -> Option<i128> {
+    match value {
+        Value::Int32(value) => Some(i128::from(*value)),
+        Value::Int64(value) => Some(i128::from(*value)),
+        Value::UInt32(value) => Some(i128::from(*value)),
+        Value::UInt64(value) => Some(i128::from(*value)),
+        Value::Int16(value) => Some(i128::from(*value)),
+        Value::UInt16(value) => Some(i128::from(*value)),
+        Value::Byte(value) => Some(i128::from(*value)),
+        Value::SByte(value) => Some(i128::from(*value)),
+        _ => None,
+    }
+}
+
+fn float_value(value: &Value) -> Option<f64> {
+    match value {
+        Value::Double(value) => Some(*value),
+        other => int_value(other).map(|value| value as f64),
+    }
+}
+
+/// The result kind of a binary arithmetic operator. A negative value mixed
+/// with an unsigned 64-bit operand is `Decimal` upstream; that is refused
+/// until `Decimal` arithmetic is implemented.
+fn numeric_kind(left: &Value, right: &Value) -> Result<NumericKind, RuntimeError> {
+    if matches!(left, Value::Double(_)) || matches!(right, Value::Double(_)) {
+        return Ok(NumericKind::Double);
+    }
+    let (Some(left_kind), Some(right_kind)) = (int_kind(left), int_kind(right)) else {
+        return refuse(MIXED_OPERANDS);
+    };
+    let left_value = int_value(left).unwrap_or_default();
+    let right_value = int_value(right).unwrap_or_default();
+    Ok(NumericKind::Int(
+        if left_kind == IntKind::U64 || right_kind == IntKind::U64 {
+            if left_value >= 0 && right_value >= 0 {
+                IntKind::U64
+            } else {
+                return refuse("UInt64 mixed with a negative value (Decimal)");
+            }
+        } else if left_kind == IntKind::I64 || right_kind == IntKind::I64 {
+            IntKind::I64
+        } else if left_kind == IntKind::U32 || right_kind == IntKind::U32 {
+            if left_value >= 0 && right_value >= 0 {
+                IntKind::U32
+            } else {
+                IntKind::I64
+            }
+        } else {
+            IntKind::I32
         },
-        (Value::String(a), Value::String(b)) => Ok(Value::String(a.concat(b))),
-        _ => refuse(MIXED_OPERANDS),
+    ))
+}
+
+/// The value of an integer result, promoting to `Double` when it does not fit
+/// the type the operands chose.
+fn integer_result(kind: IntKind, value: i128) -> Value {
+    match kind {
+        IntKind::I32 => {
+            i32::try_from(value).map_or_else(|_| Value::Double(value as f64), Value::Int32)
+        }
+        IntKind::I64 => {
+            i64::try_from(value).map_or_else(|_| Value::Double(value as f64), Value::Int64)
+        }
+        IntKind::U32 => {
+            u32::try_from(value).map_or_else(|_| Value::Double(value as f64), Value::UInt32)
+        }
+        IntKind::U64 => {
+            u64::try_from(value).map_or_else(|_| Value::Double(value as f64), Value::UInt64)
+        }
+    }
+}
+
+fn double_operands(left: &Value, right: &Value, operation: impl FnOnce(f64, f64) -> f64) -> Value {
+    Value::Double(operation(
+        float_value(left).unwrap_or_default(),
+        float_value(right).unwrap_or_default(),
+    ))
+}
+
+/// Binary `+`. A `Char` is a string in addition upstream, so `[char]'a' + 1`
+/// is `"a1"`.
+pub fn add(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    if matches!(left, Value::Char(_)) || matches!(right, Value::Char(_)) {
+        return Ok(Value::String(PsString::from(format!("{left}{right}"))));
+    }
+    if let (Value::String(a), Value::String(b)) = (left, right) {
+        return Ok(Value::String(a.concat(b)));
+    }
+    match numeric_kind(left, right)? {
+        NumericKind::Double => Ok(double_operands(left, right, |a, b| a + b)),
+        NumericKind::Int(kind) => Ok(integer_result(
+            kind,
+            int_value(left).unwrap_or_default() + int_value(right).unwrap_or_default(),
+        )),
     }
 }
 
 /// Binary `-`.
 pub fn subtract(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    match (left, right) {
-        (Value::Int32(a), Value::Int32(b)) => match a.checked_sub(*b) {
-            Some(difference) => Ok(Value::Int32(difference)),
-            None => refuse(INT32_OVERFLOW),
-        },
-        _ => refuse(MIXED_OPERANDS),
+    match numeric_kind(left, right)? {
+        NumericKind::Double => Ok(double_operands(left, right, |a, b| a - b)),
+        NumericKind::Int(kind) => Ok(integer_result(
+            kind,
+            int_value(left).unwrap_or_default() - int_value(right).unwrap_or_default(),
+        )),
     }
 }
 
 /// Binary `*`.
 pub fn multiply(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    match (left, right) {
-        (Value::Int32(a), Value::Int32(b)) => match a.checked_mul(*b) {
-            Some(product) => Ok(Value::Int32(product)),
-            None => refuse(INT32_OVERFLOW),
-        },
-        _ => refuse(MIXED_OPERANDS),
+    match numeric_kind(left, right)? {
+        NumericKind::Double => Ok(double_operands(left, right, |a, b| a * b)),
+        NumericKind::Int(kind) => {
+            let left_value = int_value(left).unwrap_or_default();
+            let right_value = int_value(right).unwrap_or_default();
+            match left_value.checked_mul(right_value) {
+                Some(product) => Ok(integer_result(kind, product)),
+                None => Ok(Value::Double(left_value as f64 * right_value as f64)),
+            }
+        }
     }
 }
 
-/// Binary `/`: an exact Int32 division stays Int32, otherwise the result is
-/// the Double `a / b`, as upstream does.
+/// Binary `/`: an exact integer division stays integer, otherwise the result
+/// is `Double`, as upstream does.
 pub fn divide(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    match (left, right) {
-        (Value::Int32(_), Value::Int32(0)) => refuse("divide by zero"),
-        (Value::Int32(a), Value::Int32(b)) => {
-            if a % b == 0 {
-                Ok(Value::Int32(a / b))
+    match numeric_kind(left, right)? {
+        NumericKind::Double => Ok(double_operands(left, right, |a, b| a / b)),
+        NumericKind::Int(kind) => {
+            let left_value = int_value(left).unwrap_or_default();
+            let right_value = int_value(right).unwrap_or_default();
+            if right_value == 0 {
+                return refuse("divide by zero");
+            }
+            if left_value % right_value == 0 {
+                Ok(integer_result(kind, left_value / right_value))
             } else {
-                Ok(Value::Double(f64::from(*a) / f64::from(*b)))
+                Ok(Value::Double(left_value as f64 / right_value as f64))
             }
         }
-        _ => refuse(MIXED_OPERANDS),
     }
 }
 
 /// Binary `%`: the sign follows the dividend, as in C#.
 pub fn remainder(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    match (left, right) {
-        (Value::Int32(_), Value::Int32(0)) => refuse("divide by zero"),
-        (Value::Int32(a), Value::Int32(b)) => Ok(Value::Int32(a % b)),
-        _ => refuse(MIXED_OPERANDS),
+    match numeric_kind(left, right)? {
+        NumericKind::Double => Ok(double_operands(left, right, |a, b| a % b)),
+        NumericKind::Int(kind) => {
+            let left_value = int_value(left).unwrap_or_default();
+            let right_value = int_value(right).unwrap_or_default();
+            if right_value == 0 {
+                return refuse("divide by zero");
+            }
+            Ok(integer_result(kind, left_value % right_value))
+        }
     }
 }
 
@@ -154,6 +281,17 @@ fn compare_scalar(
                         compare_strings(a, &b, case_sensitive)?
                     }
                     (a, b) => {
+                        if let (Some(a), Some(b)) = (int_value(a), int_value(b)) {
+                            return Ok(match op {
+                                Comparison::Eq => a == b,
+                                Comparison::Ne => a != b,
+                                Comparison::Ge => a >= b,
+                                Comparison::Gt => a > b,
+                                Comparison::Lt => a < b,
+                                Comparison::Le => a <= b,
+                                Comparison::Like | Comparison::NotLike => unreachable!(),
+                            });
+                        }
                         let a = a.to_string().parse::<f64>().map_err(|_| {
                             RuntimeError::NotImplemented {
                                 feature: "comparison on these operand types",
@@ -385,10 +523,20 @@ pub fn unary_join(operand: &Value) -> Result<Value, RuntimeError> {
 /// Unary `-`.
 pub fn negate(operand: &Value) -> Result<Value, RuntimeError> {
     match operand {
-        Value::Int32(value) => match value.checked_neg() {
-            Some(negated) => Ok(Value::Int32(negated)),
-            None => refuse(INT32_OVERFLOW),
-        },
+        Value::Double(value) => Ok(Value::Double(-value)),
+        Value::Int32(value) => Ok(value
+            .checked_neg()
+            .map_or_else(|| Value::Double(-f64::from(*value)), Value::Int32)),
+        Value::Int64(value) => Ok(value
+            .checked_neg()
+            .map_or_else(|| Value::Double(-(*value as f64)), Value::Int64)),
+        // Unsigned negation becomes Double upstream.
+        Value::UInt32(value) => Ok(Value::Double(-f64::from(*value))),
+        Value::UInt64(value) => Ok(Value::Double(-(*value as f64))),
+        // Anything narrower than Int32 negates as Int32.
+        Value::Int16(_) | Value::UInt16(_) | Value::Byte(_) | Value::SByte(_) => Ok(Value::Int32(
+            -(int_value(operand).unwrap_or_default() as i32),
+        )),
         _ => refuse(MIXED_OPERANDS),
     }
 }
@@ -482,15 +630,70 @@ mod tests {
     }
 
     #[test]
-    fn overflow_is_refused_rather_than_wrapped() {
-        for result in [
+    fn int32_overflow_promotes_to_double() {
+        assert_eq!(
             add(&int(i32::MAX), &int(1)),
+            Ok(Value::Double(2_147_483_648.0))
+        );
+        assert_eq!(
             subtract(&int(i32::MIN), &int(1)),
+            Ok(Value::Double(-2_147_483_649.0))
+        );
+        assert_eq!(
             multiply(&int(i32::MAX), &int(2)),
-            negate(&int(i32::MIN)),
-        ] {
-            assert_eq!(result.unwrap_err().feature(), INT32_OVERFLOW);
-        }
+            Ok(Value::Double(4_294_967_294.0))
+        );
+        assert_eq!(negate(&int(i32::MIN)), Ok(Value::Double(2_147_483_648.0)));
+    }
+
+    #[test]
+    fn wider_integers_keep_their_type() {
+        assert_eq!(
+            add(&Value::Int64(2_147_483_648), &int(1)),
+            Ok(Value::Int64(2_147_483_649))
+        );
+        assert_eq!(add(&Value::UInt32(1), &int(1)), Ok(Value::UInt32(2)));
+        assert_eq!(add(&Value::UInt64(1), &int(1)), Ok(Value::UInt64(2)));
+        assert_eq!(add(&Value::Byte(1), &int(1)), Ok(int(2)));
+        assert_eq!(add(&Value::Int16(1), &Value::Int16(1)), Ok(int(2)));
+    }
+
+    #[test]
+    fn mixing_a_negative_with_uint32_widens_to_int64() {
+        assert_eq!(add(&Value::UInt32(1), &int(-3)), Ok(Value::Int64(-2)));
+    }
+
+    #[test]
+    fn double_wins_over_integers() {
+        assert_eq!(add(&int(1), &Value::Double(2.5)), Ok(Value::Double(3.5)));
+        assert_eq!(
+            multiply(&Value::Double(1.5), &int(2)),
+            Ok(Value::Double(3.0))
+        );
+        assert_eq!(
+            remainder(&int(5), &Value::Double(2.0)),
+            Ok(Value::Double(1.0))
+        );
+    }
+
+    #[test]
+    fn integer_division_is_exact_or_double() {
+        assert_eq!(divide(&int(6), &int(2)), Ok(int(3)));
+        assert_eq!(divide(&int(7), &int(2)), Ok(Value::Double(3.5)));
+        assert_eq!(divide(&Value::Int64(6), &int(2)), Ok(Value::Int64(3)));
+        assert_eq!(divide(&Value::UInt32(7), &int(2)), Ok(Value::Double(3.5)));
+    }
+
+    #[test]
+    fn char_addition_is_string_concatenation() {
+        assert_eq!(
+            add(&Value::Char(0x61), &int(1)),
+            Ok(Value::String("a1".into()))
+        );
+        assert_eq!(
+            add(&int(1), &Value::Char(0x61)),
+            Ok(Value::String("1a".into()))
+        );
     }
 
     #[test]
