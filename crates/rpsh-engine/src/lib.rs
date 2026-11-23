@@ -1394,6 +1394,7 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("property"))
                     .map(|(_, value)| value.to_string());
+                let total = input.len() as i32;
                 let mut sum = Value::Int32(0);
                 let mut minimum: Option<Value> = None;
                 let mut maximum: Option<Value> = None;
@@ -1438,7 +1439,7 @@ impl Engine {
                 } else {
                     0.0
                 };
-                let mut entries = vec![("Count".to_owned(), Value::Int32(count))];
+                let mut entries = vec![("Count".to_owned(), Value::Int32(total))];
                 if flag("sum") {
                     entries.push(("Sum".to_owned(), sum));
                 }
