@@ -1,6 +1,6 @@
 use crate::{
-    BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, Parameter, ParseError, ScriptBlockAst,
-    Span, Statement, StringPart, Token, TokenKind, UnaryOp, tokenize,
+    BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, Parameter, ParseError, PipelineCommand,
+    ScriptBlockAst, Span, Statement, StringPart, Token, TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -142,13 +142,14 @@ impl Parser {
             TokenKind::Function => self.function_statement(false),
             TokenKind::Filter => self.function_statement(true),
             TokenKind::Identifier(name) | TokenKind::Bareword(name) => {
-                self.command_statement(name.clone())
+                let statement = self.command_statement(name.clone())?;
+                self.pipeline_after(statement)
             }
             TokenKind::Exit => self.exit_statement(),
             _ => {
                 let expression = self.expression()?;
                 if self.peek().kind != TokenKind::Equals {
-                    return Ok(Statement::Expression(expression));
+                    return self.pipeline_after(Statement::Expression(expression));
                 }
                 let span = expression.span;
                 self.pos += 1;
@@ -312,12 +313,58 @@ impl Parser {
         Ok((arguments, close))
     }
 
+    /// Wraps the first stage in a pipeline when a `|` follows.
+    fn pipeline_after(&mut self, first: Statement) -> Result<Statement, ParseError> {
+        if self.peek().kind != TokenKind::Pipe {
+            return Ok(first);
+        }
+        let start = match &first {
+            Statement::Expression(expr) => expr.span,
+            Statement::Command { span, .. } => *span,
+            _ => return Ok(first),
+        };
+        let mut commands = Vec::new();
+        match first {
+            Statement::Expression(expr) => commands.push(PipelineCommand::Expression(expr)),
+            Statement::Command {
+                name, arguments, ..
+            } => {
+                commands.push(PipelineCommand::Command { name, arguments });
+            }
+            other => return Ok(other),
+        }
+        while self.peek().kind == TokenKind::Pipe {
+            self.pos += 1;
+            self.skip_newlines();
+            commands.push(self.pipeline_element()?);
+        }
+        let span = start.to(self.previous_span());
+        Ok(Statement::Pipeline { commands, span })
+    }
+
+    fn pipeline_element(&mut self) -> Result<PipelineCommand, ParseError> {
+        match &self.peek().kind {
+            TokenKind::Identifier(name) | TokenKind::Bareword(name) => {
+                let name = name.clone();
+                let statement = self.command_statement(name)?;
+                let Statement::Command {
+                    name, arguments, ..
+                } = statement
+                else {
+                    return self.refuse(SYNTAX_ERRORS);
+                };
+                Ok(PipelineCommand::Command { name, arguments })
+            }
+            _ => Ok(PipelineCommand::Expression(self.nested_expression()?)),
+        }
+    }
+
     /// Parses `Name arg -Param value ...` in command mode.
     fn command_statement(&mut self, name: String) -> Result<Statement, ParseError> {
         let start = self.peek().span;
         self.pos += 1;
         let mut arguments = Vec::new();
-        while !self.at_statement_end() {
+        while !self.at_statement_end() && self.peek().kind != TokenKind::Pipe {
             match &self.peek().kind {
                 TokenKind::Parameter(parameter) => {
                     let parameter = parameter.clone();
@@ -1801,6 +1848,36 @@ mod tests {
                     .join(","),
                 show_block(body)
             ),
+            Statement::Pipeline { commands, .. } => commands
+                .iter()
+                .map(|command| match command {
+                    PipelineCommand::Expression(expr) => show(expr),
+                    PipelineCommand::Command { name, arguments } => {
+                        let mut text = name.clone();
+                        for argument in arguments {
+                            match argument {
+                                CommandArgument::Value(value) => {
+                                    text.push(' ');
+                                    text.push_str(&show(value));
+                                }
+                                CommandArgument::Bareword(word) => {
+                                    text.push(' ');
+                                    text.push_str(word);
+                                }
+                                CommandArgument::Parameter { name, value } => {
+                                    text.push_str(&format!(" -{name}"));
+                                    if let Some(value) = value {
+                                        text.push(' ');
+                                        text.push_str(&show(value));
+                                    }
+                                }
+                            }
+                        }
+                        text
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" | "),
             Statement::Command {
                 name, arguments, ..
             } => {

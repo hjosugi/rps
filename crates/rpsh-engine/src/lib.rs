@@ -18,7 +18,7 @@ use std::io::{self, Write};
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
     BinaryOp, CommandArgument, Expr, ExprKind, NumberLiteral, Parameter, ParseError,
-    ScriptBlockAst, Statement, UnaryOp, parse,
+    PipelineCommand, ScriptBlockAst, Statement, UnaryOp, parse,
 };
 
 /// Runs scripts.
@@ -27,7 +27,12 @@ pub struct Engine {
     variables: HashMap<String, Value>,
     functions: HashMap<String, FunctionDef>,
     last_success: bool,
+    /// While running a pipeline stage, output is collected here instead of
+    /// being written to the host.
+    capture: Option<Vec<Value>>,
 }
+
+type BoundArguments = (Vec<Value>, Vec<(String, Value)>);
 
 #[derive(Debug, Clone)]
 struct FunctionDef {
@@ -292,6 +297,7 @@ impl Engine {
             Statement::Command {
                 name, arguments, ..
             } => self.call_function(name, arguments, out),
+            Statement::Pipeline { commands, .. } => self.exec_pipeline(commands, out),
             Statement::If {
                 condition,
                 then,
@@ -457,57 +463,11 @@ impl Engine {
         arguments: &[CommandArgument],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
-        let Some(function) = self.functions.get(&name.to_ascii_lowercase()).cloned() else {
-            return Err(RuntimeError::NotImplemented {
-                feature: "command invocation other than a defined function",
-            }
-            .into());
-        };
-        let mut positional = Vec::new();
-        let mut named: Vec<(String, Value)> = Vec::new();
-        for argument in arguments {
-            match argument {
-                CommandArgument::Value(expr) => {
-                    positional.push(evaluate(expr, &mut self.variables, self.last_success)?);
-                }
-                CommandArgument::Bareword(word) => {
-                    positional.push(Value::String(word.clone().into()));
-                }
-                CommandArgument::Parameter { name, value } => {
-                    let value = match value {
-                        Some(expr) => evaluate(expr, &mut self.variables, self.last_success)?,
-                        None => Value::Bool(true),
-                    };
-                    named.push((name.clone(), value));
-                }
-            }
-        }
-
-        // A function body gets a copy of the caller's variables, so reads see
-        // the parent scope while writes stay local (dynamic scope, simplified).
+        let function = self.function(name)?;
+        let (positional, named) = self.evaluate_arguments(arguments)?;
         let saved = std::mem::take(&mut self.variables);
         let mut local = saved.clone();
-        let mut bound = 0;
-        for parameter in &function.parameters {
-            let value = if let Some((_, value)) = named
-                .iter()
-                .find(|(name, _)| name.eq_ignore_ascii_case(&parameter.name))
-            {
-                value.clone()
-            } else if let Some(value) = positional.get(bound) {
-                bound += 1;
-                value.clone()
-            } else if let Some(default) = &parameter.default {
-                evaluate(default, &mut local, self.last_success)?
-            } else {
-                Value::Null
-            };
-            let value = match &parameter.type_name {
-                Some(type_name) => cast_to(type_name, value)?,
-                None => value,
-            };
-            local.insert(parameter.name.clone(), value);
-        }
+        let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
         local.insert(
             "args".to_owned(),
             Value::array(positional[bound..].to_vec()),
@@ -528,6 +488,173 @@ impl Engine {
             Flow::Break(_) | Flow::Continue(_) => Flow::Normal,
             flow => flow,
         })
+    }
+
+    fn exec_pipeline(
+        &mut self,
+        commands: &[PipelineCommand],
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        let mut input = Vec::new();
+        for (index, command) in commands.iter().enumerate() {
+            let last = index + 1 == commands.len();
+            let outputs = match command {
+                PipelineCommand::Expression(expr) => {
+                    let value = evaluate(expr, &mut self.variables, self.last_success)?;
+                    flatten_value(value)
+                }
+                PipelineCommand::Command { name, arguments } => {
+                    self.run_command(name, arguments, input.clone())?
+                }
+            };
+            if last {
+                for value in outputs {
+                    self.write_value(value, out)?;
+                }
+                return Ok(Flow::Normal);
+            }
+            input = outputs;
+        }
+        Ok(Flow::Normal)
+    }
+
+    /// Runs a command for a pipeline stage and collects its output.
+    fn run_command(
+        &mut self,
+        name: &str,
+        arguments: &[CommandArgument],
+        input: Vec<Value>,
+    ) -> Result<Vec<Value>, EngineError> {
+        let function = self.function(name)?;
+        let (positional, named) = self.evaluate_arguments(arguments)?;
+        let mut outputs = Vec::new();
+        if function.filter {
+            for item in input {
+                let saved = std::mem::take(&mut self.variables);
+                let mut local = saved.clone();
+                let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
+                local.insert(
+                    "args".to_owned(),
+                    Value::array(positional[bound..].to_vec()),
+                );
+                local.insert("_".to_owned(), item);
+                self.variables = local;
+                self.capture = Some(Vec::new());
+                let flow = self.exec_block(&function.body, &mut capture_sink());
+                let captured = self.capture.take().unwrap_or_default();
+                self.variables = saved;
+                outputs.extend(captured);
+                match flow? {
+                    Flow::Return(Some(value)) => outputs.extend(flatten_value(value)),
+                    Flow::Return(None) | Flow::Normal => {}
+                    Flow::Break(_) | Flow::Continue(_) => {}
+                    _ => {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "exit or throw inside a pipeline filter",
+                        }
+                        .into());
+                    }
+                }
+            }
+        } else {
+            let saved = std::mem::take(&mut self.variables);
+            let mut local = saved.clone();
+            let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
+            local.insert(
+                "args".to_owned(),
+                Value::array(positional[bound..].to_vec()),
+            );
+            local.insert("input".to_owned(), Value::array(input));
+            self.variables = local;
+            self.capture = Some(Vec::new());
+            let flow = self.exec_block(&function.body, &mut capture_sink());
+            let captured = self.capture.take().unwrap_or_default();
+            self.variables = saved;
+            outputs.extend(captured);
+            match flow? {
+                Flow::Return(Some(value)) => outputs.extend(flatten_value(value)),
+                Flow::Return(None) | Flow::Normal => {}
+                Flow::Break(_) | Flow::Continue(_) => {}
+                _ => {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "exit or throw inside a pipeline function",
+                    }
+                    .into());
+                }
+            }
+        }
+        Ok(outputs)
+    }
+
+    fn function(&self, name: &str) -> Result<FunctionDef, EngineError> {
+        self.functions
+            .get(&name.to_ascii_lowercase())
+            .cloned()
+            .ok_or_else(|| {
+                RuntimeError::NotImplemented {
+                    feature: "command invocation other than a defined function",
+                }
+                .into()
+            })
+    }
+
+    fn evaluate_arguments(
+        &mut self,
+        arguments: &[CommandArgument],
+    ) -> Result<BoundArguments, EngineError> {
+        let mut positional = Vec::new();
+        let mut named = Vec::new();
+        for argument in arguments {
+            match argument {
+                CommandArgument::Value(expr) => {
+                    positional.push(evaluate(expr, &mut self.variables, self.last_success)?);
+                }
+                CommandArgument::Bareword(word) => {
+                    positional.push(Value::String(word.clone().into()));
+                }
+                CommandArgument::Parameter { name, value } => {
+                    let value = match value {
+                        Some(expr) => evaluate(expr, &mut self.variables, self.last_success)?,
+                        None => Value::Bool(true),
+                    };
+                    named.push((name.clone(), value));
+                }
+            }
+        }
+        Ok((positional, named))
+    }
+
+    /// Binds declared parameters into `local`; returns how many positional
+    /// arguments it consumed.
+    fn bind_parameters(
+        &mut self,
+        function: &FunctionDef,
+        positional: &[Value],
+        named: &[(String, Value)],
+        local: &mut HashMap<String, Value>,
+    ) -> Result<usize, EngineError> {
+        let mut bound = 0;
+        for parameter in &function.parameters {
+            let value = if let Some((_, value)) = named
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case(&parameter.name))
+            {
+                value.clone()
+            } else if let Some(value) = positional.get(bound) {
+                bound += 1;
+                value.clone()
+            } else if let Some(default) = &parameter.default {
+                evaluate(default, local, self.last_success)?
+            } else {
+                Value::Null
+            };
+            let value = match &parameter.type_name {
+                Some(type_name) => cast_to(type_name, value)?,
+                None => value,
+            };
+            local.insert(parameter.name.clone(), value);
+        }
+        Ok(bound)
     }
 
     fn exec_loop(
@@ -563,7 +690,7 @@ impl Engine {
         Ok(Flow::Normal)
     }
 
-    fn write_value(&self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
+    fn write_value(&mut self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
         // The host's default object formatting (Format-Table) is M6; until
         // then an object on the output stream is refused, never printed as
         // `@{...}` where pwsh would draw a table.
@@ -577,6 +704,14 @@ impl Engine {
                 feature: "default object formatting",
             }
             .into());
+        }
+        if let Some(capture) = &mut self.capture {
+            match value {
+                Value::Array(items) => capture.extend(items.iter().cloned()),
+                Value::Null | Value::AutomationNull => {}
+                value => capture.push(value),
+            }
+            return Ok(());
         }
         match value {
             Value::Array(items) => {
@@ -888,6 +1023,18 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
             feature: "indexing other than arrays",
         }),
     }
+}
+
+fn flatten_value(value: Value) -> Vec<Value> {
+    match value {
+        Value::Array(items) => items.as_ref().clone(),
+        Value::Null | Value::AutomationNull => Vec::new(),
+        value => vec![value],
+    }
+}
+
+fn capture_sink() -> io::Sink {
+    io::sink()
 }
 
 fn assignment_key(target: &Expr) -> Result<&str, RuntimeError> {

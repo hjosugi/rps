@@ -17,6 +17,7 @@ pub enum TokenKind {
     Multiply,
     Divide,
     Remainder,
+    Pipe,
     LParen,
     RParen,
     Semi,

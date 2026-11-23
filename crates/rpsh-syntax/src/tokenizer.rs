@@ -51,6 +51,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::Multiply => TokenKind::Multiply,
             FullTokenKind::Divide => TokenKind::Divide,
             FullTokenKind::Rem => TokenKind::Remainder,
+            FullTokenKind::Pipe => TokenKind::Pipe,
             FullTokenKind::LParen => TokenKind::LParen,
             FullTokenKind::RParen => TokenKind::RParen,
             FullTokenKind::Semi => TokenKind::Semi,
@@ -363,7 +364,15 @@ mod tests {
                 TokenKind::EndOfInput
             ]
         );
-        assert_eq!(refused("1 | x"), "pipelines");
+        assert_eq!(
+            kinds("1 | x"),
+            vec![
+                TokenKind::Int32(1),
+                TokenKind::Pipe,
+                TokenKind::Identifier("x".to_owned()),
+                TokenKind::EndOfInput
+            ]
+        );
         assert_eq!(
             kinds("Get-Date"),
             vec![

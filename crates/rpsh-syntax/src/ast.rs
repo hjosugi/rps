@@ -71,6 +71,11 @@ pub enum Statement {
         arguments: Vec<CommandArgument>,
         span: Span,
     },
+    /// A pipeline, `expr | command | ...`.
+    Pipeline {
+        commands: Vec<PipelineCommand>,
+        span: Span,
+    },
     /// `if` / `elseif` / `else`. Upstream: `IfStatementAst`.
     If {
         condition: Expr,
@@ -129,6 +134,18 @@ pub enum Statement {
     Continue { label: Option<String>, span: Span },
     /// `exit` with an optional exit code. Upstream: `ExitStatementAst`.
     Exit { code: Option<Expr>, span: Span },
+}
+
+/// One stage of a pipeline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PipelineCommand {
+    /// A `CommandExpressionAst` stage, such as `1..3`.
+    Expression(Expr),
+    /// A command stage, such as `Sum`.
+    Command {
+        name: String,
+        arguments: Vec<CommandArgument>,
+    },
 }
 
 /// A declared parameter. Upstream: `ParameterAst`.
