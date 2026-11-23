@@ -2348,6 +2348,29 @@ impl Engine {
                     name.eq_ignore_ascii_case("valueonly") && ops::is_true(value)
                 });
                 match name {
+                    Some(name) if name.contains(['*', '?']) => {
+                        let mut names: Vec<&String> = self
+                            .variables
+                            .keys()
+                            .filter(|key| ops::wildcard_match(key, &name, false))
+                            .collect();
+                        names.sort();
+                        let values: Vec<Value> = names
+                            .into_iter()
+                            .map(|key| {
+                                let value = self.variables.get(key).cloned().unwrap_or(Value::Null);
+                                if value_only {
+                                    value
+                                } else {
+                                    Value::object(vec![
+                                        ("Name".to_owned(), Value::String(key.clone().into())),
+                                        ("Value".to_owned(), value),
+                                    ])
+                                }
+                            })
+                            .collect();
+                        Ok(Some(values))
+                    }
                     Some(name) => {
                         let key = strip_scope(&name).to_owned();
                         let value = self.variables.get(&key).cloned().unwrap_or(Value::Null);

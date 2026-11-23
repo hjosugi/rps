@@ -17,3 +17,5 @@ Clear-Variable nv
 $null -eq $nv
 $nv
 (Get-Variable nv2 -ValueOnly) + 1
+(Get-Variable 'nv*' | ForEach-Object Name) -join ','
+(Get-Variable 'nv2*' -ValueOnly) -join ','
