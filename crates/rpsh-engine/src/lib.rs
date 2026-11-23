@@ -1551,6 +1551,9 @@ impl Engine {
                 let case_sensitive = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
                 });
+                let no_element = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("noelement") && ops::is_true(value)
+                });
                 let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
                 for item in input {
                     let key = match &property {
@@ -1574,11 +1577,14 @@ impl Engine {
                 let outputs = groups
                     .into_iter()
                     .map(|(name, group)| {
-                        Value::object(vec![
+                        let mut entries = vec![
                             ("Name".to_owned(), Value::String(name.into())),
                             ("Count".to_owned(), Value::Int32(group.len() as i32)),
-                            ("Group".to_owned(), Value::array(group)),
-                        ])
+                        ];
+                        if !no_element {
+                            entries.push(("Group".to_owned(), Value::array(group)));
+                        }
+                        Value::object(entries)
                     })
                     .collect();
                 Ok(Some(outputs))
