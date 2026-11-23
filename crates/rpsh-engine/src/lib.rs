@@ -3310,6 +3310,22 @@ impl Engine {
                 BinaryOp::Ge => ops::compare(&left, &right, ops::Comparison::Ge, false)?,
                 BinaryOp::Lt => ops::compare(&left, &right, ops::Comparison::Lt, false)?,
                 BinaryOp::Le => ops::compare(&left, &right, ops::Comparison::Le, false)?,
+                BinaryOp::CEq => ops::compare(&left, &right, ops::Comparison::Eq, true)?,
+                BinaryOp::CNe => ops::compare(&left, &right, ops::Comparison::Ne, true)?,
+                BinaryOp::CGt => ops::compare(&left, &right, ops::Comparison::Gt, true)?,
+                BinaryOp::CGe => ops::compare(&left, &right, ops::Comparison::Ge, true)?,
+                BinaryOp::CLt => ops::compare(&left, &right, ops::Comparison::Lt, true)?,
+                BinaryOp::CLe => ops::compare(&left, &right, ops::Comparison::Le, true)?,
+                BinaryOp::Like => ops::compare(&left, &right, ops::Comparison::Like, false)?,
+                BinaryOp::NotLike => ops::compare(&left, &right, ops::Comparison::NotLike, false)?,
+                BinaryOp::Contains => ops::contains(&left, &right, false)?,
+                BinaryOp::NotContains => ops::contains(&left, &right, false)
+                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true))))?,
+                BinaryOp::CContains => ops::contains(&left, &right, true)?,
+                BinaryOp::In => ops::contains(&right, &left, false)?,
+                BinaryOp::NotIn => ops::contains(&right, &left, false)
+                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true))))?,
+                BinaryOp::CIn => ops::contains(&right, &left, true)?,
                 _ => {
                     return Err(RuntimeError::NotImplemented {
                         feature: "this operator on a group expression",
