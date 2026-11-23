@@ -119,42 +119,115 @@ fn double_operands(left: &Value, right: &Value, operation: impl FnOnce(f64, f64)
     ))
 }
 
-/// Binary `+`. A `Char` is a string in addition upstream, so `[char]'a' + 1`
-/// is `"a1"`.
+/// A numeric operand, converting a string the way `LanguagePrimitives` does
+/// for arithmetic: `1 + '2'` is `3`.
+fn numeric_of(value: &Value) -> Option<Value> {
+    match value {
+        Value::String(text) => parse_number_text(&text.to_string_lossy()),
+        Value::Int32(_)
+        | Value::Int64(_)
+        | Value::UInt32(_)
+        | Value::UInt64(_)
+        | Value::Int16(_)
+        | Value::UInt16(_)
+        | Value::Byte(_)
+        | Value::SByte(_)
+        | Value::Double(_) => Some(value.clone()),
+        _ => None,
+    }
+}
+
+fn parse_number_text(text: &str) -> Option<Value> {
+    let text = text.trim();
+    let (negative, body) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text.strip_prefix('+').unwrap_or(text)),
+    };
+    if let Some(hex) = body.strip_prefix("0x").or_else(|| body.strip_prefix("0X")) {
+        let value = i128::from_str_radix(hex, 16).ok()?;
+        return integer_literal(if negative { -value } else { value });
+    }
+    if let Some(binary) = body.strip_prefix("0b").or_else(|| body.strip_prefix("0B")) {
+        let value = i128::from_str_radix(binary, 2).ok()?;
+        return integer_literal(if negative { -value } else { value });
+    }
+    let signed = if negative {
+        format!("-{body}")
+    } else {
+        body.to_owned()
+    };
+    if let Ok(value) = signed.parse::<i32>() {
+        Some(Value::Int32(value))
+    } else if let Ok(value) = signed.parse::<i64>() {
+        Some(Value::Int64(value))
+    } else {
+        signed.parse::<f64>().ok().map(Value::Double)
+    }
+}
+
+fn integer_literal(value: i128) -> Option<Value> {
+    if let Ok(value) = i32::try_from(value) {
+        Some(Value::Int32(value))
+    } else {
+        i64::try_from(value).ok().map(Value::Int64)
+    }
+}
+
+fn numeric_pair(left: &Value, right: &Value) -> Result<(Value, Value), RuntimeError> {
+    match (numeric_of(left), numeric_of(right)) {
+        (Some(left), Some(right)) => Ok((left, right)),
+        _ => refuse(MIXED_OPERANDS),
+    }
+}
+
+/// Binary `+`. A `Char` is a string in addition upstream, and a string on the
+/// left concatenates: `'1' + 2` is `"12"`.
 pub fn add(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
     if matches!(left, Value::Char(_)) || matches!(right, Value::Char(_)) {
         return Ok(Value::String(PsString::from(format!("{left}{right}"))));
     }
-    if let (Value::String(a), Value::String(b)) = (left, right) {
-        return Ok(Value::String(a.concat(b)));
+    if let Value::String(text) = left {
+        return Ok(Value::String(PsString::from(format!("{text}{right}"))));
     }
-    match numeric_kind(left, right)? {
-        NumericKind::Double => Ok(double_operands(left, right, |a, b| a + b)),
+    let (left, right) = numeric_pair(left, right)?;
+    match numeric_kind(&left, &right)? {
+        NumericKind::Double => Ok(double_operands(&left, &right, |a, b| a + b)),
         NumericKind::Int(kind) => Ok(integer_result(
             kind,
-            int_value(left).unwrap_or_default() + int_value(right).unwrap_or_default(),
+            int_value(&left).unwrap_or_default() + int_value(&right).unwrap_or_default(),
         )),
     }
 }
 
 /// Binary `-`.
 pub fn subtract(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    match numeric_kind(left, right)? {
-        NumericKind::Double => Ok(double_operands(left, right, |a, b| a - b)),
+    let (left, right) = numeric_pair(left, right)?;
+    match numeric_kind(&left, &right)? {
+        NumericKind::Double => Ok(double_operands(&left, &right, |a, b| a - b)),
         NumericKind::Int(kind) => Ok(integer_result(
             kind,
-            int_value(left).unwrap_or_default() - int_value(right).unwrap_or_default(),
+            int_value(&left).unwrap_or_default() - int_value(&right).unwrap_or_default(),
         )),
     }
 }
 
-/// Binary `*`.
+/// Binary `*`. A string on the left repeats when the right is an `Int32`:
+/// `'ab' * 3` is `"ababab"`.
 pub fn multiply(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    match numeric_kind(left, right)? {
-        NumericKind::Double => Ok(double_operands(left, right, |a, b| a * b)),
+    if let (Value::String(text), Value::Int32(times)) = (left, right) {
+        let times = usize::try_from(*times).map_err(|_| RuntimeError::NotImplemented {
+            feature: "negative string repetition",
+        })?;
+        return Ok(Value::String(PsString::from(
+            text.to_string_lossy().repeat(times),
+        )));
+    }
+    let (left, right) = numeric_pair(left, right)?;
+    match numeric_kind(&left, &right)? {
+        NumericKind::Double => Ok(double_operands(&left, &right, |a, b| a * b)),
         NumericKind::Int(kind) => {
-            let left_value = int_value(left).unwrap_or_default();
-            let right_value = int_value(right).unwrap_or_default();
+            let left_value = int_value(&left).unwrap_or_default();
+            let right_value = int_value(&right).unwrap_or_default();
             match left_value.checked_mul(right_value) {
                 Some(product) => Ok(integer_result(kind, product)),
                 None => Ok(Value::Double(left_value as f64 * right_value as f64)),
@@ -166,11 +239,12 @@ pub fn multiply(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
 /// Binary `/`: an exact integer division stays integer, otherwise the result
 /// is `Double`, as upstream does.
 pub fn divide(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    match numeric_kind(left, right)? {
-        NumericKind::Double => Ok(double_operands(left, right, |a, b| a / b)),
+    let (left, right) = numeric_pair(left, right)?;
+    match numeric_kind(&left, &right)? {
+        NumericKind::Double => Ok(double_operands(&left, &right, |a, b| a / b)),
         NumericKind::Int(kind) => {
-            let left_value = int_value(left).unwrap_or_default();
-            let right_value = int_value(right).unwrap_or_default();
+            let left_value = int_value(&left).unwrap_or_default();
+            let right_value = int_value(&right).unwrap_or_default();
             if right_value == 0 {
                 return refuse("divide by zero");
             }
@@ -185,11 +259,12 @@ pub fn divide(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
 
 /// Binary `%`: the sign follows the dividend, as in C#.
 pub fn remainder(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    match numeric_kind(left, right)? {
-        NumericKind::Double => Ok(double_operands(left, right, |a, b| a % b)),
+    let (left, right) = numeric_pair(left, right)?;
+    match numeric_kind(&left, &right)? {
+        NumericKind::Double => Ok(double_operands(&left, &right, |a, b| a % b)),
         NumericKind::Int(kind) => {
-            let left_value = int_value(left).unwrap_or_default();
-            let right_value = int_value(right).unwrap_or_default();
+            let left_value = int_value(&left).unwrap_or_default();
+            let right_value = int_value(&right).unwrap_or_default();
             if right_value == 0 {
                 return refuse("divide by zero");
             }
@@ -697,18 +772,15 @@ mod tests {
     }
 
     #[test]
-    fn conversions_between_types_are_refused() {
-        // Upstream converts here: `1 + '2'` is 3 and `'1' + 2` is '12'.
+    fn arithmetic_coerces_strings_by_the_left_operand() {
+        assert_eq!(add(&int(1), &string("2")), Ok(int(3)));
+        assert_eq!(add(&string("1"), &int(2)), Ok(string("12")));
+        assert_eq!(add(&int(1), &string("2.5")), Ok(Value::Double(3.5)));
+        assert_eq!(multiply(&string("ab"), &int(3)), Ok(string("ababab")));
+        assert_eq!(multiply(&int(2), &string("3")), Ok(int(6)));
+        assert_eq!(subtract(&string("10"), &int(2)), Ok(int(8)));
         assert_eq!(
-            add(&int(1), &string("2")).unwrap_err().feature(),
-            MIXED_OPERANDS
-        );
-        assert_eq!(
-            add(&string("1"), &int(2)).unwrap_err().feature(),
-            MIXED_OPERANDS
-        );
-        assert_eq!(
-            multiply(&string("ab"), &int(3)).unwrap_err().feature(),
+            add(&int(1), &string("ab")).unwrap_err().feature(),
             MIXED_OPERANDS
         );
     }

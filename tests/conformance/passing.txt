@@ -16,6 +16,7 @@ lang/string-escapes
 lang/string-index
 lang/string-interpolation
 lang/ternary
+lang/type-conversion
 lang/type-ops
 lang/variable-paths
 ops/comparison

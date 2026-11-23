@@ -488,13 +488,7 @@ fn evaluate(
         }
         ExprKind::Cast { type_name, value } => {
             let value = evaluate(value, variables, last_success)?;
-            if type_name.eq_ignore_ascii_case("pscustomobject") {
-                Ok(value)
-            } else {
-                Err(RuntimeError::NotImplemented {
-                    feature: "type casts other than [pscustomobject]",
-                })
-            }
+            cast_to(type_name, value)
         }
         ExprKind::Member { target, name } => {
             member(&evaluate(target, variables, last_success)?, name)
@@ -762,6 +756,161 @@ fn type_full_name(name: &str) -> &'static str {
     }
 }
 
+/// `[type]value`, the subset of `LanguagePrimitives.ConvertTo` the skeleton
+/// needs. Failing conversions are refused rather than approximated.
+fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
+    match type_name.to_ascii_lowercase().as_str() {
+        "pscustomobject" => Ok(value),
+        "int" | "int32" => Ok(Value::Int32(convert_int32(&value)?)),
+        "long" | "int64" => Ok(Value::Int64(convert_int64(&value)?)),
+        "double" => Ok(Value::Double(convert_double(&value)?)),
+        "string" => Ok(Value::String(value.to_string().into())),
+        "bool" | "boolean" => Ok(Value::Bool(convert_bool(&value))),
+        "char" => convert_char(&value),
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "type casts other than to numbers, bool, char, string and pscustomobject",
+        }),
+    }
+}
+
+fn convert_int64(value: &Value) -> Result<i64, RuntimeError> {
+    match value {
+        Value::Null | Value::AutomationNull => Ok(0),
+        Value::Bool(value) => Ok(i64::from(*value)),
+        Value::Char(unit) => Ok(i64::from(*unit)),
+        Value::Int32(value) => Ok(i64::from(*value)),
+        Value::Int64(value) => Ok(*value),
+        Value::UInt32(value) => Ok(i64::from(*value)),
+        Value::Int16(value) => Ok(i64::from(*value)),
+        Value::UInt16(value) => Ok(i64::from(*value)),
+        Value::Byte(value) => Ok(i64::from(*value)),
+        Value::SByte(value) => Ok(i64::from(*value)),
+        Value::UInt64(value) => i64::try_from(*value).map_err(|_| RuntimeError::NotImplemented {
+            feature: "integer conversion overflow",
+        }),
+        Value::Double(value) => {
+            let rounded = value.round_ties_even();
+            if rounded >= i64::MIN as f64 && rounded <= i64::MAX as f64 {
+                Ok(rounded as i64)
+            } else {
+                Err(RuntimeError::NotImplemented {
+                    feature: "integer conversion overflow",
+                })
+            }
+        }
+        Value::String(text) => parse_integer_text(&text.to_string_lossy())
+            .ok_or(RuntimeError::NotImplemented {
+                feature: "cannot convert a string to an integer",
+            })
+            .and_then(|value| {
+                i64::try_from(value).map_err(|_| RuntimeError::NotImplemented {
+                    feature: "integer conversion overflow",
+                })
+            }),
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "conversion to an integer",
+        }),
+    }
+}
+
+fn convert_int32(value: &Value) -> Result<i32, RuntimeError> {
+    i32::try_from(convert_int64(value)?).map_err(|_| RuntimeError::NotImplemented {
+        feature: "integer conversion overflow",
+    })
+}
+
+fn convert_double(value: &Value) -> Result<f64, RuntimeError> {
+    match value {
+        Value::Null | Value::AutomationNull => Ok(0.0),
+        Value::Bool(value) => Ok(if *value { 1.0 } else { 0.0 }),
+        Value::Char(unit) => Ok(f64::from(*unit)),
+        Value::Int32(value) => Ok(f64::from(*value)),
+        Value::Int64(value) => Ok(*value as f64),
+        Value::UInt32(value) => Ok(f64::from(*value)),
+        Value::UInt64(value) => Ok(*value as f64),
+        Value::Int16(value) => Ok(f64::from(*value)),
+        Value::UInt16(value) => Ok(f64::from(*value)),
+        Value::Byte(value) => Ok(f64::from(*value)),
+        Value::SByte(value) => Ok(f64::from(*value)),
+        Value::Double(value) => Ok(*value),
+        Value::String(text) => {
+            text.to_string_lossy()
+                .trim()
+                .parse()
+                .map_err(|_| RuntimeError::NotImplemented {
+                    feature: "cannot convert a string to a double",
+                })
+        }
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "conversion to a double",
+        }),
+    }
+}
+
+/// `[bool]`: an empty string or zero is false, a one-element array uses that
+/// element, and any longer array is true.
+fn convert_bool(value: &Value) -> bool {
+    match value {
+        Value::Null | Value::AutomationNull => false,
+        Value::Bool(value) => *value,
+        Value::Char(unit) => *unit != 0,
+        Value::Int32(value) => *value != 0,
+        Value::Int64(value) => *value != 0,
+        Value::UInt32(value) => *value != 0,
+        Value::UInt64(value) => *value != 0,
+        Value::Int16(value) => *value != 0,
+        Value::UInt16(value) => *value != 0,
+        Value::Byte(value) => *value != 0,
+        Value::SByte(value) => *value != 0,
+        Value::Double(value) => *value != 0.0,
+        Value::String(text) => !text.is_empty(),
+        Value::Array(items) => match items.len() {
+            0 => false,
+            1 => convert_bool(&items[0]),
+            _ => true,
+        },
+        Value::Decimal(_)
+        | Value::BigInteger(_)
+        | Value::ScriptBlock(_)
+        | Value::Object(_)
+        | Value::Type(_) => true,
+        _ => true,
+    }
+}
+
+fn convert_char(value: &Value) -> Result<Value, RuntimeError> {
+    match value {
+        Value::Char(unit) => Ok(Value::Char(*unit)),
+        Value::Int32(value) => {
+            u16::try_from(*value)
+                .map(Value::Char)
+                .map_err(|_| RuntimeError::NotImplemented {
+                    feature: "integer out of the char range",
+                })
+        }
+        Value::String(text) if text.len() == 1 => Ok(Value::Char(text.unit(0).unwrap_or_default())),
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "conversion to a char",
+        }),
+    }
+}
+
+fn parse_integer_text(text: &str) -> Option<i128> {
+    let text = text.trim();
+    let (negative, body) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text.strip_prefix('+').unwrap_or(text)),
+    };
+    let parsed = if let Some(hex) = body.strip_prefix("0x").or_else(|| body.strip_prefix("0X")) {
+        i128::from_str_radix(hex, 16).ok()?
+    } else if let Some(binary) = body.strip_prefix("0b").or_else(|| body.strip_prefix("0B")) {
+        i128::from_str_radix(binary, 2).ok()?
+    } else {
+        body.parse::<i128>().ok()?
+    };
+    Some(if negative { -parsed } else { parsed })
+}
+
 fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeError> {
     let Value::Type(full) = right else {
         return Err(RuntimeError::NotImplemented {
@@ -996,6 +1145,15 @@ mod tests {
             Some("statement keywords (if, foreach, function, ...)")
         );
         assert_eq!(out, "");
+    }
+
+    #[test]
+    fn casts_convert_the_common_types() {
+        let (result, out) = run(
+            "[int]2.5; [int]3.5; [int]'0x10'; [bool]''; [bool]'false'; [bool]@(0); [string]12; [char]65",
+        );
+        assert_eq!(result.unwrap(), 0);
+        assert_eq!(out, "2\n4\n16\nFalse\nTrue\nFalse\n12\nA\n");
     }
 
     #[test]
