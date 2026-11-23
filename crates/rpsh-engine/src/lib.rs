@@ -5378,6 +5378,27 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
         ("math", "sqrt") => Ok(Value::Double(
             convert_double(arguments.first().unwrap_or(&Value::Null))?.sqrt(),
         )),
+        ("math", "round") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.round_ties_even(),
+        )),
+        ("math", "floor") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.floor(),
+        )),
+        ("math", "ceiling") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.ceil(),
+        )),
+        ("math", "truncate") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.trunc(),
+        )),
+        ("string", "format") => {
+            let Some(template) = arguments.first() else {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "Format with no template",
+                });
+            };
+            let values = Value::array(arguments[1..].to_vec());
+            Ok(ops::format(template, &values)?)
+        }
         ("math", "pow") => {
             let a = convert_double(arguments.first().unwrap_or(&Value::Null))?;
             let b = convert_double(arguments.get(1).unwrap_or(&Value::Null))?;

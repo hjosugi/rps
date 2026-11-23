@@ -10,3 +10,7 @@
 [string]::IsNullOrEmpty('')
 [string]::Join('-', 'a', 'b')
 [int]::Parse('42')
+[string]::Format('{0}-{1}', 3, 4)
+[math]::Round(3.5)
+[math]::Floor(3.7)
+[math]::Ceiling(3.2)
