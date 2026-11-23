@@ -50,6 +50,7 @@ lang/type-ops
 lang/variable-paths
 lang/variables
 lang/wildcard
+modules/import
 native/capture
 native/environment
 native/exit-code

@@ -1596,6 +1596,29 @@ impl Engine {
                 })?;
                 Ok(Some(Vec::new()))
             }
+            "import-module" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Import-Module without a name",
+                    }
+                    .into());
+                };
+                let source = std::fs::read_to_string(&path).map_err(|_| RuntimeError::Script {
+                    id: "Modules_ModuleNotFound",
+                    category: format!("ResourceUnavailable: ({path}:String) [Import-Module], FileNotFoundException"),
+                    exception_type: "System.IO.FileNotFoundException",
+                    message: format!("The specified module '{path}' was not loaded because no valid module file was found."),
+                })?;
+                let script = parse(&source)?;
+                self.exec_block(&script.statements, &mut capture_sink())?;
+                Ok(Some(Vec::new()))
+            }
             "invoke-expression" | "iex" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
                 let Some(source) = positional.first() else {
