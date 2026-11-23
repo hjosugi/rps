@@ -69,15 +69,15 @@
   },
   {
     "name": "unicode-dash-operator",
-    "source": "1 \u2013eq 1"
+    "source": "1 –eq 1"
   },
   {
     "name": "unicode-dash-parameter",
-    "source": "echo \u2013Name x"
+    "source": "echo –Name x"
   },
   {
     "name": "unicode-quotes",
-    "source": "\u20181\u2019 \u201c2\u201d"
+    "source": "‘1’ “2”"
   },
   {
     "name": "variable-braces",
@@ -126,5 +126,9 @@
   {
     "name": "type-as",
     "source": "'x' -as [int]"
+  },
+  {
+    "name": "case-insensitive-alias",
+    "source": "1 -ieq 1"
   }
 ]

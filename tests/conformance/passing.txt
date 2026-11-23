@@ -5,6 +5,7 @@ expr/string-literals
 lang/array
 lang/comparison-basic
 lang/comparison-filter
+lang/comparison-insensitive
 lang/division
 lang/double-format
 lang/function

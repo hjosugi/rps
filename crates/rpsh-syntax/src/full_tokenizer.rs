@@ -662,10 +662,20 @@ impl Tokenizer<'_> {
                 }
             }
             let normalized = format!("-{}", &self.source[word_start..at]);
-            if let Some((kind, _)) = OPERATORS
+            let explicit_insensitive = normalized
+                .strip_prefix("-i")
+                .or_else(|| normalized.strip_prefix("-I"))
+                .map(|rest| format!("-{rest}"));
+            let found = OPERATORS
                 .iter()
                 .find(|(_, text)| text.eq_ignore_ascii_case(&normalized))
-            {
+                .or_else(|| {
+                    let candidate = explicit_insensitive.as_ref()?;
+                    OPERATORS
+                        .iter()
+                        .find(|(_, text)| text.eq_ignore_ascii_case(candidate))
+                });
+            if let Some((kind, _)) = found {
                 self.pos = at;
                 self.push(*kind, start, at);
                 self.mode = Mode::Expression;
@@ -775,6 +785,45 @@ impl Tokenizer<'_> {
             && tokens[tokens.len() - 2].kind == FullTokenKind::Dot
     }
 
+    /// `-ieq`, `-ine`, ... are explicit case-insensitive spellings of `-eq`,
+    /// `-ne`, ...; the operator table keeps only the short form.
+    fn explicit_insensitive_operator(&mut self) -> bool {
+        if self.bytes.get(self.pos) != Some(&b'-') {
+            return false;
+        }
+        let rest = &self.source[self.pos + 1..];
+        let Some(second) = rest.chars().next() else {
+            return false;
+        };
+        if second != 'i' && second != 'I' {
+            return false;
+        }
+        let mut at = second.len_utf8();
+        while let Some(ch) = rest[at..].chars().next() {
+            if ch.is_alphabetic() {
+                at += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        if at == second.len_utf8() {
+            return false;
+        }
+        let candidate = format!("-{}", &rest[second.len_utf8()..at]);
+        let Some((kind, _)) = OPERATORS
+            .iter()
+            .find(|(_, text)| text.eq_ignore_ascii_case(&candidate))
+        else {
+            return false;
+        };
+        let start = self.pos;
+        self.pos += 1 + at;
+        self.push(*kind, start, self.pos);
+        self.mode = Mode::Expression;
+        self.statement_start = false;
+        true
+    }
+
     fn operator(&mut self) -> bool {
         if self.mode == Mode::Command
             && self.bytes.get(self.pos) == Some(&b'-')
@@ -784,6 +833,9 @@ impl Tokenizer<'_> {
             && !is_unary_dash_operator(&self.source[self.pos..])
         {
             return false;
+        }
+        if self.explicit_insensitive_operator() {
+            return true;
         }
         for (kind, text) in OPERATORS {
             let end = self.pos + text.len();
