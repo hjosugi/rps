@@ -2893,6 +2893,20 @@ impl Engine {
                         items = items.split_off(items.len() - last);
                     }
                 }
+                if let Some((_, index)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("index"))
+                {
+                    let indices = flatten_value(index.clone());
+                    items = indices
+                        .iter()
+                        .filter_map(|value| convert_int32(value).ok())
+                        .filter_map(|index| {
+                            let index = usize::try_from(index).ok()?;
+                            items.get(index).cloned()
+                        })
+                        .collect();
+                }
                 if let Some((_, skip_last)) = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("skiplast"))

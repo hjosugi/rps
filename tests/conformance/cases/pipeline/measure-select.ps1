@@ -5,3 +5,4 @@
 (1..5 | Select-Object -Last 2) -join ','
 (1,1,2,2,3,1 | Get-Unique) -join ','
 ('a', 'b', 'c' | Measure-Object).Count
+(0..4 | Select-Object -Index (1, 3)) -join ','
