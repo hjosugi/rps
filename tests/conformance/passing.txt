@@ -21,6 +21,7 @@ lang/scriptblock
 lang/string-escapes
 lang/string-index
 lang/string-interpolation
+lang/switch
 lang/ternary
 lang/type-conversion
 lang/type-ops

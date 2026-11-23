@@ -79,6 +79,15 @@ pub enum Statement {
         commands: Vec<PipelineCommand>,
         span: Span,
     },
+    /// `switch [-Wildcard|-Regex] (expr) { label { body } ... }`.
+    Switch {
+        condition: Expr,
+        wildcard: bool,
+        regex: bool,
+        case_sensitive: bool,
+        clauses: Vec<SwitchClause>,
+        span: Span,
+    },
     /// `if` / `elseif` / `else`. Upstream: `IfStatementAst`.
     If {
         condition: Expr,
@@ -137,6 +146,14 @@ pub enum Statement {
     Continue { label: Option<String>, span: Span },
     /// `exit` with an optional exit code. Upstream: `ExitStatementAst`.
     Exit { code: Option<Expr>, span: Span },
+}
+
+/// One label and body of a `switch` statement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SwitchClause {
+    /// `None` for `default`.
+    pub label: Option<Expr>,
+    pub body: Vec<Statement>,
 }
 
 /// One stage of a pipeline.

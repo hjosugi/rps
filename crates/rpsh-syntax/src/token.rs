@@ -114,6 +114,8 @@ pub enum TokenKind {
     Begin,
     Process,
     End,
+    Switch,
+    Default,
     Else,
     For,
     Foreach,

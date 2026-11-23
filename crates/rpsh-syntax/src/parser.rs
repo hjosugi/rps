@@ -1,6 +1,6 @@
 use crate::{
     BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, Parameter, ParseError, PipelineCommand,
-    ScriptBlockAst, Span, Statement, StringPart, Token, TokenKind, UnaryOp, tokenize,
+    ScriptBlockAst, Span, Statement, StringPart, SwitchClause, Token, TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -134,6 +134,7 @@ impl Parser {
             TokenKind::For => self.for_statement(),
             TokenKind::Foreach => self.foreach_statement(),
             TokenKind::Do => self.do_statement(),
+            TokenKind::Switch => self.switch_statement(),
             TokenKind::Try => self.try_statement(),
             TokenKind::Throw => self.throw_statement(),
             TokenKind::Return => self.return_statement(),
@@ -545,6 +546,94 @@ impl Parser {
                 _ => return self.refuse(SYNTAX_ERRORS),
             }
         }
+    }
+
+    fn switch_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let mut wildcard = false;
+        let mut regex = false;
+        let mut case_sensitive = false;
+        loop {
+            let flag = match &self.peek().kind {
+                TokenKind::Parameter(flag) => {
+                    let flag = flag.clone();
+                    self.pos += 1;
+                    flag
+                }
+                TokenKind::Minus if self.pos + 1 < self.tokens.len() => {
+                    let (TokenKind::Identifier(flag) | TokenKind::Bareword(flag)) =
+                        &self.tokens[self.pos + 1].kind
+                    else {
+                        break;
+                    };
+                    let flag = flag.clone();
+                    self.pos += 2;
+                    flag
+                }
+                _ => break,
+            };
+            if flag.eq_ignore_ascii_case("wildcard") {
+                wildcard = true;
+            } else if flag.eq_ignore_ascii_case("regex") {
+                regex = true;
+            } else if flag.eq_ignore_ascii_case("casesensitive") {
+                case_sensitive = true;
+            } else {
+                return self.refuse("this switch flag");
+            }
+        }
+        let condition = self.condition()?;
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::LCurly {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        let mut clauses = Vec::new();
+        loop {
+            while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
+                self.pos += 1;
+            }
+            if self.peek().kind == TokenKind::RCurly {
+                self.pos += 1;
+                break;
+            }
+            if self.peek().kind == TokenKind::EndOfInput {
+                return self.refuse(SYNTAX_ERRORS);
+            }
+            if self.peek().kind == TokenKind::Default {
+                self.pos += 1;
+                let body = self.block()?.0;
+                clauses.push(SwitchClause { label: None, body });
+                continue;
+            }
+            let label = match &self.peek().kind {
+                TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
+                    let word = word.clone();
+                    let span = self.peek().span;
+                    self.pos += 1;
+                    Expr {
+                        kind: ExprKind::String(word),
+                        span,
+                    }
+                }
+                _ => self.nested_expression()?,
+            };
+            let body = self.block()?.0;
+            clauses.push(SwitchClause {
+                label: Some(label),
+                body,
+            });
+        }
+        let span = start.to(self.previous_span());
+        Ok(Statement::Switch {
+            condition,
+            wildcard,
+            regex,
+            case_sensitive,
+            clauses,
+            span,
+        })
     }
 
     fn if_statement(&mut self) -> Result<Statement, ParseError> {
@@ -1872,6 +1961,24 @@ mod tests {
                     .join(","),
                 show_block(body)
             ),
+            Statement::Switch {
+                condition, clauses, ..
+            } => {
+                let mut text = format!("switch ({}) {{", show(condition));
+                for clause in clauses {
+                    if let Some(label) = &clause.label {
+                        text.push_str(&format!(
+                            " {} {{ {} }}",
+                            show(label),
+                            show_block(&clause.body)
+                        ));
+                    } else {
+                        text.push_str(&format!(" default {{ {} }}", show_block(&clause.body)));
+                    }
+                }
+                text.push_str(" }");
+                text
+            }
             Statement::Pipeline { commands, .. } => commands
                 .iter()
                 .map(|command| match command {
@@ -2002,7 +2109,7 @@ mod tests {
         assert_eq!(refused("+1"), "unary plus");
         assert_eq!(refused("(1\n)"), "newlines inside parentheses");
         assert_eq!(
-            refused("switch (1) { 1 { 2 } }"),
+            refused("class Foo { }"),
             "statement keywords (if, foreach, function, ...)"
         );
     }

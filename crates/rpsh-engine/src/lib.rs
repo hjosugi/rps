@@ -18,7 +18,7 @@ use std::io::{self, Write};
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
     BinaryOp, CommandArgument, Expr, ExprKind, NumberLiteral, Parameter, ParseError,
-    PipelineCommand, ScriptBlockAst, Statement, UnaryOp, parse,
+    PipelineCommand, ScriptBlockAst, Statement, SwitchClause, UnaryOp, parse,
 };
 
 /// Runs scripts.
@@ -313,6 +313,14 @@ impl Engine {
                 name, arguments, ..
             } => self.call_function(name, arguments, out),
             Statement::Pipeline { commands, .. } => self.exec_pipeline(commands, out),
+            Statement::Switch {
+                condition,
+                wildcard,
+                regex,
+                case_sensitive,
+                clauses,
+                ..
+            } => self.exec_switch(condition, *wildcard, *regex, *case_sensitive, clauses, out),
             Statement::If {
                 condition,
                 then,
@@ -548,6 +556,102 @@ impl Engine {
             }
         }
         Ok(flow)
+    }
+
+    fn exec_switch(
+        &mut self,
+        condition: &Expr,
+        wildcard: bool,
+        regex: bool,
+        case_sensitive: bool,
+        clauses: &[SwitchClause],
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        let value = evaluate(condition, &mut self.variables, self.last_success)?;
+        let items = flatten_value(value);
+        let previous = self.variables.get("_").cloned();
+        let mut result = Flow::Normal;
+        'items: for item in items {
+            self.variables.insert("_".to_owned(), item.clone());
+            let mut matched = false;
+            for clause in clauses.iter().filter(|clause| clause.label.is_some()) {
+                let label = clause.label.as_ref().unwrap();
+                let is_match = if wildcard {
+                    let pattern =
+                        evaluate(label, &mut self.variables, self.last_success)?.to_string();
+                    ops::wildcard_match(&item.to_string(), &pattern, case_sensitive)
+                } else if regex {
+                    let pattern = evaluate(label, &mut self.variables, self.last_success)?;
+                    matches!(
+                        regex_match(&item, &pattern, case_sensitive, false, &mut self.variables)?,
+                        Value::Bool(true)
+                    )
+                } else if matches!(label.kind, ExprKind::ScriptBlock(_)) {
+                    self.scriptblock_truth(label)?
+                } else {
+                    let expected = evaluate(label, &mut self.variables, self.last_success)?;
+                    matches!(
+                        ops::compare(&item, &expected, ops::Comparison::Eq, case_sensitive)?,
+                        Value::Bool(true)
+                    )
+                };
+                if !is_match {
+                    continue;
+                }
+                matched = true;
+                match self.exec_block(&clause.body, out)? {
+                    Flow::Normal => {}
+                    Flow::Break(None) => {
+                        result = Flow::Normal;
+                        break 'items;
+                    }
+                    Flow::Continue(None) => continue 'items,
+                    other => {
+                        result = other;
+                        break 'items;
+                    }
+                }
+            }
+            if matched {
+                continue;
+            }
+            for clause in clauses.iter().filter(|clause| clause.label.is_none()) {
+                match self.exec_block(&clause.body, out)? {
+                    Flow::Normal => {}
+                    Flow::Break(None) => {
+                        result = Flow::Normal;
+                        break 'items;
+                    }
+                    Flow::Continue(None) => continue 'items,
+                    other => {
+                        result = other;
+                        break 'items;
+                    }
+                }
+            }
+        }
+        match previous {
+            Some(value) => self.variables.insert("_".to_owned(), value),
+            None => self.variables.remove("_"),
+        };
+        Ok(result)
+    }
+
+    fn scriptblock_truth(&mut self, expr: &Expr) -> Result<bool, EngineError> {
+        let ExprKind::ScriptBlock(statements) = &expr.kind else {
+            return Ok(ops::is_true(&evaluate(
+                expr,
+                &mut self.variables,
+                self.last_success,
+            )?));
+        };
+        let saved = self.capture.take();
+        self.capture = Some(Vec::new());
+        let flow = self.exec_block(statements, &mut capture_sink());
+        let captured = self.capture.take().unwrap_or_default();
+        self.capture = saved;
+        flow?;
+        Ok(captured.first().is_some_and(ops::is_true))
     }
 
     fn exec_pipeline(
@@ -1714,7 +1818,7 @@ mod tests {
 
     #[test]
     fn an_unparsable_script_runs_nothing() {
-        let (result, out) = run("1\n2\nswitch (1) { 1 { 3 } }");
+        let (result, out) = run("1\n2\nclass Foo { }");
         assert_eq!(
             result.unwrap_err().missing_feature(),
             Some("statement keywords (if, foreach, function, ...)")

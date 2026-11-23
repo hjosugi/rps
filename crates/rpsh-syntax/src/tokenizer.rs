@@ -168,6 +168,8 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::Begin => TokenKind::Begin,
             FullTokenKind::Process => TokenKind::Process,
             FullTokenKind::End => TokenKind::End,
+            FullTokenKind::Switch => TokenKind::Switch,
+            FullTokenKind::Default => TokenKind::Default,
             FullTokenKind::ElseIf => TokenKind::ElseIf,
             FullTokenKind::Else => TokenKind::Else,
             FullTokenKind::For => TokenKind::For,
@@ -384,7 +386,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            refused("switch (1) { 1 { 2 } }"),
+            refused("class Foo { }"),
             "statement keywords (if, foreach, function, ...)"
         );
         assert_eq!(

@@ -458,6 +458,11 @@ enum WildcardAtom {
     Class(Vec<(char, char)>),
 }
 
+/// Public `-like` match, used by `switch -Wildcard` too.
+pub fn wildcard_match(text: &str, pattern: &str, case_sensitive: bool) -> bool {
+    wildcard(text, pattern, case_sensitive)
+}
+
 /// `.NET`'s wildcard matching: `*`, `?`, `[abc]`, `[a-z]` and a backtick that
 /// escapes the next character. A malformed class (`[` with no `]`) is literal.
 fn wildcard(text: &str, pattern: &str, case_sensitive: bool) -> bool {
