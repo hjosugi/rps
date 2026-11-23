@@ -2,3 +2,7 @@ rpsh-golden-v2
 exit=0
 =>d
 <=a
+==b
+==c
+=>d
+<=a

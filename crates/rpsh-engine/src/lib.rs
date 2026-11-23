@@ -2551,7 +2551,10 @@ impl Engine {
             "format-table" | "ft" => Ok(Some(mark_format(input, "Table"))),
             "format-list" | "fl" => Ok(Some(mark_format(input, "List"))),
             "compare-object" | "diff" => {
-                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let include_equal = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("includeequal") && ops::is_true(value)
+                });
                 let (Some(left), Some(right)) = (positional.first(), positional.get(1)) else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Compare-Object without two collections",
@@ -2561,6 +2564,20 @@ impl Engine {
                 let left = flatten_value(left.clone());
                 let right = flatten_value(right.clone());
                 let mut outputs = Vec::new();
+                if include_equal {
+                    for item in &right {
+                        let text = item.to_string();
+                        if left
+                            .iter()
+                            .any(|value| value.to_string().eq_ignore_ascii_case(&text))
+                        {
+                            outputs.push(Value::object(vec![
+                                ("InputObject".to_owned(), item.clone()),
+                                ("SideIndicator".to_owned(), Value::String("==".into())),
+                            ]));
+                        }
+                    }
+                }
                 for item in &right {
                     let text = item.to_string();
                     if !left
