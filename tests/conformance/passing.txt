@@ -16,6 +16,7 @@ cmdlets/format-table
 cmdlets/item-props
 cmdlets/json
 cmdlets/json-pretty
+cmdlets/locations
 cmdlets/named-paths
 cmdlets/path-ops
 cmdlets/write-input

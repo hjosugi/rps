@@ -46,6 +46,8 @@ pub struct Engine {
     aliases: HashMap<String, String>,
     /// Names of the modules loaded by Import-Module.
     modules: Vec<String>,
+    /// Locations saved by Push-Location.
+    locations: Vec<std::path::PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -2813,6 +2815,28 @@ impl Engine {
                         message: format!("Cannot find path '{path}' because it does not exist."),
                     }
                     .into());
+                }
+                Ok(Some(Vec::new()))
+            }
+            "push-location" | "pushd" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Ok(current) = std::env::current_dir() else {
+                    return Ok(Some(Vec::new()));
+                };
+                self.locations.push(current);
+                if let Some(path) = path {
+                    let _ = std::env::set_current_dir(path);
+                }
+                Ok(Some(Vec::new()))
+            }
+            "pop-location" | "popd" => {
+                if let Some(path) = self.locations.pop() {
+                    let _ = std::env::set_current_dir(path);
                 }
                 Ok(Some(Vec::new()))
             }
