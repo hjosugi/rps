@@ -20,7 +20,6 @@ lang/numeric-literals
 lang/numeric-promotion
 lang/operators
 lang/pipeline-basic
-pipeline/where-foreach
 lang/psobject
 lang/scriptblock
 lang/string-escapes
@@ -33,7 +32,12 @@ lang/type-ops
 lang/variable-paths
 lang/variables
 lang/wildcard
+native/capture
+native/environment
+native/exit-code
+native/pipe
 ops/comparison
+pipeline/where-foreach
 stmt/crlf
 stmt/empty
 stmt/exit-code

@@ -108,6 +108,38 @@ impl Parser {
             let name = name.clone();
             let start = self.peek().span;
             self.pos += 2;
+            if !append
+                && !coalesce
+                && compound.is_none()
+                && let TokenKind::Identifier(command) | TokenKind::Bareword(command) =
+                    &self.peek().kind
+            {
+                let command = command.clone();
+                let first = self.command_statement(command)?;
+                let Statement::Command {
+                    name: command,
+                    arguments,
+                    ..
+                } = first
+                else {
+                    return self.refuse(SYNTAX_ERRORS);
+                };
+                let mut commands = vec![PipelineCommand::Command {
+                    name: command,
+                    arguments,
+                }];
+                while self.peek().kind == TokenKind::Pipe {
+                    self.pos += 1;
+                    self.skip_newlines();
+                    commands.push(self.pipeline_element()?);
+                }
+                let span = start.to(self.previous_span());
+                return Ok(Statement::AssignPipeline {
+                    name,
+                    commands,
+                    span,
+                });
+            }
             let value = self.nested_expression()?;
             let span = start.to(value.span);
             if self.peek().kind == TokenKind::Pipe && !append && !coalesce && compound.is_none() {

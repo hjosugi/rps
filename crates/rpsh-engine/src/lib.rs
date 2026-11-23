@@ -14,6 +14,8 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
+use std::path::Path;
+use std::process::Stdio;
 
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
@@ -503,6 +505,14 @@ impl Engine {
             }
             return Ok(Flow::Normal);
         }
+        if !self.functions.contains_key(&name.to_ascii_lowercase())
+            && let Some(outputs) = self.run_native(name, arguments, &[])?
+        {
+            for value in outputs {
+                self.write_value(value, out)?;
+            }
+            return Ok(Flow::Normal);
+        }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
         let saved = std::mem::take(&mut self.variables);
@@ -712,6 +722,11 @@ impl Engine {
         input: Vec<Value>,
     ) -> Result<Vec<Value>, EngineError> {
         if let Some(outputs) = self.run_builtin(name, arguments, &input)? {
+            return Ok(outputs);
+        }
+        if !self.functions.contains_key(&name.to_ascii_lowercase())
+            && let Some(outputs) = self.run_native(name, arguments, &input)?
+        {
             return Ok(outputs);
         }
         let function = self.function(name)?;
@@ -940,6 +955,114 @@ impl Engine {
             }
             _ => Ok(None),
         }
+    }
+
+    /// Runs an external program. `Ok(None)` means the executable was not
+    /// found, so the caller reports a command-not-found refusal.
+    fn run_native(
+        &mut self,
+        name: &str,
+        arguments: &[CommandArgument],
+        input: &[Value],
+    ) -> Result<Option<Vec<Value>>, EngineError> {
+        let arguments = self.native_arguments(arguments)?;
+        let mut command = std::process::Command::new(name);
+        command
+            .args(&arguments)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
+        for (key, value) in &self.variables {
+            if let Some(env_name) = key.strip_prefix("env:") {
+                match value {
+                    Value::Null | Value::AutomationNull => {
+                        command.env_remove(env_name);
+                    }
+                    value => {
+                        command.env(env_name, value.to_string());
+                    }
+                }
+            }
+        }
+        let mut child = match command.spawn() {
+            Ok(child) => child,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "starting a native command",
+                }
+                .into());
+            }
+        };
+        if let Some(mut stdin) = child.stdin.take() {
+            let mut text = String::new();
+            for (index, item) in input.iter().enumerate() {
+                if index > 0 {
+                    text.push('\n');
+                }
+                text.push_str(&item.to_string());
+            }
+            if !input.is_empty() {
+                text.push('\n');
+            }
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        let output = child
+            .wait_with_output()
+            .map_err(|_| RuntimeError::NotImplemented {
+                feature: "waiting for a native command",
+            })?;
+        let code = output.status.code().unwrap_or(1);
+        self.last_success = output.status.success();
+        self.variables
+            .insert("LASTEXITCODE".to_owned(), Value::Int32(code));
+        let text = String::from_utf8_lossy(&output.stdout);
+        let mut lines = Vec::new();
+        let mut rest = text.as_ref();
+        if rest.ends_with('\n') {
+            rest = &rest[..rest.len() - 1];
+        }
+        if !rest.is_empty() {
+            for line in rest.split('\n') {
+                lines.push(Value::String(line.trim_end_matches('\r').into()));
+            }
+        }
+        Ok(Some(lines))
+    }
+
+    fn native_arguments(
+        &mut self,
+        arguments: &[CommandArgument],
+    ) -> Result<Vec<String>, EngineError> {
+        let mut out = Vec::new();
+        for argument in arguments {
+            match argument {
+                CommandArgument::Bareword(word) => {
+                    if word.contains(['*', '?']) {
+                        let matches = expand_glob(word);
+                        if matches.is_empty() {
+                            out.push(word.clone());
+                        } else {
+                            out.extend(matches);
+                        }
+                    } else {
+                        out.push(word.clone());
+                    }
+                }
+                CommandArgument::Value(expr) => {
+                    let value = evaluate(expr, &mut self.variables, self.last_success)?;
+                    out.push(value.to_string());
+                }
+                CommandArgument::Parameter { name, value } => {
+                    out.push(format!("-{name}"));
+                    if let Some(expr) = value {
+                        let value = evaluate(expr, &mut self.variables, self.last_success)?;
+                        out.push(value.to_string());
+                    }
+                }
+            }
+        }
+        Ok(out)
     }
 
     fn function(&self, name: &str) -> Result<FunctionDef, EngineError> {
@@ -1651,6 +1774,39 @@ impl JsonParser {
             }
         }
     }
+}
+
+/// Expands `dir/pattern*` against the working directory, sorted. The caller
+/// keeps the literal pattern when nothing matches, as pwsh does.
+fn expand_glob(pattern: &str) -> Vec<String> {
+    let path = Path::new(pattern);
+    let Some(file) = path.file_name().and_then(|name| name.to_str()) else {
+        return Vec::new();
+    };
+    let directory = match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+        _ => std::path::PathBuf::from("."),
+    };
+    let mut matches = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&directory) {
+        for entry in entries.flatten() {
+            let Some(name) = entry.file_name().to_str().map(ToOwned::to_owned) else {
+                continue;
+            };
+            if !ops::wildcard_match(&name, file, false) {
+                continue;
+            }
+            let prefix = path
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty());
+            match prefix {
+                Some(prefix) => matches.push(format!("{}/{}", prefix.display(), name)),
+                None => matches.push(name),
+            }
+        }
+    }
+    matches.sort();
+    matches
 }
 
 fn flatten_value(value: Value) -> Vec<Value> {
