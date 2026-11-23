@@ -947,6 +947,113 @@ impl Engine {
                     .collect();
                 Ok(Some(outputs))
             }
+            "get-content" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let Some(path) = positional.first() else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Get-Content without a path",
+                    }
+                    .into());
+                };
+                let text = std::fs::read_to_string(path.to_string()).map_err(|_| {
+                    RuntimeError::NotImplemented {
+                        feature: "Get-Content of a missing file",
+                    }
+                })?;
+                let mut lines: Vec<Value> = text
+                    .split('\n')
+                    .map(|line| Value::String(line.trim_end_matches('\r').into()))
+                    .collect();
+                if text.ends_with('\n') {
+                    lines.pop();
+                }
+                if let Some((_, count)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("totalcount"))
+                {
+                    let count = convert_int32(count)?.max(0) as usize;
+                    lines.truncate(count);
+                }
+                Ok(Some(lines))
+            }
+            "test-path" => {
+                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let Some(path) = positional.first() else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Test-Path without a path",
+                    }
+                    .into());
+                };
+                Ok(Some(vec![Value::Bool(
+                    std::path::Path::new(&path.to_string()).exists(),
+                )]))
+            }
+            "join-path" => {
+                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let parts: Vec<String> = positional.iter().map(ToString::to_string).collect();
+                if parts.is_empty() {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Join-Path without a path",
+                    }
+                    .into());
+                }
+                Ok(Some(vec![Value::String(parts.join("/").into())]))
+            }
+            "split-path" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let Some(path) = positional.first() else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Split-Path without a path",
+                    }
+                    .into());
+                };
+                let path = path.to_string();
+                let path = std::path::Path::new(&path);
+                if named
+                    .iter()
+                    .any(|(name, value)| name.eq_ignore_ascii_case("leaf") && ops::is_true(value))
+                {
+                    let leaf = path
+                        .file_name()
+                        .map(|name| name.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    Ok(Some(vec![Value::String(leaf.into())]))
+                } else {
+                    let parent = path
+                        .parent()
+                        .map(|parent| parent.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    Ok(Some(vec![Value::String(parent.into())]))
+                }
+            }
+            "write-host" => {
+                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let mut outputs = Vec::new();
+                for value in positional {
+                    outputs.extend(flatten_value(value));
+                }
+                Ok(Some(outputs))
+            }
+            "set-content" => {
+                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let Some(path) = positional.first() else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Set-Content without a path",
+                    }
+                    .into());
+                };
+                let mut text = String::new();
+                for item in input {
+                    text.push_str(&item.to_string());
+                    text.push('\n');
+                }
+                std::fs::write(path.to_string(), text).map_err(|_| {
+                    RuntimeError::NotImplemented {
+                        feature: "Set-Content of an unwritable file",
+                    }
+                })?;
+                Ok(Some(Vec::new()))
+            }
             "convertto-json" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let compress = named.iter().any(|(name, value)| {
