@@ -42,6 +42,7 @@ lang/static-members
 lang/string-escapes
 lang/string-index
 lang/string-interpolation
+lang/string-methods
 lang/switch
 lang/switch-param
 lang/ternary

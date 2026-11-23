@@ -4094,6 +4094,84 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
             };
             Ok(Value::String(result.into()))
         }
+        "split" => {
+            let needle = needle_units(arguments.first())?;
+            let mut parts = Vec::new();
+            let mut start = 0;
+            if needle.is_empty() {
+                parts.push(PsString::from_units(units.clone()));
+            } else {
+                while let Some(at) = find_units(&units[start..], &needle) {
+                    parts.push(PsString::from_units(units[start..start + at].to_vec()));
+                    start += at + needle.len();
+                }
+                parts.push(PsString::from_units(units[start..].to_vec()));
+            }
+            Ok(Value::array(parts.into_iter().map(Value::String).collect()))
+        }
+        "startswith" | "endswith" => {
+            let needle = needle_units(arguments.first())?;
+            let found = if name.eq_ignore_ascii_case("startswith") {
+                units.starts_with(&needle)
+            } else {
+                units.ends_with(&needle)
+            };
+            Ok(Value::Bool(found))
+        }
+        "trim" | "trimstart" | "trimend" => {
+            let mut start = 0;
+            let mut end = units.len();
+            if !name.eq_ignore_ascii_case("trimend") {
+                while start < end {
+                    let ch = char::from_u32(u32::from(units[start]))
+                        .unwrap_or(char::REPLACEMENT_CHARACTER);
+                    if !ch.is_whitespace() {
+                        break;
+                    }
+                    start += 1;
+                }
+            }
+            if !name.eq_ignore_ascii_case("trimstart") {
+                while end > start {
+                    let ch = char::from_u32(u32::from(units[end - 1]))
+                        .unwrap_or(char::REPLACEMENT_CHARACTER);
+                    if !ch.is_whitespace() {
+                        break;
+                    }
+                    end -= 1;
+                }
+            }
+            Ok(Value::String(PsString::from_units(
+                units[start..end].to_vec(),
+            )))
+        }
+        "padleft" | "padright" => {
+            let width = int_argument(arguments.first())?;
+            let fill = match arguments.get(1) {
+                Some(Value::Char(unit)) => *unit,
+                Some(Value::String(text)) => text.unit(0).unwrap_or(b' ' as u16),
+                None => b' ' as u16,
+                _ => {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "this PadLeft/PadRight fill",
+                    });
+                }
+            };
+            let width = usize::try_from(width).unwrap_or(0);
+            if units.len() >= width {
+                return Ok(Value::String(PsString::from_units(units)));
+            }
+            let padding = vec![fill; width - units.len()];
+            let mut result = Vec::with_capacity(width);
+            if name.eq_ignore_ascii_case("padleft") {
+                result.extend(padding);
+                result.extend(units);
+            } else {
+                result.extend(units);
+                result.extend(padding);
+            }
+            Ok(Value::String(PsString::from_units(result)))
+        }
         "replace" => {
             let old = needle_units(arguments.first())?;
             let new = needle_units(arguments.get(1))?;
