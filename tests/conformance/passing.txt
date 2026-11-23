@@ -13,6 +13,7 @@ cmdlets/file-hash
 cmdlets/files
 cmdlets/format-mixed-stream
 cmdlets/format-table
+cmdlets/hidden
 cmdlets/item-props
 cmdlets/json
 cmdlets/json-pretty

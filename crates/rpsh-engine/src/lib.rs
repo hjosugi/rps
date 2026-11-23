@@ -1865,8 +1865,11 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("filter"))
                     .map(|(_, value)| value.to_string());
+                let force = named
+                    .iter()
+                    .any(|(name, value)| name.eq_ignore_ascii_case("force") && ops::is_true(value));
                 let mut entries: Vec<(String, bool, u64)> = Vec::new();
-                collect_children(&path, recurse, &mut entries);
+                collect_children(&path, recurse, force, &mut entries);
                 entries.retain(|(name, is_dir, _)| {
                     if files_only && *is_dir {
                         return false;
@@ -4606,15 +4609,23 @@ fn copy_directory(source: &str, destination: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-fn collect_children(path: &str, recurse: bool, entries: &mut Vec<(String, bool, u64)>) {
+fn collect_children(
+    path: &str,
+    recurse: bool,
+    force: bool,
+    entries: &mut Vec<(String, bool, u64)>,
+) {
     if let Ok(read) = std::fs::read_dir(path) {
         for entry in read.flatten() {
             let is_dir = entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false);
             let length = entry.metadata().map(|meta| meta.len()).unwrap_or(0);
             if let Some(name) = entry.file_name().to_str() {
+                if !force && name.starts_with('.') {
+                    continue;
+                }
                 entries.push((name.to_owned(), is_dir, length));
                 if recurse && is_dir {
-                    collect_children(&entry.path().to_string_lossy(), recurse, entries);
+                    collect_children(&entry.path().to_string_lossy(), recurse, force, entries);
                 }
             }
         }
