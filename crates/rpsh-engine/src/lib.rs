@@ -234,6 +234,14 @@ fn evaluate(
             op: UnaryOp::Join,
             operand,
         } => ops::unary_join(&evaluate(operand, variables, last_success)?),
+        ExprKind::Unary {
+            op: UnaryOp::Not,
+            operand,
+        } => Ok(ops::not(&evaluate(operand, variables, last_success)?)),
+        ExprKind::Unary {
+            op: UnaryOp::Bnot,
+            operand,
+        } => ops::bnot(&evaluate(operand, variables, last_success)?),
         ExprKind::Binary { op, left, right } => {
             let left = evaluate(left, variables, last_success)?;
             let right = evaluate(right, variables, last_success)?;
@@ -245,6 +253,42 @@ fn evaluate(
                 BinaryOp::Remainder => ops::remainder(&left, &right),
                 BinaryOp::Range => ops::range(&left, &right),
                 BinaryOp::Join => ops::join(&left, &right),
+                BinaryOp::Eq => ops::compare(&left, &right, ops::Comparison::Eq, false),
+                BinaryOp::Ne => ops::compare(&left, &right, ops::Comparison::Ne, false),
+                BinaryOp::Ge => ops::compare(&left, &right, ops::Comparison::Ge, false),
+                BinaryOp::Gt => ops::compare(&left, &right, ops::Comparison::Gt, false),
+                BinaryOp::Lt => ops::compare(&left, &right, ops::Comparison::Lt, false),
+                BinaryOp::Le => ops::compare(&left, &right, ops::Comparison::Le, false),
+                BinaryOp::CEq => ops::compare(&left, &right, ops::Comparison::Eq, true),
+                BinaryOp::CNe => ops::compare(&left, &right, ops::Comparison::Ne, true),
+                BinaryOp::CGe => ops::compare(&left, &right, ops::Comparison::Ge, true),
+                BinaryOp::CGt => ops::compare(&left, &right, ops::Comparison::Gt, true),
+                BinaryOp::CLt => ops::compare(&left, &right, ops::Comparison::Lt, true),
+                BinaryOp::CLe => ops::compare(&left, &right, ops::Comparison::Le, true),
+                BinaryOp::Like => ops::compare(&left, &right, ops::Comparison::Like, false),
+                BinaryOp::NotLike => ops::compare(&left, &right, ops::Comparison::NotLike, false),
+                BinaryOp::CLike => ops::compare(&left, &right, ops::Comparison::Like, true),
+                BinaryOp::CNotLike => ops::compare(&left, &right, ops::Comparison::NotLike, true),
+                BinaryOp::Contains => ops::contains(&left, &right, false),
+                BinaryOp::NotContains => ops::contains(&left, &right, false)
+                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
+                BinaryOp::CContains => ops::contains(&left, &right, true),
+                BinaryOp::CNotContains => ops::contains(&left, &right, true)
+                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
+                BinaryOp::In => ops::contains(&right, &left, false),
+                BinaryOp::NotIn => ops::contains(&right, &left, false)
+                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
+                BinaryOp::CIn => ops::contains(&right, &left, true),
+                BinaryOp::CNotIn => ops::contains(&right, &left, true)
+                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
+                BinaryOp::Shl => ops::shift(&left, &right, true),
+                BinaryOp::Shr => ops::shift(&left, &right, false),
+                BinaryOp::Band => ops::bitwise(&left, &right, "band"),
+                BinaryOp::Bor => ops::bitwise(&left, &right, "bor"),
+                BinaryOp::Bxor => ops::bitwise(&left, &right, "bxor"),
+                BinaryOp::And => ops::logical(&left, &right, "and"),
+                BinaryOp::Or => ops::logical(&left, &right, "or"),
+                BinaryOp::Xor => ops::logical(&left, &right, "xor"),
             }
         }
     }

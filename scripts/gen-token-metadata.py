@@ -44,6 +44,18 @@ operator_rows = [
     and (re.fullmatch(r'[^A-Za-z0-9_ ]+', text) or re.fullmatch(r'-[A-Za-z]+', text))
     and text not in {'<', '>', '?.'}  # redirection and ?. are lexical pairs
 ]
+operator_rows += [
+    ("Ilike", "-like"),
+    ("Inotlike", "-notlike"),
+    ("Imatch", "-match"),
+    ("Inotmatch", "-notmatch"),
+    ("Ireplace", "-replace"),
+    ("Icontains", "-contains"),
+    ("Inotcontains", "-notcontains"),
+    ("Iin", "-in"),
+    ("Inotin", "-notin"),
+    ("Isplit", "-split"),
+]
 operator_rows.sort(key=lambda row: (-len(row[1]), row[1], row[0]))
 keywords = '\n'.join(
     '    (FullTokenKind::{kind}, "{text}"),'.format(kind=kind, text=text)

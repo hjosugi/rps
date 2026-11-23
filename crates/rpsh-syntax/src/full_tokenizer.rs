@@ -689,6 +689,10 @@ impl Tokenizer<'_> {
                 break;
             }
         }
+        if is_unary_dash_operator(&self.source[start..at]) {
+            self.pos = start;
+            return false;
+        }
         self.pos = at;
         self.push(FullTokenKind::Parameter, start, at);
         true
@@ -749,6 +753,7 @@ impl Tokenizer<'_> {
             && self.bytes.get(self.pos) == Some(&b'-')
             && let Some(ch) = self.peek_char(1)
             && (ch.is_alphabetic() || ch == '?')
+            && !is_unary_dash_operator(&self.source[self.pos..])
         {
             return false;
         }
@@ -886,6 +891,13 @@ impl Tokenizer<'_> {
             flags: kind.flags(),
         });
     }
+}
+
+fn is_unary_dash_operator(text: &str) -> bool {
+    ["-not", "-bnot", "-join", "-split"].iter().any(|operator| {
+        text.get(..operator.len())
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(operator))
+    })
 }
 
 fn is_dash(ch: char) -> bool {

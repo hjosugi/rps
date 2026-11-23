@@ -108,18 +108,79 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.join()
+        self.logical()
     }
 
-    fn join(&mut self) -> Result<Expr, ParseError> {
+    fn logical(&mut self) -> Result<Expr, ParseError> {
+        let mut left = self.bitwise()?;
+        loop {
+            let op = match self.peek().kind {
+                TokenKind::And => BinaryOp::And,
+                TokenKind::Or => BinaryOp::Or,
+                TokenKind::Xor => BinaryOp::Xor,
+                _ => return Ok(left),
+            };
+            self.pos += 1;
+            self.skip_newlines();
+            let right = self.bitwise()?;
+            left = self.binary(op, left, right)?;
+        }
+    }
+
+    fn bitwise(&mut self) -> Result<Expr, ParseError> {
+        let mut left = self.comparison()?;
+        loop {
+            let op = match self.peek().kind {
+                TokenKind::Band => BinaryOp::Band,
+                TokenKind::Bor => BinaryOp::Bor,
+                TokenKind::Bxor => BinaryOp::Bxor,
+                _ => return Ok(left),
+            };
+            self.pos += 1;
+            self.skip_newlines();
+            let right = self.comparison()?;
+            left = self.binary(op, left, right)?;
+        }
+    }
+
+    fn comparison(&mut self) -> Result<Expr, ParseError> {
         let mut left = self.range()?;
-        while self.peek().kind == TokenKind::Join {
+        loop {
+            let op = match self.peek().kind {
+                TokenKind::Join => BinaryOp::Join,
+                TokenKind::Eq => BinaryOp::Eq,
+                TokenKind::Ne => BinaryOp::Ne,
+                TokenKind::Ge => BinaryOp::Ge,
+                TokenKind::Gt => BinaryOp::Gt,
+                TokenKind::Lt => BinaryOp::Lt,
+                TokenKind::Le => BinaryOp::Le,
+                TokenKind::CEq => BinaryOp::CEq,
+                TokenKind::CNe => BinaryOp::CNe,
+                TokenKind::CGe => BinaryOp::CGe,
+                TokenKind::CGt => BinaryOp::CGt,
+                TokenKind::CLt => BinaryOp::CLt,
+                TokenKind::CLe => BinaryOp::CLe,
+                TokenKind::Like => BinaryOp::Like,
+                TokenKind::NotLike => BinaryOp::NotLike,
+                TokenKind::CLike => BinaryOp::CLike,
+                TokenKind::CNotLike => BinaryOp::CNotLike,
+                TokenKind::Contains => BinaryOp::Contains,
+                TokenKind::NotContains => BinaryOp::NotContains,
+                TokenKind::CContains => BinaryOp::CContains,
+                TokenKind::CNotContains => BinaryOp::CNotContains,
+                TokenKind::In => BinaryOp::In,
+                TokenKind::NotIn => BinaryOp::NotIn,
+                TokenKind::CIn => BinaryOp::CIn,
+                TokenKind::CNotIn => BinaryOp::CNotIn,
+                TokenKind::Shl => BinaryOp::Shl,
+                TokenKind::Shr => BinaryOp::Shr,
+                _ => return Ok(left),
+            };
             self.pos += 1;
             self.skip_newlines();
             let right = self.range()?;
-            left = self.binary(BinaryOp::Join, left, right)?;
+            left = self.binary(op, left, right)?;
         }
-        Ok(left)
     }
 
     fn range(&mut self) -> Result<Expr, ParseError> {
@@ -197,6 +258,32 @@ impl Parser {
                 self.expr(
                     ExprKind::Unary {
                         op: UnaryOp::Join,
+                        operand: Box::new(operand),
+                    },
+                    span,
+                )
+            }
+            TokenKind::Not | TokenKind::Exclaim => {
+                let span = self.peek().span;
+                self.pos += 1;
+                let operand = self.unary()?;
+                let span = span.to(operand.span);
+                self.expr(
+                    ExprKind::Unary {
+                        op: UnaryOp::Not,
+                        operand: Box::new(operand),
+                    },
+                    span,
+                )
+            }
+            TokenKind::Bnot => {
+                let span = self.peek().span;
+                self.pos += 1;
+                let operand = self.unary()?;
+                let span = span.to(operand.span);
+                self.expr(
+                    ExprKind::Unary {
+                        op: UnaryOp::Bnot,
                         operand: Box::new(operand),
                     },
                     span,
@@ -632,6 +719,8 @@ mod tests {
             ExprKind::Unary { op, operand } => match op {
                 UnaryOp::Negate => format!("(-{})", show(operand)),
                 UnaryOp::Join => format!("(-join {})", show(operand)),
+                UnaryOp::Not => format!("(-not {})", show(operand)),
+                UnaryOp::Bnot => format!("(-bnot {})", show(operand)),
             },
             ExprKind::Binary { op, left, right } => {
                 let symbol = match op {
@@ -642,6 +731,38 @@ mod tests {
                     BinaryOp::Remainder => "%",
                     BinaryOp::Range => "..",
                     BinaryOp::Join => "-join",
+                    BinaryOp::Eq => "-eq",
+                    BinaryOp::Ne => "-ne",
+                    BinaryOp::Ge => "-ge",
+                    BinaryOp::Gt => "-gt",
+                    BinaryOp::Lt => "-lt",
+                    BinaryOp::Le => "-le",
+                    BinaryOp::CEq => "-ceq",
+                    BinaryOp::CNe => "-cne",
+                    BinaryOp::CGe => "-cge",
+                    BinaryOp::CGt => "-cgt",
+                    BinaryOp::CLt => "-clt",
+                    BinaryOp::CLe => "-cle",
+                    BinaryOp::Like => "-like",
+                    BinaryOp::NotLike => "-notlike",
+                    BinaryOp::CLike => "-clike",
+                    BinaryOp::CNotLike => "-cnotlike",
+                    BinaryOp::Contains => "-contains",
+                    BinaryOp::NotContains => "-notcontains",
+                    BinaryOp::CContains => "-ccontains",
+                    BinaryOp::CNotContains => "-cnotcontains",
+                    BinaryOp::In => "-in",
+                    BinaryOp::NotIn => "-notin",
+                    BinaryOp::CIn => "-cin",
+                    BinaryOp::CNotIn => "-cnotin",
+                    BinaryOp::Shl => "-shl",
+                    BinaryOp::Shr => "-shr",
+                    BinaryOp::Band => "-band",
+                    BinaryOp::Bor => "-bor",
+                    BinaryOp::Bxor => "-bxor",
+                    BinaryOp::And => "-and",
+                    BinaryOp::Or => "-or",
+                    BinaryOp::Xor => "-xor",
                 };
                 format!("({} {symbol} {})", show(left), show(right))
             }

@@ -64,6 +64,41 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::DotDot => TokenKind::DotDot,
             FullTokenKind::PlusEquals => TokenKind::PlusEquals,
             FullTokenKind::Join => TokenKind::Join,
+            FullTokenKind::Ieq => TokenKind::Eq,
+            FullTokenKind::Ine => TokenKind::Ne,
+            FullTokenKind::Ige => TokenKind::Ge,
+            FullTokenKind::Igt => TokenKind::Gt,
+            FullTokenKind::Ilt => TokenKind::Lt,
+            FullTokenKind::Ile => TokenKind::Le,
+            FullTokenKind::Ceq => TokenKind::CEq,
+            FullTokenKind::Cne => TokenKind::CNe,
+            FullTokenKind::Cge => TokenKind::CGe,
+            FullTokenKind::Cgt => TokenKind::CGt,
+            FullTokenKind::Clt => TokenKind::CLt,
+            FullTokenKind::Cle => TokenKind::CLe,
+            FullTokenKind::Ilike => TokenKind::Like,
+            FullTokenKind::Inotlike => TokenKind::NotLike,
+            FullTokenKind::Clike => TokenKind::CLike,
+            FullTokenKind::Cnotlike => TokenKind::CNotLike,
+            FullTokenKind::Icontains => TokenKind::Contains,
+            FullTokenKind::Inotcontains => TokenKind::NotContains,
+            FullTokenKind::Ccontains => TokenKind::CContains,
+            FullTokenKind::Cnotcontains => TokenKind::CNotContains,
+            FullTokenKind::Iin => TokenKind::In,
+            FullTokenKind::Inotin => TokenKind::NotIn,
+            FullTokenKind::Cin => TokenKind::CIn,
+            FullTokenKind::Cnotin => TokenKind::CNotIn,
+            FullTokenKind::Shl => TokenKind::Shl,
+            FullTokenKind::Shr => TokenKind::Shr,
+            FullTokenKind::Band => TokenKind::Band,
+            FullTokenKind::Bor => TokenKind::Bor,
+            FullTokenKind::Bxor => TokenKind::Bxor,
+            FullTokenKind::And => TokenKind::And,
+            FullTokenKind::Or => TokenKind::Or,
+            FullTokenKind::Xor => TokenKind::Xor,
+            FullTokenKind::Not => TokenKind::Not,
+            FullTokenKind::Bnot => TokenKind::Bnot,
+            FullTokenKind::Exclaim => TokenKind::Exclaim,
             FullTokenKind::RCurly => TokenKind::RCurly,
             FullTokenKind::DollarParen => TokenKind::DollarParen,
             FullTokenKind::Variable => {
@@ -286,8 +321,13 @@ mod tests {
             "statement keywords (if, foreach, function, ...)"
         );
         assert_eq!(
-            refused("1 -eq 1"),
-            "dash-prefixed operators and parameters (-eq, -not, -Name)"
+            kinds("1 -eq 1"),
+            vec![
+                TokenKind::Int32(1),
+                TokenKind::Eq,
+                TokenKind::Int32(1),
+                TokenKind::EndOfInput
+            ]
         );
         assert_eq!(
             kinds("1..3"),

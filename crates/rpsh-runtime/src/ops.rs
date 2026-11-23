@@ -74,6 +74,237 @@ pub fn remainder(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Comparison {
+    Eq,
+    Ne,
+    Ge,
+    Gt,
+    Lt,
+    Le,
+    Like,
+    NotLike,
+}
+
+/// Comparison operators, including the array-filtering form.
+pub fn compare(
+    left: &Value,
+    right: &Value,
+    op: Comparison,
+    case_sensitive: bool,
+) -> Result<Value, RuntimeError> {
+    if let Value::Array(items) = left {
+        let mut kept = Vec::new();
+        for item in items {
+            if compare_scalar(item, right, op, case_sensitive)? {
+                kept.push(item.clone());
+            }
+        }
+        return Ok(Value::Array(kept));
+    }
+    Ok(Value::Bool(compare_scalar(
+        left,
+        right,
+        op,
+        case_sensitive,
+    )?))
+}
+
+fn compare_scalar(
+    left: &Value,
+    right: &Value,
+    op: Comparison,
+    case_sensitive: bool,
+) -> Result<bool, RuntimeError> {
+    match op {
+        Comparison::Like | Comparison::NotLike => {
+            let text = left.to_string();
+            let pattern = right.to_string();
+            let matched = wildcard(&text, &pattern, case_sensitive);
+            Ok(if matches!(op, Comparison::NotLike) {
+                !matched
+            } else {
+                matched
+            })
+        }
+        _ => {
+            let ordering =
+                match (left, right) {
+                    (Value::Null, Value::Null) => 0,
+                    (Value::Null, _) => -1,
+                    (_, Value::Null) => 1,
+                    (Value::Int32(a), Value::Int32(b)) => a.cmp(b) as i8,
+                    (Value::String(a), b) => {
+                        let b = b.to_string();
+                        let a = if case_sensitive {
+                            a.clone()
+                        } else {
+                            a.to_lowercase()
+                        };
+                        let b = if case_sensitive { b } else { b.to_lowercase() };
+                        a.cmp(&b) as i8
+                    }
+                    (a, b) => {
+                        let a = a.to_string().parse::<f64>().map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "comparison on these operand types",
+                            }
+                        })?;
+                        let b = b.to_string().parse::<f64>().map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "comparison on these operand types",
+                            }
+                        })?;
+                        a.partial_cmp(&b)
+                            .map(|ordering| match ordering {
+                                std::cmp::Ordering::Less => -1,
+                                std::cmp::Ordering::Equal => 0,
+                                std::cmp::Ordering::Greater => 1,
+                            })
+                            .ok_or(RuntimeError::NotImplemented {
+                                feature: "comparison on NaN",
+                            })?
+                    }
+                };
+            Ok(match op {
+                Comparison::Eq => ordering == 0,
+                Comparison::Ne => ordering != 0,
+                Comparison::Ge => ordering >= 0,
+                Comparison::Gt => ordering > 0,
+                Comparison::Lt => ordering < 0,
+                Comparison::Le => ordering <= 0,
+                Comparison::Like | Comparison::NotLike => unreachable!(),
+            })
+        }
+    }
+}
+
+fn wildcard(text: &str, pattern: &str, case_sensitive: bool) -> bool {
+    let text: Vec<char> = if case_sensitive {
+        text.chars().collect()
+    } else {
+        text.to_lowercase().chars().collect()
+    };
+    let pattern: Vec<char> = if case_sensitive {
+        pattern.chars().collect()
+    } else {
+        pattern.to_lowercase().chars().collect()
+    };
+    let mut ti = 0;
+    let mut pi = 0;
+    let mut star = None;
+    let mut match_at = 0;
+    while ti < text.len() {
+        if pi < pattern.len() && (pattern[pi] == '?' || pattern[pi] == text[ti]) {
+            ti += 1;
+            pi += 1;
+        } else if pi < pattern.len() && pattern[pi] == '*' {
+            star = Some(pi);
+            match_at = ti;
+            pi += 1;
+        } else if let Some(star) = star {
+            pi = star + 1;
+            match_at += 1;
+            ti = match_at;
+        } else {
+            return false;
+        }
+    }
+    while pi < pattern.len() && pattern[pi] == '*' {
+        pi += 1;
+    }
+    pi == pattern.len()
+}
+
+/// `-contains` / `-in`.
+pub fn contains(
+    collection: &Value,
+    needle: &Value,
+    case_sensitive: bool,
+) -> Result<Value, RuntimeError> {
+    let Value::Array(items) = collection else {
+        return Err(RuntimeError::NotImplemented {
+            feature: "contains on a non-array",
+        });
+    };
+    for item in items {
+        if compare_scalar(item, needle, Comparison::Eq, case_sensitive)? {
+            return Ok(Value::Bool(true));
+        }
+    }
+    Ok(Value::Bool(false))
+}
+
+/// `-shl` / `-shr`.
+pub fn shift(left: &Value, right: &Value, left_shift: bool) -> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Value::Int32(a), Value::Int32(b)) => {
+            let amount = *b as u32;
+            Ok(Value::Int32(if left_shift {
+                a.wrapping_shl(amount)
+            } else {
+                a.wrapping_shr(amount)
+            }))
+        }
+        _ => refuse("shift on non-Int32 operands"),
+    }
+}
+
+/// Logical operators.
+pub fn logical(left: &Value, right: &Value, op: &str) -> Result<Value, RuntimeError> {
+    let l = truthy(left);
+    let r = truthy(right);
+    Ok(Value::Bool(match op {
+        "and" => l && r,
+        "or" => l || r,
+        "xor" => l ^ r,
+        _ => unreachable!(),
+    }))
+}
+
+/// Bitwise operators.
+pub fn bitwise(left: &Value, right: &Value, op: &str) -> Result<Value, RuntimeError> {
+    match (left, right) {
+        (Value::Int32(a), Value::Int32(b)) => Ok(Value::Int32(match op {
+            "band" => a & b,
+            "bor" => a | b,
+            "bxor" => a ^ b,
+            _ => unreachable!(),
+        })),
+        _ => refuse("bitwise operators on non-Int32 operands"),
+    }
+}
+
+pub fn not(operand: &Value) -> Value {
+    Value::Bool(!truthy(operand))
+}
+
+pub fn bnot(operand: &Value) -> Result<Value, RuntimeError> {
+    match operand {
+        Value::Int32(value) => Ok(Value::Int32(!value)),
+        _ => refuse("bitwise not on non-Int32 operands"),
+    }
+}
+
+fn truthy(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(value) => *value,
+        Value::Int32(value) => *value != 0,
+        Value::Int64(value) => *value != 0,
+        Value::UInt32(value) => *value != 0,
+        Value::UInt64(value) => *value != 0,
+        Value::Int16(value) => *value != 0,
+        Value::UInt16(value) => *value != 0,
+        Value::Byte(value) => *value != 0,
+        Value::SByte(value) => *value != 0,
+        Value::Double(value) => *value != 0.0,
+        Value::String(value) => !value.is_empty(),
+        Value::Array(items) => !items.is_empty(),
+        Value::Object(_) | Value::Type(_) | Value::Decimal(_) | Value::BigInteger(_) => true,
+    }
+}
+
 /// The range operator `a..b`.
 pub fn range(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
     match (left, right) {

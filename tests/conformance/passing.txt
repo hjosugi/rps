@@ -2,6 +2,7 @@
 expr/int-arithmetic
 expr/string-literals
 lang/array
+lang/comparison-basic
 lang/division
 lang/numeric-literals
 lang/string-escapes
