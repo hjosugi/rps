@@ -162,6 +162,9 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             }
             FullTokenKind::NewLine => TokenKind::NewLine,
             FullTokenKind::Exit => TokenKind::Exit,
+            FullTokenKind::Redirection | FullTokenKind::RedirectInStd => {
+                TokenKind::Redirection(span.text(source).to_owned())
+            }
             FullTokenKind::If => TokenKind::If,
             FullTokenKind::Function => TokenKind::Function,
             FullTokenKind::Filter => TokenKind::Filter,

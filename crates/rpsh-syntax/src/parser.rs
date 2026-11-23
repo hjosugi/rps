@@ -413,6 +413,10 @@ impl Parser {
         self.pos += 1;
         let mut arguments = Vec::new();
         while !self.at_statement_end() && self.peek().kind != TokenKind::Pipe {
+            if matches!(self.peek().kind, TokenKind::Redirection(_)) {
+                self.pos += 1;
+                continue;
+            }
             let parameter = match &self.peek().kind {
                 TokenKind::Parameter(parameter) => {
                     let parameter = parameter.clone();

@@ -92,6 +92,8 @@ pub enum TokenKind {
     CoalesceEquals,
     /// A statement label, `:name`, with the colon removed.
     Label(String),
+    /// A redirection such as `3>&1`, kept as text.
+    Redirection(String),
     DollarParen,
     Variable(String),
     ExpandableString(String),

@@ -860,7 +860,8 @@ impl Engine {
         input: &[Value],
     ) -> Result<Option<Vec<Value>>, EngineError> {
         match name.to_ascii_lowercase().as_str() {
-            "write-output" | "echo" => {
+            "write-output" | "echo" | "write-warning" | "write-verbose" | "write-debug"
+            | "write-information" | "write-error" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let no_enumerate = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("noenumerate") && ops::is_true(value)
