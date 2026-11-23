@@ -28,6 +28,7 @@ lang/string-index
 lang/string-interpolation
 lang/switch
 lang/ternary
+lang/try-catch
 lang/type-conversion
 lang/type-ops
 lang/variable-paths

@@ -182,6 +182,7 @@ impl Parser {
             TokenKind::Do => self.do_statement(),
             TokenKind::Switch => self.switch_statement(),
             TokenKind::Try => self.try_statement(),
+            TokenKind::Trap => self.trap_statement(),
             TokenKind::Throw => self.throw_statement(),
             TokenKind::Return => self.return_statement(),
             TokenKind::Break => self.break_statement(false),
@@ -963,6 +964,14 @@ impl Parser {
                 _ => return self.refuse(SYNTAX_ERRORS),
             }
         }
+    }
+
+    fn trap_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let (body, _) = self.block()?;
+        let span = start.to(self.previous_span());
+        Ok(Statement::Trap { body, span })
     }
 
     fn throw_statement(&mut self) -> Result<Statement, ParseError> {
@@ -2137,6 +2146,7 @@ mod tests {
                 value,
                 ..
             } => format!("{}[{}] = {}", show(target), show(index), show(value)),
+            Statement::Trap { body, .. } => format!("trap {{ {} }}", show_block(body)),
             Statement::Throw { value, .. } => format!("throw {}", show(value)),
             Statement::Return { value, .. } => match value {
                 Some(value) => format!("return {}", show(value)),

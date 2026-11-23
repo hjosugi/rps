@@ -142,6 +142,8 @@ pub enum Statement {
         finally: Option<Vec<Statement>>,
         span: Span,
     },
+    /// `trap { ... }`. Upstream: `TrapStatementAst`.
+    Trap { body: Vec<Statement>, span: Span },
     /// `throw expression`. Upstream: `ThrowStatementAst`.
     Throw { value: Expr, span: Span },
     /// `return` with an optional value. Upstream: `ReturnStatementAst`.

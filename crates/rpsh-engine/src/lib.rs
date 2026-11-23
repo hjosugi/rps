@@ -32,6 +32,8 @@ pub struct Engine {
     /// While running a pipeline stage, output is collected here instead of
     /// being written to the host.
     capture: Option<Vec<Value>>,
+    /// The active `trap` block of the function being run.
+    trap: Option<Vec<Statement>>,
 }
 
 type BoundArguments = (Vec<Value>, Vec<(String, Value)>);
@@ -148,12 +150,42 @@ impl Engine {
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
         for statement in statements {
-            let flow = self.exec_statement(statement, out)?;
-            if !matches!(flow, Flow::Normal) {
-                return Ok(flow);
+            match self.exec_statement(statement, out) {
+                Ok(Flow::Normal) => {}
+                Ok(Flow::Throw(value)) if self.trap.is_some() => {
+                    self.variables.insert("_".to_owned(), value);
+                    if self.run_trap(out)? {
+                        continue;
+                    }
+                    return Ok(Flow::Normal);
+                }
+                Ok(flow) => return Ok(flow),
+                Err(EngineError::Runtime(error))
+                    if self.trap.is_some() && catchable(&error).is_some() =>
+                {
+                    let record = catchable(&error).unwrap_or(Value::Null);
+                    self.variables.insert("_".to_owned(), record);
+                    if self.run_trap(out)? {
+                        continue;
+                    }
+                    return Ok(Flow::Normal);
+                }
+                Err(error) => return Err(error),
             }
         }
         Ok(Flow::Normal)
+    }
+
+    /// Runs the active `trap`; returns true when `continue` asks the caller to
+    /// resume with the next statement.
+    fn run_trap(&mut self, out: &mut dyn Write) -> Result<bool, EngineError> {
+        let trap = self.trap.clone().unwrap_or_default();
+        match self.exec_block(&trap, out)? {
+            Flow::Continue(_) => Ok(true),
+            Flow::Break(_) => Ok(false),
+            Flow::Normal => Ok(false),
+            _ => Ok(false),
+        }
     }
 
     fn exec_statement(
@@ -441,22 +473,36 @@ impl Engine {
                 finally,
                 ..
             } => {
-                let mut flow = match self.exec_block(body, out)? {
-                    Flow::Throw(value) => {
-                        let mut handled = Flow::Throw(value.clone());
-                        for clause in catches {
-                            if clause.types.is_empty()
-                                || clause.types.iter().any(|kind| catch_matches(kind))
-                            {
-                                self.variables.insert("_".to_owned(), value);
-                                handled = self.exec_block(&clause.body, out)?;
-                                break;
+                let thrown = match self.exec_block(body, out) {
+                    Ok(Flow::Throw(value)) => Some(value),
+                    Ok(flow) => {
+                        let mut result = flow;
+                        if let Some(finally) = finally {
+                            let finally = self.exec_block(finally, out)?;
+                            if !matches!(finally, Flow::Normal) {
+                                result = finally;
                             }
                         }
-                        handled
+                        return Ok(result);
                     }
-                    flow => flow,
+                    Err(EngineError::Runtime(error)) => match catchable(&error) {
+                        Some(record) => Some(record),
+                        None => return Err(EngineError::Runtime(error)),
+                    },
+                    Err(error) => return Err(error),
                 };
+                let mut flow = Flow::Throw(thrown.clone().unwrap_or(Value::Null));
+                if let Some(value) = thrown {
+                    for clause in catches {
+                        if clause.types.is_empty()
+                            || clause.types.iter().any(|kind| catch_matches(kind))
+                        {
+                            self.variables.insert("_".to_owned(), value);
+                            flow = self.exec_block(&clause.body, out)?;
+                            break;
+                        }
+                    }
+                }
                 if let Some(finally) = finally {
                     let finally = self.exec_block(finally, out)?;
                     if !matches!(finally, Flow::Normal) {
@@ -464,6 +510,10 @@ impl Engine {
                     }
                 }
                 Ok(flow)
+            }
+            Statement::Trap { body, .. } => {
+                self.trap = Some(body.clone());
+                Ok(Flow::Normal)
             }
             Statement::Throw { value, .. } => {
                 let value = evaluate(value, &mut self.variables, self.last_success)?;
@@ -525,6 +575,7 @@ impl Engine {
         if function.filter {
             local.entry("_".to_owned()).or_insert(Value::Null);
         }
+        let saved_trap = self.trap.take();
         self.variables = local;
         let flow = if function.has_blocks() {
             self.exec_named_blocks(&function, None, out)
@@ -532,6 +583,7 @@ impl Engine {
             self.exec_block(&function.body, out)
         };
         self.variables = saved;
+        self.trap = saved_trap;
         Ok(match flow? {
             Flow::Return(value) => {
                 if let Some(value) = value {
@@ -731,6 +783,7 @@ impl Engine {
         }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
+        let saved_trap = self.trap.take();
         let mut outputs = Vec::new();
         if function.filter {
             for item in input {
@@ -794,6 +847,7 @@ impl Engine {
                 }
             }
         }
+        self.trap = saved_trap;
         Ok(outputs)
     }
 
@@ -1973,6 +2027,51 @@ fn expand_glob(pattern: &str) -> Vec<String> {
     matches
 }
 
+/// A script error that `try/catch` or `trap` can catch, from the refusal
+/// features that are real PowerShell exceptions rather than missing support.
+fn catchable(error: &RuntimeError) -> Option<Value> {
+    let RuntimeError::NotImplemented { feature } = error;
+    let (id, message) = match *feature {
+        "divide by zero" => ("RuntimeException", "Attempted to divide by zero."),
+        "cannot convert a string to an integer" => (
+            "InvalidCastFromStringToInteger",
+            "Cannot convert value to type \"System.Int32\".",
+        ),
+        "cannot convert a string to a double" => (
+            "InvalidCastFromStringToDouble",
+            "Cannot convert value to type \"System.Double\".",
+        ),
+        _ => return None,
+    };
+    let exception = Value::object(vec![
+        (
+            "__TypeName".to_owned(),
+            Value::String("System.Management.Automation.RuntimeException".into()),
+        ),
+        ("Message".to_owned(), Value::String(message.into())),
+    ]);
+    Some(Value::object(vec![
+        ("FullyQualifiedErrorId".to_owned(), Value::String(id.into())),
+        (
+            "CategoryInfo".to_owned(),
+            Value::String(format!("NotSpecified: (:) [], {id}").into()),
+        ),
+        ("Exception".to_owned(), exception),
+    ]))
+}
+
+/// `.GetType()` reports a hidden type name when an object carries one.
+fn get_type(value: &Value) -> Value {
+    if let Value::Object(entries) = value
+        && let Some((_, Value::String(name))) = entries
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case("__TypeName"))
+    {
+        return Value::Type(name.clone());
+    }
+    Value::Type(value.type_name().to_owned().into())
+}
+
 fn flatten_value(value: Value) -> Vec<Value> {
     match value {
         Value::Array(items) => items.as_ref().clone(),
@@ -2336,7 +2435,7 @@ fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
 
 fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
     if name.eq_ignore_ascii_case("GetType") && arguments.is_empty() {
-        return Ok(Value::Type(target.type_name().to_owned().into()));
+        return Ok(get_type(target));
     }
     match target {
         Value::String(text) => string_method(text, name, arguments),
@@ -2500,7 +2599,7 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
 
 fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
     if name.eq_ignore_ascii_case("GetType") {
-        return Ok(Value::Type(value.type_name().to_owned().into()));
+        return Ok(get_type(value));
     }
     match value {
         Value::Type(full) if name.eq_ignore_ascii_case("FullName") => {

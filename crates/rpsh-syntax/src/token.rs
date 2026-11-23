@@ -124,6 +124,7 @@ pub enum TokenKind {
     Do,
     Until,
     Try,
+    Trap,
     Catch,
     Finally,
     Throw,

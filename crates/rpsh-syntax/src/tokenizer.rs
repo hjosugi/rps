@@ -180,6 +180,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::Do => TokenKind::Do,
             FullTokenKind::Until => TokenKind::Until,
             FullTokenKind::Try => TokenKind::Try,
+            FullTokenKind::Trap => TokenKind::Trap,
             FullTokenKind::Catch => TokenKind::Catch,
             FullTokenKind::Finally => TokenKind::Finally,
             FullTokenKind::Throw => TokenKind::Throw,
