@@ -603,13 +603,7 @@ fn evaluate(
                 BinaryOp::Xor => ops::logical(&left, &right, "xor"),
                 BinaryOp::Is => type_is(&left, &right, false),
                 BinaryOp::IsNot => type_is(&left, &right, true),
-                BinaryOp::As => type_is(&left, &right, false).map(|value| {
-                    if matches!(value, Value::Bool(true)) {
-                        left
-                    } else {
-                        Value::Null
-                    }
-                }),
+                BinaryOp::As => as_operator(&left, &right),
                 BinaryOp::Match => regex_match(&left, &right, false, false, variables),
                 BinaryOp::NotMatch => regex_match(&left, &right, false, true, variables),
                 BinaryOp::CMatch => regex_match(&left, &right, true, false, variables),
@@ -760,13 +754,13 @@ fn type_full_name(name: &str) -> &'static str {
 /// needs. Failing conversions are refused rather than approximated.
 fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
     match type_name.to_ascii_lowercase().as_str() {
-        "pscustomobject" => Ok(value),
-        "int" | "int32" => Ok(Value::Int32(convert_int32(&value)?)),
-        "long" | "int64" => Ok(Value::Int64(convert_int64(&value)?)),
-        "double" => Ok(Value::Double(convert_double(&value)?)),
-        "string" => Ok(Value::String(value.to_string().into())),
-        "bool" | "boolean" => Ok(Value::Bool(convert_bool(&value))),
-        "char" => convert_char(&value),
+        "pscustomobject" | "system.management.automation.pscustomobject" => Ok(value),
+        "int" | "int32" | "system.int32" => Ok(Value::Int32(convert_int32(&value)?)),
+        "long" | "int64" | "system.int64" => Ok(Value::Int64(convert_int64(&value)?)),
+        "double" | "system.double" => Ok(Value::Double(convert_double(&value)?)),
+        "string" | "system.string" => Ok(Value::String(value.to_string().into())),
+        "bool" | "boolean" | "system.boolean" => Ok(Value::Bool(convert_bool(&value))),
+        "char" | "system.char" => convert_char(&value),
         _ => Err(RuntimeError::NotImplemented {
             feature: "type casts other than to numbers, bool, char, string and pscustomobject",
         }),
@@ -909,6 +903,18 @@ fn parse_integer_text(text: &str) -> Option<i128> {
         body.parse::<i128>().ok()?
     };
     Some(if negative { -parsed } else { parsed })
+}
+
+/// `-as` converts when it can and yields `$null` when it cannot; it never
+/// raises a conversion error.
+fn as_operator(value: &Value, type_value: &Value) -> Result<Value, RuntimeError> {
+    let Value::Type(name) = type_value else {
+        return Err(RuntimeError::NotImplemented {
+            feature: "-as with a non-type right operand",
+        });
+    };
+    let name = name.to_string_lossy();
+    Ok(cast_to(&name, value.clone()).unwrap_or(Value::Null))
 }
 
 fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeError> {
@@ -1145,6 +1151,13 @@ mod tests {
             Some("statement keywords (if, foreach, function, ...)")
         );
         assert_eq!(out, "");
+    }
+
+    #[test]
+    fn as_operator_converts_or_yields_null() {
+        let (result, out) = run("'5' -as [int]; 'x' -as [int]; 1 -as [string]");
+        assert_eq!(result.unwrap(), 0);
+        assert_eq!(out, "5\n1\n");
     }
 
     #[test]

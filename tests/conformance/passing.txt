@@ -3,6 +3,7 @@ expr/int-arithmetic
 expr/string-literals
 lang/array
 lang/comparison-basic
+lang/comparison-filter
 lang/division
 lang/double-format
 lang/if-else
