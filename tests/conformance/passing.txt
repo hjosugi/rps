@@ -4,6 +4,7 @@ cmdlets/content-options
 cmdlets/default-formatting
 cmdlets/dot-source
 cmdlets/dot-source-fixture
+cmdlets/file-hash
 cmdlets/files
 cmdlets/format-mixed-stream
 cmdlets/json
