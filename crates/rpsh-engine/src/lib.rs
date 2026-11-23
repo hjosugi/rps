@@ -17,14 +17,23 @@ use std::io::{self, Write};
 
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
-    BinaryOp, Expr, ExprKind, NumberLiteral, ParseError, ScriptBlockAst, Statement, UnaryOp, parse,
+    BinaryOp, CommandArgument, Expr, ExprKind, NumberLiteral, Parameter, ParseError,
+    ScriptBlockAst, Statement, UnaryOp, parse,
 };
 
 /// Runs scripts.
 #[derive(Debug, Default)]
 pub struct Engine {
     variables: HashMap<String, Value>,
+    functions: HashMap<String, FunctionDef>,
     last_success: bool,
+}
+
+#[derive(Debug, Clone)]
+struct FunctionDef {
+    parameters: Vec<Parameter>,
+    body: Vec<Statement>,
+    filter: bool,
 }
 
 #[derive(Debug)]
@@ -263,6 +272,26 @@ impl Engine {
                 self.last_success = true;
                 Ok(Flow::Normal)
             }
+            Statement::Function {
+                name,
+                parameters,
+                body,
+                filter,
+                ..
+            } => {
+                self.functions.insert(
+                    name.to_ascii_lowercase(),
+                    FunctionDef {
+                        parameters: parameters.clone(),
+                        body: body.clone(),
+                        filter: *filter,
+                    },
+                );
+                Ok(Flow::Normal)
+            }
+            Statement::Command {
+                name, arguments, ..
+            } => self.call_function(name, arguments, out),
             Statement::If {
                 condition,
                 then,
@@ -422,6 +451,85 @@ impl Engine {
 
     /// Runs a loop body with the `break`/`continue` handling every loop shares.
     /// `step` is `None` for `while`, and the `for` iterator otherwise.
+    fn call_function(
+        &mut self,
+        name: &str,
+        arguments: &[CommandArgument],
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        let Some(function) = self.functions.get(&name.to_ascii_lowercase()).cloned() else {
+            return Err(RuntimeError::NotImplemented {
+                feature: "command invocation other than a defined function",
+            }
+            .into());
+        };
+        let mut positional = Vec::new();
+        let mut named: Vec<(String, Value)> = Vec::new();
+        for argument in arguments {
+            match argument {
+                CommandArgument::Value(expr) => {
+                    positional.push(evaluate(expr, &mut self.variables, self.last_success)?);
+                }
+                CommandArgument::Bareword(word) => {
+                    positional.push(Value::String(word.clone().into()));
+                }
+                CommandArgument::Parameter { name, value } => {
+                    let value = match value {
+                        Some(expr) => evaluate(expr, &mut self.variables, self.last_success)?,
+                        None => Value::Bool(true),
+                    };
+                    named.push((name.clone(), value));
+                }
+            }
+        }
+
+        // A function body gets a copy of the caller's variables, so reads see
+        // the parent scope while writes stay local (dynamic scope, simplified).
+        let saved = std::mem::take(&mut self.variables);
+        let mut local = saved.clone();
+        let mut bound = 0;
+        for parameter in &function.parameters {
+            let value = if let Some((_, value)) = named
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case(&parameter.name))
+            {
+                value.clone()
+            } else if let Some(value) = positional.get(bound) {
+                bound += 1;
+                value.clone()
+            } else if let Some(default) = &parameter.default {
+                evaluate(default, &mut local, self.last_success)?
+            } else {
+                Value::Null
+            };
+            let value = match &parameter.type_name {
+                Some(type_name) => cast_to(type_name, value)?,
+                None => value,
+            };
+            local.insert(parameter.name.clone(), value);
+        }
+        local.insert(
+            "args".to_owned(),
+            Value::array(positional[bound..].to_vec()),
+        );
+        if function.filter {
+            local.entry("_".to_owned()).or_insert(Value::Null);
+        }
+        self.variables = local;
+        let flow = self.exec_block(&function.body, out);
+        self.variables = saved;
+        Ok(match flow? {
+            Flow::Return(value) => {
+                if let Some(value) = value {
+                    self.write_value(value, out)?;
+                }
+                Flow::Normal
+            }
+            Flow::Break(_) | Flow::Continue(_) => Flow::Normal,
+            flow => flow,
+        })
+    }
+
     fn exec_loop(
         &mut self,
         label: &Option<String>,

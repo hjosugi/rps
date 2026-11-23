@@ -98,11 +98,18 @@ pub enum TokenKind {
         expandable: bool,
     },
     Identifier(String),
+    /// A command-mode bare word, e.g. a function name such as `Get-Square`.
+    Bareword(String),
+    /// A command parameter, `-Name`, with the leading dash removed.
+    Parameter(String),
     NewLine,
     /// The `exit` keyword.
     Exit,
     If,
     ElseIf,
+    Function,
+    Filter,
+    Param,
     Else,
     For,
     Foreach,

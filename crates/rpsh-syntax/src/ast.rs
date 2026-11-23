@@ -57,6 +57,20 @@ pub enum Statement {
         value: Expr,
         span: Span,
     },
+    /// `function Name(...) { ... }`; `filter` sets `filter`.
+    Function {
+        name: String,
+        parameters: Vec<Parameter>,
+        body: Vec<Statement>,
+        filter: bool,
+        span: Span,
+    },
+    /// A command invocation, `Name -a 1 x`.
+    Command {
+        name: String,
+        arguments: Vec<CommandArgument>,
+        span: Span,
+    },
     /// `if` / `elseif` / `else`. Upstream: `IfStatementAst`.
     If {
         condition: Expr,
@@ -115,6 +129,25 @@ pub enum Statement {
     Continue { label: Option<String>, span: Span },
     /// `exit` with an optional exit code. Upstream: `ExitStatementAst`.
     Exit { code: Option<Expr>, span: Span },
+}
+
+/// A declared parameter. Upstream: `ParameterAst`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Parameter {
+    pub name: String,
+    pub type_name: Option<String>,
+    pub default: Option<Expr>,
+}
+
+/// One argument of a command invocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandArgument {
+    /// An expression, `Add (1 + 2)` or `Add $x`.
+    Value(Expr),
+    /// `-Name value`, or `-Switch` with no value.
+    Parameter { name: String, value: Option<Expr> },
+    /// A bare word such as `Add hello`.
+    Bareword(String),
 }
 
 /// One `catch` clause of a `try` statement. Upstream: `CatchClauseAst`.

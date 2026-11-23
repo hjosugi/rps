@@ -154,9 +154,16 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
                 expandable: true,
             },
             FullTokenKind::Identifier => TokenKind::Identifier(span.text(source).to_owned()),
+            FullTokenKind::Generic => TokenKind::Bareword(span.text(source).to_owned()),
+            FullTokenKind::Parameter => {
+                TokenKind::Parameter(span.text(source).trim_start_matches('-').to_owned())
+            }
             FullTokenKind::NewLine => TokenKind::NewLine,
             FullTokenKind::Exit => TokenKind::Exit,
             FullTokenKind::If => TokenKind::If,
+            FullTokenKind::Function => TokenKind::Function,
+            FullTokenKind::Filter => TokenKind::Filter,
+            FullTokenKind::Param => TokenKind::Param,
             FullTokenKind::ElseIf => TokenKind::ElseIf,
             FullTokenKind::Else => TokenKind::Else,
             FullTokenKind::For => TokenKind::For,
@@ -357,7 +364,13 @@ mod tests {
             ]
         );
         assert_eq!(refused("1 | x"), "pipelines");
-        assert_eq!(refused("Get-Date"), "command invocation");
+        assert_eq!(
+            kinds("Get-Date"),
+            vec![
+                TokenKind::Bareword("Get-Date".to_owned()),
+                TokenKind::EndOfInput
+            ]
+        );
         assert_eq!(
             refused("switch (1) { 1 { 2 } }"),
             "statement keywords (if, foreach, function, ...)"
@@ -454,9 +467,18 @@ mod tests {
     #[test]
     fn exit_is_a_keyword_only_as_a_whole_word() {
         assert_eq!(
-            crate::parse("exits").unwrap_err().feature(),
-            "command invocation"
+            kinds("exits"),
+            vec![
+                TokenKind::Identifier("exits".to_owned()),
+                TokenKind::EndOfInput
+            ]
         );
-        assert_eq!(refused("exit.exe"), "command invocation");
+        assert_eq!(
+            kinds("exit.exe"),
+            vec![
+                TokenKind::Bareword("exit.exe".to_owned()),
+                TokenKind::EndOfInput
+            ]
+        );
     }
 }

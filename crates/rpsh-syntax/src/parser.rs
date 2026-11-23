@@ -1,6 +1,6 @@
 use crate::{
-    BinaryOp, CatchClause, Expr, ExprKind, ParseError, ScriptBlockAst, Span, Statement, StringPart,
-    Token, TokenKind, UnaryOp, tokenize,
+    BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, Parameter, ParseError, ScriptBlockAst,
+    Span, Statement, StringPart, Token, TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -128,7 +128,7 @@ impl Parser {
                 Statement::Assign { name, value, span }
             });
         }
-        match self.peek().kind {
+        match &self.peek().kind {
             TokenKind::If => self.if_statement(),
             TokenKind::While => self.while_statement(),
             TokenKind::For => self.for_statement(),
@@ -139,6 +139,11 @@ impl Parser {
             TokenKind::Return => self.return_statement(),
             TokenKind::Break => self.break_statement(false),
             TokenKind::Continue => self.break_statement(true),
+            TokenKind::Function => self.function_statement(false),
+            TokenKind::Filter => self.function_statement(true),
+            TokenKind::Identifier(name) | TokenKind::Bareword(name) => {
+                self.command_statement(name.clone())
+            }
             TokenKind::Exit => self.exit_statement(),
             _ => {
                 let expression = self.expression()?;
@@ -305,6 +310,170 @@ impl Parser {
         let close = self.peek().span;
         self.pos += 1;
         Ok((arguments, close))
+    }
+
+    /// Parses `Name arg -Param value ...` in command mode.
+    fn command_statement(&mut self, name: String) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let mut arguments = Vec::new();
+        while !self.at_statement_end() {
+            match &self.peek().kind {
+                TokenKind::Parameter(parameter) => {
+                    let parameter = parameter.clone();
+                    self.pos += 1;
+                    let value = match &self.peek().kind {
+                        TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
+                            let word = word.clone();
+                            let span = self.peek().span;
+                            self.pos += 1;
+                            Some(Expr {
+                                kind: ExprKind::String(word),
+                                span,
+                            })
+                        }
+                        _ if self.argument_starts() => Some(self.nested_expression()?),
+                        _ => None,
+                    };
+                    arguments.push(CommandArgument::Parameter {
+                        name: parameter,
+                        value,
+                    });
+                }
+                TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
+                    let word = word.clone();
+                    self.pos += 1;
+                    arguments.push(CommandArgument::Bareword(word));
+                }
+                _ => arguments.push(CommandArgument::Value(self.nested_expression()?)),
+            }
+        }
+        let span = start.to(self.previous_span());
+        Ok(Statement::Command {
+            name,
+            arguments,
+            span,
+        })
+    }
+
+    fn argument_starts(&self) -> bool {
+        matches!(
+            self.peek().kind,
+            TokenKind::Int32(_)
+                | TokenKind::Numeric(_)
+                | TokenKind::StringLiteral(_)
+                | TokenKind::ExpandableString(_)
+                | TokenKind::HereString { .. }
+                | TokenKind::Variable(_)
+                | TokenKind::LParen
+                | TokenKind::AtParen
+                | TokenKind::AtCurly
+                | TokenKind::LBracket
+                | TokenKind::DollarParen
+                | TokenKind::Minus
+                | TokenKind::PlusPlus
+                | TokenKind::MinusMinus
+                | TokenKind::Exclaim
+                | TokenKind::Not
+                | TokenKind::Bnot
+        )
+    }
+
+    fn function_statement(&mut self, filter: bool) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let name = match &self.peek().kind {
+            TokenKind::Identifier(name) | TokenKind::Bareword(name) => name.clone(),
+            _ => return self.refuse(SYNTAX_ERRORS),
+        };
+        self.pos += 1;
+        let mut parameters = Vec::new();
+        self.skip_newlines();
+        if self.peek().kind == TokenKind::LParen {
+            parameters = self.parameter_list()?;
+        }
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::LCurly {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        let mut body = Vec::new();
+        loop {
+            while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
+                self.pos += 1;
+            }
+            if self.peek().kind == TokenKind::RCurly {
+                self.pos += 1;
+                break;
+            }
+            if self.peek().kind == TokenKind::EndOfInput {
+                return self.refuse(SYNTAX_ERRORS);
+            }
+            if self.peek().kind == TokenKind::Param && body.is_empty() {
+                self.pos += 1;
+                parameters = self.parameter_list()?;
+                continue;
+            }
+            self.nodes = 0;
+            body.push(self.statement()?);
+            if !self.at_statement_end() {
+                return self.refuse(SYNTAX_ERRORS);
+            }
+        }
+        let span = start.to(self.previous_span());
+        Ok(Statement::Function {
+            name,
+            parameters,
+            body,
+            filter,
+            span,
+        })
+    }
+
+    /// Parses `( [type]$name [= default], ... )`.
+    fn parameter_list(&mut self) -> Result<Vec<Parameter>, ParseError> {
+        self.pos += 1;
+        let mut parameters = Vec::new();
+        self.skip_newlines();
+        if self.peek().kind == TokenKind::RParen {
+            self.pos += 1;
+            return Ok(parameters);
+        }
+        loop {
+            self.skip_newlines();
+            let type_name = if self.peek().kind == TokenKind::LBracket {
+                Some(self.exception_type()?)
+            } else {
+                None
+            };
+            self.skip_newlines();
+            let Token { kind, .. } = self.peek().clone();
+            let TokenKind::Variable(name) = kind else {
+                return self.refuse(SYNTAX_ERRORS);
+            };
+            self.pos += 1;
+            self.skip_newlines();
+            let default = if self.peek().kind == TokenKind::Equals {
+                self.pos += 1;
+                Some(self.nested_expression()?)
+            } else {
+                None
+            };
+            parameters.push(Parameter {
+                name,
+                type_name,
+                default,
+            });
+            self.skip_newlines();
+            match self.peek().kind {
+                TokenKind::Comma => self.pos += 1,
+                TokenKind::RParen => {
+                    self.pos += 1;
+                    return Ok(parameters);
+                }
+                _ => return self.refuse(SYNTAX_ERRORS),
+            }
+        }
     }
 
     fn if_statement(&mut self) -> Result<Statement, ParseError> {
@@ -1613,6 +1782,47 @@ mod tests {
                 }
                 if let Some(finally) = finally {
                     text.push_str(&format!(" finally {{ {} }}", show_block(finally)));
+                }
+                text
+            }
+            Statement::Function {
+                name,
+                parameters,
+                body,
+                filter,
+                ..
+            } => format!(
+                "{} {name}({}) {{ {} }}",
+                if *filter { "filter" } else { "function" },
+                parameters
+                    .iter()
+                    .map(|parameter| parameter.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(","),
+                show_block(body)
+            ),
+            Statement::Command {
+                name, arguments, ..
+            } => {
+                let mut text = name.clone();
+                for argument in arguments {
+                    match argument {
+                        CommandArgument::Value(value) => {
+                            text.push(' ');
+                            text.push_str(&show(value));
+                        }
+                        CommandArgument::Bareword(word) => {
+                            text.push(' ');
+                            text.push_str(word);
+                        }
+                        CommandArgument::Parameter { name, value } => {
+                            text.push_str(&format!(" -{name}"));
+                            if let Some(value) = value {
+                                text.push(' ');
+                                text.push_str(&show(value));
+                            }
+                        }
+                    }
                 }
                 text
             }
