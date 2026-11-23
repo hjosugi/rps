@@ -2082,6 +2082,97 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
+            "export-csv" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Export-Csv without a path",
+                    }
+                    .into());
+                };
+                let mut lines: Vec<String> = Vec::new();
+                let mut columns: Vec<String> = Vec::new();
+                for item in input {
+                    if let Value::Object(entries) = item {
+                        if columns.is_empty() {
+                            columns = visible_entries(entries)
+                                .iter()
+                                .map(|(name, _)| (*name).clone())
+                                .collect();
+                            lines.push(
+                                columns
+                                    .iter()
+                                    .map(|name| csv_quote(name))
+                                    .collect::<Vec<_>>()
+                                    .join(","),
+                            );
+                        }
+                        let cells: Vec<String> = columns
+                            .iter()
+                            .map(|column| {
+                                entries
+                                    .iter()
+                                    .find(|(key, _)| {
+                                        !is_hidden(key) && key.eq_ignore_ascii_case(column)
+                                    })
+                                    .map_or_else(String::new, |(_, value)| value.to_string())
+                            })
+                            .map(|value| csv_quote(&value))
+                            .collect();
+                        lines.push(cells.join(","));
+                    }
+                }
+                let mut text = lines.join("\n");
+                if !text.is_empty() {
+                    text.push('\n');
+                }
+                std::fs::write(&path, text).map_err(|_| RuntimeError::NotImplemented {
+                    feature: "Export-Csv cannot write this file",
+                })?;
+                Ok(Some(Vec::new()))
+            }
+            "import-csv" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Import-Csv without a path",
+                    }
+                    .into());
+                };
+                let text =
+                    std::fs::read_to_string(&path).map_err(|_| RuntimeError::NotImplemented {
+                        feature: "Import-Csv of a missing file",
+                    })?;
+                let mut lines = text.lines();
+                let Some(header) = lines.next() else {
+                    return Ok(Some(Vec::new()));
+                };
+                let columns = parse_csv_line(header);
+                let mut outputs = Vec::new();
+                for line in lines {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    let cells = parse_csv_line(line);
+                    let mut entries = Vec::new();
+                    for (index, column) in columns.iter().enumerate() {
+                        let value = cells.get(index).cloned().unwrap_or_default();
+                        entries.push((column.clone(), Value::String(value.into())));
+                    }
+                    outputs.push(Value::object(entries));
+                }
+                Ok(Some(outputs))
+            }
             "convertfrom-csv" => {
                 let mut lines: Vec<String> = Vec::new();
                 for item in input {

@@ -1,6 +1,7 @@
 # Conformance cases rpsh passes. Maintained by `cargo harness conform check --bless`.
 cmdlets/content
 cmdlets/content-options
+cmdlets/csv-files
 cmdlets/default-formatting
 cmdlets/dot-source
 cmdlets/dot-source-fixture
