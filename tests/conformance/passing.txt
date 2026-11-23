@@ -2,6 +2,7 @@
 cmdlets/child-item
 cmdlets/content
 cmdlets/content-options
+cmdlets/copy-into-dir
 cmdlets/copy-recurse
 cmdlets/csv-files
 cmdlets/default-formatting

@@ -1768,6 +1768,14 @@ impl Engine {
                 let recurse = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("recurse") && ops::is_true(value)
                 });
+                let destination = if std::path::Path::new(&destination).is_dir() {
+                    let name = std::path::Path::new(&source)
+                        .file_name()
+                        .map_or_else(String::new, |name| name.to_string_lossy().to_string());
+                    format!("{destination}/{name}")
+                } else {
+                    destination
+                };
                 if std::path::Path::new(&source).is_dir() && recurse {
                     copy_directory(&source, &destination).map_err(|_| {
                         RuntimeError::NotImplemented {
@@ -1800,6 +1808,14 @@ impl Engine {
                         feature: "Move-Item without source and destination",
                     }
                     .into());
+                };
+                let destination = if std::path::Path::new(&destination).is_dir() {
+                    let name = std::path::Path::new(&source)
+                        .file_name()
+                        .map_or_else(String::new, |name| name.to_string_lossy().to_string());
+                    format!("{destination}/{name}")
+                } else {
+                    destination
                 };
                 std::fs::rename(&source, &destination).map_err(|_| {
                     RuntimeError::NotImplemented {
