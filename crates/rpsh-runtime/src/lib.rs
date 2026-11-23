@@ -156,6 +156,11 @@ impl fmt::Display for Value {
                 Ok(())
             }
             Value::Object(entries) => {
+                if let Some((_, Value::String(text))) =
+                    entries.iter().find(|(key, _)| key == "__Text")
+                {
+                    return fmt::Display::fmt(text, f);
+                }
                 f.write_str("@{")?;
                 for (index, (name, value)) in entries.iter().enumerate() {
                     if index > 0 {

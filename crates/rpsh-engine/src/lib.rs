@@ -2347,6 +2347,50 @@ fn encoding_value() -> Value {
     Value::object(vec![("WebName".to_owned(), Value::String("utf-8".into()))])
 }
 
+fn typed_scalar(type_name: &str, text: &str) -> Value {
+    Value::object(vec![
+        (
+            "__TypeName".to_owned(),
+            Value::String(type_name.to_owned().into()),
+        ),
+        ("__Text".to_owned(), Value::String(text.to_owned().into())),
+    ])
+}
+
+fn ps_version_table() -> Value {
+    let mut entries = vec![
+        (
+            "PSVersion".to_owned(),
+            typed_scalar("System.Management.Automation.SemanticVersion", "7.7.0"),
+        ),
+        ("PSEdition".to_owned(), Value::String("Core".into())),
+        ("GitCommitId".to_owned(), Value::String("7.7.0".into())),
+        ("OS".to_owned(), Value::String("Linux 0.0.0".into())),
+        ("Platform".to_owned(), Value::String("Unix".into())),
+        (
+            "PSCompatibleVersions".to_owned(),
+            typed_scalar("System.Version[]", "1.0 2.0 3.0 4.0 5.0 5.1 6.0 7.0"),
+        ),
+        (
+            "PSRemotingProtocolVersion".to_owned(),
+            typed_scalar("System.Version", "2.4"),
+        ),
+        (
+            "SerializationVersion".to_owned(),
+            typed_scalar("System.Version", "1.1.0.1"),
+        ),
+        (
+            "WSManStackVersion".to_owned(),
+            typed_scalar("System.Version", "3.0"),
+        ),
+    ];
+    entries.push((
+        "__TypeName".to_owned(),
+        Value::String("System.Management.Automation.PSVersionHashTable".into()),
+    ));
+    Value::object(entries)
+}
+
 fn automatic_variable(name: &str) -> Option<Value> {
     match name {
         "PSStyle" => Some(Value::object(vec![(
@@ -2372,6 +2416,7 @@ fn automatic_variable(name: &str) -> Option<Value> {
                 )]),
             ),
         ])),
+        "PSVersionTable" => Some(ps_version_table()),
         "IsLinux" => Some(Value::Bool(true)),
         "IsWindows" | "IsMacOS" => Some(Value::Bool(false)),
         "IsCoreCLR" => Some(Value::Bool(true)),

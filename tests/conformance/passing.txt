@@ -5,6 +5,7 @@ cmdlets/json
 cmdlets/write-output
 contract/console
 contract/streams
+contract/version-table
 expr/int-arithmetic
 expr/string-literals
 lang/array
