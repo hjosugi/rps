@@ -1752,26 +1752,33 @@ impl Engine {
                 let recurse = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("recurse") && ops::is_true(value)
                 });
-                let destination = if std::path::Path::new(&destination).is_dir() {
-                    let name = std::path::Path::new(&source)
-                        .file_name()
-                        .map_or_else(String::new, |name| name.to_string_lossy().to_string());
-                    format!("{destination}/{name}")
+                let sources = if source.contains(['*', '?']) {
+                    expand_glob(&source)
                 } else {
-                    destination
+                    vec![source.clone()]
                 };
-                if std::path::Path::new(&source).is_dir() && recurse {
-                    copy_directory(&source, &destination).map_err(|_| {
-                        RuntimeError::NotImplemented {
-                            feature: "Copy-Item cannot copy this directory",
-                        }
-                    })?;
-                } else {
-                    std::fs::copy(&source, &destination).map_err(|_| {
-                        RuntimeError::NotImplemented {
-                            feature: "Copy-Item cannot copy this file",
-                        }
-                    })?;
+                for source in sources {
+                    let target = if std::path::Path::new(&destination).is_dir() {
+                        let name = std::path::Path::new(&source)
+                            .file_name()
+                            .map_or_else(String::new, |name| name.to_string_lossy().to_string());
+                        format!("{destination}/{name}")
+                    } else {
+                        destination.clone()
+                    };
+                    if std::path::Path::new(&source).is_dir() && recurse {
+                        copy_directory(&source, &target).map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "Copy-Item cannot copy this directory",
+                            }
+                        })?;
+                    } else {
+                        std::fs::copy(&source, &target).map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "Copy-Item cannot copy this file",
+                            }
+                        })?;
+                    }
                 }
                 Ok(Some(Vec::new()))
             }

@@ -3,6 +3,7 @@ cmdlets/child-item
 cmdlets/clear-content
 cmdlets/content
 cmdlets/content-options
+cmdlets/copy-glob
 cmdlets/copy-into-dir
 cmdlets/copy-recurse
 cmdlets/csv-files
