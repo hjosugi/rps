@@ -2046,6 +2046,70 @@ impl Engine {
                 }
                 Ok(Some(input.to_vec()))
             }
+            "convertto-csv" => {
+                let mut outputs: Vec<Value> = Vec::new();
+                let mut columns: Vec<String> = Vec::new();
+                for item in input {
+                    if let Value::Object(entries) = item {
+                        if columns.is_empty() {
+                            columns = visible_entries(entries)
+                                .iter()
+                                .map(|(name, _)| (*name).clone())
+                                .collect();
+                            outputs.push(Value::String(
+                                columns
+                                    .iter()
+                                    .map(|name| csv_quote(name))
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                                    .into(),
+                            ));
+                        }
+                        let cells: Vec<String> = columns
+                            .iter()
+                            .map(|column| {
+                                entries
+                                    .iter()
+                                    .find(|(key, _)| {
+                                        !is_hidden(key) && key.eq_ignore_ascii_case(column)
+                                    })
+                                    .map_or_else(String::new, |(_, value)| value.to_string())
+                            })
+                            .map(|value| csv_quote(&value))
+                            .collect();
+                        outputs.push(Value::String(cells.join(",").into()));
+                    }
+                }
+                Ok(Some(outputs))
+            }
+            "convertfrom-csv" => {
+                let mut lines: Vec<String> = Vec::new();
+                for item in input {
+                    if let Value::Array(items) = item {
+                        lines.extend(items.iter().map(ToString::to_string));
+                    } else {
+                        lines.push(item.to_string());
+                    }
+                }
+                let Some(header) = lines.first() else {
+                    return Ok(Some(Vec::new()));
+                };
+                let columns = parse_csv_line(header);
+                let mut outputs = Vec::new();
+                for line in &lines[1..] {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    let cells = parse_csv_line(line);
+                    let mut entries = Vec::new();
+                    for (index, column) in columns.iter().enumerate() {
+                        let value = cells.get(index).cloned().unwrap_or_default();
+                        entries.push((column.clone(), Value::String(value.into())));
+                    }
+                    outputs.push(Value::object(entries));
+                }
+                Ok(Some(outputs))
+            }
             "select-string" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let pattern = named
@@ -3944,6 +4008,33 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "Write-Verbose",
     "Write-Warning",
 ];
+
+fn csv_quote(text: &str) -> String {
+    format!("\"{}\"", text.replace('"', "\"\""))
+}
+
+fn parse_csv_line(line: &str) -> Vec<String> {
+    let mut cells = Vec::new();
+    let mut cell = String::new();
+    let mut quoted = false;
+    let mut chars = line.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '"' => {
+                if quoted && chars.peek() == Some(&'"') {
+                    cell.push('"');
+                    chars.next();
+                } else {
+                    quoted = !quoted;
+                }
+            }
+            ',' if !quoted => cells.push(std::mem::take(&mut cell)),
+            other => cell.push(other),
+        }
+    }
+    cells.push(cell);
+    cells
+}
 
 fn culture_rank(text: &str) -> u8 {
     match text.chars().next() {

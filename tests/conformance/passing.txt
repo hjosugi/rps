@@ -65,6 +65,7 @@ native/exit-code
 native/glob
 native/pipe
 ops/comparison
+pipeline/csv
 pipeline/foreach-blocks
 pipeline/group-measure-property
 pipeline/group-select
