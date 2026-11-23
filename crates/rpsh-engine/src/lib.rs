@@ -166,7 +166,30 @@ impl Engine {
             Statement::AppendAssign { name, value, .. } => {
                 let value = evaluate(value, &mut self.variables, self.last_success)?;
                 let key = strip_scope(name);
-                let updated = append(self.variables.get(key), value)?;
+                let old = self.variables.get(key).cloned().unwrap_or(Value::Null);
+                let updated = ops::add(&old, &value)?;
+                self.variables.insert(key.to_owned(), updated);
+                self.last_success = true;
+                Ok(Flow::Normal)
+            }
+            Statement::CompoundAssign {
+                name, op, value, ..
+            } => {
+                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let key = strip_scope(name);
+                let old = self.variables.get(key).cloned().unwrap_or(Value::Null);
+                let updated = match op {
+                    BinaryOp::Subtract => ops::subtract(&old, &value)?,
+                    BinaryOp::Multiply => ops::multiply(&old, &value)?,
+                    BinaryOp::Divide => ops::divide(&old, &value)?,
+                    BinaryOp::Remainder => ops::remainder(&old, &value)?,
+                    _ => {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "this compound assignment operator",
+                        }
+                        .into());
+                    }
+                };
                 self.variables.insert(key.to_owned(), updated);
                 self.last_success = true;
                 Ok(Flow::Normal)
@@ -613,9 +636,12 @@ fn increment(
             feature: "incrementing anything but a variable",
         });
     };
-    let old = lookup(name, variables, last_success).ok_or(RuntimeError::NotImplemented {
-        feature: "undefined variable",
-    })?;
+    let old = lookup(name, variables, last_success).unwrap_or(Value::Null);
+    if matches!(old, Value::String(_)) {
+        return Err(RuntimeError::NotImplemented {
+            feature: "incrementing a string",
+        });
+    }
     let one = Value::Int32(1);
     let updated = match op {
         UnaryOp::Increment | UnaryOp::PostIncrement => ops::add(&old, &one)?,
@@ -677,32 +703,6 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
         }
         _ => Err(RuntimeError::NotImplemented {
             feature: "indexing other than arrays",
-        }),
-    }
-}
-
-fn append(old: Option<&Value>, value: Value) -> Result<Value, RuntimeError> {
-    match (old, value) {
-        (None, value) => Ok(Value::array(vec![value])),
-        (Some(Value::Array(items)), Value::Array(more)) => {
-            let mut items = items.as_ref().clone();
-            items.extend(more.iter().cloned());
-            Ok(Value::array(items))
-        }
-        (Some(Value::Array(items)), value) => {
-            let mut items = items.as_ref().clone();
-            items.push(value);
-            Ok(Value::array(items))
-        }
-        (Some(Value::Int32(a)), Value::Int32(b)) => a.checked_add(b).map_or(
-            Err(RuntimeError::NotImplemented {
-                feature: "Int32 overflow (promotion to Double)",
-            }),
-            |value| Ok(Value::Int32(value)),
-        ),
-        (Some(Value::String(a)), Value::String(b)) => Ok(Value::String(a.concat(&b))),
-        _ => Err(RuntimeError::NotImplemented {
-            feature: "compound assignment on these values",
         }),
     }
 }
@@ -1145,6 +1145,19 @@ mod tests {
             Some("statement keywords (if, foreach, function, ...)")
         );
         assert_eq!(out, "");
+    }
+
+    #[test]
+    fn compound_assignment_and_increment_work() {
+        let (result, out) = run("$x = 5; $x -= 2; $x\n\
+             $y = 5; $y *= 2; $y\n\
+             $z = 5; $z /= 2; $z\n\
+             $w = 5; $w %= 2; $w\n\
+             $s = 'ab'; $s += 'cd'; $s\n\
+             $a = 1, 2; $a += 3; $a\n\
+             $n = $null; $n++; $n");
+        assert_eq!(result.unwrap(), 0);
+        assert_eq!(out, "3\n10\n2.5\n1\nabcd\n1\n2\n3\n1\n");
     }
 
     #[test]

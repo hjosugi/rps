@@ -123,6 +123,7 @@ fn double_operands(left: &Value, right: &Value, operation: impl FnOnce(f64, f64)
 /// for arithmetic: `1 + '2'` is `3`.
 fn numeric_of(value: &Value) -> Option<Value> {
     match value {
+        Value::Null | Value::AutomationNull => Some(Value::Int32(0)),
         Value::String(text) => parse_number_text(&text.to_string_lossy()),
         Value::Int32(_)
         | Value::Int64(_)
@@ -183,6 +184,24 @@ fn numeric_pair(left: &Value, right: &Value) -> Result<(Value, Value), RuntimeEr
 /// Binary `+`. A `Char` is a string in addition upstream, and a string on the
 /// left concatenates: `'1' + 2` is `"12"`.
 pub fn add(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    if matches!(left, Value::Null | Value::AutomationNull)
+        && matches!(right, Value::Null | Value::AutomationNull)
+    {
+        return Ok(Value::Null);
+    }
+    if matches!(left, Value::Null | Value::AutomationNull)
+        && let Value::String(text) = right
+    {
+        return Ok(Value::String(text.clone()));
+    }
+    if let Value::Array(items) = left {
+        let mut result = items.as_ref().clone();
+        match right {
+            Value::Array(more) => result.extend(more.iter().cloned()),
+            value => result.push(value.clone()),
+        }
+        return Ok(Value::array(result));
+    }
     if matches!(left, Value::Char(_)) || matches!(right, Value::Char(_)) {
         return Ok(Value::String(PsString::from(format!("{left}{right}"))));
     }
@@ -214,6 +233,16 @@ pub fn subtract(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
 /// Binary `*`. A string on the left repeats when the right is an `Int32`:
 /// `'ab' * 3` is `"ababab"`.
 pub fn multiply(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    if let (Value::Array(items), Value::Int32(times)) = (left, right) {
+        let times = usize::try_from(*times).map_err(|_| RuntimeError::NotImplemented {
+            feature: "negative array repetition",
+        })?;
+        let mut result = Vec::with_capacity(items.len() * times);
+        for _ in 0..times {
+            result.extend(items.iter().cloned());
+        }
+        return Ok(Value::array(result));
+    }
     if let (Value::String(text), Value::Int32(times)) = (left, right) {
         let times = usize::try_from(*times).map_err(|_| RuntimeError::NotImplemented {
             feature: "negative string repetition",
@@ -757,6 +786,33 @@ mod tests {
         assert_eq!(divide(&int(7), &int(2)), Ok(Value::Double(3.5)));
         assert_eq!(divide(&Value::Int64(6), &int(2)), Ok(Value::Int64(3)));
         assert_eq!(divide(&Value::UInt32(7), &int(2)), Ok(Value::Double(3.5)));
+    }
+
+    #[test]
+    fn arrays_concatenate_and_repeat() {
+        let array = Value::array(vec![int(1), int(2)]);
+        assert_eq!(
+            add(&array, &int(3)),
+            Ok(Value::array(vec![int(1), int(2), int(3)]))
+        );
+        assert_eq!(
+            add(&array, &Value::array(vec![int(3)])),
+            Ok(Value::array(vec![int(1), int(2), int(3)]))
+        );
+        assert_eq!(
+            multiply(&array, &int(2)),
+            Ok(Value::array(vec![int(1), int(2), int(1), int(2)]))
+        );
+        // The left operand decides: a scalar does not add an array.
+        assert_eq!(add(&int(3), &array).unwrap_err().feature(), MIXED_OPERANDS);
+    }
+
+    #[test]
+    fn null_behaves_as_zero_in_arithmetic() {
+        assert_eq!(add(&Value::Null, &int(1)), Ok(int(1)));
+        assert_eq!(subtract(&int(1), &Value::Null), Ok(int(1)));
+        assert_eq!(add(&Value::Null, &Value::Null), Ok(Value::Null));
+        assert_eq!(multiply(&Value::Null, &int(2)), Ok(int(0)));
     }
 
     #[test]

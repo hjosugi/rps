@@ -83,9 +83,22 @@ impl Parser {
             && let Some(next) = self.tokens.get(self.pos + 1)
             && matches!(
                 next.kind,
-                TokenKind::Equals | TokenKind::PlusEquals | TokenKind::CoalesceEquals
+                TokenKind::Equals
+                    | TokenKind::PlusEquals
+                    | TokenKind::MinusEquals
+                    | TokenKind::MultiplyEquals
+                    | TokenKind::DivideEquals
+                    | TokenKind::RemainderEquals
+                    | TokenKind::CoalesceEquals
             )
         {
+            let compound = match next.kind {
+                TokenKind::MinusEquals => Some(BinaryOp::Subtract),
+                TokenKind::MultiplyEquals => Some(BinaryOp::Multiply),
+                TokenKind::DivideEquals => Some(BinaryOp::Divide),
+                TokenKind::RemainderEquals => Some(BinaryOp::Remainder),
+                _ => None,
+            };
             let append = next.kind == TokenKind::PlusEquals;
             let coalesce = next.kind == TokenKind::CoalesceEquals;
             let name = name.clone();
@@ -100,6 +113,13 @@ impl Parser {
                 Statement::AppendAssign { name, value, span }
             } else if coalesce {
                 Statement::CoalesceAssign { name, value, span }
+            } else if let Some(op) = compound {
+                Statement::CompoundAssign {
+                    name,
+                    op,
+                    value,
+                    span,
+                }
             } else {
                 Statement::Assign { name, value, span }
             });
@@ -1415,6 +1435,18 @@ mod tests {
             Statement::AppendAssign { name, value, .. } => format!("${name} += {}", show(value)),
             Statement::CoalesceAssign { name, value, .. } => {
                 format!("${name} ??= {}", show(value))
+            }
+            Statement::CompoundAssign {
+                name, op, value, ..
+            } => {
+                let symbol = match op {
+                    BinaryOp::Subtract => "-=",
+                    BinaryOp::Multiply => "*=",
+                    BinaryOp::Divide => "/=",
+                    BinaryOp::Remainder => "%=",
+                    _ => "?=",
+                };
+                format!("${name} {symbol} {}", show(value))
             }
             Statement::If {
                 condition,

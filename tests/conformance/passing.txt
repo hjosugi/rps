@@ -10,6 +10,7 @@ lang/int-overflow
 lang/loops
 lang/numeric-literals
 lang/numeric-promotion
+lang/operators
 lang/psobject
 lang/scriptblock
 lang/string-escapes

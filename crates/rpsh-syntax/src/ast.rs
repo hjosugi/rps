@@ -36,6 +36,13 @@ pub enum Statement {
         value: Expr,
         span: Span,
     },
+    /// `$name -= expression`, `*=`, `/=`, `%=`.
+    CompoundAssign {
+        name: String,
+        op: BinaryOp,
+        value: Expr,
+        span: Span,
+    },
     /// `if` / `elseif` / `else`. Upstream: `IfStatementAst`.
     If {
         condition: Expr,
