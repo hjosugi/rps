@@ -1650,6 +1650,17 @@ impl Engine {
                         Value::Int64(target.metadata().map_or(0, |meta| meta.len()) as i64),
                     ));
                     entries.push((
+                        "BaseName".to_owned(),
+                        Value::String(
+                            target
+                                .file_stem()
+                                .map_or_else(String::new, |value| {
+                                    value.to_string_lossy().to_string()
+                                })
+                                .into(),
+                        ),
+                    ));
+                    entries.push((
                         "Extension".to_owned(),
                         Value::String(
                             target

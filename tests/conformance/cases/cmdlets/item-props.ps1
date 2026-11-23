@@ -4,3 +4,4 @@
 (Get-Item fixtures/data.txt).Length
 (Get-Item fixtures/data.txt).Extension
 ('ab', 'cde' | ForEach-Object -MemberName Length) -join ','
+(Get-Item fixtures/data.txt).BaseName
