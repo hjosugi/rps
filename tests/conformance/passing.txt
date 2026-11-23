@@ -60,6 +60,7 @@ native/glob
 native/pipe
 ops/comparison
 pipeline/group-select
+pipeline/measure-select
 pipeline/select-sort
 pipeline/where-foreach
 pipeline/where-property

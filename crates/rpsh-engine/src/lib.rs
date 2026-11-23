@@ -1173,19 +1173,61 @@ impl Engine {
             }
             "measure-object" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
-                let sum = named
-                    .iter()
-                    .any(|(name, _)| name.eq_ignore_ascii_case("sum"));
-                let mut total = Value::Int32(0);
-                if sum {
-                    for item in input {
-                        total = ops::add(&total, item)?;
+                let flag = |wanted: &str| {
+                    named
+                        .iter()
+                        .any(|(name, _)| name.eq_ignore_ascii_case(wanted))
+                };
+                let mut sum = Value::Int32(0);
+                let mut minimum: Option<Value> = None;
+                let mut maximum: Option<Value> = None;
+                let mut average = 0.0;
+                let mut count = 0;
+                for item in input {
+                    if !is_numeric_value(item) {
+                        continue;
+                    }
+                    count += 1;
+                    sum = ops::add(&sum, item)?;
+                    average += convert_double(item)?;
+                    let compare = |a: &Value, b: &Value| {
+                        matches!(
+                            ops::compare(a, b, ops::Comparison::Lt, false),
+                            Ok(Value::Bool(true))
+                        )
+                    };
+                    if minimum
+                        .as_ref()
+                        .is_none_or(|current| compare(item, current))
+                    {
+                        minimum = Some(item.clone());
+                    }
+                    if maximum
+                        .as_ref()
+                        .is_none_or(|current| compare(current, item))
+                    {
+                        maximum = Some(item.clone());
                     }
                 }
-                Ok(Some(vec![Value::object(vec![
-                    ("Count".to_owned(), Value::Int32(input.len() as i32)),
-                    ("Sum".to_owned(), total),
-                ])]))
+                let average = if count > 0 {
+                    average / f64::from(count)
+                } else {
+                    0.0
+                };
+                let mut entries = vec![("Count".to_owned(), Value::Int32(count))];
+                if flag("sum") {
+                    entries.push(("Sum".to_owned(), sum));
+                }
+                if flag("average") {
+                    entries.push(("Average".to_owned(), Value::Double(average)));
+                }
+                if flag("minimum") {
+                    entries.push(("Minimum".to_owned(), minimum.unwrap_or(Value::Null)));
+                }
+                if flag("maximum") {
+                    entries.push(("Maximum".to_owned(), maximum.unwrap_or(Value::Null)));
+                }
+                Ok(Some(vec![Value::object(entries)]))
             }
             "sort-object" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
@@ -1715,6 +1757,78 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
+            "get-unique" => {
+                let mut outputs = Vec::new();
+                let mut previous: Option<String> = None;
+                for item in input {
+                    let key = item.to_string();
+                    if previous.as_deref() != Some(key.as_str()) {
+                        outputs.push(item.clone());
+                        previous = Some(key);
+                    }
+                }
+                Ok(Some(outputs))
+            }
+            "get-location" | "pwd" => Ok(Some(vec![Value::object(vec![(
+                "Path".to_owned(),
+                Value::String(
+                    std::env::current_dir()
+                        .map_or_else(|_| String::new(), |path| path.display().to_string())
+                        .into(),
+                ),
+            )])])),
+            "set-location" | "cd" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                if let Some(path) = path
+                    && std::env::set_current_dir(&path).is_err()
+                {
+                    return Err(RuntimeError::Script {
+                        id: "PathNotFound,Microsoft.PowerShell.Commands.SetLocationCommand",
+                        category: format!(
+                            "ObjectNotFound: ({path}:String) [Set-Location], ItemNotFoundException"
+                        ),
+                        exception_type: "System.Management.Automation.ItemNotFoundException",
+                        message: format!("Cannot find path '{path}' because it does not exist."),
+                    }
+                    .into());
+                }
+                Ok(Some(Vec::new()))
+            }
+            "start-sleep" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let seconds = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("seconds"))
+                    .map(|(_, value)| convert_double(value))
+                    .transpose()?
+                    .or_else(|| {
+                        named
+                            .iter()
+                            .find(|(name, _)| name.eq_ignore_ascii_case("milliseconds"))
+                            .map(|(_, value)| convert_double(value).map(|ms| ms / 1000.0))
+                            .transpose()
+                            .ok()
+                            .flatten()
+                    })
+                    .or_else(|| {
+                        positional
+                            .first()
+                            .map(convert_double)
+                            .transpose()
+                            .ok()
+                            .flatten()
+                    })
+                    .unwrap_or(0.0);
+                if seconds > 0.0 {
+                    std::thread::sleep(std::time::Duration::from_secs_f64(seconds));
+                }
+                Ok(Some(Vec::new()))
+            }
             "get-random" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 if let Some((_, seed)) = named
@@ -1865,6 +1979,15 @@ impl Engine {
                 {
                     let first = convert_int32(first)?.max(0) as usize;
                     items.truncate(first);
+                }
+                if let Some((_, last)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("last"))
+                {
+                    let last = convert_int32(last)?.max(0) as usize;
+                    if items.len() > last {
+                        items = items.split_off(items.len() - last);
+                    }
                 }
                 Ok(Some(items))
             }
