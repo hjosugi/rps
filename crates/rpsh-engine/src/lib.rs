@@ -2376,7 +2376,7 @@ impl Engine {
                     }
                 }
             }
-            "set-variable" => {
+            "set-variable" | "new-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let name = named
                     .iter()
