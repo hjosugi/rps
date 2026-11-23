@@ -683,6 +683,18 @@ impl Engine {
                 }
                 Ok(flow)
             }
+            Statement::DotSource { path, .. } => {
+                let source = std::fs::read_to_string(path).map_err(|_| {
+                    RuntimeError::Script {
+                        id: "CommandNotFoundException",
+                        category: format!("ObjectNotFound: ({path}:String) [], CommandNotFoundException"),
+                        exception_type: "System.Management.Automation.CommandNotFoundException",
+                        message: format!("The term '{path}' is not recognized as a name of a cmdlet, function, script file, or executable program."),
+                    }
+                })?;
+                let script = parse(&source)?;
+                self.exec_block(&script.statements, out)
+            }
             Statement::Param { parameters, .. } => {
                 let positional = match self.variables.get("args") {
                     Some(Value::Array(items)) => items.as_ref().clone(),

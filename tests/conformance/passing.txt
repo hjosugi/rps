@@ -1,6 +1,8 @@
 # Conformance cases rpsh passes. Maintained by `cargo harness conform check --bless`.
 cmdlets/content
 cmdlets/default-formatting
+cmdlets/dot-source
+cmdlets/dot-source-fixture
 cmdlets/files
 cmdlets/format-mixed-stream
 cmdlets/json

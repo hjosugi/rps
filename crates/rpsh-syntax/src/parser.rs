@@ -178,6 +178,19 @@ impl Parser {
                 Statement::Assign { name, value, span }
             });
         }
+        if self.peek().kind == TokenKind::Dot {
+            let start = self.peek().span;
+            self.pos += 1;
+            let Token { kind, .. } = self.peek().clone();
+            let path = match kind {
+                TokenKind::Identifier(path) | TokenKind::Bareword(path) => path,
+                TokenKind::StringLiteral(path) => path,
+                _ => return self.refuse("dot-sourcing"),
+            };
+            self.pos += 1;
+            let span = start.to(self.previous_span());
+            return Ok(Statement::DotSource { path, span });
+        }
         match &self.peek().kind {
             TokenKind::If => self.if_statement(),
             TokenKind::While => self.while_statement(),
@@ -2329,6 +2342,7 @@ mod tests {
                 value,
                 ..
             } => format!("{}[{}] = {}", show(target), show(index), show(value)),
+            Statement::DotSource { path, .. } => format!(". {path}"),
             Statement::Param { parameters, .. } => format!(
                 "param({})",
                 parameters

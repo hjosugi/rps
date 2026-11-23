@@ -142,6 +142,8 @@ pub enum Statement {
         finally: Option<Vec<Statement>>,
         span: Span,
     },
+    /// `. path`: run a script in the current scope.
+    DotSource { path: String, span: Span },
     /// A script-level `param(...)` declaration.
     Param {
         parameters: Vec<Parameter>,
