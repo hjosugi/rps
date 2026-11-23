@@ -1083,13 +1083,19 @@ impl Engine {
                     name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
                 });
                 let mut items = input.to_vec();
-                items.sort_by_key(|item| {
-                    let text = item.to_string();
-                    if case_sensitive {
-                        text
-                    } else {
-                        text.to_lowercase()
-                    }
+                items.sort_by(|left, right| {
+                    let left = left.to_string();
+                    let right = right.to_string();
+                    culture_rank(&left)
+                        .cmp(&culture_rank(&right))
+                        .then_with(|| left.to_lowercase().cmp(&right.to_lowercase()))
+                        .then_with(|| {
+                            if case_sensitive {
+                                culture_case(&left).cmp(&culture_case(&right))
+                            } else {
+                                std::cmp::Ordering::Equal
+                            }
+                        })
                 });
                 if descending {
                     items.reverse();
@@ -1122,6 +1128,7 @@ impl Engine {
                     .collect();
                 Ok(Some(outputs))
             }
+            "get-culture" | "get-uiculture" => Ok(Some(vec![culture_value()])),
             "get-item" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
                 let Some(path) = positional.first() else {
@@ -1505,6 +1512,25 @@ impl Engine {
     fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
         if let ExprKind::Group(statements) = &expr.kind {
             return self.eval_group(statements);
+        }
+        if let ExprKind::ExpandableString(parts) = &expr.kind {
+            let mut text = String::new();
+            for part in parts {
+                match part {
+                    rpsh_syntax::StringPart::Literal(value) => text.push_str(value),
+                    rpsh_syntax::StringPart::Variable(name) => {
+                        if let Some(value) = lookup(name, &self.variables, self.last_success) {
+                            use std::fmt::Write as _;
+                            let _ = write!(text, "{value}");
+                        }
+                    }
+                    rpsh_syntax::StringPart::Subexpression(expr) => {
+                        use std::fmt::Write as _;
+                        let _ = write!(text, "{}", self.eval_expression(expr)?);
+                    }
+                }
+            }
+            return Ok(Value::String(text.into()));
         }
         if let ExprKind::Member { target, name } = &expr.kind
             && let ExprKind::Group(statements) = &target.kind
@@ -2590,6 +2616,17 @@ fn order_hashtable(mut entries: Vec<(String, Value)>) -> Vec<(String, Value)> {
     entries
 }
 
+fn weekday(year: i32, month: i32, day: i32) -> i32 {
+    // Sakamoto's algorithm; 0 = Sunday.
+    const OFFSETS: [i32; 12] = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+    let mut year = year;
+    if month < 3 {
+        year -= 1;
+    }
+    (year + year / 4 - year / 100 + year / 400 + OFFSETS[(month as usize).clamp(1, 12) - 1] + day)
+        % 7
+}
+
 fn next_prime(mut value: usize) -> usize {
     loop {
         if (2..value).all(|factor| !value.is_multiple_of(factor)) {
@@ -2697,6 +2734,23 @@ fn format_host_stream(objects: &[Value]) -> String {
     }
     text.push('\n');
     text
+}
+
+fn culture_rank(text: &str) -> u8 {
+    match text.chars().next() {
+        Some(ch) if !ch.is_alphanumeric() => 0,
+        Some(ch) if ch.is_ascii_digit() => 1,
+        Some(_) => 2,
+        None => 0,
+    }
+}
+
+fn culture_case(text: &str) -> u8 {
+    match text.chars().next() {
+        Some(ch) if ch.is_lowercase() => 0,
+        Some(ch) if ch.is_uppercase() => 1,
+        _ => 0,
+    }
 }
 
 fn flatten_value(value: Value) -> Vec<Value> {
@@ -2861,6 +2915,19 @@ fn normalize_type(type_name: &str) -> String {
         .map_or(lower.clone(), ToOwned::to_owned)
 }
 
+fn culture_value() -> Value {
+    Value::object(vec![
+        ("Name".to_owned(), Value::String("en-US".into())),
+        (
+            "DateTimeFormat".to_owned(),
+            Value::object(vec![(
+                "LongTimePattern".to_owned(),
+                Value::String("h:mm:ss\u{202F}tt".into()),
+            )]),
+        ),
+    ])
+}
+
 fn static_member(type_name: &str, name: &str) -> Result<Value, RuntimeError> {
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
@@ -2902,6 +2969,12 @@ fn static_member(type_name: &str, name: &str) -> Result<Value, RuntimeError> {
         };
     }
     match (kind.as_str(), name.as_str()) {
+        ("cultureinfo", "currentculture") | ("cultureinfo", "currentuiculture") => {
+            Ok(culture_value())
+        }
+        ("datetimekind", "utc") => Ok(Value::Int32(1)),
+        ("datetimekind", "local") => Ok(Value::Int32(2)),
+        ("datetimekind", "unspecified") => Ok(Value::Int32(0)),
         ("console", "isoutputredirected") => Ok(Value::Bool(true)),
         ("console", "windowwidth") => Ok(Value::Int32(0)),
         ("console", "outputencoding") => Ok(encoding_value()),
@@ -2921,6 +2994,31 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        ("datetime", "new") => {
+            let number = |index: usize| -> Result<i32, RuntimeError> {
+                arguments.get(index).map_or(Ok(0), convert_int32)
+            };
+            let year = number(0)?;
+            let month = number(1)?;
+            let day = number(2)?;
+            let hour = number(3)?;
+            let minute = number(4)?;
+            let second = number(5)?;
+            let text = format!("{month:02}/{day:02}/{year:04} {hour:02}:{minute:02}:{second:02}");
+            Ok(Value::object(vec![
+                (
+                    "__TypeName".to_owned(),
+                    Value::String("System.DateTime".into()),
+                ),
+                ("__Year".to_owned(), Value::Int32(year)),
+                ("__Month".to_owned(), Value::Int32(month)),
+                ("__Day".to_owned(), Value::Int32(day)),
+                ("__Hour".to_owned(), Value::Int32(hour)),
+                ("__Minute".to_owned(), Value::Int32(minute)),
+                ("__Second".to_owned(), Value::Int32(second)),
+                ("__Text".to_owned(), Value::String(text.into())),
+            ]))
+        }
         ("io.file", "readalltext") => {
             let Some(value) = arguments.first() else {
                 return Err(RuntimeError::NotImplemented {
@@ -3393,6 +3491,18 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
     if name.eq_ignore_ascii_case("GetType") && arguments.is_empty() {
         return Ok(get_type(target));
     }
+    if name.eq_ignore_ascii_case("ToString")
+        && !matches!(target, Value::String(_) | Value::Object(_))
+    {
+        return match arguments.first() {
+            Some(spec) => {
+                let spec = spec.to_string();
+                let template = Value::String(format!("{{0:{spec}}}").into());
+                Ok(ops::format(&template, target)?)
+            }
+            None => Ok(Value::String(target.to_string().into())),
+        };
+    }
     if target.is_null_like() {
         return Err(RuntimeError::Script {
             id: "InvokeMethodOnNull",
@@ -3478,6 +3588,75 @@ fn object_method(
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
     match name.to_ascii_lowercase().as_str() {
+        "tostring" if entries.iter().any(|(key, _)| key == "__Year") => {
+            let field = |name: &str| -> i32 {
+                entries
+                    .iter()
+                    .find(|(key, _)| key == name)
+                    .and_then(|(_, value)| convert_int32(value).ok())
+                    .unwrap_or(0)
+            };
+            let year = field("__Year");
+            let month = field("__Month");
+            let day = field("__Day");
+            let hour = field("__Hour");
+            let minute = field("__Minute");
+            let second = field("__Second");
+            let format = arguments.first().map(ToString::to_string);
+            let text = match format.as_deref() {
+                None => {
+                    let (hour12, ampm) = if hour == 0 {
+                        (12, "AM")
+                    } else if hour < 12 {
+                        (hour, "AM")
+                    } else if hour == 12 {
+                        (12, "PM")
+                    } else {
+                        (hour - 12, "PM")
+                    };
+                    format!("{month}/{day}/{year} {hour12}:{minute:02}:{second:02}\u{202F}{ampm}")
+                }
+                Some(format) if format.eq_ignore_ascii_case("D") => {
+                    const WEEKDAYS: [&str; 7] = [
+                        "Sunday",
+                        "Monday",
+                        "Tuesday",
+                        "Wednesday",
+                        "Thursday",
+                        "Friday",
+                        "Saturday",
+                    ];
+                    const MONTHS: [&str; 12] = [
+                        "January",
+                        "February",
+                        "March",
+                        "April",
+                        "May",
+                        "June",
+                        "July",
+                        "August",
+                        "September",
+                        "October",
+                        "November",
+                        "December",
+                    ];
+                    let weekday = weekday(year, month, day) as usize;
+                    format!(
+                        "{}, {} {}, {}",
+                        WEEKDAYS[weekday % 7],
+                        MONTHS[(month as usize).clamp(1, 12) - 1],
+                        day,
+                        year
+                    )
+                }
+                Some(_) => {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "this DateTime format",
+                    });
+                }
+            };
+            Ok(Value::String(text.into()))
+        }
         "next" => {
             let raw = entries
                 .iter()

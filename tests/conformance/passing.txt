@@ -6,6 +6,7 @@ cmdlets/json
 cmdlets/write-output
 contract/collection-order
 contract/console
+contract/culture
 contract/error-records
 contract/seeded-random
 contract/streams
