@@ -2017,6 +2017,9 @@ impl Engine {
                     .into());
                 };
                 let path_text = path.to_string();
+                if path_text.contains(['*', '?']) {
+                    return Ok(Some(vec![Value::Bool(!expand_glob(&path_text).is_empty())]));
+                }
                 let target = std::path::Path::new(&path_text);
                 let matches = match named
                     .iter()
