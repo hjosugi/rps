@@ -17,6 +17,7 @@ lang/numeric-literals
 lang/numeric-promotion
 lang/operators
 lang/pipeline-basic
+pipeline/where-foreach
 lang/psobject
 lang/scriptblock
 lang/string-escapes

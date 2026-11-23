@@ -791,16 +791,45 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "foreach-object" => {
-                let script = arguments.iter().find_map(|argument| match argument {
-                    CommandArgument::Value(Expr {
-                        kind: ExprKind::ScriptBlock(statements),
-                        ..
-                    }) => Some(statements),
+                if let Some(script) = script_block_argument(arguments) {
+                    let script = script.clone();
+                    let mut outputs = Vec::new();
+                    for item in input {
+                        let previous = self.variables.insert("_".to_owned(), item.clone());
+                        let saved = self.capture.take();
+                        self.capture = Some(Vec::new());
+                        let flow = self.exec_block(&script, &mut capture_sink());
+                        let captured = self.capture.take().unwrap_or_default();
+                        self.capture = saved;
+                        match previous {
+                            Some(value) => self.variables.insert("_".to_owned(), value),
+                            None => self.variables.remove("_"),
+                        };
+                        outputs.extend(captured);
+                        flow?;
+                    }
+                    return Ok(Some(outputs));
+                }
+                let member_name = arguments.iter().find_map(|argument| match argument {
+                    CommandArgument::Bareword(word) => Some(word.clone()),
                     _ => None,
                 });
-                let Some(script) = script else {
+                let Some(member_name) = member_name else {
                     return Err(RuntimeError::NotImplemented {
-                        feature: "ForEach-Object without a script block",
+                        feature: "ForEach-Object without a script block or member name",
+                    }
+                    .into());
+                };
+                let mut outputs = Vec::new();
+                for item in input {
+                    outputs.push(member(item, &member_name)?);
+                }
+                Ok(Some(outputs))
+            }
+            "where-object" | "where" => {
+                let Some(script) = script_block_argument(arguments) else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Where-Object without a script block",
                     }
                     .into());
                 };
@@ -817,10 +846,52 @@ impl Engine {
                         Some(value) => self.variables.insert("_".to_owned(), value),
                         None => self.variables.remove("_"),
                     };
-                    outputs.extend(captured);
                     flow?;
+                    if captured.first().is_some_and(ops::is_true) {
+                        outputs.push(item.clone());
+                    }
                 }
                 Ok(Some(outputs))
+            }
+            "measure-object" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let sum = named
+                    .iter()
+                    .any(|(name, _)| name.eq_ignore_ascii_case("sum"));
+                let mut total = Value::Int32(0);
+                if sum {
+                    for item in input {
+                        total = ops::add(&total, item)?;
+                    }
+                }
+                Ok(Some(vec![Value::object(vec![
+                    ("Count".to_owned(), Value::Int32(input.len() as i32)),
+                    ("Sum".to_owned(), total),
+                ])]))
+            }
+            "sort-object" => {
+                let mut items = input.to_vec();
+                items.sort_by_key(|item| item.to_string().to_lowercase());
+                Ok(Some(items))
+            }
+            "select-object" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let mut items = input.to_vec();
+                if let Some((_, skip)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("skip"))
+                {
+                    let skip = convert_int32(skip)?.max(0) as usize;
+                    items = items.into_iter().skip(skip).collect();
+                }
+                if let Some((_, first)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("first"))
+                {
+                    let first = convert_int32(first)?.max(0) as usize;
+                    items.truncate(first);
+                }
+                Ok(Some(items))
             }
             _ => Ok(None),
         }
@@ -1262,6 +1333,16 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
             feature: "indexing other than arrays",
         }),
     }
+}
+
+fn script_block_argument(arguments: &[CommandArgument]) -> Option<&Vec<Statement>> {
+    arguments.iter().find_map(|argument| match argument {
+        CommandArgument::Value(Expr {
+            kind: ExprKind::ScriptBlock(statements),
+            ..
+        }) => Some(statements),
+        _ => None,
+    })
 }
 
 fn flatten_value(value: Value) -> Vec<Value> {
