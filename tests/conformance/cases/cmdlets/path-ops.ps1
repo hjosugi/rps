@@ -7,3 +7,5 @@ Test-Path fixtures/*.txt
 Test-Path fixtures/*.nope
 Split-Path fixtures/data.txt -Extension
 Split-Path fixtures/data.txt -LeafBase
+Test-Path fixtures/tree/*.txt -PathType Leaf
+Test-Path fixtures/tree/*.txt -PathType Container

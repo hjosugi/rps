@@ -2075,8 +2075,21 @@ impl Engine {
                     .into());
                 };
                 let path_text = path.to_string();
+                let path_type = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("pathtype"))
+                    .map(|(_, value)| value.to_string());
                 if path_text.contains(['*', '?']) {
-                    return Ok(Some(vec![Value::Bool(!expand_glob(&path_text).is_empty())]));
+                    let matches = expand_glob(&path_text);
+                    let found = matches.iter().any(|path| {
+                        let target = std::path::Path::new(path);
+                        match path_type.as_deref() {
+                            Some(kind) if kind.eq_ignore_ascii_case("leaf") => target.is_file(),
+                            Some(kind) if kind.eq_ignore_ascii_case("container") => target.is_dir(),
+                            _ => target.exists(),
+                        }
+                    });
+                    return Ok(Some(vec![Value::Bool(found)]));
                 }
                 let target = std::path::Path::new(&path_text);
                 let matches = match named
