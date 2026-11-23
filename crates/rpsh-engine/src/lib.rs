@@ -1908,6 +1908,26 @@ impl Engine {
                 ))
             }
             "out-null" => Ok(Some(Vec::new())),
+            "join-string" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let separator = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("separator"))
+                    .map_or_else(String::new, |(_, value)| value.to_string());
+                let property = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                    .map(|(_, value)| value.to_string());
+                let values: Vec<String> = input
+                    .iter()
+                    .map(|item| match &property {
+                        Some(property) => member(item, property)
+                            .map_or_else(|_| String::new(), |value| value.to_string()),
+                        None => item.to_string(),
+                    })
+                    .collect();
+                Ok(Some(vec![Value::String(values.join(&separator).into())]))
+            }
             "clear-content" | "clc" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named

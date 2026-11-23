@@ -84,6 +84,7 @@ pipeline/foreach-blocks
 pipeline/get-member
 pipeline/group-measure-property
 pipeline/group-select
+pipeline/join-string
 pipeline/measure-select
 pipeline/measure-text
 pipeline/random-pipeline
