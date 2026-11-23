@@ -1946,6 +1946,48 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
+            "select-string" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let pattern = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("pattern"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(pattern) = pattern else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Select-String without a pattern",
+                    }
+                    .into());
+                };
+                let regex = rpsh_runtime::regex::Regex::new(&pattern, false)
+                    .map_err(|feature| RuntimeError::NotImplemented { feature })?;
+                let mut lines: Vec<String> = Vec::new();
+                if input.is_empty() {
+                    if let Some(path) = positional.get(1).map(ToString::to_string)
+                        && let Ok(text) = std::fs::read_to_string(&path)
+                    {
+                        lines.extend(text.lines().map(ToOwned::to_owned));
+                    }
+                } else {
+                    for item in input {
+                        if let Value::Array(items) = item {
+                            lines.extend(items.iter().map(ToString::to_string));
+                        } else {
+                            lines.push(item.to_string());
+                        }
+                    }
+                }
+                let mut outputs = Vec::new();
+                for (index, line) in lines.iter().enumerate() {
+                    if regex.find(line).is_some() {
+                        outputs.push(Value::object(vec![
+                            ("Line".to_owned(), Value::String(line.clone().into())),
+                            ("LineNumber".to_owned(), Value::Int32(index as i32 + 1)),
+                        ]));
+                    }
+                }
+                Ok(Some(outputs))
+            }
             "get-date" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let date = named

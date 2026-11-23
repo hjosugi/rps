@@ -68,6 +68,7 @@ ops/comparison
 pipeline/group-select
 pipeline/measure-select
 pipeline/select-sort
+pipeline/select-string
 pipeline/where-foreach
 pipeline/where-property
 stmt/crlf
