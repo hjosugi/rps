@@ -2644,8 +2644,15 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
-            "format-table" | "ft" => Ok(Some(mark_format(input, "Table"))),
-            "format-list" | "fl" => Ok(Some(mark_format(input, "List"))),
+            "format-table" | "ft" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let property = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                    .map(|(_, value)| value.clone());
+                Ok(Some(mark_format(input, "Table", property)))
+            }
+            "format-list" | "fl" => Ok(Some(mark_format(input, "List", None))),
             "compare-object" | "diff" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let include_equal = named.iter().any(|(name, value)| {
@@ -4497,18 +4504,34 @@ fn hidden_type(value: &Value) -> Option<String> {
 
 /// The text `Out-String` returns for one pipeline, following the host's
 /// default table and list views for the shapes the conformance cases use.
-fn mark_format(input: &[Value], kind: &str) -> Vec<Value> {
+fn mark_format(input: &[Value], kind: &str, properties: Option<Value>) -> Vec<Value> {
     input
         .iter()
         .map(|item| match item {
             Value::Object(entries) => {
                 let mut entries = entries.as_ref().clone();
-                entries.push(("__Format".to_owned(), Value::String(kind.to_owned().into())));
+                entries.push(("__Format".to_owned(), Value::String(kind.into())));
+                if let Some(properties) = &properties {
+                    entries.push(("__TableProperty".to_owned(), properties.clone()));
+                }
                 Value::object(entries)
             }
             other => other.clone(),
         })
         .collect()
+}
+
+fn format_table_properties(value: &Value) -> Vec<String> {
+    let Value::Object(entries) = value else {
+        return Vec::new();
+    };
+    let Some((_, property)) = entries.iter().find(|(key, _)| key == "__TableProperty") else {
+        return Vec::new();
+    };
+    match property {
+        Value::Array(values) => values.iter().map(ToString::to_string).collect(),
+        other => vec![other.to_string()],
+    }
 }
 
 fn format_marker(value: &Value) -> Option<String> {
@@ -4584,7 +4607,12 @@ fn format_out_string(input: &[Value]) -> String {
         text.push('\n');
         return text;
     }
-    let columns: Vec<String> = visible.iter().map(|(name, _)| (*name).clone()).collect();
+    let selected = format_table_properties(first);
+    let columns: Vec<String> = if force_table && !selected.is_empty() {
+        selected
+    } else {
+        visible.iter().map(|(name, _)| (*name).clone()).collect()
+    };
     let rows: Vec<Vec<String>> = input
         .iter()
         .map(|item| {
