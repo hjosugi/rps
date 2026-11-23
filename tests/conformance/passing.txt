@@ -21,6 +21,7 @@ contract/streams
 contract/version-table
 expr/int-arithmetic
 expr/string-literals
+lang/aliases
 lang/array
 lang/class
 lang/comparison-basic

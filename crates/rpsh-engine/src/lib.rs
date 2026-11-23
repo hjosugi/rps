@@ -42,6 +42,8 @@ pub struct Engine {
     globals: HashMap<String, Value>,
     /// User-defined PowerShell classes.
     classes: HashMap<String, ClassDef>,
+    /// `Set-Alias` definitions.
+    aliases: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -916,6 +918,8 @@ impl Engine {
         arguments: &[CommandArgument],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
+        let resolved = self.resolve_alias(name);
+        let name = resolved.as_deref().unwrap_or(name);
         if let Some(outputs) = self.run_builtin(name, arguments, &[])? {
             for value in outputs {
                 self.write_value(value, out)?;
@@ -1137,6 +1141,8 @@ impl Engine {
         arguments: &[CommandArgument],
         input: Vec<Value>,
     ) -> Result<Vec<Value>, EngineError> {
+        let resolved = self.resolve_alias(name);
+        let name = resolved.as_deref().unwrap_or(name);
         if let Some(outputs) = self.run_builtin(name, arguments, &input)? {
             return Ok(outputs);
         }
@@ -2386,6 +2392,57 @@ impl Engine {
                     }
                 }
             }
+            "get-alias" | "gal" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let wanted = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let mut entries: Vec<(String, String)> = self
+                    .aliases
+                    .iter()
+                    .map(|(name, definition)| (name.clone(), definition.clone()))
+                    .collect();
+                for (name, definition) in DEFAULT_ALIASES {
+                    entries.push(((*name).to_owned(), (*definition).to_owned()));
+                }
+                let mut outputs = Vec::new();
+                for (name, definition) in entries {
+                    let matches = wanted.as_deref().is_none_or(|wanted| {
+                        if wanted.contains(['*', '?']) {
+                            ops::wildcard_match(&name, wanted, false)
+                        } else {
+                            name.eq_ignore_ascii_case(wanted)
+                        }
+                    });
+                    if matches {
+                        outputs.push(Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.clone().into())),
+                            ("Definition".to_owned(), Value::String(definition.into())),
+                        ]));
+                    }
+                }
+                outputs.sort_by_key(|value| value.to_string());
+                Ok(Some(outputs))
+            }
+            "set-alias" | "sal" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let name = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let value = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("value"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.get(1).map(ToString::to_string));
+                if let (Some(name), Some(value)) = (name, value) {
+                    self.aliases.insert(name.to_ascii_lowercase(), value);
+                }
+                Ok(Some(Vec::new()))
+            }
             "get-command" | "gcm" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let wanted = named
@@ -2759,6 +2816,14 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    fn resolve_alias(&self, name: &str) -> Option<String> {
+        let lower = name.to_ascii_lowercase();
+        self.aliases
+            .get(&lower)
+            .cloned()
+            .or_else(|| default_alias(&lower).map(ToOwned::to_owned))
     }
 
     fn function(&self, name: &str) -> Result<FunctionDef, EngineError> {
@@ -4137,6 +4202,33 @@ fn sort_key(value: &Value, property: &Value) -> String {
         Ok(value) => value.to_string(),
         Err(_) => String::new(),
     }
+}
+
+const DEFAULT_ALIASES: &[(&str, &str)] = &[
+    ("cd", "Set-Location"),
+    ("chdir", "Set-Location"),
+    ("del", "Remove-Item"),
+    ("dir", "Get-ChildItem"),
+    ("echo", "Write-Output"),
+    ("erase", "Remove-Item"),
+    ("gal", "Get-Alias"),
+    ("gc", "Get-Content"),
+    ("gci", "Get-ChildItem"),
+    ("gcm", "Get-Command"),
+    ("iex", "Invoke-Expression"),
+    ("pwd", "Get-Location"),
+    ("rd", "Remove-Item"),
+    ("sal", "Set-Alias"),
+    ("sl", "Set-Location"),
+    ("type", "Get-Content"),
+    ("where", "Where-Object"),
+];
+
+fn default_alias(name: &str) -> Option<&'static str> {
+    DEFAULT_ALIASES
+        .iter()
+        .find(|(alias, _)| *alias == name)
+        .map(|(_, definition)| *definition)
 }
 
 const BUILTIN_COMMANDS: &[&str] = &[
