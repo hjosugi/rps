@@ -36,6 +36,78 @@ pub struct Engine {
     trap: Option<Vec<Statement>>,
 }
 
+/// .NET's seeded `System.Random` (the subtractive generator).
+#[derive(Debug, Clone)]
+struct RandomGenerator {
+    seed_array: [i32; 56],
+    inext: i32,
+    inextp: i32,
+}
+
+impl RandomGenerator {
+    fn new(seed: i32) -> Self {
+        const MBIG: i32 = i32::MAX;
+        const MSEED: i32 = 161803398;
+        let mut seed_array = [0i32; 56];
+        let subtraction = if seed == i32::MIN {
+            i32::MAX
+        } else {
+            seed.abs()
+        };
+        let mut mj = MSEED.wrapping_sub(subtraction);
+        seed_array[55] = mj;
+        let mut mk = 1;
+        for i in 1..55 {
+            let ii = (21 * i) % 55;
+            seed_array[ii as usize] = mk;
+            mk = mj.wrapping_sub(mk);
+            if mk < 0 {
+                mk = mk.wrapping_add(MBIG);
+            }
+            mj = seed_array[ii as usize];
+        }
+        for _ in 1..5 {
+            for i in 1..56 {
+                seed_array[i] = seed_array[i].wrapping_sub(seed_array[1 + (i + 30) % 55]);
+                if seed_array[i] < 0 {
+                    seed_array[i] = seed_array[i].wrapping_add(MBIG);
+                }
+            }
+        }
+        RandomGenerator {
+            seed_array,
+            inext: 0,
+            inextp: 21,
+        }
+    }
+
+    fn sample(&mut self) -> i32 {
+        const MBIG: i32 = i32::MAX;
+        let mut inext = self.inext;
+        let mut inextp = self.inextp;
+        inext += 1;
+        if inext >= 56 {
+            inext = 1;
+        }
+        inextp += 1;
+        if inextp >= 56 {
+            inextp = 1;
+        }
+        let mut value =
+            self.seed_array[inext as usize].wrapping_sub(self.seed_array[inextp as usize]);
+        if value == MBIG {
+            value -= 1;
+        }
+        if value < 0 {
+            value = value.wrapping_add(MBIG);
+        }
+        self.seed_array[inext as usize] = value;
+        self.inext = inext;
+        self.inextp = inextp;
+        value
+    }
+}
+
 type BoundArguments = (Vec<Value>, Vec<(String, Value)>);
 
 #[derive(Debug, Clone)]
@@ -1302,19 +1374,34 @@ impl Engine {
 
     fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
         if let ExprKind::Group(statements) = &expr.kind {
-            let saved = self.capture.take();
-            self.capture = Some(Vec::new());
-            let flow = self.exec_block(statements, &mut capture_sink());
-            let mut outputs = self.capture.take().unwrap_or_default();
-            self.capture = saved;
-            flow?;
-            return Ok(match outputs.len() {
-                0 => Value::Null,
-                1 => outputs.pop().unwrap_or(Value::Null),
-                _ => Value::array(outputs),
-            });
+            return self.eval_group(statements);
+        }
+        if let ExprKind::Binary {
+            op: BinaryOp::Join,
+            left,
+            right,
+        } = &expr.kind
+            && let ExprKind::Group(statements) = &left.kind
+        {
+            let left = self.eval_group(statements)?;
+            let right = evaluate(right, &mut self.variables, self.last_success)?;
+            return Ok(ops::join(&left, &right)?);
         }
         Ok(evaluate(expr, &mut self.variables, self.last_success)?)
+    }
+
+    fn eval_group(&mut self, statements: &[Statement]) -> Result<Value, EngineError> {
+        let saved = self.capture.take();
+        self.capture = Some(Vec::new());
+        let flow = self.exec_block(statements, &mut capture_sink());
+        let mut outputs = self.capture.take().unwrap_or_default();
+        self.capture = saved;
+        flow?;
+        Ok(match outputs.len() {
+            0 => Value::Null,
+            1 => outputs.pop().unwrap_or(Value::Null),
+            _ => Value::array(outputs),
+        })
     }
 
     fn evaluate_arguments(
@@ -2511,6 +2598,21 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        ("random", "new") => {
+            let seed = match arguments.first() {
+                Some(value) if !value.is_null_like() => convert_int32(value)?,
+                _ => 0,
+            };
+            let mut generator = RandomGenerator::new(seed);
+            let value = generator.sample();
+            Ok(Value::object(vec![
+                (
+                    "__TypeName".to_owned(),
+                    Value::String("System.Random".into()),
+                ),
+                ("__Next".to_owned(), Value::Int32(value)),
+            ]))
+        }
         ("math", "abs") => match arguments.first() {
             Some(Value::Int32(value)) => Ok(Value::Int32(value.abs())),
             Some(Value::Int64(value)) => Ok(Value::Int64(value.abs())),
@@ -2975,6 +3077,25 @@ fn object_method(
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
     match name.to_ascii_lowercase().as_str() {
+        "next" => {
+            let raw = entries
+                .iter()
+                .find(|(key, _)| key == "__Next")
+                .map(|(_, value)| value.clone())
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "Next on this object",
+                })?;
+            match arguments.first() {
+                Some(maximum) => {
+                    let maximum = convert_int32(maximum)?;
+                    let raw = convert_int64(&raw)?;
+                    Ok(Value::Int32(
+                        (raw as f64 / f64::from(i32::MAX) * f64::from(maximum)) as i32,
+                    ))
+                }
+                None => Ok(raw),
+            }
+        }
         "containskey" => {
             let Some(key) = arguments.first() else {
                 return Err(RuntimeError::NotImplemented {

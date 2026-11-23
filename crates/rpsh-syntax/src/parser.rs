@@ -508,6 +508,13 @@ impl Parser {
                 continue;
             }
             let parameter = match &self.peek().kind {
+                TokenKind::Identifier(word) | TokenKind::Bareword(word)
+                    if word.starts_with('-') =>
+                {
+                    let parameter = word.trim_start_matches('-').to_owned();
+                    self.pos += 1;
+                    Some(parameter)
+                }
                 TokenKind::Parameter(parameter) => {
                     let parameter = parameter.clone();
                     self.pos += 1;
@@ -534,7 +541,7 @@ impl Parser {
                             span,
                         })
                     }
-                    _ if self.argument_starts() => Some(self.argument_value()?),
+                    _ if self.argument_starts() => Some(self.unary()?),
                     _ => None,
                 };
                 arguments.push(CommandArgument::Parameter {
@@ -731,6 +738,13 @@ impl Parser {
             let flag = match &self.peek().kind {
                 TokenKind::Parameter(flag) => {
                     let flag = flag.clone();
+                    self.pos += 1;
+                    flag
+                }
+                TokenKind::Identifier(flag) | TokenKind::Bareword(flag)
+                    if flag.starts_with('-') =>
+                {
+                    let flag = flag.trim_start_matches('-').to_owned();
                     self.pos += 1;
                     flag
                 }

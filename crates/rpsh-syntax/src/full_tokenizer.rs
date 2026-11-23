@@ -870,6 +870,19 @@ impl Tokenizer<'_> {
                     .get(self.pos..end)
                     .is_some_and(|candidate| candidate.eq_ignore_ascii_case(text))
             {
+                // A dash operator must be a whole word: `-in` is not a prefix
+                // of `-InputObject`.
+                if text.starts_with('-')
+                    && self
+                        .source
+                        .get(end..)
+                        .and_then(|rest| rest.chars().next())
+                        .is_some_and(|ch| {
+                            ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '?'
+                        })
+                {
+                    continue;
+                }
                 if self.mode == Mode::Command
                     && self.command_seen
                     && !matches!(
@@ -879,6 +892,7 @@ impl Tokenizer<'_> {
                             | FullTokenKind::OrOr
                             | FullTokenKind::Ampersand
                             | FullTokenKind::Comma
+                            | FullTokenKind::ColonColon
                     )
                     && !(self.hashtable_depth > 0 && *kind == FullTokenKind::Equals)
                     && !self.after_member()
@@ -946,7 +960,7 @@ impl Tokenizer<'_> {
                     )
                     || (self.command_seen && (ch == '[' || ch == ']'))
             } else {
-                ch.is_alphanumeric() || ch == '_'
+                ch.is_alphanumeric() || ch == '_' || ch == '-'
             };
             if accepted {
                 at += ch.len_utf8();
