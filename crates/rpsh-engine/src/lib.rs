@@ -229,7 +229,7 @@ impl Engine {
             match self.exec_statement(statement, out) {
                 Ok(Flow::Normal) => {}
                 Ok(Flow::Throw(value)) if self.trap.is_some() => {
-                    self.variables.insert("_".to_owned(), value);
+                    self.variables.insert("_".to_owned(), throw_record(&value));
                     if self.run_trap(out)? {
                         continue;
                     }
@@ -550,7 +550,7 @@ impl Engine {
                 ..
             } => {
                 let thrown = match self.exec_block(body, out) {
-                    Ok(Flow::Throw(value)) => Some(value),
+                    Ok(Flow::Throw(value)) => Some((value, true)),
                     Ok(flow) => {
                         let mut result = flow;
                         if let Some(finally) = finally {
@@ -562,18 +562,27 @@ impl Engine {
                         return Ok(result);
                     }
                     Err(EngineError::Runtime(error)) => match catchable(&error) {
-                        Some(record) => Some(record),
+                        Some(record) => Some((record, false)),
                         None => return Err(EngineError::Runtime(error)),
                     },
                     Err(error) => return Err(error),
                 };
-                let mut flow = Flow::Throw(thrown.clone().unwrap_or(Value::Null));
-                if let Some(value) = thrown {
+                let mut flow = Flow::Throw(
+                    thrown
+                        .as_ref()
+                        .map_or(Value::Null, |(value, _)| value.clone()),
+                );
+                if let Some((value, from_throw)) = thrown {
                     for clause in catches {
                         if clause.types.is_empty()
                             || clause.types.iter().any(|kind| catch_matches(kind))
                         {
-                            self.variables.insert("_".to_owned(), value);
+                            let record = if from_throw {
+                                throw_record(&value)
+                            } else {
+                                value
+                            };
+                            self.variables.insert("_".to_owned(), record);
                             flow = self.exec_block(&clause.body, out)?;
                             break;
                         }
@@ -631,13 +640,14 @@ impl Engine {
             }
             return Ok(Flow::Normal);
         }
-        if !self.functions.contains_key(&name.to_ascii_lowercase())
-            && let Some(outputs) = self.run_native(name, arguments, &[])?
-        {
-            for value in outputs {
-                self.write_value(value, out)?;
+        if !self.functions.contains_key(&name.to_ascii_lowercase()) {
+            if let Some(outputs) = self.run_native(name, arguments, &[])? {
+                for value in outputs {
+                    self.write_value(value, out)?;
+                }
+                return Ok(Flow::Normal);
             }
-            return Ok(Flow::Normal);
+            return Err(command_not_found(name).into());
         }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -852,10 +862,11 @@ impl Engine {
         if let Some(outputs) = self.run_builtin(name, arguments, &input)? {
             return Ok(outputs);
         }
-        if !self.functions.contains_key(&name.to_ascii_lowercase())
-            && let Some(outputs) = self.run_native(name, arguments, &input)?
-        {
-            return Ok(outputs);
+        if !self.functions.contains_key(&name.to_ascii_lowercase()) {
+            if let Some(outputs) = self.run_native(name, arguments, &input)? {
+                return Ok(outputs);
+            }
+            return Err(command_not_found(name).into());
         }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -1078,6 +1089,34 @@ impl Engine {
                     })
                     .collect();
                 Ok(Some(outputs))
+            }
+            "get-item" => {
+                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let Some(path) = positional.first() else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Get-Item without a path",
+                    }
+                    .into());
+                };
+                let text = path.to_string();
+                if !std::path::Path::new(&text).exists() {
+                    return Err(RuntimeError::Script {
+                        id: "PathNotFound,Microsoft.PowerShell.Commands.GetItemCommand",
+                        category: format!(
+                            "ObjectNotFound: ({text}:String) [Get-Item], ItemNotFoundException"
+                        ),
+                        exception_type: "System.Management.Automation.ItemNotFoundException",
+                        message: format!("Cannot find path '{text}' because it does not exist."),
+                    }
+                    .into());
+                }
+                Ok(Some(vec![Value::object(vec![
+                    (
+                        "__TypeName".to_owned(),
+                        Value::String("System.IO.FileInfo".into()),
+                    ),
+                    ("FullName".to_owned(), Value::String(text.into())),
+                ])]))
             }
             "get-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -2182,35 +2221,87 @@ fn expand_glob(pattern: &str) -> Vec<String> {
 
 /// A script error that `try/catch` or `trap` can catch, from the refusal
 /// features that are real PowerShell exceptions rather than missing support.
-fn catchable(error: &RuntimeError) -> Option<Value> {
-    let RuntimeError::NotImplemented { feature } = error;
-    let (id, message) = match *feature {
-        "divide by zero" => ("RuntimeException", "Attempted to divide by zero."),
-        "cannot convert a string to an integer" => (
-            "InvalidCastFromStringToInteger",
-            "Cannot convert value to type \"System.Int32\".",
+fn error_record(
+    id: &str,
+    category: &str,
+    exception_type: &str,
+    message: &str,
+    text: &str,
+) -> Value {
+    let exception = Value::object(vec![
+        (
+            "__TypeName".to_owned(),
+            Value::String(exception_type.to_owned().into()),
         ),
+        (
+            "Message".to_owned(),
+            Value::String(message.to_owned().into()),
+        ),
+    ]);
+    Value::object(vec![
+        ("__Text".to_owned(), Value::String(text.to_owned().into())),
+        (
+            "FullyQualifiedErrorId".to_owned(),
+            Value::String(id.to_owned().into()),
+        ),
+        (
+            "CategoryInfo".to_owned(),
+            Value::String(category.to_owned().into()),
+        ),
+        ("Exception".to_owned(), exception),
+    ])
+}
+
+fn command_not_found(name: &str) -> RuntimeError {
+    RuntimeError::Script {
+        id: "CommandNotFoundException",
+        category: format!("ObjectNotFound: ({name}:String) [], CommandNotFoundException"),
+        exception_type: "System.Management.Automation.CommandNotFoundException",
+        message: format!(
+            "The term '{name}' is not recognized as a name of a cmdlet, function, script file, or executable program.\nCheck the spelling of the name, or if a path was included, verify that the path is correct and try again."
+        ),
+    }
+}
+
+fn throw_record(value: &Value) -> Value {
+    let text = value.to_string();
+    error_record(
+        &text,
+        &format!("OperationStopped: ({text}:String) [], RuntimeException"),
+        "System.Management.Automation.RuntimeException",
+        &text,
+        &text,
+    )
+}
+
+fn catchable(error: &RuntimeError) -> Option<Value> {
+    if let Some(script) = error.script() {
+        return Some(error_record(
+            script.id,
+            script.category,
+            script.exception_type,
+            script.message,
+            script.message,
+        ));
+    }
+    let feature = match error {
+        RuntimeError::NotImplemented { feature } => feature,
+        RuntimeError::Script { .. } => return None,
+    };
+    let (id, message) = match *feature {
         "cannot convert a string to a double" => (
             "InvalidCastFromStringToDouble",
             "Cannot convert value to type \"System.Double\".",
         ),
         _ => return None,
     };
-    let exception = Value::object(vec![
-        (
-            "__TypeName".to_owned(),
-            Value::String("System.Management.Automation.RuntimeException".into()),
-        ),
-        ("Message".to_owned(), Value::String(message.into())),
-    ]);
-    Some(Value::object(vec![
-        ("FullyQualifiedErrorId".to_owned(), Value::String(id.into())),
-        (
-            "CategoryInfo".to_owned(),
-            Value::String(format!("NotSpecified: (:) [], {id}").into()),
-        ),
-        ("Exception".to_owned(), exception),
-    ]))
+    Some(error_record(
+        id,
+        "NotSpecified: (:) [], RuntimeException",
+        "System.Management.Automation.RuntimeException",
+        message,
+        message,
+    ))
 }
 
 /// `.GetType()` reports a hidden type name when an object carries one.
@@ -2744,6 +2835,25 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        ("io.file", "readalltext") => {
+            let Some(value) = arguments.first() else {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "ReadAllText with no path",
+                });
+            };
+            let path = value.to_string();
+            match std::fs::read_to_string(&path) {
+                Ok(text) => Ok(Value::String(text.into())),
+                Err(_) => Err(RuntimeError::Script {
+                    id: "DirectoryNotFoundException",
+                    category: "NotSpecified: (:) [], MethodInvocationException".to_owned(),
+                    exception_type: "System.Management.Automation.MethodInvocationException",
+                    message: format!(
+                        "Exception calling \"ReadAllText\" with \"1\" argument(s): \"Could not find a part of the path '{path}'.\""
+                    ),
+                }),
+            }
+        }
         (kind, "new") if kind.starts_with("collections.generic.hashset") => {
             let values = arguments
                 .first()
@@ -2810,10 +2920,29 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
                     feature: "Parse with no argument",
                 });
             };
+            let text = value.to_string();
+            let Some(parsed) = parse_integer_text(text.trim()) else {
+                return Err(RuntimeError::Script {
+                    id: "FormatException",
+                    category: "NotSpecified: (:) [], MethodInvocationException".to_owned(),
+                    exception_type: "System.Management.Automation.MethodInvocationException",
+                    message: format!(
+                        "Exception calling \"Parse\" with \"1\" argument(s): \"The input string '{text}' was not in a correct format.\""
+                    ),
+                });
+            };
             if kind.starts_with("int32") || kind == "int" {
-                Ok(Value::Int32(convert_int32(value)?))
+                i32::try_from(parsed)
+                    .map(Value::Int32)
+                    .map_err(|_| RuntimeError::NotImplemented {
+                        feature: "integer conversion overflow",
+                    })
             } else {
-                Ok(Value::Int64(convert_int64(value)?))
+                i64::try_from(parsed)
+                    .map(Value::Int64)
+                    .map_err(|_| RuntimeError::NotImplemented {
+                        feature: "integer conversion overflow",
+                    })
             }
         }
         ("string", "isnullorempty") => {
@@ -2923,15 +3052,22 @@ fn convert_int64(value: &Value) -> Result<i64, RuntimeError> {
                 })
             }
         }
-        Value::String(text) => parse_integer_text(&text.to_string_lossy())
-            .ok_or(RuntimeError::NotImplemented {
-                feature: "cannot convert a string to an integer",
-            })
-            .and_then(|value| {
-                i64::try_from(value).map_err(|_| RuntimeError::NotImplemented {
+        Value::String(text) => {
+            let lossy = text.to_string_lossy();
+            match parse_integer_text(&lossy) {
+                Some(value) => i64::try_from(value).map_err(|_| RuntimeError::NotImplemented {
                     feature: "integer conversion overflow",
-                })
-            }),
+                }),
+                None => Err(RuntimeError::Script {
+                    id: "InvalidCastFromStringToInteger",
+                    category: "InvalidArgument: (:) [], RuntimeException".to_owned(),
+                    exception_type: "System.Management.Automation.RuntimeException",
+                    message: format!(
+                        "Cannot convert value \"{lossy}\" to type \"System.Int32\". Error: \"The input string '{lossy}' was not in a correct format.\""
+                    ),
+                }),
+            }
+        }
         _ => Err(RuntimeError::NotImplemented {
             feature: "conversion to an integer",
         }),
@@ -3171,6 +3307,14 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
     if name.eq_ignore_ascii_case("GetType") && arguments.is_empty() {
         return Ok(get_type(target));
     }
+    if target.is_null_like() {
+        return Err(RuntimeError::Script {
+            id: "InvokeMethodOnNull",
+            category: "InvalidOperation: (:) [], RuntimeException".to_owned(),
+            exception_type: "System.Management.Automation.RuntimeException",
+            message: "You cannot call a method on a null-valued expression.".to_owned(),
+        });
+    }
     match target {
         Value::String(text) => string_method(text, name, arguments),
         Value::Object(entries) => object_method(entries, name, arguments),
@@ -3184,24 +3328,28 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
     let units: Vec<u16> = text.units().collect();
     match name.to_ascii_lowercase().as_str() {
         "substring" => {
+            let out_of_range = || RuntimeError::Script {
+                id: "ArgumentOutOfRangeException",
+                category: "NotSpecified: (:) [], MethodInvocationException".to_owned(),
+                exception_type: "System.Management.Automation.MethodInvocationException",
+                message: if arguments.len() > 1 {
+                    "Exception calling \"Substring\" with \"2\" argument(s): \"Length cannot be less than zero. (Parameter 'length')\"".to_owned()
+                } else {
+                    "Exception calling \"Substring\" with \"1\" argument(s): \"startIndex cannot be larger than length of string. (Parameter 'startIndex')\"".to_owned()
+                },
+            };
             let start = int_argument(arguments.first())?;
-            let start = usize::try_from(start).map_err(|_| RuntimeError::NotImplemented {
-                feature: "Substring out of range",
-            })?;
+            let start = usize::try_from(start).map_err(|_| out_of_range())?;
             let length = match arguments.get(1) {
-                Some(value) => usize::try_from(int_argument(Some(value))?).map_err(|_| {
-                    RuntimeError::NotImplemented {
-                        feature: "Substring out of range",
-                    }
-                })?,
+                Some(value) => {
+                    usize::try_from(int_argument(Some(value))?).map_err(|_| out_of_range())?
+                }
                 None => units.len().saturating_sub(start),
             };
             let end = start
                 .checked_add(length)
                 .filter(|end| *end <= units.len())
-                .ok_or(RuntimeError::NotImplemented {
-                    feature: "Substring out of range",
-                })?;
+                .ok_or_else(out_of_range)?;
             Ok(Value::String(PsString::from_units(
                 units[start..end].to_vec(),
             )))

@@ -226,6 +226,16 @@ fn trim_fraction(text: &str) -> String {
 pub enum RuntimeError {
     /// The operation is valid PowerShell whose result rpsh cannot produce yet.
     NotImplemented { feature: &'static str },
+    /// A real script exception that `try/catch` and `trap` can catch.
+    Script {
+        /// `FullyQualifiedErrorId`, and the label of the error kind.
+        id: &'static str,
+        /// The preformatted `CategoryInfo` text.
+        category: String,
+        /// The .NET exception type name.
+        exception_type: &'static str,
+        message: String,
+    },
 }
 
 impl RuntimeError {
@@ -233,13 +243,42 @@ impl RuntimeError {
     pub fn feature(&self) -> &'static str {
         match self {
             Self::NotImplemented { feature } => feature,
+            Self::Script { id, .. } => id,
+        }
+    }
+
+    pub fn script(&self) -> Option<ScriptErrorRef<'_>> {
+        match self {
+            Self::Script {
+                id,
+                category,
+                exception_type,
+                message,
+            } => Some(ScriptErrorRef {
+                id,
+                category,
+                exception_type,
+                message,
+            }),
+            Self::NotImplemented { .. } => None,
         }
     }
 }
 
+#[derive(Debug)]
+pub struct ScriptErrorRef<'a> {
+    pub id: &'a str,
+    pub category: &'a str,
+    pub exception_type: &'a str,
+    pub message: &'a str,
+}
+
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.feature())
+        match self {
+            Self::NotImplemented { feature } => f.write_str(feature),
+            Self::Script { message, .. } => f.write_str(message),
+        }
     }
 }
 

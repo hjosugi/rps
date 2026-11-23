@@ -11,6 +11,15 @@ fn refuse<T>(feature: &'static str) -> Result<T, RuntimeError> {
     Err(RuntimeError::NotImplemented { feature })
 }
 
+fn divide_by_zero() -> RuntimeError {
+    RuntimeError::Script {
+        id: "RuntimeException",
+        category: "NotSpecified: (:) [], RuntimeException".to_owned(),
+        exception_type: "System.Management.Automation.RuntimeException",
+        message: "Attempted to divide by zero.".to_owned(),
+    }
+}
+
 /// The integer types that share a result kind. Anything narrower than `Int32`
 /// promotes to `Int32`, as upstream's binder does.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -275,7 +284,7 @@ pub fn divide(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
             let left_value = int_value(&left).unwrap_or_default();
             let right_value = int_value(&right).unwrap_or_default();
             if right_value == 0 {
-                return refuse("divide by zero");
+                return Err(divide_by_zero());
             }
             if left_value % right_value == 0 {
                 Ok(integer_result(kind, left_value / right_value))
@@ -295,7 +304,7 @@ pub fn remainder(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
             let left_value = int_value(&left).unwrap_or_default();
             let right_value = int_value(&right).unwrap_or_default();
             if right_value == 0 {
-                return refuse("divide by zero");
+                return Err(divide_by_zero());
             }
             Ok(integer_result(kind, left_value % right_value))
         }

@@ -6,6 +6,7 @@ cmdlets/json
 cmdlets/write-output
 contract/collection-order
 contract/console
+contract/error-records
 contract/streams
 contract/version-table
 expr/int-arithmetic
