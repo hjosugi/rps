@@ -80,6 +80,7 @@ pipeline/get-member
 pipeline/group-measure-property
 pipeline/group-select
 pipeline/measure-select
+pipeline/measure-text
 pipeline/select-sort
 pipeline/select-string
 pipeline/tee-sort

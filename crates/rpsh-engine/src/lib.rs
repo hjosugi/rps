@@ -1400,6 +1400,9 @@ impl Engine {
                 let mut maximum: Option<Value> = None;
                 let mut average = 0.0;
                 let mut count = 0;
+                let mut words = 0;
+                let mut lines = 0;
+                let mut characters = 0;
                 for item in input {
                     let item = match &property {
                         Some(property) => match member(item, property) {
@@ -1409,6 +1412,10 @@ impl Engine {
                         None => item.clone(),
                     };
                     let item = &item;
+                    let text = item.to_string();
+                    words += text.split_whitespace().count();
+                    lines += text.lines().count().max(1);
+                    characters += text.chars().count();
                     if !is_numeric_value(item) {
                         continue;
                     }
@@ -1451,6 +1458,15 @@ impl Engine {
                 }
                 if flag("maximum") {
                     entries.push(("Maximum".to_owned(), maximum.unwrap_or(Value::Null)));
+                }
+                if flag("word") {
+                    entries.push(("Words".to_owned(), Value::Int32(words as i32)));
+                }
+                if flag("line") {
+                    entries.push(("Lines".to_owned(), Value::Int32(lines as i32)));
+                }
+                if flag("character") {
+                    entries.push(("Characters".to_owned(), Value::Int32(characters as i32)));
                 }
                 Ok(Some(vec![Value::object(entries)]))
             }
