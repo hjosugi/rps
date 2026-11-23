@@ -2415,6 +2415,23 @@ impl Engine {
                     Vec::new()
                 }))
             }
+            "clear-variable" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let name = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(name) = name else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Clear-Variable without a name",
+                    }
+                    .into());
+                };
+                self.variables
+                    .insert(strip_scope(&name).to_owned(), Value::Null);
+                Ok(Some(Vec::new()))
+            }
             "remove-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let name = named

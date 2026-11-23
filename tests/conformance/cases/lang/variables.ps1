@@ -13,3 +13,6 @@ $temp
 New-Variable nv 5
 $nv
 (New-Variable nv2 6 -PassThru).Value
+Clear-Variable nv
+$null -eq $nv
+$nv
