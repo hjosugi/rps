@@ -2655,7 +2655,14 @@ impl Engine {
                 });
                 Ok(Some(mark_format(input, "Table", property, hide_headers)))
             }
-            "format-list" | "fl" => Ok(Some(mark_format(input, "List", None, false))),
+            "format-list" | "fl" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let property = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                    .map(|(_, value)| value.clone());
+                Ok(Some(mark_format(input, "List", property, false)))
+            }
             "compare-object" | "diff" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let include_equal = named.iter().any(|(name, value)| {
@@ -4605,13 +4612,31 @@ fn format_out_string(input: &[Value]) -> String {
     let force_table = format_marker(first).as_deref() == Some("Table");
     let visible = visible_entries(entries);
     if !force_table && (force_list || visible.len() > 4) {
-        let width = visible
+        let selected = format_table_properties(first);
+        let rows: Vec<(String, String)> = if force_list && !selected.is_empty() {
+            selected
+                .into_iter()
+                .map(|name| {
+                    let value = visible
+                        .iter()
+                        .find(|(key, _)| key.eq_ignore_ascii_case(&name))
+                        .map_or_else(String::new, |(_, value)| value.to_string());
+                    (name, value)
+                })
+                .collect()
+        } else {
+            visible
+                .iter()
+                .map(|(name, value)| ((*name).clone(), value.to_string()))
+                .collect()
+        };
+        let width = rows
             .iter()
             .map(|(name, _)| name.chars().count())
             .max()
             .unwrap_or(0);
         let mut text = String::from("\n");
-        for (name, value) in &visible {
+        for (name, value) in &rows {
             text.push_str(&format!("{:<width$} : {}", name, value, width = width));
             text.push('\n');
         }
