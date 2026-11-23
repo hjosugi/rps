@@ -5,3 +5,5 @@ Test-Path fixtures/data.txt -PathType Container
 (Resolve-Path fixtures/data.txt).Path -eq (Join-Path (Get-Location).Path 'fixtures/data.txt')
 Test-Path fixtures/*.txt
 Test-Path fixtures/*.nope
+Split-Path fixtures/data.txt -Extension
+Split-Path fixtures/data.txt -LeafBase
