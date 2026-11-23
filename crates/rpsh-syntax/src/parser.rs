@@ -445,6 +445,9 @@ impl Parser {
         }
         self.pos += 1;
         let mut body = Vec::new();
+        let mut begin = Vec::new();
+        let mut process = Vec::new();
+        let mut end = Vec::new();
         loop {
             while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
                 self.pos += 1;
@@ -456,10 +459,28 @@ impl Parser {
             if self.peek().kind == TokenKind::EndOfInput {
                 return self.refuse(SYNTAX_ERRORS);
             }
-            if self.peek().kind == TokenKind::Param && body.is_empty() {
+            if self.peek().kind == TokenKind::Param {
                 self.pos += 1;
                 parameters = self.parameter_list()?;
                 continue;
+            }
+            match self.peek().kind {
+                TokenKind::Begin => {
+                    self.pos += 1;
+                    begin = self.block()?.0;
+                    continue;
+                }
+                TokenKind::Process => {
+                    self.pos += 1;
+                    process = self.block()?.0;
+                    continue;
+                }
+                TokenKind::End => {
+                    self.pos += 1;
+                    end = self.block()?.0;
+                    continue;
+                }
+                _ => {}
             }
             self.nodes = 0;
             body.push(self.statement()?);
@@ -471,6 +492,9 @@ impl Parser {
         Ok(Statement::Function {
             name,
             parameters,
+            begin,
+            process,
+            end,
             body,
             filter,
             span,

@@ -61,6 +61,9 @@ pub enum Statement {
     Function {
         name: String,
         parameters: Vec<Parameter>,
+        begin: Vec<Statement>,
+        process: Vec<Statement>,
+        end: Vec<Statement>,
         body: Vec<Statement>,
         filter: bool,
         span: Span,

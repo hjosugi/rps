@@ -37,8 +37,17 @@ type BoundArguments = (Vec<Value>, Vec<(String, Value)>);
 #[derive(Debug, Clone)]
 struct FunctionDef {
     parameters: Vec<Parameter>,
+    begin: Vec<Statement>,
+    process: Vec<Statement>,
+    end: Vec<Statement>,
     body: Vec<Statement>,
     filter: bool,
+}
+
+impl FunctionDef {
+    fn has_blocks(&self) -> bool {
+        !self.begin.is_empty() || !self.process.is_empty() || !self.end.is_empty()
+    }
 }
 
 #[derive(Debug)]
@@ -280,6 +289,9 @@ impl Engine {
             Statement::Function {
                 name,
                 parameters,
+                begin,
+                process,
+                end,
                 body,
                 filter,
                 ..
@@ -288,6 +300,9 @@ impl Engine {
                     name.to_ascii_lowercase(),
                     FunctionDef {
                         parameters: parameters.clone(),
+                        begin: begin.clone(),
+                        process: process.clone(),
+                        end: end.clone(),
                         body: body.clone(),
                         filter: *filter,
                     },
@@ -476,7 +491,11 @@ impl Engine {
             local.entry("_".to_owned()).or_insert(Value::Null);
         }
         self.variables = local;
-        let flow = self.exec_block(&function.body, out);
+        let flow = if function.has_blocks() {
+            self.exec_named_blocks(&function, None, out)
+        } else {
+            self.exec_block(&function.body, out)
+        };
         self.variables = saved;
         Ok(match flow? {
             Flow::Return(value) => {
@@ -488,6 +507,47 @@ impl Engine {
             Flow::Break(_) | Flow::Continue(_) => Flow::Normal,
             flow => flow,
         })
+    }
+
+    /// Runs a function's `begin` / `process` / `end` blocks over `input`.
+    /// `None` invokes `process` once with `$_` as null.
+    fn exec_named_blocks(
+        &mut self,
+        function: &FunctionDef,
+        input: Option<Vec<Value>>,
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        let mut flow = self.exec_block(&function.begin, out)?;
+        if matches!(flow, Flow::Normal) {
+            match input {
+                Some(items) if !function.process.is_empty() => {
+                    for item in items {
+                        self.variables.insert("_".to_owned(), item);
+                        flow = self.exec_block(&function.process, out)?;
+                        if !matches!(flow, Flow::Normal) {
+                            break;
+                        }
+                    }
+                }
+                Some(items) => {
+                    self.variables
+                        .insert("input".to_owned(), Value::array(items));
+                }
+                None => {
+                    self.variables.insert("_".to_owned(), Value::Null);
+                    if !function.process.is_empty() {
+                        flow = self.exec_block(&function.process, out)?;
+                    }
+                }
+            }
+        }
+        if matches!(flow, Flow::Normal | Flow::Return(_)) {
+            let end = self.exec_block(&function.end, out)?;
+            if !matches!(end, Flow::Normal) {
+                flow = end;
+            }
+        }
+        Ok(flow)
     }
 
     fn exec_pipeline(
@@ -557,6 +617,7 @@ impl Engine {
                 }
             }
         } else {
+            let has_blocks = function.has_blocks();
             let saved = std::mem::take(&mut self.variables);
             let mut local = saved.clone();
             let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
@@ -564,10 +625,16 @@ impl Engine {
                 "args".to_owned(),
                 Value::array(positional[bound..].to_vec()),
             );
-            local.insert("input".to_owned(), Value::array(input));
+            if !has_blocks {
+                local.insert("input".to_owned(), Value::array(input.clone()));
+            }
             self.variables = local;
             self.capture = Some(Vec::new());
-            let flow = self.exec_block(&function.body, &mut capture_sink());
+            let flow = if has_blocks {
+                self.exec_named_blocks(&function, Some(input), &mut capture_sink())
+            } else {
+                self.exec_block(&function.body, &mut capture_sink())
+            };
             let captured = self.capture.take().unwrap_or_default();
             self.variables = saved;
             outputs.extend(captured);
