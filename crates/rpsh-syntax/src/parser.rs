@@ -1101,6 +1101,10 @@ impl Parser {
                     name.push_str(part);
                     self.pos += 1;
                 }
+                TokenKind::Switch => {
+                    name.push_str("switch");
+                    self.pos += 1;
+                }
                 _ => return self.refuse(SYNTAX_ERRORS),
             }
             match self.peek().kind {

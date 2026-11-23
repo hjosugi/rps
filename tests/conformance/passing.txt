@@ -43,6 +43,7 @@ lang/string-escapes
 lang/string-index
 lang/string-interpolation
 lang/switch
+lang/switch-param
 lang/ternary
 lang/try-catch
 lang/type-conversion

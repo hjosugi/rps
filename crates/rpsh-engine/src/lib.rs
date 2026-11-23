@@ -3725,6 +3725,9 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         "string" | "system.string" => Ok(Value::String(value.to_string().into())),
         "bool" | "boolean" | "system.boolean" => Ok(Value::Bool(convert_bool(&value))),
         "char" | "system.char" => convert_char(&value),
+        "switch" | "system.management.automation.switchparameter" => {
+            Ok(Value::Bool(convert_bool(&value)))
+        }
         _ => Err(RuntimeError::NotImplemented {
             feature: "type casts other than to numbers, bool, char, string and pscustomobject",
         }),
