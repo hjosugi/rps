@@ -4,7 +4,7 @@ operator	token	flags	platform	status
 --	PostfixMinusMinus	UnaryOperator,DisallowedInRestrictedMode,PrefixOrPostfixOperator	linux-x64	todo
 -=	MinusEquals	AssignmentOperator	linux-x64	todo
 -and	And	BinaryPrecedenceLogical,BinaryOperator,CanConstantFold	linux-x64	done
--as	As	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	linux-x64	todo
+-as	As	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	linux-x64	done
 -band	Band	BinaryPrecedenceBitwise,BinaryOperator,CanConstantFold	linux-x64	done
 -bnot	Bnot	UnaryOperator,CanConstantFold	linux-x64	done
 -bor	Bor	BinaryPrecedenceBitwise,BinaryOperator,CanConstantFold	linux-x64	done
@@ -38,8 +38,8 @@ operator	token	flags	platform	status
 -inotlike	Inotlike	BinaryPrecedenceComparison,BinaryOperator	linux-x64	done
 -inotmatch	Inotmatch	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	linux-x64	todo
 -ireplace	Ireplace	BinaryPrecedenceComparison,BinaryOperator,DisallowedInRestrictedMode	linux-x64	todo
--is	Is	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
--isnot	IsNot	BinaryPrecedenceComparison,BinaryOperator	linux-x64	todo
+-is	Is	BinaryPrecedenceComparison,BinaryOperator	linux-x64	done
+-isnot	IsNot	BinaryPrecedenceComparison,BinaryOperator	linux-x64	done
 -isplit	Isplit	BinaryPrecedenceComparison,BinaryOperator,UnaryOperator,DisallowedInRestrictedMode	linux-x64	todo
 -join	Join	BinaryPrecedenceComparison,BinaryOperator,UnaryOperator,DisallowedInRestrictedMode	linux-x64	done
 -le	Ile	BinaryPrecedenceComparison,BinaryOperator	linux-x64	done
@@ -54,9 +54,9 @@ operator	token	flags	platform	status
 :	Colon	SpecialOperator,DisallowedInRestrictedMode	linux-x64	todo
 ::	ColonColon	SpecialOperator,DisallowedInRestrictedMode	linux-x64	todo
 !	Exclaim	UnaryOperator,CanConstantFold	linux-x64	done
-?	QuestionMark	TernaryOperator,DisallowedInRestrictedMode	linux-x64	todo
-??	QuestionQuestion	BinaryPrecedenceCoalesce,BinaryOperator	linux-x64	todo
-??=	QuestionQuestionEquals	AssignmentOperator	linux-x64	todo
+?	QuestionMark	TernaryOperator,DisallowedInRestrictedMode	linux-x64	done
+??	QuestionQuestion	BinaryPrecedenceCoalesce,BinaryOperator	linux-x64	done
+??=	QuestionQuestionEquals	AssignmentOperator	linux-x64	done
 ?.	QuestionDot	SpecialOperator,DisallowedInRestrictedMode	linux-x64	todo
 .	Dot	SpecialOperator,DisallowedInRestrictedMode	linux-x64	todo
 ..	DotDot	BinaryPrecedenceRange,BinaryOperator,DisallowedInRestrictedMode	linux-x64	done

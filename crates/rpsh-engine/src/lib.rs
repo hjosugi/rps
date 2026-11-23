@@ -115,6 +115,14 @@ impl Engine {
                     }
                     self.last_success = true;
                 }
+                Statement::CoalesceAssign { name, value, .. } => {
+                    let key = strip_scope(name);
+                    if matches!(self.variables.get(key), None | Some(Value::Null)) {
+                        let value = evaluate(value, &self.variables, self.last_success)?;
+                        self.variables.insert(key.to_owned(), value);
+                    }
+                    self.last_success = true;
+                }
                 Statement::AppendAssign { name, value, .. } => {
                     let value = evaluate(value, &self.variables, self.last_success)?;
                     let key = strip_scope(name);
@@ -181,6 +189,26 @@ fn evaluate(
             Ok(Value::String(text))
         }
         ExprKind::Subexpression(expr) => evaluate(expr, variables, last_success),
+        ExprKind::Ternary {
+            condition,
+            when_true,
+            when_false,
+        } => {
+            if ops::is_true(&evaluate(condition, variables, last_success)?) {
+                evaluate(when_true, variables, last_success)
+            } else {
+                evaluate(when_false, variables, last_success)
+            }
+        }
+        ExprKind::TypeLiteral(name) => Ok(Value::Type(type_full_name(name).to_owned())),
+        ExprKind::Coalesce { left, right } => {
+            let value = evaluate(left, variables, last_success)?;
+            if matches!(value, Value::Null) {
+                evaluate(right, variables, last_success)
+            } else {
+                Ok(value)
+            }
+        }
         ExprKind::Array(items) => {
             let mut values = Vec::with_capacity(items.len());
             for item in items {
@@ -289,6 +317,15 @@ fn evaluate(
                 BinaryOp::And => ops::logical(&left, &right, "and"),
                 BinaryOp::Or => ops::logical(&left, &right, "or"),
                 BinaryOp::Xor => ops::logical(&left, &right, "xor"),
+                BinaryOp::Is => type_is(&left, &right, false),
+                BinaryOp::IsNot => type_is(&left, &right, true),
+                BinaryOp::As => type_is(&left, &right, false).map(|value| {
+                    if matches!(value, Value::Bool(true)) {
+                        left
+                    } else {
+                        Value::Null
+                    }
+                }),
             }
         }
     }
@@ -379,6 +416,35 @@ fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) ->
     }
     let key = strip_scope(name);
     variables.get(key).cloned()
+}
+
+fn type_full_name(name: &str) -> &'static str {
+    match name.to_ascii_lowercase().as_str() {
+        "int" | "int32" => "System.Int32",
+        "long" | "int64" => "System.Int64",
+        "uint" | "uint32" => "System.UInt32",
+        "ulong" | "uint64" => "System.UInt64",
+        "short" | "int16" => "System.Int16",
+        "ushort" | "uint16" => "System.UInt16",
+        "byte" => "System.Byte",
+        "sbyte" => "System.SByte",
+        "string" => "System.String",
+        "bool" | "boolean" => "System.Boolean",
+        "double" => "System.Double",
+        "decimal" => "System.Decimal",
+        "biginteger" => "System.Numerics.BigInteger",
+        _ => "System.Object",
+    }
+}
+
+fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeError> {
+    let Value::Type(full) = right else {
+        return Err(RuntimeError::NotImplemented {
+            feature: "-is / -as with a non-type right operand",
+        });
+    };
+    let same = left.type_name() == full;
+    Ok(Value::Bool(if negate { !same } else { same }))
 }
 
 fn number_value(value: &NumberLiteral) -> Value {

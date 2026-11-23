@@ -30,6 +30,12 @@ pub enum Statement {
         value: Expr,
         span: Span,
     },
+    /// `$name ??= expression`.
+    CoalesceAssign {
+        name: String,
+        value: Expr,
+        span: Span,
+    },
     /// `exit` with an optional exit code. Upstream: `ExitStatementAst`.
     Exit { code: Option<Expr>, span: Span },
 }
@@ -64,10 +70,20 @@ pub enum ExprKind {
     ExpandableString(Vec<StringPart>),
     /// Upstream: `SubExpressionAst`.
     Subexpression(Box<Expr>),
+    /// Upstream: `TypeExpressionAst` used as a value.
+    TypeLiteral(String),
     /// Upstream: `ArrayLiteralAst`.
     Array(Vec<Expr>),
     /// Upstream: `IndexExpressionAst`.
     Index { target: Box<Expr>, index: Box<Expr> },
+    /// Upstream: `TernaryExpressionAst`.
+    Ternary {
+        condition: Box<Expr>,
+        when_true: Box<Expr>,
+        when_false: Box<Expr>,
+    },
+    /// Upstream: `BinaryExpressionAst` with `??`.
+    Coalesce { left: Box<Expr>, right: Box<Expr> },
     /// Upstream: `HashtableAst` (and the value of `[pscustomobject]`).
     Object(Vec<(String, Expr)>),
     /// Upstream: `ConvertExpressionAst` for the supported `[pscustomobject]`.
@@ -134,4 +150,7 @@ pub enum BinaryOp {
     And,
     Or,
     Xor,
+    Is,
+    IsNot,
+    As,
 }

@@ -37,6 +37,7 @@ pub fn tokenize_full(source: &str) -> Result<Vec<FullToken>, ParseError> {
         mode: Mode::Command,
         command_seen: false,
         statement_start: true,
+        ternary_depth: 0,
     };
     tokenizer.run()?;
     let lines = Lines::new(source);
@@ -113,6 +114,7 @@ struct Tokenizer<'a> {
     mode: Mode,
     command_seen: bool,
     statement_start: bool,
+    ternary_depth: usize,
 }
 
 impl Tokenizer<'_> {
@@ -180,7 +182,13 @@ impl Tokenizer<'_> {
             {
                 let start = self.pos;
                 self.pos += 1;
-                self.push(FullTokenKind::Generic, start, self.pos);
+                let kind = if self.ternary_depth > 0 {
+                    self.ternary_depth -= 1;
+                    FullTokenKind::Colon
+                } else {
+                    FullTokenKind::Generic
+                };
+                self.push(kind, start, self.pos);
                 self.statement_start = false;
                 continue;
             }
@@ -790,6 +798,9 @@ impl Tokenizer<'_> {
                 let start = self.pos;
                 self.pos = end;
                 let kind = *kind;
+                if kind == FullTokenKind::QuestionMark {
+                    self.ternary_depth += 1;
+                }
                 self.push(kind, start, end);
                 match kind {
                     FullTokenKind::Pipe

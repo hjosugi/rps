@@ -102,5 +102,25 @@
   {
     "name": "variable-colon-string",
     "source": "\"$x:\""
+  },
+  {
+    "name": "ternary",
+    "source": "(1 -eq 1) ? 'yes' : 'no'"
+  },
+  {
+    "name": "coalesce",
+    "source": "$null ?? 'x'"
+  },
+  {
+    "name": "coalesce-assign",
+    "source": "$x ??= 'x'"
+  },
+  {
+    "name": "type-is",
+    "source": "1 -is [int]"
+  },
+  {
+    "name": "type-as",
+    "source": "'x' -as [int]"
   }
 ]

@@ -71,9 +71,13 @@ impl Parser {
     fn statement(&mut self) -> Result<Statement, ParseError> {
         if let TokenKind::Variable(name) = &self.peek().kind
             && let Some(next) = self.tokens.get(self.pos + 1)
-            && matches!(next.kind, TokenKind::Equals | TokenKind::PlusEquals)
+            && matches!(
+                next.kind,
+                TokenKind::Equals | TokenKind::PlusEquals | TokenKind::CoalesceEquals
+            )
         {
             let append = next.kind == TokenKind::PlusEquals;
+            let coalesce = next.kind == TokenKind::CoalesceEquals;
             let name = name.clone();
             let start = self.peek().span;
             self.pos += 2;
@@ -84,6 +88,8 @@ impl Parser {
             }
             return Ok(if append {
                 Statement::AppendAssign { name, value, span }
+            } else if coalesce {
+                Statement::CoalesceAssign { name, value, span }
             } else {
                 Statement::Assign { name, value, span }
             });
@@ -108,7 +114,49 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.logical()
+        self.ternary()
+    }
+
+    fn ternary(&mut self) -> Result<Expr, ParseError> {
+        let condition = self.coalesce()?;
+        if self.peek().kind != TokenKind::QuestionMark {
+            return Ok(condition);
+        }
+        let span = condition.span;
+        self.pos += 1;
+        let when_true = self.ternary()?;
+        if self.peek().kind != TokenKind::Colon {
+            return self.refuse("ternary ':'");
+        }
+        self.pos += 1;
+        let when_false = self.ternary()?;
+        let span = span.to(when_false.span);
+        self.expr(
+            ExprKind::Ternary {
+                condition: Box::new(condition),
+                when_true: Box::new(when_true),
+                when_false: Box::new(when_false),
+            },
+            span,
+        )
+    }
+
+    fn coalesce(&mut self) -> Result<Expr, ParseError> {
+        let mut left = self.logical()?;
+        while self.peek().kind == TokenKind::Coalesce {
+            let span = left.span;
+            self.pos += 1;
+            let right = self.logical()?;
+            let span = span.to(right.span);
+            left = self.expr(
+                ExprKind::Coalesce {
+                    left: Box::new(left),
+                    right: Box::new(right),
+                },
+                span,
+            )?;
+        }
+        Ok(left)
     }
 
     fn logical(&mut self) -> Result<Expr, ParseError> {
@@ -174,6 +222,9 @@ impl Parser {
                 TokenKind::CNotIn => BinaryOp::CNotIn,
                 TokenKind::Shl => BinaryOp::Shl,
                 TokenKind::Shr => BinaryOp::Shr,
+                TokenKind::Is => BinaryOp::Is,
+                TokenKind::IsNot => BinaryOp::IsNot,
+                TokenKind::As => BinaryOp::As,
                 _ => return Ok(left),
             };
             self.pos += 1;
@@ -435,16 +486,33 @@ impl Parser {
                 }
                 let close = self.peek().span;
                 self.pos += 1;
-                let value = self.primary()?;
-                let span = span.to(value.span);
-                let _ = (name_span, close);
-                self.expr(
-                    ExprKind::Cast {
-                        type_name,
-                        value: Box::new(value),
-                    },
-                    span,
-                )
+                let _ = name_span;
+                if matches!(
+                    self.peek().kind,
+                    TokenKind::Int32(_)
+                        | TokenKind::Numeric(_)
+                        | TokenKind::StringLiteral(_)
+                        | TokenKind::ExpandableString(_)
+                        | TokenKind::HereString { .. }
+                        | TokenKind::Variable(_)
+                        | TokenKind::LParen
+                        | TokenKind::AtParen
+                        | TokenKind::AtCurly
+                        | TokenKind::LBracket
+                        | TokenKind::DollarParen
+                ) {
+                    let value = self.primary()?;
+                    let span = span.to(value.span);
+                    self.expr(
+                        ExprKind::Cast {
+                            type_name,
+                            value: Box::new(value),
+                        },
+                        span,
+                    )
+                } else {
+                    self.expr(ExprKind::TypeLiteral(type_name), span.to(close))
+                }
             }
             TokenKind::AtCurly => {
                 self.pos += 1;
@@ -763,6 +831,9 @@ mod tests {
                     BinaryOp::And => "-and",
                     BinaryOp::Or => "-or",
                     BinaryOp::Xor => "-xor",
+                    BinaryOp::Is => "-is",
+                    BinaryOp::IsNot => "-isnot",
+                    BinaryOp::As => "-as",
                 };
                 format!("({} {symbol} {})", show(left), show(right))
             }
@@ -780,10 +851,22 @@ mod tests {
                     .collect::<String>()
             ),
             ExprKind::Subexpression(expr) => format!("$({})", show(expr)),
+            ExprKind::TypeLiteral(name) => format!("[{name}]"),
             ExprKind::Array(items) => {
                 format!("[{}]", items.iter().map(show).collect::<Vec<_>>().join(","))
             }
             ExprKind::Index { target, index } => format!("{}[{}]", show(target), show(index)),
+            ExprKind::Ternary {
+                condition,
+                when_true,
+                when_false,
+            } => format!(
+                "({} ? {} : {})",
+                show(condition),
+                show(when_true),
+                show(when_false)
+            ),
+            ExprKind::Coalesce { left, right } => format!("({} ?? {})", show(left), show(right)),
             ExprKind::Object(entries) => format!(
                 "@{{{}}}",
                 entries
@@ -808,6 +891,9 @@ mod tests {
                 Statement::Assign { name, value, .. } => format!("${name} = {}", show(value)),
                 Statement::AppendAssign { name, value, .. } => {
                     format!("${name} += {}", show(value))
+                }
+                Statement::CoalesceAssign { name, value, .. } => {
+                    format!("${name} ??= {}", show(value))
                 }
                 Statement::Exit { code: None, .. } => "exit".to_owned(),
                 Statement::Exit {

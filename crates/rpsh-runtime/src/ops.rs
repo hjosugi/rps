@@ -252,8 +252,8 @@ pub fn shift(left: &Value, right: &Value, left_shift: bool) -> Result<Value, Run
 
 /// Logical operators.
 pub fn logical(left: &Value, right: &Value, op: &str) -> Result<Value, RuntimeError> {
-    let l = truthy(left);
-    let r = truthy(right);
+    let l = is_true(left);
+    let r = is_true(right);
     Ok(Value::Bool(match op {
         "and" => l && r,
         "or" => l || r,
@@ -276,7 +276,7 @@ pub fn bitwise(left: &Value, right: &Value, op: &str) -> Result<Value, RuntimeEr
 }
 
 pub fn not(operand: &Value) -> Value {
-    Value::Bool(!truthy(operand))
+    Value::Bool(!is_true(operand))
 }
 
 pub fn bnot(operand: &Value) -> Result<Value, RuntimeError> {
@@ -286,7 +286,7 @@ pub fn bnot(operand: &Value) -> Result<Value, RuntimeError> {
     }
 }
 
-fn truthy(value: &Value) -> bool {
+pub fn is_true(value: &Value) -> bool {
     match value {
         Value::Null => false,
         Value::Bool(value) => *value,

@@ -7,6 +7,8 @@ lang/division
 lang/numeric-literals
 lang/string-escapes
 lang/string-interpolation
+lang/ternary
+lang/type-ops
 lang/variable-paths
 stmt/crlf
 stmt/empty

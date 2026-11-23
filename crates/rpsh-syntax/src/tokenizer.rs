@@ -99,6 +99,13 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::Not => TokenKind::Not,
             FullTokenKind::Bnot => TokenKind::Bnot,
             FullTokenKind::Exclaim => TokenKind::Exclaim,
+            FullTokenKind::Is => TokenKind::Is,
+            FullTokenKind::IsNot => TokenKind::IsNot,
+            FullTokenKind::As => TokenKind::As,
+            FullTokenKind::QuestionMark => TokenKind::QuestionMark,
+            FullTokenKind::Colon => TokenKind::Colon,
+            FullTokenKind::QuestionQuestion => TokenKind::Coalesce,
+            FullTokenKind::QuestionQuestionEquals => TokenKind::CoalesceEquals,
             FullTokenKind::RCurly => TokenKind::RCurly,
             FullTokenKind::DollarParen => TokenKind::DollarParen,
             FullTokenKind::Variable => {
