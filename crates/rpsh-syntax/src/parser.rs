@@ -329,6 +329,15 @@ impl Parser {
         }
         self.pos += 1;
         self.skip_newlines();
+        if matches!(
+            self.peek().kind,
+            TokenKind::Identifier(_) | TokenKind::Bareword(_)
+        ) || self.paren_has_pipe()
+        {
+            let statements = self.paren_statements()?;
+            let span = self.previous_span();
+            return self.expr(ExprKind::Group(statements), span);
+        }
         let condition = self.nested_expression()?;
         self.skip_newlines();
         if self.peek().kind != TokenKind::RParen {

@@ -536,13 +536,13 @@ impl Engine {
                 otherwise,
                 ..
             } => {
-                let value = evaluate(condition, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(condition)?;
                 if ops::is_true(&value) {
                     self.last_success = true;
                     return self.exec_block(then, out);
                 }
                 for (condition, body) in elseif {
-                    let value = evaluate(condition, &mut self.variables, self.last_success)?;
+                    let value = self.eval_expression(condition)?;
                     if ops::is_true(&value) {
                         self.last_success = true;
                         return self.exec_block(body, out);
@@ -622,7 +622,7 @@ impl Engine {
                             if label.as_deref() == Some(target.as_str()) => {}
                         other => return Ok(other),
                     }
-                    let value = evaluate(condition, &mut self.variables, self.last_success)?;
+                    let value = self.eval_expression(condition)?;
                     let truth = ops::is_true(&value);
                     if (*until && truth) || (!*until && !truth) {
                         break;
@@ -846,7 +846,7 @@ impl Engine {
         clauses: &[SwitchClause],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
-        let value = evaluate(condition, &mut self.variables, self.last_success)?;
+        let value = self.eval_expression(condition)?;
         let items = flatten_value(value);
         let previous = self.variables.get("_").cloned();
         let mut result = Flow::Normal;
@@ -918,11 +918,7 @@ impl Engine {
 
     fn scriptblock_truth(&mut self, expr: &Expr) -> Result<bool, EngineError> {
         let ExprKind::ScriptBlock(statements) = &expr.kind else {
-            return Ok(ops::is_true(&evaluate(
-                expr,
-                &mut self.variables,
-                self.last_success,
-            )?));
+            return Ok(ops::is_true(&self.eval_expression(expr)?));
         };
         let saved = self.capture.take();
         self.capture = Some(Vec::new());
@@ -1239,6 +1235,206 @@ impl Engine {
                     ("FullName".to_owned(), Value::String(text.into())),
                 ])]))
             }
+            "new-item" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "New-Item without a path",
+                    }
+                    .into());
+                };
+                let item_type = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("itemtype"))
+                    .map_or_else(|| "file".to_owned(), |(_, value)| value.to_string());
+                let target = std::path::Path::new(&path);
+                if item_type.eq_ignore_ascii_case("directory") {
+                    std::fs::create_dir_all(target).map_err(|_| RuntimeError::NotImplemented {
+                        feature: "New-Item cannot create this directory",
+                    })?;
+                } else {
+                    if let Some(parent) = target.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    std::fs::write(target, b"").map_err(|_| RuntimeError::NotImplemented {
+                        feature: "New-Item cannot create this file",
+                    })?;
+                }
+                Ok(Some(vec![Value::object(vec![
+                    (
+                        "__TypeName".to_owned(),
+                        Value::String(
+                            if item_type.eq_ignore_ascii_case("directory") {
+                                "System.IO.DirectoryInfo"
+                            } else {
+                                "System.IO.FileInfo"
+                            }
+                            .into(),
+                        ),
+                    ),
+                    ("FullName".to_owned(), Value::String(path.into())),
+                ])]))
+            }
+            "remove-item" | "del" | "rm" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Remove-Item without a path",
+                    }
+                    .into());
+                };
+                let target = std::path::Path::new(&path);
+                if target.is_dir() {
+                    std::fs::remove_dir_all(target).map_err(|_| RuntimeError::NotImplemented {
+                        feature: "Remove-Item cannot remove this directory",
+                    })?;
+                } else if target.exists() {
+                    std::fs::remove_file(target).map_err(|_| RuntimeError::NotImplemented {
+                        feature: "Remove-Item cannot remove this file",
+                    })?;
+                }
+                Ok(Some(Vec::new()))
+            }
+            "copy-item" | "cp" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let destination = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("destination"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.get(1).map(ToString::to_string));
+                let (Some(source), Some(destination)) = (positional.first(), destination) else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Copy-Item without source and destination",
+                    }
+                    .into());
+                };
+                std::fs::copy(source.to_string(), &destination).map_err(|_| {
+                    RuntimeError::NotImplemented {
+                        feature: "Copy-Item cannot copy this file",
+                    }
+                })?;
+                Ok(Some(Vec::new()))
+            }
+            "move-item" | "mv" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let destination = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("destination"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.get(1).map(ToString::to_string));
+                let (Some(source), Some(destination)) = (positional.first(), destination) else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Move-Item without source and destination",
+                    }
+                    .into());
+                };
+                std::fs::rename(source.to_string(), &destination).map_err(|_| {
+                    RuntimeError::NotImplemented {
+                        feature: "Move-Item cannot move this file",
+                    }
+                })?;
+                Ok(Some(Vec::new()))
+            }
+            "get-childitem" | "ls" | "dir" => {
+                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let path = positional
+                    .first()
+                    .map_or_else(|| ".".to_owned(), ToString::to_string);
+                let mut names = Vec::new();
+                if let Ok(entries) = std::fs::read_dir(&path) {
+                    for entry in entries.flatten() {
+                        if let Some(name) = entry.file_name().to_str() {
+                            names.push(name.to_owned());
+                        }
+                    }
+                }
+                names.sort();
+                Ok(Some(
+                    names
+                        .into_iter()
+                        .map(|name| {
+                            Value::object(vec![
+                                (
+                                    "__TypeName".to_owned(),
+                                    Value::String("System.IO.FileInfo".into()),
+                                ),
+                                ("Name".to_owned(), Value::String(name.into())),
+                            ])
+                        })
+                        .collect(),
+                ))
+            }
+            "out-null" => Ok(Some(Vec::new())),
+            "add-content" | "ac" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = positional.first().map(ToString::to_string);
+                let Some(path) = path else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Add-Content without a path",
+                    }
+                    .into());
+                };
+                let values: Vec<Value> = if input.is_empty() {
+                    named
+                        .iter()
+                        .filter(|(name, _)| name.eq_ignore_ascii_case("value"))
+                        .map(|(_, value)| value.clone())
+                        .collect()
+                } else {
+                    input.to_vec()
+                };
+                let mut text = String::new();
+                for value in values {
+                    text.push_str(&value.to_string());
+                    text.push('\n');
+                }
+                use std::io::Write as _;
+                let mut file = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&path)
+                    .map_err(|_| RuntimeError::NotImplemented {
+                        feature: "Add-Content cannot open this file",
+                    })?;
+                file.write_all(text.as_bytes())
+                    .map_err(|_| RuntimeError::NotImplemented {
+                        feature: "Add-Content cannot write this file",
+                    })?;
+                Ok(Some(Vec::new()))
+            }
+            "out-file" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("filepath"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Out-File without a path",
+                    }
+                    .into());
+                };
+                let mut text = String::new();
+                for item in input {
+                    text.push_str(&item.to_string());
+                    text.push('\n');
+                }
+                std::fs::write(&path, text).map_err(|_| RuntimeError::NotImplemented {
+                    feature: "Out-File cannot write this file",
+                })?;
+                Ok(Some(Vec::new()))
+            }
             "get-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let Some(path) = positional.first() else {
@@ -1327,7 +1523,7 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "set-content" => {
-                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let (positional, named) = self.evaluate_arguments(arguments)?;
                 let Some(path) = positional.first() else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Set-Content without a path",
@@ -1335,7 +1531,16 @@ impl Engine {
                     .into());
                 };
                 let mut text = String::new();
-                for item in input {
+                let values: Vec<Value> = if input.is_empty() {
+                    named
+                        .iter()
+                        .filter(|(name, _)| name.eq_ignore_ascii_case("value"))
+                        .map(|(_, value)| value.clone())
+                        .collect()
+                } else {
+                    input.to_vec()
+                };
+                for item in values {
                     text.push_str(&item.to_string());
                     text.push('\n');
                 }
@@ -1723,7 +1928,7 @@ impl Engine {
     ) -> Result<Flow, EngineError> {
         loop {
             if let Some(condition) = condition {
-                let value = evaluate(condition, &mut self.variables, self.last_success)?;
+                let value = self.eval_expression(condition)?;
                 if !ops::is_true(&value) {
                     break;
                 }
