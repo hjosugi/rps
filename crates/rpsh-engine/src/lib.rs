@@ -1594,7 +1594,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let Some(path) = path else {
@@ -1622,6 +1625,7 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| {
                         name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
                             || name.eq_ignore_ascii_case("literalpath")
                     })
                     .map(|(_, value)| value.to_string())
@@ -1660,6 +1664,7 @@ impl Engine {
                     .find(|(name, _)| {
                         name.eq_ignore_ascii_case("path")
                             || name.eq_ignore_ascii_case("literalpath")
+                            || name.eq_ignore_ascii_case("literalpath")
                     })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
@@ -1692,7 +1697,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let Some(path) = path else {
@@ -1751,7 +1759,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let Some(path) = path else {
@@ -1785,7 +1796,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let source = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let destination = named
@@ -1836,7 +1850,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let source = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let destination = named
@@ -1869,7 +1886,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| {
                         positional
@@ -1969,7 +1989,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 if let Some(path) = path {
@@ -1983,7 +2006,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let Some(path) = path else {
@@ -2068,17 +2094,24 @@ impl Engine {
             }
             "get-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let Some(path) = positional.first() else {
+                let path = named
+                    .iter()
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-Content without a path",
                     }
                     .into());
                 };
-                let text = std::fs::read_to_string(path.to_string()).map_err(|_| {
-                    RuntimeError::NotImplemented {
+                let text =
+                    std::fs::read_to_string(path).map_err(|_| RuntimeError::NotImplemented {
                         feature: "Get-Content of a missing file",
-                    }
-                })?;
+                    })?;
                 if named
                     .iter()
                     .any(|(name, value)| name.eq_ignore_ascii_case("raw") && ops::is_true(value))
@@ -2116,6 +2149,7 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| {
                         name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
                             || name.eq_ignore_ascii_case("literalpath")
                     })
                     .map(|(_, value)| value.to_string())
@@ -2459,7 +2493,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let Some(path) = path else {
@@ -2513,7 +2550,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let Some(path) = path else {
@@ -2664,7 +2704,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let Some(path) = path else {
@@ -2939,7 +2982,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 if let Some(path) = path
@@ -2961,7 +3007,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let Ok(current) = std::env::current_dir() else {

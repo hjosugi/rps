@@ -14,3 +14,4 @@ Test-Path -Path fixtures/data.txt
 (Get-Item -LiteralPath fixtures/data.txt).Name
 Split-Path /tmp/x -IsAbsolute
 Split-Path fixtures/data.txt -IsAbsolute
+(Get-Content -LiteralPath fixtures/data.txt) -join ','
