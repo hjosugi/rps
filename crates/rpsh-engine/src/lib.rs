@@ -2328,6 +2328,43 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
+            "compare-object" | "diff" => {
+                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let (Some(left), Some(right)) = (positional.first(), positional.get(1)) else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Compare-Object without two collections",
+                    }
+                    .into());
+                };
+                let left = flatten_value(left.clone());
+                let right = flatten_value(right.clone());
+                let mut outputs = Vec::new();
+                for item in &right {
+                    let text = item.to_string();
+                    if !left
+                        .iter()
+                        .any(|value| value.to_string().eq_ignore_ascii_case(&text))
+                    {
+                        outputs.push(Value::object(vec![
+                            ("InputObject".to_owned(), item.clone()),
+                            ("SideIndicator".to_owned(), Value::String("=>".into())),
+                        ]));
+                    }
+                }
+                for item in &left {
+                    let text = item.to_string();
+                    if !right
+                        .iter()
+                        .any(|value| value.to_string().eq_ignore_ascii_case(&text))
+                    {
+                        outputs.push(Value::object(vec![
+                            ("InputObject".to_owned(), item.clone()),
+                            ("SideIndicator".to_owned(), Value::String("<=".into())),
+                        ]));
+                    }
+                }
+                Ok(Some(outputs))
+            }
             "get-filehash" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
