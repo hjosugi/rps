@@ -2511,7 +2511,8 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
-            "format-table" | "ft" => Ok(Some(input.to_vec())),
+            "format-table" | "ft" => Ok(Some(mark_format(input, "Table"))),
+            "format-list" | "fl" => Ok(Some(mark_format(input, "List"))),
             "compare-object" | "diff" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
                 let (Some(left), Some(right)) = (positional.first(), positional.get(1)) else {
@@ -4325,6 +4326,36 @@ fn hidden_type(value: &Value) -> Option<String> {
 
 /// The text `Out-String` returns for one pipeline, following the host's
 /// default table and list views for the shapes the conformance cases use.
+fn mark_format(input: &[Value], kind: &str) -> Vec<Value> {
+    input
+        .iter()
+        .map(|item| match item {
+            Value::Object(entries) => {
+                let mut entries = entries.as_ref().clone();
+                entries.push(("__Format".to_owned(), Value::String(kind.to_owned().into())));
+                Value::object(entries)
+            }
+            other => other.clone(),
+        })
+        .collect()
+}
+
+fn format_marker(value: &Value) -> Option<String> {
+    let Value::Object(entries) = value else {
+        return None;
+    };
+    entries.iter().find_map(|(key, value)| {
+        if key == "__Format" {
+            match value {
+                Value::String(text) => Some(text.to_string_lossy()),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    })
+}
+
 fn format_out_string(input: &[Value]) -> String {
     let Some(first) = input.first() else {
         return String::new();
@@ -4365,8 +4396,10 @@ fn format_out_string(input: &[Value]) -> String {
         text.push('\n');
         return text;
     }
+    let force_list = format_marker(first).as_deref() == Some("List");
+    let force_table = format_marker(first).as_deref() == Some("Table");
     let visible = visible_entries(entries);
-    if visible.len() > 4 {
+    if !force_table && (force_list || visible.len() > 4) {
         let width = visible
             .iter()
             .map(|(name, _)| name.chars().count())

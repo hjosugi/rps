@@ -1,0 +1,13 @@
+rpsh-golden-v2
+exit=0
+
+A : 1
+B : 2
+
+
+
+A B C D E
+- - - - -
+1 2 3 4 5
+
+

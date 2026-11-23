@@ -12,6 +12,7 @@ cmdlets/dot-source
 cmdlets/dot-source-fixture
 cmdlets/file-hash
 cmdlets/files
+cmdlets/format-list-table
 cmdlets/format-mixed-stream
 cmdlets/format-table
 cmdlets/hidden
