@@ -1,0 +1,15 @@
+rpsh-golden-v2
+exit=0
+a=2
+b=2
+c=1
+a
+A
+b
+c
+b
+a
+a
+A
+B
+b

@@ -38,6 +38,7 @@ native/exit-code
 native/glob
 native/pipe
 ops/comparison
+pipeline/group-select
 pipeline/where-foreach
 stmt/crlf
 stmt/empty

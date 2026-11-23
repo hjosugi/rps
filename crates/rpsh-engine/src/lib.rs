@@ -901,9 +901,51 @@ impl Engine {
                 ])]))
             }
             "sort-object" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let descending = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("descending") && ops::is_true(value)
+                });
+                let case_sensitive = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
+                });
                 let mut items = input.to_vec();
-                items.sort_by_key(|item| item.to_string().to_lowercase());
+                items.sort_by_key(|item| {
+                    let text = item.to_string();
+                    if case_sensitive {
+                        text
+                    } else {
+                        text.to_lowercase()
+                    }
+                });
+                if descending {
+                    items.reverse();
+                }
                 Ok(Some(items))
+            }
+            "group-object" => {
+                let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
+                for item in input {
+                    let key = item.to_string();
+                    if let Some((_, members)) = groups
+                        .iter_mut()
+                        .find(|(name, _)| name.eq_ignore_ascii_case(&key))
+                    {
+                        members.push(item.clone());
+                    } else {
+                        groups.push((key, vec![item.clone()]));
+                    }
+                }
+                let outputs = groups
+                    .into_iter()
+                    .map(|(name, group)| {
+                        Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.into())),
+                            ("Count".to_owned(), Value::Int32(group.len() as i32)),
+                            ("Group".to_owned(), Value::array(group)),
+                        ])
+                    })
+                    .collect();
+                Ok(Some(outputs))
             }
             "convertto-json" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -937,6 +979,21 @@ impl Engine {
             "select-object" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
                 let mut items = input.to_vec();
+                if named
+                    .iter()
+                    .any(|(name, value)| name.eq_ignore_ascii_case("unique") && ops::is_true(value))
+                {
+                    let mut seen: Vec<String> = Vec::new();
+                    items.retain(|item| {
+                        let key = item.to_string();
+                        if seen.contains(&key) {
+                            false
+                        } else {
+                            seen.push(key);
+                            true
+                        }
+                    });
+                }
                 if let Some((_, skip)) = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("skip"))
@@ -2366,6 +2423,12 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
             if name.eq_ignore_ascii_case("pstypenames") {
                 return Ok(pstypenames());
             }
+            if let Some((_, value)) = entries
+                .iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            {
+                return Ok(value.clone());
+            }
             if name.eq_ignore_ascii_case("Count") {
                 return Ok(Value::Int32(entries.len() as i32));
             }
@@ -2382,10 +2445,7 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
                     entries.iter().map(|(_, value)| value.clone()).collect(),
                 ));
             }
-            Ok(entries
-                .iter()
-                .find(|(key, _)| key.eq_ignore_ascii_case(name))
-                .map_or(Value::Null, |(_, value)| value.clone()))
+            Ok(Value::Null)
         }
         _ => Err(RuntimeError::NotImplemented {
             feature: "member access other than GetType().FullName / .Name",
