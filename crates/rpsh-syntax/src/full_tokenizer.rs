@@ -376,6 +376,11 @@ impl Tokenizer<'_> {
                 self.command_seen = false;
                 self.statement_start = true;
             }
+            FullTokenKind::RParen => {
+                self.mode = Mode::Expression;
+                self.statement_start = false;
+                self.command_seen = false;
+            }
             FullTokenKind::LParen => {
                 let call = self.tokens.len() >= 2
                     && matches!(

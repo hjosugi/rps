@@ -1062,6 +1062,7 @@ impl Engine {
                         groups.push((key, vec![item.clone()]));
                     }
                 }
+                groups.sort_by_key(|(name, _)| name.to_lowercase());
                 let outputs = groups
                     .into_iter()
                     .map(|(name, group)| {
@@ -1376,14 +1377,26 @@ impl Engine {
         if let ExprKind::Group(statements) = &expr.kind {
             return self.eval_group(statements);
         }
+        if let ExprKind::Member { target, name } = &expr.kind
+            && let ExprKind::Group(statements) = &target.kind
+        {
+            let target = self.eval_group(statements)?;
+            return Ok(member(&target, name)?);
+        }
+        if let ExprKind::Index { target, index } = &expr.kind
+            && let ExprKind::Group(statements) = &target.kind
+        {
+            let target = self.eval_group(statements)?;
+            let index = evaluate(index, &mut self.variables, self.last_success)?;
+            return Ok(index_value(&target, &index)?);
+        }
         if let ExprKind::Binary {
             op: BinaryOp::Join,
             left,
             right,
         } = &expr.kind
-            && let ExprKind::Group(statements) = &left.kind
         {
-            let left = self.eval_group(statements)?;
+            let left = self.eval_expression(left)?;
             let right = evaluate(right, &mut self.variables, self.last_success)?;
             return Ok(ops::join(&left, &right)?);
         }
@@ -1497,6 +1510,14 @@ impl Engine {
     }
 
     fn write_value(&mut self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
+        if let Some(capture) = &mut self.capture {
+            match value {
+                Value::Array(items) => capture.extend(items.iter().cloned()),
+                Value::Null | Value::AutomationNull => {}
+                value => capture.push(value),
+            }
+            return Ok(());
+        }
         // The host's default object formatting (Format-Table) is M6; until
         // then an object on the output stream is refused, never printed as
         // `@{...}` where pwsh would draw a table.
@@ -1510,14 +1531,6 @@ impl Engine {
                 feature: "default object formatting",
             }
             .into());
-        }
-        if let Some(capture) = &mut self.capture {
-            match value {
-                Value::Array(items) => capture.extend(items.iter().cloned()),
-                Value::Null | Value::AutomationNull => {}
-                value => capture.push(value),
-            }
-            return Ok(());
         }
         match value {
             Value::Array(items) => {
@@ -1633,6 +1646,9 @@ fn evaluate(
             let mut object = Vec::with_capacity(entries.len());
             for (name, value) in entries {
                 object.push((name.clone(), evaluate(value, variables, last_success)?));
+            }
+            if !object.is_empty() && object.iter().all(|(key, _)| key.parse::<i64>().is_ok()) {
+                object = order_hashtable(object);
             }
             Ok(Value::object(object))
         }
@@ -2376,6 +2392,26 @@ fn format_out_string(input: &[Value]) -> String {
     text
 }
 
+/// .NET's `Hashtable` walks integer keys by descending bucket. For small
+/// tables it uses the next prime at least twice the entry count.
+fn order_hashtable(mut entries: Vec<(String, Value)>) -> Vec<(String, Value)> {
+    let capacity = next_prime((entries.len() * 2).max(3));
+    entries.sort_by_key(|(key, _)| {
+        let value = key.parse::<i64>().unwrap_or(0) as u64 & 0x7fff_ffff;
+        std::cmp::Reverse(value % capacity as u64)
+    });
+    entries
+}
+
+fn next_prime(mut value: usize) -> usize {
+    loop {
+        if (2..value).all(|factor| !value.is_multiple_of(factor)) {
+            return value;
+        }
+        value += 1;
+    }
+}
+
 fn flatten_value(value: Value) -> Vec<Value> {
     match value {
         Value::Array(items) => items.as_ref().clone(),
@@ -2598,6 +2634,21 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        (kind, "new") if kind.starts_with("collections.generic.hashset") => {
+            let values = arguments
+                .first()
+                .map_or_else(Vec::new, |value| flatten_value(value.clone()));
+            let mut unique: Vec<Value> = Vec::new();
+            for value in values {
+                if !unique.iter().any(|existing| existing == &value) {
+                    unique.push(value);
+                }
+            }
+            Ok(Value::array(unique))
+        }
+        (kind, "new") if kind.starts_with("collections.generic.dictionary") => {
+            Ok(Value::object(Vec::new()))
+        }
         ("random", "new") => {
             let seed = match arguments.first() {
                 Some(value) if !value.is_null_like() => convert_int32(value)?,
@@ -2711,6 +2762,12 @@ fn is_hidden(key: &str) -> bool {
 /// `[type]value`, the subset of `LanguagePrimitives.ConvertTo` the skeleton
 /// needs. Failing conversions are refused rather than approximated.
 fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
+    if type_name.ends_with("[]") {
+        return Ok(match value {
+            Value::Array(_) => value,
+            other => Value::array(vec![other]),
+        });
+    }
     match type_name.to_ascii_lowercase().as_str() {
         "pscustomobject" | "system.management.automation.pscustomobject" => Ok(value),
         "ordered" | "ordereddictionary" | "system.collections.specialized.ordereddictionary" => Ok(

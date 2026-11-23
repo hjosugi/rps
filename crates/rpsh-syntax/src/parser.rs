@@ -337,6 +337,26 @@ impl Parser {
         Ok(condition)
     }
 
+    /// True when a `|` occurs at the top level before the matching `)`.
+    fn paren_has_pipe(&self) -> bool {
+        let mut depth = 0usize;
+        for token in &self.tokens[self.pos..] {
+            match token.kind {
+                TokenKind::LParen => depth += 1,
+                TokenKind::RParen => {
+                    if depth == 0 {
+                        return false;
+                    }
+                    depth -= 1;
+                }
+                TokenKind::Pipe if depth == 0 => return true,
+                TokenKind::EndOfInput => return false,
+                _ => {}
+            }
+        }
+        false
+    }
+
     fn paren_statements(&mut self) -> Result<Vec<Statement>, ParseError> {
         let mut statements = Vec::new();
         loop {
@@ -1649,6 +1669,8 @@ impl Parser {
                     let key = match kind {
                         TokenKind::Identifier(name) => name,
                         TokenKind::StringLiteral(value) => value,
+                        TokenKind::Int32(value) => value.to_string(),
+                        TokenKind::Numeric(value) => value.to_string(),
                         _ => return self.refuse("hashtable keys"),
                     };
                     self.pos += 1;
@@ -1681,7 +1703,8 @@ impl Parser {
                 if matches!(
                     self.peek().kind,
                     TokenKind::Identifier(_) | TokenKind::Bareword(_)
-                ) {
+                ) || self.paren_has_pipe()
+                {
                     let statements = self.paren_statements()?;
                     return self.expr(ExprKind::Group(statements), span.to(self.previous_span()));
                 }

@@ -3,6 +3,7 @@ cmdlets/content
 cmdlets/default-formatting
 cmdlets/json
 cmdlets/write-output
+contract/collection-order
 contract/console
 contract/streams
 contract/version-table
