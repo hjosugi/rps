@@ -1248,6 +1248,15 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "foreach-object" => {
+                let mut member_name_named = None;
+                for argument in arguments {
+                    if let CommandArgument::Parameter { name, value } = argument
+                        && name.eq_ignore_ascii_case("membername")
+                        && let Some(expr) = value
+                    {
+                        member_name_named = Some(self.eval_expression(expr)?.to_string());
+                    }
+                }
                 let block_for = |wanted: &str| -> Option<Vec<Statement>> {
                     arguments.iter().find_map(|argument| match argument {
                         CommandArgument::Parameter { name, value }
@@ -1306,9 +1315,11 @@ impl Engine {
                     }
                     return Ok(Some(outputs));
                 }
-                let member_name = arguments.iter().find_map(|argument| match argument {
-                    CommandArgument::Bareword(word) => Some(word.clone()),
-                    _ => None,
+                let member_name = member_name_named.or_else(|| {
+                    arguments.iter().find_map(|argument| match argument {
+                        CommandArgument::Bareword(word) => Some(word.clone()),
+                        _ => None,
+                    })
                 });
                 let Some(member_name) = member_name else {
                     return Err(RuntimeError::NotImplemented {
@@ -1578,13 +1589,48 @@ impl Engine {
                     }
                     .into());
                 }
-                Ok(Some(vec![Value::object(vec![
+                let target = std::path::Path::new(&text);
+                let mut entries = vec![
                     (
                         "__TypeName".to_owned(),
-                        Value::String("System.IO.FileInfo".into()),
+                        Value::String(
+                            if target.is_dir() {
+                                "System.IO.DirectoryInfo"
+                            } else {
+                                "System.IO.FileInfo"
+                            }
+                            .into(),
+                        ),
                     ),
-                    ("FullName".to_owned(), Value::String(text.into())),
-                ])]))
+                    ("FullName".to_owned(), Value::String(text.clone().into())),
+                    (
+                        "Name".to_owned(),
+                        Value::String(
+                            target
+                                .file_name()
+                                .map_or_else(String::new, |name| name.to_string_lossy().to_string())
+                                .into(),
+                        ),
+                    ),
+                ];
+                if target.is_file() {
+                    entries.push((
+                        "Length".to_owned(),
+                        Value::Int64(target.metadata().map_or(0, |meta| meta.len()) as i64),
+                    ));
+                    entries.push((
+                        "Extension".to_owned(),
+                        Value::String(
+                            target
+                                .extension()
+                                .map_or_else(String::new, |value| {
+                                    format!(".{}", value.to_string_lossy())
+                                })
+                                .into(),
+                        ),
+                    ));
+                }
+                Ok(Some(vec![Value::object(entries)]))
             }
             "new-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -2742,6 +2788,17 @@ impl Engine {
                     let last = convert_int32(last)?.max(0) as usize;
                     if items.len() > last {
                         items = items.split_off(items.len() - last);
+                    }
+                }
+                if let Some((_, skip_last)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("skiplast"))
+                {
+                    let skip_last = convert_int32(skip_last)?.max(0) as usize;
+                    if skip_last >= items.len() {
+                        items.clear();
+                    } else {
+                        items.truncate(items.len() - skip_last);
                     }
                 }
                 Ok(Some(items))

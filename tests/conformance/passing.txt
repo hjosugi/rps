@@ -9,6 +9,7 @@ cmdlets/dot-source-fixture
 cmdlets/file-hash
 cmdlets/files
 cmdlets/format-mixed-stream
+cmdlets/item-props
 cmdlets/json
 cmdlets/json-pretty
 cmdlets/path-ops
