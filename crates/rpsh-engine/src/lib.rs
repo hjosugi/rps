@@ -1934,17 +1934,17 @@ impl Engine {
                 if text.ends_with('\n') {
                     lines.pop();
                 }
-                if let Some((_, count)) = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("totalcount"))
-                {
+                if let Some((_, count)) = named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("totalcount")
+                        || name.eq_ignore_ascii_case("first")
+                        || name.eq_ignore_ascii_case("head")
+                }) {
                     let count = convert_int32(count)?.max(0) as usize;
                     lines.truncate(count);
                 }
-                if let Some((_, count)) = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("tail"))
-                {
+                if let Some((_, count)) = named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("tail") || name.eq_ignore_ascii_case("last")
+                }) {
                     let count = convert_int32(count)?.max(0) as usize;
                     if lines.len() > count {
                         lines = lines.split_off(lines.len() - count);
