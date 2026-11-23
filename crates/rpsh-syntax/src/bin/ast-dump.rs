@@ -110,6 +110,7 @@ fn binary(op: BinaryOp) -> &'static str {
         BinaryOp::Remainder => "Remainder",
         BinaryOp::Range => "Range",
         BinaryOp::Join => "Join",
+        BinaryOp::Format => "Format",
         BinaryOp::Eq => "Eq",
         BinaryOp::Ne => "Ne",
         BinaryOp::Ge => "Ge",

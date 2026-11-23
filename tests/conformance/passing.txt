@@ -8,6 +8,7 @@ lang/comparison-filter
 lang/comparison-insensitive
 lang/division
 lang/double-format
+lang/format-operator
 lang/function
 lang/function-basic
 lang/hashtable

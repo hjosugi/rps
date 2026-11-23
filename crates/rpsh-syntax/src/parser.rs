@@ -1075,6 +1075,7 @@ impl Parser {
         loop {
             let op = match self.peek().kind {
                 TokenKind::Join => BinaryOp::Join,
+                TokenKind::Format => BinaryOp::Format,
                 TokenKind::Eq => BinaryOp::Eq,
                 TokenKind::Ne => BinaryOp::Ne,
                 TokenKind::Ge => BinaryOp::Ge,
@@ -1739,6 +1740,7 @@ mod tests {
                     BinaryOp::Remainder => "%",
                     BinaryOp::Range => "..",
                     BinaryOp::Join => "-join",
+                    BinaryOp::Format => "-f",
                     BinaryOp::Eq => "-eq",
                     BinaryOp::Ne => "-ne",
                     BinaryOp::Ge => "-ge",

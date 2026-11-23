@@ -70,6 +70,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::DivideEquals => TokenKind::DivideEquals,
             FullTokenKind::RemainderEquals => TokenKind::RemainderEquals,
             FullTokenKind::Join => TokenKind::Join,
+            FullTokenKind::Format => TokenKind::Format,
             FullTokenKind::Imatch => TokenKind::Match,
             FullTokenKind::Inotmatch => TokenKind::NotMatch,
             FullTokenKind::Cmatch => TokenKind::CMatch,

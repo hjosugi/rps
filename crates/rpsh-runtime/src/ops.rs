@@ -698,6 +698,144 @@ pub fn join(left: &Value, separator: &Value) -> Result<Value, RuntimeError> {
     Ok(Value::String(text.into()))
 }
 
+/// The `-f` format operator: `{index[:spec]}` placeholders and `{{`/`}}`.
+pub fn format(template: &Value, arguments: &Value) -> Result<Value, RuntimeError> {
+    let Value::String(text) = template else {
+        return refuse("format string is not a string");
+    };
+    let args: Vec<&Value> = match arguments {
+        Value::Array(items) => items.iter().collect(),
+        other => vec![other],
+    };
+    let chars: Vec<char> = text.to_string_lossy().chars().collect();
+    let mut out = String::new();
+    let mut at = 0;
+    while at < chars.len() {
+        match chars[at] {
+            '{' => {
+                if chars.get(at + 1) == Some(&'{') {
+                    out.push('{');
+                    at += 2;
+                    continue;
+                }
+                at += 1;
+                let start = at;
+                while at < chars.len() && chars[at].is_ascii_digit() {
+                    at += 1;
+                }
+                let index = chars[start..at].iter().collect::<String>();
+                let mut spec = String::new();
+                if chars.get(at) == Some(&':') {
+                    at += 1;
+                    let spec_start = at;
+                    while at < chars.len() && chars[at] != '}' {
+                        at += 1;
+                    }
+                    spec = chars[spec_start..at].iter().collect();
+                }
+                if chars.get(at) != Some(&'}') {
+                    return refuse("malformed format string");
+                }
+                at += 1;
+                let index: usize = index.parse().map_err(|_| RuntimeError::NotImplemented {
+                    feature: "malformed format string",
+                })?;
+                let argument = args.get(index).ok_or(RuntimeError::NotImplemented {
+                    feature: "format index out of range",
+                })?;
+                out.push_str(&format_one(argument, &spec)?);
+            }
+            '}' => {
+                if chars.get(at + 1) == Some(&'}') {
+                    out.push('}');
+                    at += 2;
+                } else {
+                    return refuse("malformed format string");
+                }
+            }
+            other => {
+                out.push(other);
+                at += 1;
+            }
+        }
+    }
+    Ok(Value::String(out.into()))
+}
+
+fn format_one(value: &Value, spec: &str) -> Result<String, RuntimeError> {
+    if spec.is_empty() {
+        return Ok(value.to_string());
+    }
+    let kind = spec.chars().next().unwrap_or(' ').to_ascii_uppercase();
+    let precision = &spec[1..];
+    let precision: Option<usize> = if precision.is_empty() {
+        None
+    } else {
+        Some(
+            precision
+                .parse()
+                .map_err(|_| RuntimeError::NotImplemented {
+                    feature: "this format specifier",
+                })?,
+        )
+    };
+    match kind {
+        'N' => {
+            let value = float_value(value).ok_or(RuntimeError::NotImplemented {
+                feature: "this format specifier",
+            })?;
+            let precision = precision.unwrap_or(2);
+            Ok(group_thousands(&format!("{value:.precision$}"), precision))
+        }
+        'F' => {
+            let value = float_value(value).ok_or(RuntimeError::NotImplemented {
+                feature: "this format specifier",
+            })?;
+            let precision = precision.unwrap_or(2);
+            Ok(format!("{value:.precision$}"))
+        }
+        'D' => {
+            let value = int_value(value).ok_or(RuntimeError::NotImplemented {
+                feature: "this format specifier",
+            })?;
+            Ok(format!("{value:0width$}", width = precision.unwrap_or(0)))
+        }
+        'C' => {
+            let value = float_value(value).ok_or(RuntimeError::NotImplemented {
+                feature: "this format specifier",
+            })?;
+            Ok(format!("${}", group_thousands(&format!("{value:.2}"), 2)))
+        }
+        _ => refuse("this format specifier"),
+    }
+}
+
+/// Inserts thousands separators into the integer part of `text`, which has
+/// `decimals` fractional digits.
+fn group_thousands(text: &str, decimals: usize) -> String {
+    let (sign, text) = match text.strip_prefix('-') {
+        Some(rest) => ("-", rest),
+        None => ("", text),
+    };
+    let (integer, fraction) = if decimals > 0 {
+        text.split_once('.').unwrap_or((text, ""))
+    } else {
+        (text, "")
+    };
+    let mut grouped = String::new();
+    for (index, ch) in integer.chars().enumerate() {
+        if index > 0 && (integer.len() - index) % 3 == 0 {
+            grouped.push(',');
+        }
+        grouped.push(ch);
+    }
+    if decimals > 0 {
+        format!("{sign}{grouped}.{fraction}")
+    } else {
+        format!("{sign}{grouped}")
+    }
+}
+
 /// Unary `-join`: join an array with no separator.
 pub fn unary_join(operand: &Value) -> Result<Value, RuntimeError> {
     join(operand, &Value::String(Default::default()))
@@ -865,6 +1003,19 @@ mod tests {
         assert_eq!(divide(&int(7), &int(2)), Ok(Value::Double(3.5)));
         assert_eq!(divide(&Value::Int64(6), &int(2)), Ok(Value::Int64(3)));
         assert_eq!(divide(&Value::UInt32(7), &int(2)), Ok(Value::Double(3.5)));
+    }
+
+    #[test]
+    fn format_operator_substitutes_and_formats() {
+        assert_eq!(
+            format(&string("{0}-{1}"), &Value::array(vec![int(1), int(2)])),
+            Ok(string("1-2"))
+        );
+        assert_eq!(
+            format(&string("{0:N2}"), &Value::Double(1234567.891)),
+            Ok(string("1,234,567.89"))
+        );
+        assert_eq!(format(&string("{{x}}"), &int(1)), Ok(string("{x}")));
     }
 
     #[test]

@@ -1192,6 +1192,7 @@ fn evaluate(
                 BinaryOp::Remainder => ops::remainder(&left, &right),
                 BinaryOp::Range => ops::range(&left, &right),
                 BinaryOp::Join => ops::join(&left, &right),
+                BinaryOp::Format => ops::format(&left, &right),
                 BinaryOp::Eq => ops::compare(&left, &right, ops::Comparison::Eq, false),
                 BinaryOp::Ne => ops::compare(&left, &right, ops::Comparison::Ne, false),
                 BinaryOp::Ge => ops::compare(&left, &right, ops::Comparison::Ge, false),

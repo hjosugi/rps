@@ -288,6 +288,7 @@ pub enum BinaryOp {
     Remainder,
     Range,
     Join,
+    Format,
     Eq,
     Ne,
     Ge,

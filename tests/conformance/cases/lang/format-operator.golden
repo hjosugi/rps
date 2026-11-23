@@ -1,0 +1,9 @@
+rpsh-golden-v2
+exit=0
+a = 1
+b-a
+1,234,567.89
+2.5
+007
+$12.50
+{literal} 1

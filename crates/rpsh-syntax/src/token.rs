@@ -37,6 +37,7 @@ pub enum TokenKind {
     DivideEquals,
     RemainderEquals,
     Join,
+    Format,
     Match,
     NotMatch,
     CMatch,
