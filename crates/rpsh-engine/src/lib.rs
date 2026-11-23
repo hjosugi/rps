@@ -1548,6 +1548,9 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("property"))
                     .map(|(_, value)| value.to_string());
+                let case_sensitive = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
+                });
                 let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
                 for item in input {
                     let key = match &property {
@@ -1555,10 +1558,13 @@ impl Engine {
                             .map_or_else(|_| String::new(), |value| value.to_string()),
                         None => item.to_string(),
                     };
-                    if let Some((_, members)) = groups
-                        .iter_mut()
-                        .find(|(name, _)| name.eq_ignore_ascii_case(&key))
-                    {
+                    if let Some((_, members)) = groups.iter_mut().find(|(name, _)| {
+                        if case_sensitive {
+                            name == &key
+                        } else {
+                            name.eq_ignore_ascii_case(&key)
+                        }
+                    }) {
                         members.push(item.clone());
                     } else {
                         groups.push((key, vec![item.clone()]));
