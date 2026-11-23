@@ -1614,7 +1614,10 @@ impl Engine {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 let Some(path) = path else {
@@ -2068,13 +2071,20 @@ impl Engine {
             }
             "test-path" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let Some(path) = positional.first() else {
+                let path = named
+                    .iter()
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path_text) = path else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Test-Path without a path",
                     }
                     .into());
                 };
-                let path_text = path.to_string();
                 let path_type = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("pathtype"))
@@ -2754,6 +2764,9 @@ impl Engine {
                     }
                 }
             }
+            "get-host" => Ok(Some(vec![
+                automatic_variable("Host").unwrap_or(Value::Null),
+            ])),
             "get-module" | "gmo" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let wanted = named

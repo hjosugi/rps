@@ -9,3 +9,6 @@ Split-Path fixtures/data.txt -Extension
 Split-Path fixtures/data.txt -LeafBase
 Test-Path fixtures/tree/*.txt -PathType Leaf
 Test-Path fixtures/tree/*.txt -PathType Container
+Test-Path -LiteralPath fixtures/data.txt
+Test-Path -Path fixtures/data.txt
+(Get-Item -LiteralPath fixtures/data.txt).Name
