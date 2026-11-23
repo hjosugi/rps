@@ -1573,6 +1573,102 @@ impl Engine {
                 })?;
                 Ok(Some(Vec::new()))
             }
+            "invoke-expression" | "iex" => {
+                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let Some(source) = positional.first() else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Invoke-Expression without a script",
+                    }
+                    .into());
+                };
+                let script = parse(&source.to_string())?;
+                let saved = self.capture.take();
+                self.capture = Some(Vec::new());
+                let flow = self.exec_block(&script.statements, &mut capture_sink());
+                let outputs = self.capture.take().unwrap_or_default();
+                self.capture = saved;
+                flow?;
+                Ok(Some(outputs))
+            }
+            "get-variable" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let name = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                match name {
+                    Some(name) => {
+                        let key = strip_scope(&name).to_owned();
+                        let value = self.variables.get(&key).cloned().unwrap_or(Value::Null);
+                        Ok(Some(vec![Value::object(vec![
+                            ("Name".to_owned(), Value::String(key.into())),
+                            ("Value".to_owned(), value),
+                        ])]))
+                    }
+                    None => {
+                        let mut names: Vec<&String> = self.variables.keys().collect();
+                        names.sort();
+                        Ok(Some(
+                            names
+                                .into_iter()
+                                .map(|name| {
+                                    Value::object(vec![
+                                        ("Name".to_owned(), Value::String(name.clone().into())),
+                                        (
+                                            "Value".to_owned(),
+                                            self.variables
+                                                .get(name)
+                                                .cloned()
+                                                .unwrap_or(Value::Null),
+                                        ),
+                                    ])
+                                })
+                                .collect(),
+                        ))
+                    }
+                }
+            }
+            "set-variable" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let name = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let value = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("value"))
+                    .map(|(_, value)| value.clone())
+                    .or_else(|| positional.get(1).cloned())
+                    .unwrap_or(Value::Null);
+                let Some(name) = name else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Set-Variable without a name",
+                    }
+                    .into());
+                };
+                let key = strip_scope(&name).to_owned();
+                if is_global_scope(&name) {
+                    self.globals.insert(key.clone(), value.clone());
+                }
+                self.variables.insert(key, value);
+                Ok(Some(Vec::new()))
+            }
+            "remove-variable" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let name = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                if let Some(name) = name {
+                    let key = strip_scope(&name);
+                    self.variables.remove(key);
+                    self.globals.remove(key);
+                }
+                Ok(Some(Vec::new()))
+            }
             "get-random" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 if let Some((_, seed)) = named

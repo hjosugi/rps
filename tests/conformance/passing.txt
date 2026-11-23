@@ -29,6 +29,7 @@ lang/function-basic
 lang/hashtable
 lang/if-else
 lang/int-overflow
+lang/invoke-expression
 lang/loops
 lang/numeric-literals
 lang/numeric-promotion
