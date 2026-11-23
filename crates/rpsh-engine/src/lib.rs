@@ -36,6 +36,8 @@ pub struct Engine {
     trap: Option<Vec<Statement>>,
     /// Objects written to the host, formatted as one table at the end.
     host_objects: Vec<Value>,
+    /// The generator Get-Random draws from; -SetSeed replaces it.
+    random: Option<RandomGenerator>,
 }
 
 /// .NET's seeded `System.Random` (the subtractive generator).
@@ -81,6 +83,36 @@ impl RandomGenerator {
             inext: 0,
             inextp: 21,
         }
+    }
+
+    fn next_value(&mut self) -> i32 {
+        loop {
+            let mut bytes = [0u8; 4];
+            for byte in &mut bytes {
+                *byte = self.sample() as u8;
+            }
+            let value = i32::from_le_bytes(bytes);
+            if value != i32::MAX {
+                return if value < 0 {
+                    value.wrapping_add(i32::MAX)
+                } else {
+                    value
+                };
+            }
+        }
+    }
+
+    fn next_double(&mut self) -> f64 {
+        f64::from(self.next_value()) / f64::from(i32::MAX)
+    }
+
+    fn next_max(&mut self, maximum: i32) -> i32 {
+        (self.next_double() * f64::from(maximum)) as i32
+    }
+
+    fn next_range(&mut self, minimum: i32, maximum: i32) -> i32 {
+        let range = i64::from(maximum) - i64::from(minimum);
+        (self.next_double() * range as f64) as i32 + minimum
     }
 
     fn sample(&mut self) -> i32 {
@@ -1224,6 +1256,60 @@ impl Engine {
                     }
                 })?;
                 Ok(Some(Vec::new()))
+            }
+            "get-random" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                if let Some((_, seed)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("setseed"))
+                {
+                    self.random = Some(RandomGenerator::new(convert_int32(seed)?));
+                }
+                if self.random.is_none() {
+                    let seed = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |duration| duration.subsec_nanos() as i32);
+                    self.random = Some(RandomGenerator::new(seed));
+                }
+                let generator = self.random.as_mut().unwrap();
+                if let Some((_, maximum)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("maximum"))
+                {
+                    let maximum = convert_int32(maximum)?;
+                    return Ok(Some(vec![Value::Int32(generator.next_max(maximum))]));
+                }
+                let input = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("inputobject"))
+                    .map(|(_, value)| value.clone())
+                    .or_else(|| positional.first().cloned());
+                if let Some(input) = input {
+                    let items = flatten_value(input);
+                    let count = named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("count"))
+                        .map_or(Ok(1), |(_, count)| convert_int32(count))?
+                        .max(1) as usize;
+                    let count = count.min(items.len());
+                    let mut chosen: Vec<Value> = items[..count].to_vec();
+                    for (index, item) in items.iter().enumerate().skip(count) {
+                        if generator.next_range(0, index as i32 + 1) < count as i32 {
+                            let replace = generator.next_range(0, count as i32) as usize;
+                            chosen[replace] = item.clone();
+                        }
+                    }
+                    let mut output = Vec::new();
+                    for i in 0..count {
+                        let j = generator.next_range(i as i32, count as i32) as usize;
+                        output.push(chosen[j].clone());
+                        if i != j {
+                            chosen[j] = chosen[i].clone();
+                        }
+                    }
+                    return Ok(Some(output));
+                }
+                Ok(Some(vec![Value::Int32(generator.next_max(i32::MAX))]))
             }
             "out-string" => {
                 let text = format_out_string(input);
