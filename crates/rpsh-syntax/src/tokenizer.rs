@@ -111,10 +111,16 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::Is => TokenKind::Is,
             FullTokenKind::IsNot => TokenKind::IsNot,
             FullTokenKind::As => TokenKind::As,
+            FullTokenKind::PlusPlus | FullTokenKind::PostfixPlusPlus => TokenKind::PlusPlus,
+            FullTokenKind::MinusMinus | FullTokenKind::PostfixMinusMinus => TokenKind::MinusMinus,
             FullTokenKind::QuestionMark => TokenKind::QuestionMark,
             FullTokenKind::Colon => TokenKind::Colon,
             FullTokenKind::QuestionQuestion => TokenKind::Coalesce,
             FullTokenKind::QuestionQuestionEquals => TokenKind::CoalesceEquals,
+            FullTokenKind::Label => {
+                let text = span.text(source);
+                TokenKind::Label(text.trim_start_matches(':').to_owned())
+            }
             FullTokenKind::RCurly => TokenKind::RCurly,
             FullTokenKind::DollarParen => TokenKind::DollarParen,
             FullTokenKind::Variable => {
@@ -146,6 +152,22 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::Identifier => TokenKind::Identifier(span.text(source).to_owned()),
             FullTokenKind::NewLine => TokenKind::NewLine,
             FullTokenKind::Exit => TokenKind::Exit,
+            FullTokenKind::If => TokenKind::If,
+            FullTokenKind::ElseIf => TokenKind::ElseIf,
+            FullTokenKind::Else => TokenKind::Else,
+            FullTokenKind::For => TokenKind::For,
+            FullTokenKind::Foreach => TokenKind::Foreach,
+            FullTokenKind::In => TokenKind::In,
+            FullTokenKind::While => TokenKind::While,
+            FullTokenKind::Do => TokenKind::Do,
+            FullTokenKind::Until => TokenKind::Until,
+            FullTokenKind::Try => TokenKind::Try,
+            FullTokenKind::Catch => TokenKind::Catch,
+            FullTokenKind::Finally => TokenKind::Finally,
+            FullTokenKind::Throw => TokenKind::Throw,
+            FullTokenKind::Return => TokenKind::Return,
+            FullTokenKind::Break => TokenKind::Break,
+            FullTokenKind::Continue => TokenKind::Continue,
             FullTokenKind::EndOfInput => TokenKind::EndOfInput,
             FullTokenKind::Comment => {
                 let text = span.text(source);
@@ -333,8 +355,48 @@ mod tests {
         assert_eq!(refused("1 | x"), "pipelines");
         assert_eq!(refused("Get-Date"), "command invocation");
         assert_eq!(
-            refused("if (1) { 2 }"),
+            refused("switch (1) { 1 { 2 } }"),
             "statement keywords (if, foreach, function, ...)"
+        );
+        assert_eq!(
+            kinds(
+                "if\nwhile\nfor\nforeach\ndo\ntry\ncatch\nfinally\nthrow\nreturn\nbreak\ncontinue"
+            ),
+            vec![
+                TokenKind::If,
+                TokenKind::NewLine,
+                TokenKind::While,
+                TokenKind::NewLine,
+                TokenKind::For,
+                TokenKind::NewLine,
+                TokenKind::Foreach,
+                TokenKind::NewLine,
+                TokenKind::Do,
+                TokenKind::NewLine,
+                TokenKind::Try,
+                TokenKind::NewLine,
+                TokenKind::Catch,
+                TokenKind::NewLine,
+                TokenKind::Finally,
+                TokenKind::NewLine,
+                TokenKind::Throw,
+                TokenKind::NewLine,
+                TokenKind::Return,
+                TokenKind::NewLine,
+                TokenKind::Break,
+                TokenKind::NewLine,
+                TokenKind::Continue,
+                TokenKind::EndOfInput,
+            ]
+        );
+        assert_eq!(
+            kinds(":outer $i++"),
+            vec![
+                TokenKind::Label("outer".to_owned()),
+                TokenKind::Variable("i".to_owned()),
+                TokenKind::PlusPlus,
+                TokenKind::EndOfInput,
+            ]
         );
         assert_eq!(
             kinds("1 -eq 1"),

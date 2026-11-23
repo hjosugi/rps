@@ -36,8 +36,73 @@ pub enum Statement {
         value: Expr,
         span: Span,
     },
+    /// `if` / `elseif` / `else`. Upstream: `IfStatementAst`.
+    If {
+        condition: Expr,
+        then: Vec<Statement>,
+        elseif: Vec<(Expr, Vec<Statement>)>,
+        otherwise: Vec<Statement>,
+        span: Span,
+    },
+    /// `while (condition) { ... }`. Upstream: `WhileStatementAst`.
+    While {
+        label: Option<String>,
+        condition: Expr,
+        body: Vec<Statement>,
+        span: Span,
+    },
+    /// `for (init; condition; step) { ... }`. Upstream: `ForStatementAst`.
+    For {
+        label: Option<String>,
+        init: Option<Box<Statement>>,
+        condition: Option<Expr>,
+        step: Option<Box<Statement>>,
+        body: Vec<Statement>,
+        span: Span,
+    },
+    /// `foreach ($name in collection) { ... }`. Upstream: `ForEachStatementAst`.
+    Foreach {
+        label: Option<String>,
+        name: String,
+        collection: Expr,
+        body: Vec<Statement>,
+        span: Span,
+    },
+    /// `do { ... } while|until (condition)`. Upstream: `DoWhileStatementAst` /
+    /// `DoUntilStatementAst`.
+    Do {
+        label: Option<String>,
+        body: Vec<Statement>,
+        condition: Expr,
+        until: bool,
+        span: Span,
+    },
+    /// `try { ... } catch { ... } finally { ... }`. Upstream: `TryStatementAst`.
+    Try {
+        body: Vec<Statement>,
+        catches: Vec<CatchClause>,
+        finally: Option<Vec<Statement>>,
+        span: Span,
+    },
+    /// `throw expression`. Upstream: `ThrowStatementAst`.
+    Throw { value: Expr, span: Span },
+    /// `return` with an optional value. Upstream: `ReturnStatementAst`.
+    Return { value: Option<Expr>, span: Span },
+    /// `break [label]`. Upstream: `BreakStatementAst`.
+    Break { label: Option<String>, span: Span },
+    /// `continue [label]`. Upstream: `ContinueStatementAst`.
+    Continue { label: Option<String>, span: Span },
     /// `exit` with an optional exit code. Upstream: `ExitStatementAst`.
     Exit { code: Option<Expr>, span: Span },
+}
+
+/// One `catch` clause of a `try` statement. Upstream: `CatchClauseAst`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatchClause {
+    /// The exception types the clause catches. Empty means every exception.
+    pub types: Vec<String>,
+    pub body: Vec<Statement>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,6 +174,14 @@ pub enum UnaryOp {
     Join,
     Not,
     Bnot,
+    /// `++$x`. Upstream: a `UnaryExpressionAst` whose token is `++`.
+    Increment,
+    /// `--$x`.
+    Decrement,
+    /// `$x++`.
+    PostIncrement,
+    /// `$x--`.
+    PostDecrement,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,6 +1,6 @@
 use crate::{
-    BinaryOp, Expr, ExprKind, ParseError, ScriptBlockAst, Span, Statement, StringPart, Token,
-    TokenKind, UnaryOp, tokenize,
+    BinaryOp, CatchClause, Expr, ExprKind, ParseError, ScriptBlockAst, Span, Statement, StringPart,
+    Token, TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -43,8 +43,12 @@ impl Parser {
     fn at_statement_end(&self) -> bool {
         matches!(
             self.peek().kind,
-            TokenKind::NewLine | TokenKind::Semi | TokenKind::EndOfInput
+            TokenKind::NewLine | TokenKind::Semi | TokenKind::RCurly | TokenKind::EndOfInput
         )
+    }
+
+    fn previous_span(&self) -> Span {
+        self.tokens[self.pos.saturating_sub(1)].span
     }
 
     fn refuse<T>(&self, feature: &'static str) -> Result<T, ParseError> {
@@ -69,6 +73,12 @@ impl Parser {
     }
 
     fn statement(&mut self) -> Result<Statement, ParseError> {
+        if let TokenKind::Label(label) = &self.peek().kind {
+            let label = label.clone();
+            let start = self.peek().span;
+            self.pos += 1;
+            return self.labeled_statement(label, start);
+        }
         if let TokenKind::Variable(name) = &self.peek().kind
             && let Some(next) = self.tokens.get(self.pos + 1)
             && matches!(
@@ -94,9 +104,429 @@ impl Parser {
                 Statement::Assign { name, value, span }
             });
         }
-        if self.peek().kind != TokenKind::Exit {
-            return Ok(Statement::Expression(self.expression()?));
+        match self.peek().kind {
+            TokenKind::If => self.if_statement(),
+            TokenKind::While => self.while_statement(),
+            TokenKind::For => self.for_statement(),
+            TokenKind::Foreach => self.foreach_statement(),
+            TokenKind::Do => self.do_statement(),
+            TokenKind::Try => self.try_statement(),
+            TokenKind::Throw => self.throw_statement(),
+            TokenKind::Return => self.return_statement(),
+            TokenKind::Break => self.break_statement(false),
+            TokenKind::Continue => self.break_statement(true),
+            TokenKind::Exit => self.exit_statement(),
+            _ => Ok(Statement::Expression(self.expression()?)),
         }
+    }
+
+    fn labeled_statement(&mut self, label: String, start: Span) -> Result<Statement, ParseError> {
+        let span = |statement_span: Span| start.to(statement_span);
+        match self.statement()? {
+            Statement::While {
+                condition,
+                body,
+                span: inner,
+                ..
+            } => Ok(Statement::While {
+                label: Some(label),
+                condition,
+                body,
+                span: span(inner),
+            }),
+            Statement::For {
+                init,
+                condition,
+                step,
+                body,
+                span: inner,
+                ..
+            } => Ok(Statement::For {
+                label: Some(label),
+                init,
+                condition,
+                step,
+                body,
+                span: span(inner),
+            }),
+            Statement::Foreach {
+                name,
+                collection,
+                body,
+                span: inner,
+                ..
+            } => Ok(Statement::Foreach {
+                label: Some(label),
+                name,
+                collection,
+                body,
+                span: span(inner),
+            }),
+            Statement::Do {
+                body,
+                condition,
+                until,
+                span: inner,
+                ..
+            } => Ok(Statement::Do {
+                label: Some(label),
+                body,
+                condition,
+                until,
+                span: span(inner),
+            }),
+            _ => Err(ParseError::not_implemented(
+                "labels on statements other than loops",
+                start,
+            )),
+        }
+    }
+
+    /// Parses a `{ ... }` statement block.
+    fn block(&mut self) -> Result<(Vec<Statement>, Span), ParseError> {
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::LCurly {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        let open = self.peek().span;
+        self.pos += 1;
+        let mut statements = Vec::new();
+        loop {
+            while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
+                self.pos += 1;
+            }
+            if self.peek().kind == TokenKind::RCurly {
+                let close = self.peek().span;
+                self.pos += 1;
+                return Ok((statements, open.to(close)));
+            }
+            if self.peek().kind == TokenKind::EndOfInput {
+                return self.refuse(SYNTAX_ERRORS);
+            }
+            self.nodes = 0;
+            statements.push(self.statement()?);
+            if !self.at_statement_end() {
+                return self.refuse(SYNTAX_ERRORS);
+            }
+        }
+    }
+
+    /// Parses `( expression )`, as a statement keyword's condition uses.
+    fn condition(&mut self) -> Result<Expr, ParseError> {
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::LParen {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        self.skip_newlines();
+        let condition = self.expression()?;
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::RParen {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        Ok(condition)
+    }
+
+    fn if_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let condition = self.condition()?;
+        let (then, _) = self.block()?;
+        let mut elseif = Vec::new();
+        let mut otherwise = Vec::new();
+        loop {
+            let save = self.pos;
+            self.skip_newlines();
+            match self.peek().kind {
+                TokenKind::ElseIf => {
+                    self.pos += 1;
+                    let condition = self.condition()?;
+                    let (body, _) = self.block()?;
+                    elseif.push((condition, body));
+                }
+                TokenKind::Else => {
+                    self.pos += 1;
+                    let save = self.pos;
+                    self.skip_newlines();
+                    if self.peek().kind == TokenKind::If {
+                        otherwise = vec![self.if_statement()?];
+                    } else {
+                        self.pos = save;
+                        otherwise = self.block()?.0;
+                    }
+                    break;
+                }
+                _ => {
+                    self.pos = save;
+                    break;
+                }
+            }
+        }
+        let span = start.to(self.previous_span());
+        Ok(Statement::If {
+            condition,
+            then,
+            elseif,
+            otherwise,
+            span,
+        })
+    }
+
+    fn while_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let condition = self.condition()?;
+        let (body, _) = self.block()?;
+        let span = start.to(self.previous_span());
+        Ok(Statement::While {
+            label: None,
+            condition,
+            body,
+            span,
+        })
+    }
+
+    fn for_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::LParen {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        self.skip_newlines();
+        let init = if self.peek().kind == TokenKind::Semi {
+            None
+        } else {
+            Some(Box::new(self.statement()?))
+        };
+        if self.peek().kind != TokenKind::Semi {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        self.skip_newlines();
+        let condition = if self.peek().kind == TokenKind::Semi {
+            None
+        } else {
+            Some(self.expression()?)
+        };
+        if self.peek().kind != TokenKind::Semi {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        self.skip_newlines();
+        let step = if self.peek().kind == TokenKind::RParen {
+            None
+        } else {
+            Some(Box::new(self.statement()?))
+        };
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::RParen {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        let (body, _) = self.block()?;
+        let span = start.to(self.previous_span());
+        Ok(Statement::For {
+            label: None,
+            init,
+            condition,
+            step,
+            body,
+            span,
+        })
+    }
+
+    fn foreach_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::LParen {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        self.skip_newlines();
+        let Token { kind, .. } = self.peek().clone();
+        let TokenKind::Variable(name) = kind else {
+            return self.refuse("foreach without a variable");
+        };
+        self.pos += 1;
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::In {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        self.skip_newlines();
+        let collection = self.expression()?;
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::RParen {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        let (body, _) = self.block()?;
+        let span = start.to(self.previous_span());
+        Ok(Statement::Foreach {
+            label: None,
+            name,
+            collection,
+            body,
+            span,
+        })
+    }
+
+    fn do_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let (body, _) = self.block()?;
+        self.skip_newlines();
+        let until = match self.peek().kind {
+            TokenKind::While => false,
+            TokenKind::Until => true,
+            _ => return self.refuse(SYNTAX_ERRORS),
+        };
+        self.pos += 1;
+        let condition = self.condition()?;
+        let span = start.to(self.previous_span());
+        Ok(Statement::Do {
+            label: None,
+            body,
+            condition,
+            until,
+            span,
+        })
+    }
+
+    fn try_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let (body, _) = self.block()?;
+        let mut catches = Vec::new();
+        loop {
+            let save = self.pos;
+            self.skip_newlines();
+            if self.peek().kind != TokenKind::Catch {
+                self.pos = save;
+                break;
+            }
+            let catch_start = self.peek().span;
+            self.pos += 1;
+            let mut types = Vec::new();
+            loop {
+                self.skip_newlines();
+                if self.peek().kind != TokenKind::LBracket {
+                    break;
+                }
+                types.push(self.exception_type()?);
+                self.skip_newlines();
+                if self.peek().kind != TokenKind::Comma {
+                    break;
+                }
+                self.pos += 1;
+            }
+            let (catch_body, catch_span) = self.block()?;
+            catches.push(CatchClause {
+                types,
+                body: catch_body,
+                span: catch_start.to(catch_span),
+            });
+        }
+        let save = self.pos;
+        self.skip_newlines();
+        let finally = if self.peek().kind == TokenKind::Finally {
+            self.pos += 1;
+            Some(self.block()?.0)
+        } else {
+            self.pos = save;
+            None
+        };
+        if catches.is_empty() && finally.is_none() {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        let span = start.to(self.previous_span());
+        Ok(Statement::Try {
+            body,
+            catches,
+            finally,
+            span,
+        })
+    }
+
+    /// Parses an exception type in a `catch` clause, `[A.B.C]`.
+    fn exception_type(&mut self) -> Result<String, ParseError> {
+        self.pos += 1;
+        let mut name = String::new();
+        loop {
+            self.skip_newlines();
+            match &self.peek().kind {
+                TokenKind::Identifier(part) => {
+                    name.push_str(part);
+                    self.pos += 1;
+                }
+                _ => return self.refuse(SYNTAX_ERRORS),
+            }
+            match self.peek().kind {
+                TokenKind::Dot => {
+                    name.push('.');
+                    self.pos += 1;
+                }
+                TokenKind::RBracket => {
+                    self.pos += 1;
+                    return Ok(name);
+                }
+                _ => return self.refuse(SYNTAX_ERRORS),
+            }
+        }
+    }
+
+    fn throw_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        if self.at_statement_end() {
+            return self.refuse("throw without an expression");
+        }
+        let value = self.expression()?;
+        let span = start.to(value.span);
+        Ok(Statement::Throw { value, span })
+    }
+
+    fn return_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        if self.at_statement_end() {
+            return Ok(Statement::Return {
+                value: None,
+                span: start,
+            });
+        }
+        let value = self.expression()?;
+        let span = start.to(value.span);
+        Ok(Statement::Return {
+            value: Some(value),
+            span,
+        })
+    }
+
+    fn break_statement(&mut self, is_continue: bool) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let label = match &self.peek().kind {
+            TokenKind::Identifier(label) | TokenKind::Label(label) => {
+                let label = label.clone();
+                self.pos += 1;
+                Some(label)
+            }
+            _ => None,
+        };
+        let span = start.to(self.previous_span());
+        Ok(if is_continue {
+            Statement::Continue { label, span }
+        } else {
+            Statement::Break { label, span }
+        })
+    }
+
+    fn exit_statement(&mut self) -> Result<Statement, ParseError> {
         let exit = self.peek().span;
         self.pos += 1;
         if self.at_statement_end() {
@@ -302,6 +732,25 @@ impl Parser {
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
         match self.peek().kind {
+            TokenKind::PlusPlus | TokenKind::MinusMinus => {
+                let increment = self.peek().kind == TokenKind::PlusPlus;
+                let span = self.peek().span;
+                self.pos += 1;
+                let operand = self.unary()?;
+                let span = span.to(operand.span);
+                let op = if increment {
+                    UnaryOp::Increment
+                } else {
+                    UnaryOp::Decrement
+                };
+                self.expr(
+                    ExprKind::Unary {
+                        op,
+                        operand: Box::new(operand),
+                    },
+                    span,
+                )
+            }
             TokenKind::Comma => {
                 let span = self.peek().span;
                 self.pos += 1;
@@ -410,6 +859,24 @@ impl Parser {
                         ExprKind::Index {
                             target: Box::new(expression),
                             index: Box::new(index),
+                        },
+                        span,
+                    )?;
+                }
+                TokenKind::PlusPlus | TokenKind::MinusMinus => {
+                    let increment = self.peek().kind == TokenKind::PlusPlus;
+                    let close = self.peek().span;
+                    self.pos += 1;
+                    let span = expression.span.to(close);
+                    let op = if increment {
+                        UnaryOp::PostIncrement
+                    } else {
+                        UnaryOp::PostDecrement
+                    };
+                    expression = self.expr(
+                        ExprKind::Unary {
+                            op,
+                            operand: Box::new(expression),
                         },
                         span,
                     )?;
@@ -812,6 +1279,10 @@ mod tests {
                 UnaryOp::Join => format!("(-join {})", show(operand)),
                 UnaryOp::Not => format!("(-not {})", show(operand)),
                 UnaryOp::Bnot => format!("(-bnot {})", show(operand)),
+                UnaryOp::Increment => format!("(++{})", show(operand)),
+                UnaryOp::Decrement => format!("(--{})", show(operand)),
+                UnaryOp::PostIncrement => format!("({}++)", show(operand)),
+                UnaryOp::PostDecrement => format!("({}--)", show(operand)),
             },
             ExprKind::Binary { op, left, right } => {
                 let symbol = match op {
@@ -918,21 +1389,145 @@ mod tests {
             .unwrap()
             .statements
             .iter()
-            .map(|statement| match statement {
-                Statement::Expression(expr) => show(expr),
-                Statement::Assign { name, value, .. } => format!("${name} = {}", show(value)),
-                Statement::AppendAssign { name, value, .. } => {
-                    format!("${name} += {}", show(value))
-                }
-                Statement::CoalesceAssign { name, value, .. } => {
-                    format!("${name} ??= {}", show(value))
-                }
-                Statement::Exit { code: None, .. } => "exit".to_owned(),
-                Statement::Exit {
-                    code: Some(code), ..
-                } => format!("exit {}", show(code)),
-            })
+            .map(show_statement)
             .collect()
+    }
+
+    fn show_block(statements: &[Statement]) -> String {
+        statements
+            .iter()
+            .map(show_statement)
+            .collect::<Vec<_>>()
+            .join("; ")
+    }
+
+    fn show_label(label: &Option<String>) -> String {
+        label
+            .as_ref()
+            .map(|label| format!(":{label} "))
+            .unwrap_or_default()
+    }
+
+    fn show_statement(statement: &Statement) -> String {
+        match statement {
+            Statement::Expression(expr) => show(expr),
+            Statement::Assign { name, value, .. } => format!("${name} = {}", show(value)),
+            Statement::AppendAssign { name, value, .. } => format!("${name} += {}", show(value)),
+            Statement::CoalesceAssign { name, value, .. } => {
+                format!("${name} ??= {}", show(value))
+            }
+            Statement::If {
+                condition,
+                then,
+                elseif,
+                otherwise,
+                ..
+            } => {
+                let mut text = format!("if {} {{ {} }}", show(condition), show_block(then));
+                for (condition, body) in elseif {
+                    text.push_str(&format!(
+                        " elseif {} {{ {} }}",
+                        show(condition),
+                        show_block(body)
+                    ));
+                }
+                if !otherwise.is_empty() {
+                    text.push_str(&format!(" else {{ {} }}", show_block(otherwise)));
+                }
+                text
+            }
+            Statement::While {
+                label,
+                condition,
+                body,
+                ..
+            } => format!(
+                "{}while {} {{ {} }}",
+                show_label(label),
+                show(condition),
+                show_block(body)
+            ),
+            Statement::For {
+                label,
+                init,
+                condition,
+                step,
+                body,
+                ..
+            } => format!(
+                "{}for ({}; {}; {}) {{ {} }}",
+                show_label(label),
+                init.as_ref()
+                    .map_or_else(String::new, |c| show_statement(c)),
+                condition.as_ref().map_or_else(String::new, show),
+                step.as_ref()
+                    .map_or_else(String::new, |c| show_statement(c)),
+                show_block(body)
+            ),
+            Statement::Foreach {
+                label,
+                name,
+                collection,
+                body,
+                ..
+            } => format!(
+                "{}foreach (${name} in {}) {{ {} }}",
+                show_label(label),
+                show(collection),
+                show_block(body)
+            ),
+            Statement::Do {
+                label,
+                body,
+                condition,
+                until,
+                ..
+            } => format!(
+                "{}do {{ {} }} {} ({})",
+                show_label(label),
+                show_block(body),
+                if *until { "until" } else { "while" },
+                show(condition)
+            ),
+            Statement::Try {
+                body,
+                catches,
+                finally,
+                ..
+            } => {
+                let mut text = format!("try {{ {} }}", show_block(body));
+                for clause in catches {
+                    text.push_str(" catch");
+                    for (index, kind) in clause.types.iter().enumerate() {
+                        text.push_str(if index == 0 { " [" } else { ", [" });
+                        text.push_str(kind);
+                        text.push(']');
+                    }
+                    text.push_str(&format!(" {{ {} }}", show_block(&clause.body)));
+                }
+                if let Some(finally) = finally {
+                    text.push_str(&format!(" finally {{ {} }}", show_block(finally)));
+                }
+                text
+            }
+            Statement::Throw { value, .. } => format!("throw {}", show(value)),
+            Statement::Return { value, .. } => match value {
+                Some(value) => format!("return {}", show(value)),
+                None => "return".to_owned(),
+            },
+            Statement::Break { label, .. } => match label {
+                Some(label) => format!("break {label}"),
+                None => "break".to_owned(),
+            },
+            Statement::Continue { label, .. } => match label {
+                Some(label) => format!("continue {label}"),
+                None => "continue".to_owned(),
+            },
+            Statement::Exit { code: None, .. } => "exit".to_owned(),
+            Statement::Exit {
+                code: Some(code), ..
+            } => format!("exit {}", show(code)),
+        }
     }
 
     fn refused(source: &str) -> &'static str {
@@ -978,9 +1573,53 @@ mod tests {
         assert_eq!(refused("+1"), "unary plus");
         assert_eq!(refused("(1\n)"), "newlines inside parentheses");
         assert_eq!(
-            refused("if (1) { 2 }"),
+            refused("switch (1) { 1 { 2 } }"),
             "statement keywords (if, foreach, function, ...)"
         );
+    }
+
+    #[test]
+    fn if_chains_elseif_and_else() {
+        assert_eq!(
+            shown("if ($a) { 1 } elseif ($b) { 2 } else { 3 }"),
+            ["if $a { 1 } elseif $b { 2 } else { 3 }"]
+        );
+        assert_eq!(
+            shown("if ($a) { 1 }\nelse { 2 }"),
+            ["if $a { 1 } else { 2 }"]
+        );
+    }
+
+    #[test]
+    fn loops_take_a_label_and_a_block() {
+        assert_eq!(
+            shown(":outer foreach ($x in 1, 2) { $x }"),
+            [":outer foreach ($x in [1,2]) { $x }"]
+        );
+        assert_eq!(shown("while ($a) { $a-- }"), ["while $a { ($a--) }"]);
+        assert_eq!(
+            shown("for ($i = 0; $i -lt 3; $i++) { $i }"),
+            ["for ($i = 0; ($i -lt 3); ($i++)) { $i }"]
+        );
+        assert_eq!(shown("do { 1 } until ($a)"), ["do { 1 } until ($a)"]);
+    }
+
+    #[test]
+    fn break_and_continue_take_an_optional_label() {
+        assert_eq!(shown("while ($a) { break }"), ["while $a { break }"]);
+        assert_eq!(
+            shown(":outer while ($a) { continue outer }"),
+            [":outer while $a { continue outer }"]
+        );
+    }
+
+    #[test]
+    fn try_takes_catch_types_and_finally() {
+        assert_eq!(
+            shown("try { 1 } catch [A.B] { 2 } finally { 3 }"),
+            ["try { 1 } catch [A.B] { 2 } finally { 3 }"]
+        );
+        assert_eq!(refused("try { 1 }"), SYNTAX_ERRORS);
     }
 
     #[test]

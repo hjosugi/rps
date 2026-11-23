@@ -164,7 +164,8 @@ impl Tokenizer<'_> {
                 if end > start + 1 {
                     self.pos = end;
                     self.push(FullTokenKind::Label, start, end);
-                    self.statement_start = false;
+                    self.statement_start = true;
+                    self.command_seen = false;
                     continue;
                 }
             }

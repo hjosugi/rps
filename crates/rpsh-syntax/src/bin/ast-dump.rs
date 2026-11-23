@@ -92,6 +92,10 @@ fn unary(op: UnaryOp) -> &'static str {
         UnaryOp::Not => "Not",
         UnaryOp::Bnot => "Bnot",
         UnaryOp::Join => "Join",
+        UnaryOp::Increment => "Increment",
+        UnaryOp::Decrement => "Decrement",
+        UnaryOp::PostIncrement => "PostIncrement",
+        UnaryOp::PostDecrement => "PostDecrement",
     }
 }
 

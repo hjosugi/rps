@@ -26,7 +26,9 @@ mod span;
 mod token;
 mod tokenizer;
 
-pub use ast::{BinaryOp, Expr, ExprKind, ScriptBlockAst, Statement, StringPart, UnaryOp};
+pub use ast::{
+    BinaryOp, CatchClause, Expr, ExprKind, ScriptBlockAst, Statement, StringPart, UnaryOp,
+};
 pub use error::ParseError;
 pub use full_token_kind::{FullTokenKind, TOKEN_KINDS, TokenFlags, TokenKindInfo};
 pub use full_tokenizer::{FullToken, tokenize_full};

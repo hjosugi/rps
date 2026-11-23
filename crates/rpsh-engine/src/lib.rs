@@ -98,60 +98,315 @@ impl Engine {
         script: &ScriptBlockAst,
         out: &mut dyn Write,
     ) -> Result<i32, EngineError> {
-        for statement in &script.statements {
-            match statement {
-                Statement::Expression(expr) => {
-                    let value = evaluate(expr, &mut self.variables, self.last_success)?;
-                    match value {
-                        Value::Array(items) => {
-                            for item in items {
-                                if !matches!(item, Value::Null) {
-                                    writeln!(out, "{item}")?;
-                                }
+        match self.exec_block(&script.statements, out)? {
+            Flow::Normal => Ok(0),
+            Flow::Exit(code) => Ok(code),
+            Flow::Return(value) => {
+                if let Some(value) = value {
+                    self.write_value(value, out)?;
+                }
+                Ok(0)
+            }
+            Flow::Throw(_) => Err(RuntimeError::NotImplemented {
+                feature: "uncaught throw",
+            }
+            .into()),
+            // `break` and `continue` outside a loop end the script quietly, as
+            // upstream's top-level script block does.
+            Flow::Break(_) | Flow::Continue(_) => Ok(0),
+        }
+    }
+
+    fn exec_block(
+        &mut self,
+        statements: &[Statement],
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        for statement in statements {
+            let flow = self.exec_statement(statement, out)?;
+            if !matches!(flow, Flow::Normal) {
+                return Ok(flow);
+            }
+        }
+        Ok(Flow::Normal)
+    }
+
+    fn exec_statement(
+        &mut self,
+        statement: &Statement,
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        match statement {
+            Statement::Expression(expr) => {
+                let value = evaluate(expr, &mut self.variables, self.last_success)?;
+                if !matches!(
+                    expr.kind,
+                    ExprKind::Unary {
+                        op: UnaryOp::Increment
+                            | UnaryOp::Decrement
+                            | UnaryOp::PostIncrement
+                            | UnaryOp::PostDecrement,
+                        ..
+                    }
+                ) {
+                    self.write_value(value, out)?;
+                }
+                self.last_success = true;
+                Ok(Flow::Normal)
+            }
+            Statement::CoalesceAssign { name, value, .. } => {
+                let key = strip_scope(name);
+                if matches!(self.variables.get(key), None | Some(Value::Null)) {
+                    let value = evaluate(value, &mut self.variables, self.last_success)?;
+                    self.variables.insert(key.to_owned(), value);
+                }
+                self.last_success = true;
+                Ok(Flow::Normal)
+            }
+            Statement::AppendAssign { name, value, .. } => {
+                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let key = strip_scope(name);
+                let updated = append(self.variables.get(key), value)?;
+                self.variables.insert(key.to_owned(), updated);
+                self.last_success = true;
+                Ok(Flow::Normal)
+            }
+            Statement::Assign { name, value, .. } => {
+                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                let key = strip_scope(name);
+                self.variables.insert(key.to_owned(), value);
+                self.last_success = true;
+                Ok(Flow::Normal)
+            }
+            Statement::If {
+                condition,
+                then,
+                elseif,
+                otherwise,
+                ..
+            } => {
+                let value = evaluate(condition, &mut self.variables, self.last_success)?;
+                if ops::is_true(&value) {
+                    self.last_success = true;
+                    return self.exec_block(then, out);
+                }
+                for (condition, body) in elseif {
+                    let value = evaluate(condition, &mut self.variables, self.last_success)?;
+                    if ops::is_true(&value) {
+                        self.last_success = true;
+                        return self.exec_block(body, out);
+                    }
+                }
+                self.last_success = true;
+                self.exec_block(otherwise, out)
+            }
+            Statement::While {
+                label,
+                condition,
+                body,
+                ..
+            } => self.exec_loop(label, Some(condition), None, body, out),
+            Statement::For {
+                label,
+                init,
+                condition,
+                step,
+                body,
+                ..
+            } => {
+                if let Some(init) = init {
+                    let flow = self.exec_statement(init, out)?;
+                    if !matches!(flow, Flow::Normal) {
+                        return Ok(flow);
+                    }
+                }
+                self.exec_loop(label, condition.as_ref(), step.as_deref(), body, out)
+            }
+            Statement::Foreach {
+                label,
+                name,
+                collection,
+                body,
+                ..
+            } => {
+                let value = evaluate(collection, &mut self.variables, self.last_success)?;
+                let items = match value {
+                    Value::Array(items) => items,
+                    Value::Null => Vec::new(),
+                    value => vec![value],
+                };
+                let key = strip_scope(name).to_owned();
+                for item in items {
+                    self.variables.insert(key.clone(), item);
+                    match self.exec_block(body, out)? {
+                        Flow::Normal => {}
+                        Flow::Break(None) => break,
+                        Flow::Break(Some(target)) if label.as_deref() == Some(target.as_str()) => {
+                            break;
+                        }
+                        Flow::Continue(None) => {}
+                        Flow::Continue(Some(target))
+                            if label.as_deref() == Some(target.as_str()) => {}
+                        other => return Ok(other),
+                    }
+                }
+                Ok(Flow::Normal)
+            }
+            Statement::Do {
+                label,
+                body,
+                condition,
+                until,
+                ..
+            } => {
+                loop {
+                    match self.exec_block(body, out)? {
+                        Flow::Normal => {}
+                        Flow::Break(None) => break,
+                        Flow::Break(Some(target)) if label.as_deref() == Some(target.as_str()) => {
+                            break;
+                        }
+                        Flow::Continue(None) => {}
+                        Flow::Continue(Some(target))
+                            if label.as_deref() == Some(target.as_str()) => {}
+                        other => return Ok(other),
+                    }
+                    let value = evaluate(condition, &mut self.variables, self.last_success)?;
+                    let truth = ops::is_true(&value);
+                    if (*until && truth) || (!*until && !truth) {
+                        break;
+                    }
+                }
+                Ok(Flow::Normal)
+            }
+            Statement::Try {
+                body,
+                catches,
+                finally,
+                ..
+            } => {
+                let mut flow = match self.exec_block(body, out)? {
+                    Flow::Throw(value) => {
+                        let mut handled = Flow::Throw(value.clone());
+                        for clause in catches {
+                            if clause.types.is_empty()
+                                || clause.types.iter().any(|kind| catch_matches(kind))
+                            {
+                                self.variables.insert("_".to_owned(), value);
+                                handled = self.exec_block(&clause.body, out)?;
+                                break;
                             }
                         }
-                        Value::Null => {}
-                        value => writeln!(out, "{value}")?,
+                        handled
                     }
-                    self.last_success = true;
-                }
-                Statement::CoalesceAssign { name, value, .. } => {
-                    let key = strip_scope(name);
-                    if matches!(self.variables.get(key), None | Some(Value::Null)) {
-                        let value = evaluate(value, &mut self.variables, self.last_success)?;
-                        self.variables.insert(key.to_owned(), value);
+                    flow => flow,
+                };
+                if let Some(finally) = finally {
+                    let finally = self.exec_block(finally, out)?;
+                    if !matches!(finally, Flow::Normal) {
+                        flow = finally;
                     }
-                    self.last_success = true;
                 }
-                Statement::AppendAssign { name, value, .. } => {
-                    let value = evaluate(value, &mut self.variables, self.last_success)?;
-                    let key = strip_scope(name);
-                    let updated = append(self.variables.get(key), value)?;
-                    self.variables.insert(key.to_owned(), updated);
-                    self.last_success = true;
+                Ok(flow)
+            }
+            Statement::Throw { value, .. } => {
+                let value = evaluate(value, &mut self.variables, self.last_success)?;
+                Ok(Flow::Throw(value))
+            }
+            Statement::Return { value, .. } => {
+                let value = match value {
+                    Some(value) => Some(evaluate(value, &mut self.variables, self.last_success)?),
+                    None => None,
+                };
+                Ok(Flow::Return(value))
+            }
+            Statement::Break { label, .. } => Ok(Flow::Break(label.clone())),
+            Statement::Continue { label, .. } => Ok(Flow::Continue(label.clone())),
+            Statement::Exit { code: None, .. } => Ok(Flow::Exit(0)),
+            Statement::Exit {
+                code: Some(code), ..
+            } => match evaluate(code, &mut self.variables, self.last_success)? {
+                Value::Int32(code) => Ok(Flow::Exit(code)),
+                _ => Err(RuntimeError::NotImplemented {
+                    feature: "exit with a value other than Int32",
                 }
-                Statement::Assign { name, value, .. } => {
-                    let value = evaluate(value, &mut self.variables, self.last_success)?;
-                    let key = strip_scope(name);
-                    self.variables.insert(key.to_owned(), value);
-                    self.last_success = true;
+                .into()),
+            },
+        }
+    }
+
+    /// Runs a loop body with the `break`/`continue` handling every loop shares.
+    /// `step` is `None` for `while`, and the `for` iterator otherwise.
+    fn exec_loop(
+        &mut self,
+        label: &Option<String>,
+        condition: Option<&Expr>,
+        step: Option<&Statement>,
+        body: &[Statement],
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        loop {
+            if let Some(condition) = condition {
+                let value = evaluate(condition, &mut self.variables, self.last_success)?;
+                if !ops::is_true(&value) {
+                    break;
                 }
-                Statement::Exit { code: None, .. } => return Ok(0),
-                Statement::Exit {
-                    code: Some(code), ..
-                } => {
-                    return match evaluate(code, &mut self.variables, self.last_success)? {
-                        Value::Int32(code) => Ok(code),
-                        _ => Err(RuntimeError::NotImplemented {
-                            feature: "exit with a value other than Int32",
-                        }
-                        .into()),
-                    };
+            }
+            match self.exec_block(body, out)? {
+                Flow::Normal => {}
+                Flow::Break(None) => break,
+                Flow::Break(Some(target)) if label.as_deref() == Some(target.as_str()) => break,
+                Flow::Continue(None) => {}
+                Flow::Continue(Some(target)) if label.as_deref() == Some(target.as_str()) => {}
+                other => return Ok(other),
+            }
+            if let Some(step) = step {
+                let flow = self.exec_statement(step, out)?;
+                if !matches!(flow, Flow::Normal) {
+                    return Ok(flow);
                 }
             }
         }
-        Ok(0)
+        Ok(Flow::Normal)
     }
+
+    fn write_value(&self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
+        match value {
+            Value::Array(items) => {
+                for item in items {
+                    if !matches!(item, Value::Null) {
+                        writeln!(out, "{item}")?;
+                    }
+                }
+            }
+            Value::Null => {}
+            value => writeln!(out, "{value}")?,
+        }
+        Ok(())
+    }
+}
+
+/// How a statement finishes. Only `Normal` continues with the next statement;
+/// the rest is consumed by the nearest construct that understands it.
+#[derive(Debug)]
+enum Flow {
+    Normal,
+    Break(Option<String>),
+    Continue(Option<String>),
+    Return(Option<Value>),
+    Throw(Value),
+    Exit(i32),
+}
+
+/// A `catch` clause with one of these types takes a value thrown by `throw`.
+fn catch_matches(kind: &str) -> bool {
+    matches!(
+        kind.to_ascii_lowercase().as_str(),
+        "system.management.automation.runtimeexception"
+            | "runtimeexception"
+            | "system.exception"
+            | "exception"
+    )
 }
 
 fn evaluate(
@@ -258,6 +513,14 @@ fn evaluate(
             }
         }
         ExprKind::Unary {
+            op:
+                op @ (UnaryOp::Increment
+                | UnaryOp::Decrement
+                | UnaryOp::PostIncrement
+                | UnaryOp::PostDecrement),
+            operand,
+        } => increment(operand, variables, last_success, *op),
+        ExprKind::Unary {
             op: UnaryOp::Negate,
             operand,
         } => ops::negate(&evaluate(operand, variables, last_success)?),
@@ -342,6 +605,35 @@ fn evaluate(
     }
 }
 
+/// `++$x` / `$x++` / `--$x` / `$x--`: a postfix form yields the value before
+/// the update, a prefix form the value after it.
+fn increment(
+    operand: &Expr,
+    variables: &mut HashMap<String, Value>,
+    last_success: bool,
+    op: UnaryOp,
+) -> Result<Value, RuntimeError> {
+    let ExprKind::Variable(name) = &operand.kind else {
+        return Err(RuntimeError::NotImplemented {
+            feature: "incrementing anything but a variable",
+        });
+    };
+    let old = lookup(name, variables, last_success).ok_or(RuntimeError::NotImplemented {
+        feature: "undefined variable",
+    })?;
+    let one = Value::Int32(1);
+    let updated = match op {
+        UnaryOp::Increment | UnaryOp::PostIncrement => ops::add(&old, &one)?,
+        UnaryOp::Decrement | UnaryOp::PostDecrement => ops::subtract(&old, &one)?,
+        _ => unreachable!("increment is called only for increment operators"),
+    };
+    variables.insert(strip_scope(name).to_owned(), updated.clone());
+    Ok(match op {
+        UnaryOp::PostIncrement | UnaryOp::PostDecrement => old,
+        _ => updated,
+    })
+}
+
 fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
     match (target, index) {
         (Value::Array(items), Value::Int32(at)) => {
@@ -421,7 +713,7 @@ fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) ->
         "true" => return Some(Value::Bool(true)),
         "false" => return Some(Value::Bool(false)),
         "?" => return Some(Value::Bool(last_success)),
-        "_" => return Some(Value::Null),
+        "_" => return variables.get("_").cloned().or(Some(Value::Null)),
         _ => {}
     }
     if let Some(rest) = name.strip_prefix("env:") {
@@ -598,12 +890,44 @@ mod tests {
 
     #[test]
     fn an_unparsable_script_runs_nothing() {
-        let (result, out) = run("1\n2\nif (1) { 3 }");
+        let (result, out) = run("1\n2\nswitch (1) { 1 { 3 } }");
         assert_eq!(
             result.unwrap_err().missing_feature(),
             Some("statement keywords (if, foreach, function, ...)")
         );
         assert_eq!(out, "");
+    }
+
+    #[test]
+    fn if_selects_the_first_true_branch() {
+        let (result, out) =
+            run("$n = 7; if ($n -gt 10) { 'big' } elseif ($n -gt 5) { 'medium' } else { 'small' }");
+        assert_eq!(result.unwrap(), 0);
+        assert_eq!(out, "medium\n");
+
+        let (_, out) = run("if (@()) { 'yes' } else { 'no' }; if ('0') { 'yes' } else { 'no' }");
+        assert_eq!(out, "no\nyes\n");
+    }
+
+    #[test]
+    fn loops_support_break_and_continue() {
+        let (result, out) = run(
+            "$n = 0; while ($true) { $n++; if ($n -ge 3) { break } }; $n\n\
+             foreach ($x in 'a', 'b', 'c') { if ($x -eq 'b') { continue }; $x }\n\
+             for ($i = 0; $i -lt 3; $i++) { $i }\n\
+             do { $n-- } until ($n -le 0)\n$n",
+        );
+        assert_eq!(result.unwrap(), 0);
+        assert_eq!(out, "3\na\nc\n0\n1\n2\n0\n");
+    }
+
+    #[test]
+    fn a_label_is_carried_out_of_the_inner_loop() {
+        let (result, out) = run(
+            ":outer foreach ($a in 1..3) { foreach ($b in 1..3) { if ($b -eq 2) { continue outer }; \"$a$b\" } }",
+        );
+        assert_eq!(result.unwrap(), 0);
+        assert_eq!(out, "11\n21\n31\n");
     }
 
     #[test]

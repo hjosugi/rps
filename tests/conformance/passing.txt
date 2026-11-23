@@ -4,6 +4,8 @@ expr/string-literals
 lang/array
 lang/comparison-basic
 lang/division
+lang/if-else
+lang/loops
 lang/numeric-literals
 lang/scriptblock
 lang/string-escapes
