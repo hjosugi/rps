@@ -2154,12 +2154,6 @@ impl Engine {
                 let compress = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("compress") && ops::is_true(value)
                 });
-                if !compress {
-                    return Err(RuntimeError::NotImplemented {
-                        feature: "ConvertTo-Json without -Compress",
-                    }
-                    .into());
-                }
                 let values = if input.is_empty() {
                     positional
                 } else {
@@ -2167,7 +2161,12 @@ impl Engine {
                 };
                 let mut outputs = Vec::new();
                 for value in values {
-                    outputs.push(Value::String(json_stringify(&value)?.into()));
+                    let text = if compress {
+                        json_stringify(&value)?
+                    } else {
+                        json_stringify_pretty(&value, 0)?
+                    };
+                    outputs.push(Value::String(text.into()));
                 }
                 Ok(Some(outputs))
             }
@@ -2994,6 +2993,38 @@ fn json_stringify(value: &Value) -> Result<String, RuntimeError> {
         _ => Err(RuntimeError::NotImplemented {
             feature: "ConvertTo-Json for this value",
         }),
+    }
+}
+
+fn json_stringify_pretty(value: &Value, indent: usize) -> Result<String, RuntimeError> {
+    let pad = " ".repeat(indent);
+    let inner = " ".repeat(indent + 2);
+    match value {
+        Value::Array(items) if !items.is_empty() => {
+            let mut parts = Vec::with_capacity(items.len());
+            for item in items.iter() {
+                parts.push(format!(
+                    "{inner}{}",
+                    json_stringify_pretty(item, indent + 2)?
+                ));
+            }
+            Ok(format!("[\n{}\n{pad}]", parts.join(",\n")))
+        }
+        Value::Object(entries) if entries.iter().any(|(key, _)| !is_hidden(key)) => {
+            let mut parts = Vec::new();
+            for (name, value) in entries.iter() {
+                if is_hidden(name) {
+                    continue;
+                }
+                parts.push(format!(
+                    "{inner}{}: {}",
+                    json_quote(name),
+                    json_stringify_pretty(value, indent + 2)?
+                ));
+            }
+            Ok(format!("{{\n{}\n{pad}}}", parts.join(",\n")))
+        }
+        _ => json_stringify(value),
     }
 }
 

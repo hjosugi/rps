@@ -6,6 +6,7 @@ cmdlets/dot-source-fixture
 cmdlets/files
 cmdlets/format-mixed-stream
 cmdlets/json
+cmdlets/json-pretty
 cmdlets/write-output
 contract/collection-order
 contract/console
