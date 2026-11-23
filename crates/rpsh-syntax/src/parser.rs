@@ -621,6 +621,7 @@ impl Parser {
             TokenKind::LParen
                 | TokenKind::AtParen
                 | TokenKind::AtCurly
+                | TokenKind::LCurly
                 | TokenKind::LBracket
                 | TokenKind::DollarParen
         ) {
@@ -642,6 +643,7 @@ impl Parser {
                 | TokenKind::LParen
                 | TokenKind::AtParen
                 | TokenKind::AtCurly
+                | TokenKind::LCurly
                 | TokenKind::LBracket
                 | TokenKind::DollarParen
                 | TokenKind::Minus

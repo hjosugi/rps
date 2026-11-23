@@ -1242,6 +1242,45 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "foreach-object" => {
+                let block_for = |wanted: &str| -> Option<Vec<Statement>> {
+                    arguments.iter().find_map(|argument| match argument {
+                        CommandArgument::Parameter { name, value }
+                            if name.eq_ignore_ascii_case(wanted) =>
+                        {
+                            value.as_ref().and_then(|expr| match &expr.kind {
+                                ExprKind::ScriptBlock(statements) => Some(statements.clone()),
+                                _ => None,
+                            })
+                        }
+                        _ => None,
+                    })
+                };
+                let begin = block_for("begin");
+                let process = block_for("process");
+                let end = block_for("end");
+                if begin.is_some() || process.is_some() || end.is_some() {
+                    let saved = self.capture.take();
+                    self.capture = Some(Vec::new());
+                    if let Some(begin) = begin {
+                        let _ = self.exec_block(&begin, &mut capture_sink())?;
+                    }
+                    if let Some(process) = process {
+                        for item in input {
+                            let previous = self.variables.insert("_".to_owned(), item.clone());
+                            self.exec_block(&process, &mut capture_sink())?;
+                            match previous {
+                                Some(value) => self.variables.insert("_".to_owned(), value),
+                                None => self.variables.remove("_"),
+                            };
+                        }
+                    }
+                    if let Some(end) = end {
+                        self.exec_block(&end, &mut capture_sink())?;
+                    }
+                    let outputs = self.capture.take().unwrap_or_default();
+                    self.capture = saved;
+                    return Ok(Some(outputs));
+                }
                 if let Some(script) = script_block_argument(arguments) {
                     let script = script.clone();
                     let mut outputs = Vec::new();
