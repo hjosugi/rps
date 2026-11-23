@@ -48,6 +48,9 @@ pub struct Engine {
     modules: Vec<String>,
     /// Locations saved by Push-Location.
     locations: Vec<std::path::PathBuf>,
+    /// True when a typed host value was written, so the format stream gets a
+    /// final blank line.
+    host_text: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -285,6 +288,10 @@ impl Engine {
     ) -> Result<i32, EngineError> {
         let flow = self.exec_block(&script.statements, out)?;
         self.flush_host(out)?;
+        if self.host_text {
+            out.write_all(b"\n")?;
+            self.host_text = false;
+        }
         match flow {
             Flow::Normal => Ok(0),
             Flow::Exit(code) => Ok(code),
@@ -3469,7 +3476,8 @@ impl Engine {
                     _ => None,
                 });
             if let Some(text) = host_text {
-                write!(out, "\n{text}\n\n")?;
+                write!(out, "\n{text}\n")?;
+                self.host_text = true;
                 return Ok(());
             }
             let text = entries
@@ -5072,6 +5080,68 @@ fn format_datetime(
             ('m', 1) => out.push_str(&minute.to_string()),
             ('s', 2) => out.push_str(&format!("{second:02}")),
             ('s', 1) => out.push_str(&second.to_string()),
+            ('d', 4) => {
+                const WEEKDAYS: [&str; 7] = [
+                    "Sunday",
+                    "Monday",
+                    "Tuesday",
+                    "Wednesday",
+                    "Thursday",
+                    "Friday",
+                    "Saturday",
+                ];
+                out.push_str(WEEKDAYS[weekday(year, month, day) as usize % 7]);
+            }
+            ('d', 3) => {
+                const WEEKDAYS: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                out.push_str(WEEKDAYS[weekday(year, month, day) as usize % 7]);
+            }
+            ('M', 4) => {
+                const MONTHS: [&str; 12] = [
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December",
+                ];
+                out.push_str(MONTHS[(month as usize).clamp(1, 12) - 1]);
+            }
+            ('M', 3) => {
+                const MONTHS: [&str; 12] = [
+                    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+                    "Dec",
+                ];
+                out.push_str(MONTHS[(month as usize).clamp(1, 12) - 1]);
+            }
+            ('h', 2) | ('h', 1) => {
+                let hour12 = if hour == 0 {
+                    12
+                } else if hour > 12 {
+                    hour - 12
+                } else {
+                    hour
+                };
+                if count == 2 {
+                    out.push_str(&format!("{hour12:02}"));
+                } else {
+                    out.push_str(&hour12.to_string());
+                }
+            }
+            ('t', 2) | ('t', 1) => {
+                let ampm = if hour < 12 { "AM" } else { "PM" };
+                if count == 2 {
+                    out.push_str(ampm);
+                } else {
+                    out.push(ampm.chars().next().unwrap_or('A'));
+                }
+            }
             (other, _) => {
                 for _ in 0..count {
                     out.push(other);
