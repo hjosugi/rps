@@ -1697,30 +1697,70 @@ impl Engine {
                 Ok(Some(Vec::new()))
             }
             "get-childitem" | "ls" | "dir" => {
-                let (positional, _) = self.evaluate_arguments(arguments)?;
-                let path = positional
-                    .first()
-                    .map_or_else(|| ".".to_owned(), ToString::to_string);
-                let mut names = Vec::new();
-                if let Ok(entries) = std::fs::read_dir(&path) {
-                    for entry in entries.flatten() {
-                        if let Some(name) = entry.file_name().to_str() {
-                            names.push(name.to_owned());
-                        }
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| {
+                        positional
+                            .first()
+                            .map_or_else(|| Some(".".to_owned()), |value| Some(value.to_string()))
+                    })
+                    .unwrap_or_else(|| ".".to_owned());
+                let recurse = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("recurse") && ops::is_true(value)
+                });
+                let files_only = named
+                    .iter()
+                    .any(|(name, value)| name.eq_ignore_ascii_case("file") && ops::is_true(value));
+                let directories_only = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("directory") && ops::is_true(value)
+                });
+                let names_only = named
+                    .iter()
+                    .any(|(name, value)| name.eq_ignore_ascii_case("name") && ops::is_true(value));
+                let filter = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("filter"))
+                    .map(|(_, value)| value.to_string());
+                let mut entries: Vec<(String, bool, u64)> = Vec::new();
+                collect_children(&path, recurse, &mut entries);
+                entries.retain(|(name, is_dir, _)| {
+                    if files_only && *is_dir {
+                        return false;
                     }
-                }
-                names.sort();
+                    if directories_only && !*is_dir {
+                        return false;
+                    }
+                    match &filter {
+                        Some(filter) => ops::wildcard_match(name, filter, false),
+                        None => true,
+                    }
+                });
+                entries.sort_by_key(|(name, _, _)| name.to_lowercase());
                 Ok(Some(
-                    names
+                    entries
                         .into_iter()
-                        .map(|name| {
-                            Value::object(vec![
-                                (
-                                    "__TypeName".to_owned(),
-                                    Value::String("System.IO.FileInfo".into()),
-                                ),
-                                ("Name".to_owned(), Value::String(name.into())),
-                            ])
+                        .map(|(name, is_dir, _)| {
+                            if names_only {
+                                Value::String(name.into())
+                            } else {
+                                Value::object(vec![
+                                    (
+                                        "__TypeName".to_owned(),
+                                        Value::String(
+                                            if is_dir {
+                                                "System.IO.DirectoryInfo"
+                                            } else {
+                                                "System.IO.FileInfo"
+                                            }
+                                            .into(),
+                                        ),
+                                    ),
+                                    ("Name".to_owned(), Value::String(name.into())),
+                                ])
+                            }
                         })
                         .collect(),
                 ))
@@ -4194,6 +4234,21 @@ fn comparison_for(name: &str) -> Option<ops::Comparison> {
         "notlike" | "inotlike" => ops::Comparison::NotLike,
         _ => return None,
     })
+}
+
+fn collect_children(path: &str, recurse: bool, entries: &mut Vec<(String, bool, u64)>) {
+    if let Ok(read) = std::fs::read_dir(path) {
+        for entry in read.flatten() {
+            let is_dir = entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false);
+            let length = entry.metadata().map(|meta| meta.len()).unwrap_or(0);
+            if let Some(name) = entry.file_name().to_str() {
+                entries.push((name.to_owned(), is_dir, length));
+                if recurse && is_dir {
+                    collect_children(&entry.path().to_string_lossy(), recurse, entries);
+                }
+            }
+        }
+    }
 }
 
 fn sort_key(value: &Value, property: &Value) -> String {

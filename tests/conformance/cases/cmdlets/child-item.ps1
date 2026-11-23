@@ -1,0 +1,3 @@
+# rpsh-conformance: level=c2
+(Get-ChildItem fixtures/tree -Recurse -File | ForEach-Object Name | Sort-Object) -join ','
+(Get-ChildItem fixtures/tree -Filter '*.txt' -Name | Sort-Object) -join ','
