@@ -862,6 +862,7 @@ impl Tokenizer<'_> {
                 }
                 if self.mode == Mode::Command
                     && (*text == "." || *text == "/")
+                    && !self.after_member()
                     && self
                         .bytes
                         .get(end)
@@ -905,8 +906,14 @@ impl Tokenizer<'_> {
         let start = self.pos;
         let mut at = self.pos;
         let command_mode = self.mode == Mode::Command;
+        let after_dot = self.tokens.len() >= 2
+            && self.tokens[self.tokens.len() - 1].kind == FullTokenKind::Dot
+            && !matches!(
+                self.tokens[self.tokens.len() - 2].kind,
+                FullTokenKind::NewLine | FullTokenKind::Semi
+            );
         while let Some(ch) = self.source[at..].chars().next() {
-            let accepted = if command_mode {
+            let accepted = if command_mode && !after_dot {
                 ch.is_alphanumeric()
                     || matches!(
                         ch,

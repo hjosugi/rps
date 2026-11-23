@@ -313,6 +313,17 @@ impl Engine {
                 name, arguments, ..
             } => self.call_function(name, arguments, out),
             Statement::Pipeline { commands, .. } => self.exec_pipeline(commands, out),
+            Statement::AssignPipeline { name, commands, .. } => {
+                let outputs = self.pipeline_output(commands)?;
+                let value = match outputs.len() {
+                    0 => Value::Null,
+                    1 => outputs.into_iter().next().unwrap_or(Value::Null),
+                    _ => Value::array(outputs),
+                };
+                let key = strip_scope(name);
+                self.variables.insert(key.to_owned(), value);
+                Ok(Flow::Normal)
+            }
             Statement::Switch {
                 condition,
                 wildcard,
@@ -665,6 +676,14 @@ impl Engine {
         commands: &[PipelineCommand],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
+        let outputs = self.pipeline_output(commands)?;
+        for value in outputs {
+            self.write_value(value, out)?;
+        }
+        Ok(Flow::Normal)
+    }
+
+    fn pipeline_output(&mut self, commands: &[PipelineCommand]) -> Result<Vec<Value>, EngineError> {
         let mut input = Vec::new();
         for (index, command) in commands.iter().enumerate() {
             let last = index + 1 == commands.len();
@@ -678,14 +697,11 @@ impl Engine {
                 }
             };
             if last {
-                for value in outputs {
-                    self.write_value(value, out)?;
-                }
-                return Ok(Flow::Normal);
+                return Ok(outputs);
             }
             input = outputs;
         }
-        Ok(Flow::Normal)
+        Ok(input)
     }
 
     /// Runs a command for a pipeline stage and collects its output.
@@ -873,6 +889,35 @@ impl Engine {
                 let mut items = input.to_vec();
                 items.sort_by_key(|item| item.to_string().to_lowercase());
                 Ok(Some(items))
+            }
+            "convertto-json" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let compress = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("compress") && ops::is_true(value)
+                });
+                if !compress {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "ConvertTo-Json without -Compress",
+                    }
+                    .into());
+                }
+                let values = if input.is_empty() {
+                    positional
+                } else {
+                    input.to_vec()
+                };
+                let mut outputs = Vec::new();
+                for value in values {
+                    outputs.push(Value::String(json_stringify(&value)?.into()));
+                }
+                Ok(Some(outputs))
+            }
+            "convertfrom-json" => {
+                let mut outputs = Vec::new();
+                for item in input {
+                    outputs.push(json_parse(&item.to_string())?);
+                }
+                Ok(Some(outputs))
             }
             "select-object" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
@@ -1344,6 +1389,268 @@ fn script_block_argument(arguments: &[CommandArgument]) -> Option<&Vec<Statement
         }) => Some(statements),
         _ => None,
     })
+}
+
+fn json_stringify(value: &Value) -> Result<String, RuntimeError> {
+    match value {
+        Value::Null | Value::AutomationNull => Ok("null".to_owned()),
+        Value::Bool(value) => Ok(value.to_string()),
+        Value::Char(unit) => {
+            let ch = char::from_u32(u32::from(*unit)).unwrap_or(char::REPLACEMENT_CHARACTER);
+            Ok(json_quote(&ch.to_string()))
+        }
+        Value::Int32(_)
+        | Value::Int64(_)
+        | Value::UInt32(_)
+        | Value::UInt64(_)
+        | Value::Int16(_)
+        | Value::UInt16(_)
+        | Value::Byte(_)
+        | Value::SByte(_)
+        | Value::Double(_) => Ok(value.to_string()),
+        Value::String(text) => Ok(json_quote(&text.to_string_lossy())),
+        Value::Array(items) => {
+            let mut parts = Vec::with_capacity(items.len());
+            for item in items.iter() {
+                parts.push(json_stringify(item)?);
+            }
+            Ok(format!("[{}]", parts.join(",")))
+        }
+        Value::Object(entries) => {
+            let mut parts = Vec::with_capacity(entries.len());
+            for (name, value) in entries.iter() {
+                parts.push(format!("{}:{}", json_quote(name), json_stringify(value)?));
+            }
+            Ok(format!("{{{}}}", parts.join(",")))
+        }
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "ConvertTo-Json for this value",
+        }),
+    }
+}
+
+fn json_quote(text: &str) -> String {
+    let mut out = String::from("\"");
+    for ch in text.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            ch if (ch as u32) < 0x20 => {
+                use std::fmt::Write as _;
+                let _ = write!(out, "\\u{:04x}", ch as u32);
+            }
+            ch => out.push(ch),
+        }
+    }
+    out.push('"');
+    out
+}
+
+fn json_parse(text: &str) -> Result<Value, RuntimeError> {
+    let mut parser = JsonParser {
+        chars: text.chars().collect(),
+        at: 0,
+    };
+    let value = parser.value()?;
+    parser.whitespace();
+    if parser.at != parser.chars.len() {
+        return Err(RuntimeError::NotImplemented {
+            feature: "trailing JSON input",
+        });
+    }
+    Ok(value)
+}
+
+struct JsonParser {
+    chars: Vec<char>,
+    at: usize,
+}
+
+impl JsonParser {
+    fn whitespace(&mut self) {
+        while self
+            .chars
+            .get(self.at)
+            .is_some_and(|ch| ch.is_ascii_whitespace())
+        {
+            self.at += 1;
+        }
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.chars.get(self.at).copied()
+    }
+
+    fn expect(&mut self, expected: char) -> Result<(), RuntimeError> {
+        self.whitespace();
+        if self.peek() == Some(expected) {
+            self.at += 1;
+            Ok(())
+        } else {
+            Err(RuntimeError::NotImplemented {
+                feature: "invalid JSON",
+            })
+        }
+    }
+
+    fn value(&mut self) -> Result<Value, RuntimeError> {
+        self.whitespace();
+        match self.peek() {
+            Some('"') => self.string(),
+            Some('{') => self.object(),
+            Some('[') => self.array(),
+            Some('t') => self.literal("true", Value::Bool(true)),
+            Some('f') => self.literal("false", Value::Bool(false)),
+            Some('n') => self.literal("null", Value::Null),
+            Some(ch) if ch == '-' || ch.is_ascii_digit() => self.number(),
+            _ => Err(RuntimeError::NotImplemented {
+                feature: "invalid JSON",
+            }),
+        }
+    }
+
+    fn literal(&mut self, text: &str, value: Value) -> Result<Value, RuntimeError> {
+        for expected in text.chars() {
+            if self.peek() != Some(expected) {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "invalid JSON",
+                });
+            }
+            self.at += 1;
+        }
+        Ok(value)
+    }
+
+    fn string(&mut self) -> Result<Value, RuntimeError> {
+        self.expect('"')?;
+        let mut text = String::new();
+        while let Some(ch) = self.peek() {
+            self.at += 1;
+            match ch {
+                '"' => return Ok(Value::String(text.into())),
+                '\\' => {
+                    let Some(escaped) = self.peek() else {
+                        break;
+                    };
+                    self.at += 1;
+                    match escaped {
+                        '"' => text.push('"'),
+                        '\\' => text.push('\\'),
+                        '/' => text.push('/'),
+                        'b' => text.push('\u{8}'),
+                        'f' => text.push('\u{c}'),
+                        'n' => text.push('\n'),
+                        'r' => text.push('\r'),
+                        't' => text.push('\t'),
+                        'u' => {
+                            let hex: String = self.chars[self.at..self.at + 4].iter().collect();
+                            self.at += 4;
+                            if let Ok(code) = u32::from_str_radix(&hex, 16)
+                                && let Some(ch) = char::from_u32(code)
+                            {
+                                text.push(ch);
+                            }
+                        }
+                        _ => {
+                            return Err(RuntimeError::NotImplemented {
+                                feature: "invalid JSON escape",
+                            });
+                        }
+                    }
+                }
+                ch => text.push(ch),
+            }
+        }
+        Err(RuntimeError::NotImplemented {
+            feature: "invalid JSON",
+        })
+    }
+
+    fn number(&mut self) -> Result<Value, RuntimeError> {
+        let start = self.at;
+        while self
+            .peek()
+            .is_some_and(|ch| ch.is_ascii_digit() || matches!(ch, '-' | '+' | '.' | 'e' | 'E'))
+        {
+            self.at += 1;
+        }
+        let text: String = self.chars[start..self.at].iter().collect();
+        if let Ok(value) = text.parse::<i32>() {
+            Ok(Value::Int32(value))
+        } else if let Ok(value) = text.parse::<i64>() {
+            Ok(Value::Int64(value))
+        } else if let Ok(value) = text.parse::<f64>() {
+            Ok(Value::Double(value))
+        } else {
+            Err(RuntimeError::NotImplemented {
+                feature: "invalid JSON number",
+            })
+        }
+    }
+
+    fn array(&mut self) -> Result<Value, RuntimeError> {
+        self.expect('[')?;
+        let mut items = Vec::new();
+        self.whitespace();
+        if self.peek() == Some(']') {
+            self.at += 1;
+            return Ok(Value::array(items));
+        }
+        loop {
+            items.push(self.value()?);
+            self.whitespace();
+            match self.peek() {
+                Some(',') => {
+                    self.at += 1;
+                }
+                Some(']') => {
+                    self.at += 1;
+                    return Ok(Value::array(items));
+                }
+                _ => {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "invalid JSON",
+                    });
+                }
+            }
+        }
+    }
+
+    fn object(&mut self) -> Result<Value, RuntimeError> {
+        self.expect('{')?;
+        let mut entries = Vec::new();
+        self.whitespace();
+        if self.peek() == Some('}') {
+            self.at += 1;
+            return Ok(Value::object(entries));
+        }
+        loop {
+            let Value::String(key) = self.string()? else {
+                unreachable!()
+            };
+            self.expect(':')?;
+            let value = self.value()?;
+            entries.push((key.to_string_lossy(), value));
+            self.whitespace();
+            match self.peek() {
+                Some(',') => {
+                    self.at += 1;
+                }
+                Some('}') => {
+                    self.at += 1;
+                    return Ok(Value::object(entries));
+                }
+                _ => {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "invalid JSON",
+                    });
+                }
+            }
+        }
+    }
 }
 
 fn flatten_value(value: Value) -> Vec<Value> {

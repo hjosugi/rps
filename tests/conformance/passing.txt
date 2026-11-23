@@ -1,4 +1,5 @@
 # Conformance cases rpsh passes. Maintained by `cargo harness conform check --bless`.
+cmdlets/json
 cmdlets/write-output
 expr/int-arithmetic
 expr/string-literals

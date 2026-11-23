@@ -43,6 +43,12 @@ pub enum Statement {
         value: Expr,
         span: Span,
     },
+    /// `$name = pipeline`, assigning the pipeline's output.
+    AssignPipeline {
+        name: String,
+        commands: Vec<PipelineCommand>,
+        span: Span,
+    },
     /// `$object.property = expression`.
     MemberAssign {
         target: Expr,

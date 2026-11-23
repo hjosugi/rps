@@ -110,6 +110,20 @@ impl Parser {
             self.pos += 2;
             let value = self.nested_expression()?;
             let span = start.to(value.span);
+            if self.peek().kind == TokenKind::Pipe && !append && !coalesce && compound.is_none() {
+                let mut commands = vec![PipelineCommand::Expression(value)];
+                while self.peek().kind == TokenKind::Pipe {
+                    self.pos += 1;
+                    self.skip_newlines();
+                    commands.push(self.pipeline_element()?);
+                }
+                let span = start.to(self.previous_span());
+                return Ok(Statement::AssignPipeline {
+                    name,
+                    commands,
+                    span,
+                });
+            }
             if !self.at_statement_end() {
                 return self.refuse(SYNTAX_ERRORS);
             }
@@ -2068,6 +2082,17 @@ mod tests {
                 }
                 text
             }
+            Statement::AssignPipeline { name, commands, .. } => format!(
+                "${name} = {}",
+                commands
+                    .iter()
+                    .map(|command| match command {
+                        PipelineCommand::Expression(expr) => show(expr),
+                        PipelineCommand::Command { name, .. } => name.clone(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            ),
             Statement::MemberAssign {
                 target,
                 name,
