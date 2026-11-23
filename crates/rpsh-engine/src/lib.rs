@@ -1421,6 +1421,22 @@ impl Engine {
                 if descending {
                     items.reverse();
                 }
+                let unique = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("unique") && ops::is_true(value)
+                });
+                if unique {
+                    items.dedup_by(|a, b| {
+                        let left = match &property {
+                            Some(property) => sort_key(a, property),
+                            None => a.to_string(),
+                        };
+                        let right = match &property {
+                            Some(property) => sort_key(b, property),
+                            None => b.to_string(),
+                        };
+                        left.eq_ignore_ascii_case(&right)
+                    });
+                }
                 Ok(Some(items))
             }
             "group-object" => {
@@ -1806,6 +1822,9 @@ impl Engine {
                     }
                     .into());
                 };
+                let no_newline = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("nonewline") && ops::is_true(value)
+                });
                 let mut text = String::new();
                 let values: Vec<Value> = if input.is_empty() {
                     named
@@ -1818,7 +1837,9 @@ impl Engine {
                 };
                 for item in values {
                     text.push_str(&item.to_string());
-                    text.push('\n');
+                    if !no_newline {
+                        text.push('\n');
+                    }
                 }
                 std::fs::write(path.to_string(), text).map_err(|_| {
                     RuntimeError::NotImplemented {
@@ -1945,6 +1966,25 @@ impl Engine {
                     self.globals.remove(key);
                 }
                 Ok(Some(Vec::new()))
+            }
+            "tee-object" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("filepath"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                if let Some(path) = path {
+                    let mut text = String::new();
+                    for item in input {
+                        text.push_str(&item.to_string());
+                        text.push('\n');
+                    }
+                    std::fs::write(&path, text).map_err(|_| RuntimeError::NotImplemented {
+                        feature: "Tee-Object cannot write this file",
+                    })?;
+                }
+                Ok(Some(input.to_vec()))
             }
             "select-string" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
