@@ -206,6 +206,7 @@ impl Parser {
             TokenKind::Break => self.break_statement(false),
             TokenKind::Continue => self.break_statement(true),
             TokenKind::Function => self.function_statement(false),
+            TokenKind::Enum => self.enum_statement(),
             TokenKind::Filter => self.function_statement(true),
             TokenKind::Identifier(name) | TokenKind::Bareword(name) => {
                 let statement = self.command_statement(name.clone())?;
@@ -648,6 +649,58 @@ impl Parser {
                 | TokenKind::Not
                 | TokenKind::Bnot
         )
+    }
+
+    fn enum_statement(&mut self) -> Result<Statement, ParseError> {
+        let start = self.peek().span;
+        self.pos += 1;
+        let name = match &self.peek().kind {
+            TokenKind::Identifier(name) | TokenKind::Bareword(name) => name.clone(),
+            _ => return self.refuse(SYNTAX_ERRORS),
+        };
+        self.pos += 1;
+        self.skip_newlines();
+        if self.peek().kind != TokenKind::LCurly {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        self.pos += 1;
+        let mut members = Vec::new();
+        loop {
+            while matches!(
+                self.peek().kind,
+                TokenKind::NewLine | TokenKind::Semi | TokenKind::Comma
+            ) {
+                self.pos += 1;
+            }
+            if self.peek().kind == TokenKind::RCurly {
+                self.pos += 1;
+                break;
+            }
+            let Token { kind, .. } = self.peek().clone();
+            let member = match kind {
+                TokenKind::Identifier(member) | TokenKind::Bareword(member) => member,
+                _ => return self.refuse(SYNTAX_ERRORS),
+            };
+            self.pos += 1;
+            let value = if self.peek().kind == TokenKind::Equals {
+                self.pos += 1;
+                let Token { kind, .. } = self.peek().clone();
+                let TokenKind::Int32(value) = kind else {
+                    return self.refuse(SYNTAX_ERRORS);
+                };
+                self.pos += 1;
+                Some(i64::from(value))
+            } else {
+                None
+            };
+            members.push((member, value));
+        }
+        let span = start.to(self.previous_span());
+        Ok(Statement::Enum {
+            name,
+            members,
+            span,
+        })
     }
 
     fn function_statement(&mut self, filter: bool) -> Result<Statement, ParseError> {
@@ -2346,6 +2399,14 @@ mod tests {
                 value,
                 ..
             } => format!("{}[{}] = {}", show(target), show(index), show(value)),
+            Statement::Enum { name, members, .. } => format!(
+                "enum {name} {{ {} }}",
+                members
+                    .iter()
+                    .map(|(name, _)| name.clone())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
             Statement::DotSource { path, .. } => format!(". {path}"),
             Statement::Param { parameters, .. } => format!(
                 "param({})",

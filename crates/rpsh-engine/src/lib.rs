@@ -685,6 +685,21 @@ impl Engine {
                 }
                 Ok(flow)
             }
+            Statement::Enum { name, members, .. } => {
+                let mut next = 0i64;
+                for (member, value) in members {
+                    let value = value.unwrap_or(next);
+                    next = value + 1;
+                    let typed = Value::object(vec![
+                        ("__TypeName".to_owned(), Value::String(name.clone().into())),
+                        ("__Text".to_owned(), Value::String(member.clone().into())),
+                        ("__EnumValue".to_owned(), Value::Int64(value)),
+                    ]);
+                    self.variables
+                        .insert(format!("__enum::{name}::{member}"), typed);
+                }
+                Ok(Flow::Normal)
+            }
             Statement::DotSource { path, .. } => {
                 let source = std::fs::read_to_string(path).map_err(|_| {
                     RuntimeError::Script {
@@ -2553,7 +2568,7 @@ fn evaluate(
             let value = evaluate(value, variables, last_success)?;
             cast_to(type_name, value)
         }
-        ExprKind::StaticMember { type_name, name } => static_member(type_name, name),
+        ExprKind::StaticMember { type_name, name } => static_member(type_name, name, variables),
         ExprKind::InvokeStatic {
             type_name,
             name,
@@ -3822,7 +3837,15 @@ fn culture_value() -> Value {
     ])
 }
 
-fn static_member(type_name: &str, name: &str) -> Result<Value, RuntimeError> {
+fn static_member(
+    type_name: &str,
+    name: &str,
+    variables: &HashMap<String, Value>,
+) -> Result<Value, RuntimeError> {
+    let enum_key = format!("__enum::{type_name}::{name}");
+    if let Some(value) = variables.get(&enum_key) {
+        return Ok(value.clone());
+    }
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     let integer = match &kind[..] {
@@ -4133,6 +4156,17 @@ fn convert_int64(value: &Value) -> Result<i64, RuntimeError> {
                 })
             }
         }
+        Value::Object(entries) => entries
+            .iter()
+            .find(|(key, _)| key == "__EnumValue")
+            .and_then(|(_, value)| match value {
+                Value::Int64(value) => Some(*value),
+                Value::Int32(value) => Some(i64::from(*value)),
+                _ => None,
+            })
+            .ok_or(RuntimeError::NotImplemented {
+                feature: "conversion to an integer",
+            }),
         Value::String(text) => {
             let lossy = text.to_string_lossy();
             match parse_integer_text(&lossy) {

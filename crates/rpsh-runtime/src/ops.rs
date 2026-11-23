@@ -365,6 +365,14 @@ fn compare_scalar(
             })
         }
         _ => {
+            if let (Some(left), Some(right)) = (typed_text(left), typed_text(right)) {
+                return compare_scalar(
+                    &Value::String(left.into()),
+                    &Value::String(right.into()),
+                    op,
+                    case_sensitive,
+                );
+            }
             if let (Value::Object(a), Value::Object(b)) = (left, right) {
                 return match op {
                     Comparison::Eq => Ok(Rc::ptr_eq(a, b)),
@@ -474,6 +482,22 @@ pub fn wildcard_match(text: &str, pattern: &str, case_sensitive: bool) -> bool {
 
 /// `.NET`'s wildcard matching: `*`, `?`, `[abc]`, `[a-z]` and a backtick that
 /// escapes the next character. A malformed class (`[` with no `]`) is literal.
+fn typed_text(value: &Value) -> Option<String> {
+    let Value::Object(entries) = value else {
+        return None;
+    };
+    entries.iter().find_map(|(key, value)| {
+        if key == "__Text" || key == "__HostText" {
+            match value {
+                Value::String(text) => Some(text.to_string_lossy()),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    })
+}
+
 fn wildcard(text: &str, pattern: &str, case_sensitive: bool) -> bool {
     let text: Vec<char> = if case_sensitive {
         text.chars().collect()

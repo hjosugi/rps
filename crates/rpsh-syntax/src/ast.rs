@@ -142,6 +142,12 @@ pub enum Statement {
         finally: Option<Vec<Statement>>,
         span: Span,
     },
+    /// `enum Name { A; B = 2 }`.
+    Enum {
+        name: String,
+        members: Vec<(String, Option<i64>)>,
+        span: Span,
+    },
     /// `. path`: run a script in the current scope.
     DotSource { path: String, span: Span },
     /// A script-level `param(...)` declaration.

@@ -23,6 +23,7 @@ lang/comparison-insensitive
 lang/division
 lang/dotnet-random
 lang/double-format
+lang/enum
 lang/format-operator
 lang/function
 lang/function-basic

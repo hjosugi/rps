@@ -39,6 +39,7 @@ pub fn tokenize_full(source: &str) -> Result<Vec<FullToken>, ParseError> {
         statement_start: true,
         ternary_depth: 0,
         hashtable_depth: 0,
+        brace_depth: 0,
     };
     tokenizer.run()?;
     let lines = Lines::new(source);
@@ -117,6 +118,7 @@ struct Tokenizer<'a> {
     statement_start: bool,
     ternary_depth: usize,
     hashtable_depth: usize,
+    brace_depth: usize,
 }
 
 impl Tokenizer<'_> {
@@ -367,7 +369,15 @@ impl Tokenizer<'_> {
         self.push(kind, start, self.pos);
         match kind {
             FullTokenKind::AtCurly => self.hashtable_depth += 1,
-            FullTokenKind::RCurly if self.hashtable_depth > 0 => self.hashtable_depth -= 1,
+            FullTokenKind::LCurly => self.brace_depth += 1,
+            FullTokenKind::RCurly => {
+                if self.hashtable_depth > 0 {
+                    self.hashtable_depth -= 1;
+                }
+                if self.brace_depth > 0 {
+                    self.brace_depth -= 1;
+                }
+            }
             _ => {}
         }
         match kind {
@@ -808,6 +818,15 @@ impl Tokenizer<'_> {
     }
 
     /// True when the cursor follows `.$name`, the target of `$o.name = value`.
+    fn after_identifier(&self) -> bool {
+        self.tokens.last().is_some_and(|token| {
+            matches!(
+                token.kind,
+                FullTokenKind::Identifier | FullTokenKind::Generic
+            )
+        })
+    }
+
     fn after_member(&self) -> bool {
         let tokens = &self.tokens;
         tokens.len() >= 2
@@ -900,6 +919,9 @@ impl Tokenizer<'_> {
                             | FullTokenKind::ColonColon
                     )
                     && !(self.hashtable_depth > 0 && *kind == FullTokenKind::Equals)
+                    && !(self.brace_depth > 0
+                        && *kind == FullTokenKind::Equals
+                        && self.after_identifier())
                     && !self.after_member()
                 {
                     continue;
