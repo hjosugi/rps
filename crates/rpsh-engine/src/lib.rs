@@ -1334,12 +1334,24 @@ impl Engine {
                         .iter()
                         .any(|(name, _)| name.eq_ignore_ascii_case(wanted))
                 };
+                let property = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                    .map(|(_, value)| value.to_string());
                 let mut sum = Value::Int32(0);
                 let mut minimum: Option<Value> = None;
                 let mut maximum: Option<Value> = None;
                 let mut average = 0.0;
                 let mut count = 0;
                 for item in input {
+                    let item = match &property {
+                        Some(property) => match member(item, property) {
+                            Ok(value) => value,
+                            Err(_) => continue,
+                        },
+                        None => item.clone(),
+                    };
+                    let item = &item;
                     if !is_numeric_value(item) {
                         continue;
                     }
@@ -1440,9 +1452,18 @@ impl Engine {
                 Ok(Some(items))
             }
             "group-object" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let property = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                    .map(|(_, value)| value.to_string());
                 let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
                 for item in input {
-                    let key = item.to_string();
+                    let key = match &property {
+                        Some(property) => member(item, property)
+                            .map_or_else(|_| String::new(), |value| value.to_string()),
+                        None => item.to_string(),
+                    };
                     if let Some((_, members)) = groups
                         .iter_mut()
                         .find(|(name, _)| name.eq_ignore_ascii_case(&key))
