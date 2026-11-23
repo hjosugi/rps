@@ -2344,10 +2344,16 @@ impl Engine {
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
+                let value_only = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("valueonly") && ops::is_true(value)
+                });
                 match name {
                     Some(name) => {
                         let key = strip_scope(&name).to_owned();
                         let value = self.variables.get(&key).cloned().unwrap_or(Value::Null);
+                        if value_only {
+                            return Ok(Some(vec![value]));
+                        }
                         Ok(Some(vec![Value::object(vec![
                             ("Name".to_owned(), Value::String(key.into())),
                             ("Value".to_owned(), value),

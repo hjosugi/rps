@@ -16,3 +16,4 @@ $nv
 Clear-Variable nv
 $null -eq $nv
 $nv
+(Get-Variable nv2 -ValueOnly) + 1
