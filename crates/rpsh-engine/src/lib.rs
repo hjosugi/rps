@@ -1553,6 +1553,18 @@ fn evaluate(
             let value = evaluate(value, variables, last_success)?;
             cast_to(type_name, value)
         }
+        ExprKind::StaticMember { type_name, name } => static_member(type_name, name),
+        ExprKind::InvokeStatic {
+            type_name,
+            name,
+            arguments,
+        } => {
+            let mut values = Vec::with_capacity(arguments.len());
+            for argument in arguments {
+                values.push(evaluate(argument, variables, last_success)?);
+            }
+            invoke_static(type_name, name, &values)
+        }
         ExprKind::Member { target, name } => {
             member(&evaluate(target, variables, last_success)?, name)
         }
@@ -2344,6 +2356,148 @@ fn type_full_name(name: &str) -> &'static str {
         "decimal" => "System.Decimal",
         "biginteger" => "System.Numerics.BigInteger",
         _ => "System.Object",
+    }
+}
+
+fn normalize_type(type_name: &str) -> String {
+    let lower = type_name.to_ascii_lowercase();
+    lower
+        .strip_prefix("system.")
+        .map_or(lower.clone(), ToOwned::to_owned)
+}
+
+fn static_member(type_name: &str, name: &str) -> Result<Value, RuntimeError> {
+    let kind = normalize_type(type_name);
+    let name = name.to_ascii_lowercase();
+    let integer = match &kind[..] {
+        "int32" | "int" => Some(("int32", i64::from(i32::MAX), i64::from(i32::MIN))),
+        "int64" | "long" => Some(("int64", i64::MAX, i64::MIN)),
+        "uint32" | "uint" => Some(("uint32", i64::from(u32::MAX), 0)),
+        "int16" | "short" => Some(("int16", i64::from(i16::MAX), i64::from(i16::MIN))),
+        "uint16" | "ushort" => Some(("uint16", i64::from(u16::MAX), 0)),
+        "byte" => Some(("byte", i64::from(u8::MAX), 0)),
+        "sbyte" => Some(("sbyte", i64::from(i8::MAX), i64::from(i8::MIN))),
+        _ => None,
+    };
+    if let Some((kind, max, min)) = integer {
+        return match name.as_str() {
+            "maxvalue" => match kind {
+                "int32" => Ok(Value::Int32(i32::MAX)),
+                "int64" => Ok(Value::Int64(i64::MAX)),
+                "uint32" => Ok(Value::UInt32(u32::MAX)),
+                "int16" => Ok(Value::Int16(i16::MAX)),
+                "uint16" => Ok(Value::UInt16(u16::MAX)),
+                "byte" => Ok(Value::Byte(u8::MAX)),
+                "sbyte" => Ok(Value::SByte(i8::MAX)),
+                _ => Ok(Value::Int64(max)),
+            },
+            "minvalue" => match kind {
+                "int32" => Ok(Value::Int32(i32::MIN)),
+                "int64" => Ok(Value::Int64(i64::MIN)),
+                "uint32" => Ok(Value::UInt32(0)),
+                "int16" => Ok(Value::Int16(i16::MIN)),
+                "uint16" => Ok(Value::UInt16(0)),
+                "byte" => Ok(Value::Byte(0)),
+                "sbyte" => Ok(Value::SByte(i8::MIN)),
+                _ => Ok(Value::Int64(min)),
+            },
+            _ => Err(RuntimeError::NotImplemented {
+                feature: "this static member",
+            }),
+        };
+    }
+    match (kind.as_str(), name.as_str()) {
+        ("double", "maxvalue") => Ok(Value::Double(f64::MAX)),
+        ("double", "minvalue") => Ok(Value::Double(f64::MIN)),
+        ("double", "epsilon") => Ok(Value::Double(f64::EPSILON)),
+        ("string", "empty") => Ok(Value::String("".into())),
+        ("math", "pi") => Ok(Value::Double(std::f64::consts::PI)),
+        ("math", "e") => Ok(Value::Double(std::f64::consts::E)),
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "this static member",
+        }),
+    }
+}
+
+fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
+    let kind = normalize_type(type_name);
+    let name = name.to_ascii_lowercase();
+    match (kind.as_str(), name.as_str()) {
+        ("math", "abs") => match arguments.first() {
+            Some(Value::Int32(value)) => Ok(Value::Int32(value.abs())),
+            Some(Value::Int64(value)) => Ok(Value::Int64(value.abs())),
+            Some(value) => Ok(Value::Double(convert_double(value)?.abs())),
+            None => Err(RuntimeError::NotImplemented {
+                feature: "math with no argument",
+            }),
+        },
+        ("math", "max") | ("math", "min") => {
+            let (Some(left), Some(right)) = (arguments.first(), arguments.get(1)) else {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "math with fewer than two arguments",
+                });
+            };
+            let want_max = name == "max";
+            if let (Value::Int32(a), Value::Int32(b)) = (left, right) {
+                return Ok(Value::Int32(if want_max { *a.max(b) } else { *a.min(b) }));
+            }
+            let a = convert_double(left)?;
+            let b = convert_double(right)?;
+            Ok(Value::Double(if want_max { a.max(b) } else { a.min(b) }))
+        }
+        ("math", "sqrt") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.sqrt(),
+        )),
+        ("math", "pow") => {
+            let a = convert_double(arguments.first().unwrap_or(&Value::Null))?;
+            let b = convert_double(arguments.get(1).unwrap_or(&Value::Null))?;
+            Ok(Value::Double(a.powf(b)))
+        }
+        ("int32" | "int", "parse") | ("int64" | "long", "parse") => {
+            let Some(value) = arguments.first() else {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "Parse with no argument",
+                });
+            };
+            if kind.starts_with("int32") || kind == "int" {
+                Ok(Value::Int32(convert_int32(value)?))
+            } else {
+                Ok(Value::Int64(convert_int64(value)?))
+            }
+        }
+        ("string", "isnullorempty") => {
+            let empty = arguments
+                .first()
+                .is_none_or(|value| matches!(value, Value::Null | Value::AutomationNull))
+                || arguments
+                    .first()
+                    .is_some_and(|value| value.to_string().is_empty());
+            Ok(Value::Bool(empty))
+        }
+        ("string", "join") => {
+            let Some(separator) = arguments.first() else {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "Join with no separator",
+                });
+            };
+            let separator = separator.to_string();
+            let values: Vec<Value> = if arguments.len() == 2 {
+                flatten_value(arguments[1].clone())
+            } else {
+                arguments[1..].to_vec()
+            };
+            Ok(Value::String(
+                values
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(&separator)
+                    .into(),
+            ))
+        }
+        _ => Err(RuntimeError::NotImplemented {
+            feature: "this static method",
+        }),
     }
 }
 

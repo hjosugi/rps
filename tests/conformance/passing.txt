@@ -25,6 +25,7 @@ lang/operators
 lang/pipeline-basic
 lang/psobject
 lang/scriptblock
+lang/static-members
 lang/string-escapes
 lang/string-index
 lang/string-interpolation

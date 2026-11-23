@@ -22,6 +22,7 @@ pub enum TokenKind {
     RParen,
     Semi,
     Dot,
+    ColonColon,
     Equals,
     LBracket,
     RBracket,

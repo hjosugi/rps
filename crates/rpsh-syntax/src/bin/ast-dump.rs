@@ -34,6 +34,14 @@ fn format_expr(expr: &Expr) -> String {
         ),
         ExprKind::Paren(inner) => format!("(paren {})", format_expr(inner)),
         ExprKind::Member { target, name } => format!("(member {} {name})", format_expr(target)),
+        ExprKind::StaticMember { type_name, name } => {
+            format!("(static {type_name} {name})")
+        }
+        ExprKind::InvokeStatic {
+            type_name, name, ..
+        } => {
+            format!("(invoke-static {type_name} {name})")
+        }
         ExprKind::InvokeMember {
             target,
             name,

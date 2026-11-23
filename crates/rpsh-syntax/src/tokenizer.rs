@@ -56,6 +56,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::RParen => TokenKind::RParen,
             FullTokenKind::Semi => TokenKind::Semi,
             FullTokenKind::Dot => TokenKind::Dot,
+            FullTokenKind::ColonColon => TokenKind::ColonColon,
             FullTokenKind::Equals => TokenKind::Equals,
             FullTokenKind::LBracket => TokenKind::LBracket,
             FullTokenKind::RBracket => TokenKind::RBracket,

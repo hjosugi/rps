@@ -258,6 +258,14 @@ pub enum ExprKind {
     Cast { type_name: String, value: Box<Expr> },
     /// Upstream: `MemberExpressionAst`.
     Member { target: Box<Expr>, name: String },
+    /// `[Type]::Member`.
+    StaticMember { type_name: String, name: String },
+    /// `[Type]::Method(...)`.
+    InvokeStatic {
+        type_name: String,
+        name: String,
+        arguments: Vec<Expr>,
+    },
     /// Upstream: `InvokeMemberExpressionAst`.
     InvokeMember {
         target: Box<Expr>,

@@ -358,6 +358,60 @@ impl Parser {
         }
     }
 
+    /// Parses a type name with dotted parts, generic arguments and array
+    /// suffixes: `System.Collections.Generic.HashSet[string]`, `string[]`.
+    fn parse_type_name(&mut self) -> Result<String, ParseError> {
+        let Token { kind, .. } = self.peek().clone();
+        let TokenKind::Identifier(identifier) = kind else {
+            return self.refuse("type literals, casts and indexing");
+        };
+        let mut name = identifier;
+        self.pos += 1;
+        loop {
+            match &self.peek().kind {
+                TokenKind::Dot => {
+                    self.pos += 1;
+                    let Token { kind, .. } = self.peek().clone();
+                    let TokenKind::Identifier(identifier) = kind else {
+                        return self.refuse("type literals, casts and indexing");
+                    };
+                    name.push('.');
+                    name.push_str(&identifier);
+                    self.pos += 1;
+                }
+                TokenKind::LBracket => {
+                    if self
+                        .tokens
+                        .get(self.pos + 1)
+                        .is_some_and(|token| token.kind == TokenKind::RBracket)
+                    {
+                        self.pos += 2;
+                        name.push_str("[]");
+                        continue;
+                    }
+                    self.pos += 1;
+                    name.push('[');
+                    loop {
+                        name.push_str(&self.parse_type_name()?);
+                        if self.peek().kind == TokenKind::Comma {
+                            self.pos += 1;
+                            name.push(',');
+                            continue;
+                        }
+                        break;
+                    }
+                    if self.peek().kind != TokenKind::RBracket {
+                        return self.refuse("type literals, casts and indexing");
+                    }
+                    self.pos += 1;
+                    name.push(']');
+                }
+                _ => break,
+            }
+        }
+        Ok(name)
+    }
+
     /// Parses `( argument, ... )` for a method call.
     fn arguments(&mut self) -> Result<(Vec<Expr>, Span), ParseError> {
         self.pos += 1;
@@ -1505,20 +1559,37 @@ impl Parser {
             }
             TokenKind::LBracket => {
                 self.pos += 1;
-                let Token {
-                    kind,
-                    span: name_span,
-                } = self.peek().clone();
-                let TokenKind::Identifier(type_name) = kind else {
-                    return self.refuse("type literals, casts and indexing");
-                };
-                self.pos += 1;
+                let type_name = self.parse_type_name()?;
                 if self.peek().kind != TokenKind::RBracket {
                     return self.refuse("type literals, casts and indexing");
                 }
                 let close = self.peek().span;
                 self.pos += 1;
-                let _ = name_span;
+                if self.peek().kind == TokenKind::ColonColon {
+                    self.pos += 1;
+                    let Token {
+                        kind,
+                        span: name_span,
+                    } = self.peek().clone();
+                    let TokenKind::Identifier(name) = kind else {
+                        return self.refuse("static member access");
+                    };
+                    self.pos += 1;
+                    if self.peek().kind == TokenKind::LParen {
+                        let (arguments, close) = self.arguments()?;
+                        let span = span.to(close);
+                        return self.expr(
+                            ExprKind::InvokeStatic {
+                                type_name,
+                                name,
+                                arguments,
+                            },
+                            span,
+                        );
+                    }
+                    let span = span.to(name_span);
+                    return self.expr(ExprKind::StaticMember { type_name, name }, span);
+                }
                 if matches!(
                     self.peek().kind,
                     TokenKind::Int32(_)
@@ -1930,6 +2001,15 @@ mod tests {
             ),
             ExprKind::Cast { type_name, value } => format!("[{type_name}]{}", show(value)),
             ExprKind::Member { target, name } => format!("{}.{}", show(target), name),
+            ExprKind::StaticMember { type_name, name } => format!("[{type_name}]::{name}"),
+            ExprKind::InvokeStatic {
+                type_name,
+                name,
+                arguments,
+            } => format!(
+                "[{type_name}]::{name}({})",
+                arguments.iter().map(show).collect::<Vec<_>>().join(",")
+            ),
             ExprKind::InvokeMember {
                 target,
                 name,
