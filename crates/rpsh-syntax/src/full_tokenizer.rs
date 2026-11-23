@@ -973,7 +973,10 @@ impl Tokenizer<'_> {
         let mut at = self.pos;
         let command_mode = self.mode == Mode::Command;
         let after_dot = self.tokens.len() >= 2
-            && self.tokens[self.tokens.len() - 1].kind == FullTokenKind::Dot
+            && matches!(
+                self.tokens[self.tokens.len() - 1].kind,
+                FullTokenKind::Dot | FullTokenKind::ColonColon
+            )
             && !matches!(
                 self.tokens[self.tokens.len() - 2].kind,
                 FullTokenKind::NewLine | FullTokenKind::Semi
@@ -986,8 +989,10 @@ impl Tokenizer<'_> {
                         '_' | '-' | '.' | '/' | '\\' | ':' | '+' | '~' | '@' | '%' | '?' | '*'
                     )
                     || (self.command_seen && (ch == '[' || ch == ']'))
+            } else if after_dot {
+                ch.is_alphanumeric() || ch == '_'
             } else {
-                ch.is_alphanumeric() || ch == '_' || ch == '-'
+                ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '.'
             };
             if accepted {
                 at += ch.len_utf8();

@@ -408,8 +408,9 @@ impl Parser {
     /// suffixes: `System.Collections.Generic.HashSet[string]`, `string[]`.
     fn parse_type_name(&mut self) -> Result<String, ParseError> {
         let Token { kind, .. } = self.peek().clone();
-        let TokenKind::Identifier(identifier) = kind else {
-            return self.refuse("type literals, casts and indexing");
+        let identifier = match kind {
+            TokenKind::Identifier(identifier) | TokenKind::Bareword(identifier) => identifier,
+            _ => return self.refuse("type literals, casts and indexing"),
         };
         let mut name = identifier;
         self.pos += 1;
@@ -418,8 +419,11 @@ impl Parser {
                 TokenKind::Dot => {
                     self.pos += 1;
                     let Token { kind, .. } = self.peek().clone();
-                    let TokenKind::Identifier(identifier) = kind else {
-                        return self.refuse("type literals, casts and indexing");
+                    let identifier = match kind {
+                        TokenKind::Identifier(identifier) | TokenKind::Bareword(identifier) => {
+                            identifier
+                        }
+                        _ => return self.refuse("type literals, casts and indexing"),
                     };
                     name.push('.');
                     name.push_str(&identifier);
@@ -1221,7 +1225,7 @@ impl Parser {
         loop {
             self.skip_newlines();
             match &self.peek().kind {
-                TokenKind::Identifier(part) => {
+                TokenKind::Identifier(part) | TokenKind::Bareword(part) => {
                     name.push_str(part);
                     self.pos += 1;
                 }

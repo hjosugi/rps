@@ -1658,8 +1658,14 @@ impl Engine {
                     if let Some(parent) = target.parent() {
                         let _ = std::fs::create_dir_all(parent);
                     }
-                    std::fs::write(target, b"").map_err(|_| RuntimeError::NotImplemented {
-                        feature: "New-Item cannot create this file",
+                    let value = named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("value"))
+                        .map_or_else(String::new, |(_, value)| value.to_string());
+                    std::fs::write(target, value.as_bytes()).map_err(|_| {
+                        RuntimeError::NotImplemented {
+                            feature: "New-Item cannot create this file",
+                        }
                     })?;
                 }
                 Ok(Some(vec![Value::object(vec![
@@ -1715,11 +1721,23 @@ impl Engine {
                     }
                     .into());
                 };
-                std::fs::copy(source.to_string(), &destination).map_err(|_| {
-                    RuntimeError::NotImplemented {
-                        feature: "Copy-Item cannot copy this file",
-                    }
-                })?;
+                let recurse = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("recurse") && ops::is_true(value)
+                });
+                let source = source.to_string();
+                if std::path::Path::new(&source).is_dir() && recurse {
+                    copy_directory(&source, &destination).map_err(|_| {
+                        RuntimeError::NotImplemented {
+                            feature: "Copy-Item cannot copy this directory",
+                        }
+                    })?;
+                } else {
+                    std::fs::copy(source, &destination).map_err(|_| {
+                        RuntimeError::NotImplemented {
+                            feature: "Copy-Item cannot copy this file",
+                        }
+                    })?;
+                }
                 Ok(Some(Vec::new()))
             }
             "move-item" | "mv" => {
@@ -4328,6 +4346,21 @@ fn comparison_for(name: &str) -> Option<ops::Comparison> {
         "notlike" | "inotlike" => ops::Comparison::NotLike,
         _ => return None,
     })
+}
+
+fn copy_directory(source: &str, destination: &str) -> std::io::Result<()> {
+    std::fs::create_dir_all(destination)?;
+    for entry in std::fs::read_dir(source)? {
+        let entry = entry?;
+        let path = entry.path();
+        let target = std::path::Path::new(destination).join(entry.file_name());
+        if path.is_dir() {
+            copy_directory(&path.to_string_lossy(), &target.to_string_lossy())?;
+        } else {
+            std::fs::copy(&path, &target)?;
+        }
+    }
+    Ok(())
 }
 
 fn collect_children(path: &str, recurse: bool, entries: &mut Vec<(String, bool, u64)>) {
