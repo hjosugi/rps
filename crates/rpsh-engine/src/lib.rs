@@ -1673,9 +1673,27 @@ impl Engine {
                     text.push_str(&item.to_string());
                     text.push('\n');
                 }
-                std::fs::write(&path, text).map_err(|_| RuntimeError::NotImplemented {
-                    feature: "Out-File cannot write this file",
-                })?;
+                if named
+                    .iter()
+                    .any(|(name, value)| name.eq_ignore_ascii_case("append") && ops::is_true(value))
+                {
+                    use std::io::Write as _;
+                    let mut file = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&path)
+                        .map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Out-File cannot open this file",
+                        })?;
+                    file.write_all(text.as_bytes())
+                        .map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Out-File cannot write this file",
+                        })?;
+                } else {
+                    std::fs::write(&path, text).map_err(|_| RuntimeError::NotImplemented {
+                        feature: "Out-File cannot write this file",
+                    })?;
+                }
                 Ok(Some(Vec::new()))
             }
             "get-content" => {
@@ -1691,6 +1709,12 @@ impl Engine {
                         feature: "Get-Content of a missing file",
                     }
                 })?;
+                if named
+                    .iter()
+                    .any(|(name, value)| name.eq_ignore_ascii_case("raw") && ops::is_true(value))
+                {
+                    return Ok(Some(vec![Value::String(text.into())]));
+                }
                 let mut lines: Vec<Value> = text
                     .split('\n')
                     .map(|line| Value::String(line.trim_end_matches('\r').into()))
@@ -1704,6 +1728,15 @@ impl Engine {
                 {
                     let count = convert_int32(count)?.max(0) as usize;
                     lines.truncate(count);
+                }
+                if let Some((_, count)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("tail"))
+                {
+                    let count = convert_int32(count)?.max(0) as usize;
+                    if lines.len() > count {
+                        lines = lines.split_off(lines.len() - count);
+                    }
                 }
                 Ok(Some(lines))
             }
