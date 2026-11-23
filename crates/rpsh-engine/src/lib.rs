@@ -2337,7 +2337,47 @@ fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) ->
             .map(|value| Value::String(value.into()));
     }
     let key = strip_scope(name);
-    variables.get(key).cloned()
+    if let Some(value) = variables.get(key) {
+        return Some(value.clone());
+    }
+    automatic_variable(key)
+}
+
+fn encoding_value() -> Value {
+    Value::object(vec![("WebName".to_owned(), Value::String("utf-8".into()))])
+}
+
+fn automatic_variable(name: &str) -> Option<Value> {
+    match name {
+        "PSStyle" => Some(Value::object(vec![(
+            "OutputRendering".to_owned(),
+            Value::String("PlainText".into()),
+        )])),
+        "ErrorView" => Some(Value::String("ConciseView".into())),
+        "OutputEncoding" => Some(encoding_value()),
+        "Host" => Some(Value::object(vec![
+            ("Name".to_owned(), Value::String("ConsoleHost".into())),
+            ("Version".to_owned(), Value::String("7.7.0".into())),
+            (
+                "UI".to_owned(),
+                Value::object(vec![(
+                    "RawUI".to_owned(),
+                    Value::object(vec![(
+                        "WindowSize".to_owned(),
+                        Value::object(vec![
+                            ("Width".to_owned(), Value::Int32(80)),
+                            ("Height".to_owned(), Value::Int32(40)),
+                        ]),
+                    )]),
+                )]),
+            ),
+        ])),
+        "IsLinux" => Some(Value::Bool(true)),
+        "IsWindows" | "IsMacOS" => Some(Value::Bool(false)),
+        "IsCoreCLR" => Some(Value::Bool(true)),
+        "PSEdition" => Some(Value::String("Core".into())),
+        _ => None,
+    }
 }
 
 fn type_full_name(name: &str) -> &'static str {
@@ -2407,6 +2447,9 @@ fn static_member(type_name: &str, name: &str) -> Result<Value, RuntimeError> {
         };
     }
     match (kind.as_str(), name.as_str()) {
+        ("console", "isoutputredirected") => Ok(Value::Bool(true)),
+        ("console", "windowwidth") => Ok(Value::Int32(0)),
+        ("console", "outputencoding") => Ok(encoding_value()),
         ("double", "maxvalue") => Ok(Value::Double(f64::MAX)),
         ("double", "minvalue") => Ok(Value::Double(f64::MIN)),
         ("double", "epsilon") => Ok(Value::Double(f64::EPSILON)),
