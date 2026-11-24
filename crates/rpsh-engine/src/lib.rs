@@ -3367,6 +3367,21 @@ impl Engine {
                     });
                 if let Some(input) = input {
                     let items = flatten_value(input);
+                    if named.iter().any(|(name, value)| {
+                        name.eq_ignore_ascii_case("shuffle") && ops::is_true(value)
+                    }) {
+                        let mut items = items;
+                        let length = items.len();
+                        let mut outputs = Vec::with_capacity(length);
+                        for index in 0..length {
+                            let pick = generator.next_range(index as i32, length as i32) as usize;
+                            outputs.push(items[pick].clone());
+                            if index != pick {
+                                items[pick] = items[index].clone();
+                            }
+                        }
+                        return Ok(Some(outputs));
+                    }
                     let count = named
                         .iter()
                         .find(|(name, _)| name.eq_ignore_ascii_case("count"))
