@@ -2390,64 +2390,68 @@ impl Engine {
             }
             "test-path" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
-                    .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string))
-                    .or_else(|| {
-                        named
-                            .iter()
-                            .find(|(name, _)| name.eq_ignore_ascii_case("isvalid"))
-                            .and_then(|(_, value)| match value {
-                                Value::String(text) => Some(text.to_string_lossy()),
-                                _ => None,
-                            })
-                    });
-                let Some(path_text) = path.map(|path| expand_home(&path)) else {
+                let mut paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if paths.is_empty()
+                    && let Some((_, value)) = named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("isvalid"))
+                    && let Value::String(text) = value
+                {
+                    paths.push(text.to_string_lossy());
+                }
+                if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Test-Path without a path",
                     }
                     .into());
-                };
-                if named.iter().any(|(name, value)| {
-                    name.eq_ignore_ascii_case("isvalid") && ops::is_true(value)
-                }) {
-                    let valid = !path_text.is_empty()
-                        && !path_text.contains('\0')
-                        && !path_text.contains(':');
-                    return Ok(Some(vec![Value::Bool(valid)]));
                 }
+                let is_valid = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("isvalid") && ops::is_true(value)
+                });
                 let path_type = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("pathtype"))
                     .map(|(_, value)| value.to_string());
-                if path_text.contains(['*', '?']) {
-                    let matches = expand_glob(&path_text);
-                    let found = matches.iter().any(|path| {
-                        let target = std::path::Path::new(path);
+                let mut outputs = Vec::new();
+                for path in paths {
+                    let path_text = expand_home(&path);
+                    if is_valid {
+                        let valid = !path_text.is_empty()
+                            && !path_text.contains('\0')
+                            && !path_text.contains(':');
+                        outputs.push(Value::Bool(valid));
+                        continue;
+                    }
+                    let matches = if path_text.contains(['*', '?']) {
+                        expand_glob(&path_text).into_iter().any(|path| {
+                            let target = std::path::Path::new(&path);
+                            match path_type.as_deref() {
+                                Some(kind) if kind.eq_ignore_ascii_case("leaf") => target.is_file(),
+                                Some(kind) if kind.eq_ignore_ascii_case("container") => {
+                                    target.is_dir()
+                                }
+                                _ => target.exists(),
+                            }
+                        })
+                    } else {
+                        let target = std::path::Path::new(&path_text);
                         match path_type.as_deref() {
                             Some(kind) if kind.eq_ignore_ascii_case("leaf") => target.is_file(),
                             Some(kind) if kind.eq_ignore_ascii_case("container") => target.is_dir(),
                             _ => target.exists(),
                         }
-                    });
-                    return Ok(Some(vec![Value::Bool(found)]));
+                    };
+                    outputs.push(Value::Bool(matches));
                 }
-                let target = std::path::Path::new(&path_text);
-                let matches = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("pathtype"))
-                    .map(|(_, value)| value.to_string())
-                {
-                    Some(kind) if kind.eq_ignore_ascii_case("leaf") => target.is_file(),
-                    Some(kind) if kind.eq_ignore_ascii_case("container") => target.is_dir(),
-                    _ => target.exists(),
-                };
-                Ok(Some(vec![Value::Bool(matches)]))
+                Ok(Some(outputs))
             }
             "join-path" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
