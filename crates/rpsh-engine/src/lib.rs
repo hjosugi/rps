@@ -1242,8 +1242,31 @@ impl Engine {
         input: &[Value],
     ) -> Result<Option<Vec<Value>>, EngineError> {
         match name.to_ascii_lowercase().as_str() {
-            "write-output" | "echo" | "write-warning" | "write-verbose" | "write-debug"
-            | "write-information" | "write-error" => {
+            "write-verbose" | "write-debug" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let is_verbose = name.eq_ignore_ascii_case("write-verbose");
+                let preference = if is_verbose {
+                    "VerbosePreference"
+                } else {
+                    "DebugPreference"
+                };
+                let enabled = named.iter().any(|(name, value)| {
+                    (name.eq_ignore_ascii_case("verbose") || name.eq_ignore_ascii_case("debug"))
+                        && ops::is_true(value)
+                }) || self
+                    .variables
+                    .get(preference)
+                    .is_some_and(|value| value.to_string().eq_ignore_ascii_case("continue"));
+                if !enabled {
+                    return Ok(Some(Vec::new()));
+                }
+                let mut outputs = Vec::new();
+                for value in positional {
+                    outputs.extend(flatten_value(value));
+                }
+                Ok(Some(outputs))
+            }
+            "write-output" | "echo" | "write-warning" | "write-information" | "write-error" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let no_enumerate = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("noenumerate") && ops::is_true(value)
