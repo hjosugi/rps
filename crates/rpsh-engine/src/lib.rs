@@ -2789,6 +2789,16 @@ impl Engine {
                 let include_equal = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("includeequal") && ops::is_true(value)
                 });
+                let case_sensitive = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
+                });
+                let same = |a: &str, b: &str| {
+                    if case_sensitive {
+                        a == b
+                    } else {
+                        a.eq_ignore_ascii_case(b)
+                    }
+                };
                 let (Some(left), Some(right)) = (positional.first(), positional.get(1)) else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Compare-Object without two collections",
@@ -2801,10 +2811,7 @@ impl Engine {
                 if include_equal {
                     for item in &right {
                         let text = item.to_string();
-                        if left
-                            .iter()
-                            .any(|value| value.to_string().eq_ignore_ascii_case(&text))
-                        {
+                        if left.iter().any(|value| same(&value.to_string(), &text)) {
                             outputs.push(Value::object(vec![
                                 ("InputObject".to_owned(), item.clone()),
                                 ("SideIndicator".to_owned(), Value::String("==".into())),
@@ -2814,10 +2821,7 @@ impl Engine {
                 }
                 for item in &right {
                     let text = item.to_string();
-                    if !left
-                        .iter()
-                        .any(|value| value.to_string().eq_ignore_ascii_case(&text))
-                    {
+                    if !left.iter().any(|value| same(&value.to_string(), &text)) {
                         outputs.push(Value::object(vec![
                             ("InputObject".to_owned(), item.clone()),
                             ("SideIndicator".to_owned(), Value::String("=>".into())),
@@ -2826,10 +2830,7 @@ impl Engine {
                 }
                 for item in &left {
                     let text = item.to_string();
-                    if !right
-                        .iter()
-                        .any(|value| value.to_string().eq_ignore_ascii_case(&text))
-                    {
+                    if !right.iter().any(|value| same(&value.to_string(), &text)) {
                         outputs.push(Value::object(vec![
                             ("InputObject".to_owned(), item.clone()),
                             ("SideIndicator".to_owned(), Value::String("<=".into())),
