@@ -6394,6 +6394,15 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
         ("math", "tan") => Ok(Value::Double(
             convert_double(arguments.first().unwrap_or(&Value::Null))?.tan(),
         )),
+        ("math", "asin") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.asin(),
+        )),
+        ("math", "acos") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.acos(),
+        )),
+        ("math", "atan") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.atan(),
+        )),
         ("math", "atan2") => {
             let y = convert_double(arguments.first().unwrap_or(&Value::Null))?;
             let x = convert_double(arguments.get(1).unwrap_or(&Value::Null))?;

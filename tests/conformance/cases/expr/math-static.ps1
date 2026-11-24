@@ -17,3 +17,6 @@
 [Math]::Round(1.2345, 2)
 [Math]::Round(2.5)
 [Math]::Round(3.5)
+[Math]::Asin(0)
+[Math]::Acos(1)
+[Math]::Atan(0)
