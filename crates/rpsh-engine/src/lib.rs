@@ -2079,10 +2079,15 @@ impl Engine {
                     }
                     .into());
                 };
+                let no_newline = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("nonewline") && ops::is_true(value)
+                });
                 let mut text = String::new();
                 for item in input {
                     text.push_str(&item.to_string());
-                    text.push('\n');
+                    if !no_newline {
+                        text.push('\n');
+                    }
                 }
                 if named
                     .iter()
