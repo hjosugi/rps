@@ -15,3 +15,8 @@ Test-Path -Path fixtures/data.txt
 Split-Path /tmp/x -IsAbsolute
 Split-Path fixtures/data.txt -IsAbsolute
 (Get-Content -LiteralPath fixtures/data.txt) -join ','
+Test-Path 'foo' -IsValid
+Test-Path '' -IsValid
+Test-Path 'a/b' -IsValid
+Test-Path 'a:b' -IsValid
+Test-Path -IsValid 'foo'

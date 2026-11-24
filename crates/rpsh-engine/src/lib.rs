@@ -2184,16 +2184,32 @@ impl Engine {
                     .find(|(name, _)| {
                         name.eq_ignore_ascii_case("path")
                             || name.eq_ignore_ascii_case("literalpath")
-                            || name.eq_ignore_ascii_case("literalpath")
                     })
                     .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
+                    .or_else(|| positional.first().map(ToString::to_string))
+                    .or_else(|| {
+                        named
+                            .iter()
+                            .find(|(name, _)| name.eq_ignore_ascii_case("isvalid"))
+                            .and_then(|(_, value)| match value {
+                                Value::String(text) => Some(text.to_string_lossy()),
+                                _ => None,
+                            })
+                    });
                 let Some(path_text) = path else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Test-Path without a path",
                     }
                     .into());
                 };
+                if named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("isvalid") && ops::is_true(value)
+                }) {
+                    let valid = !path_text.is_empty()
+                        && !path_text.contains('\0')
+                        && !path_text.contains(':');
+                    return Ok(Some(vec![Value::Bool(valid)]));
+                }
                 let path_type = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("pathtype"))
