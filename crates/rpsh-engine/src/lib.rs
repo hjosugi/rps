@@ -2937,6 +2937,61 @@ impl Engine {
                 };
                 let left = flatten_value(left.clone());
                 let right = flatten_value(right.clone());
+                let properties: Vec<String> = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                if !properties.is_empty() {
+                    let describe = |item: &Value| -> (String, Vec<(String, Value)>) {
+                        let mut key = Vec::new();
+                        let mut entries = Vec::new();
+                        for property in &properties {
+                            let value = member(item, property).unwrap_or(Value::Null);
+                            key.push(if case_sensitive {
+                                value.to_string()
+                            } else {
+                                value.to_string().to_lowercase()
+                            });
+                            entries.push((property.clone(), value));
+                        }
+                        (key.join("\u{0}"), entries)
+                    };
+                    let mut outputs = Vec::new();
+                    let mut right_keys: Vec<String> = Vec::new();
+                    for item in &right {
+                        let (key, entries) = describe(item);
+                        right_keys.push(key.clone());
+                        let present = left.iter().any(|left| describe(left).0 == key);
+                        if include_equal && present {
+                            let mut object = entries;
+                            object.push(("SideIndicator".to_owned(), Value::String("==".into())));
+                            outputs.push(Value::object(object));
+                        }
+                    }
+                    for item in &right {
+                        let (key, entries) = describe(item);
+                        if !left.iter().any(|left| describe(left).0 == key) {
+                            let mut object = entries;
+                            object.push(("SideIndicator".to_owned(), Value::String("=>".into())));
+                            outputs.push(Value::object(object));
+                        }
+                    }
+                    for item in &left {
+                        let (key, entries) = describe(item);
+                        if !right_keys.contains(&key) {
+                            let mut object = entries;
+                            object.push(("SideIndicator".to_owned(), Value::String("<=".into())));
+                            outputs.push(Value::object(object));
+                        }
+                    }
+                    return Ok(Some(outputs));
+                }
                 let mut outputs = Vec::new();
                 if include_equal {
                     for item in &right {
