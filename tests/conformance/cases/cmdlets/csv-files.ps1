@@ -18,3 +18,10 @@ Remove-Item rpsh-nh.csv
 Remove-Item rpsh-semi.csv
 '1;2', '3;4' | ConvertFrom-Csv -Delimiter ';' -Header A, B | ForEach-Object { "$($_.A)$($_.B)" }
 @('a;b', '1;2') | ConvertFrom-Csv -Delimiter ';' | ForEach-Object { "$($_.a)$($_.b)" }
+[pscustomobject]@{a=1} | Export-Csv rpsh-append.csv
+[pscustomobject]@{a=2} | Export-Csv rpsh-append.csv -Append
+(Get-Content rpsh-append.csv) -join '|'
+Remove-Item rpsh-append.csv
+[pscustomobject]@{a=1} | Export-Csv rpsh-append2.csv -Append
+(Get-Content rpsh-append2.csv) -join '|'
+Remove-Item rpsh-append2.csv

@@ -2798,6 +2798,34 @@ impl Engine {
                         lines.push(cells.join(&delimiter));
                     }
                 }
+                let append = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("append") && ops::is_true(value)
+                });
+                if append {
+                    let exists = std::fs::metadata(&path)
+                        .map(|meta| meta.len() > 0)
+                        .unwrap_or(false);
+                    if exists && !no_header && !lines.is_empty() {
+                        lines.remove(0);
+                    }
+                    use std::io::Write as _;
+                    let mut file = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&path)
+                        .map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Export-Csv cannot open this file",
+                        })?;
+                    let mut text = lines.join("\n");
+                    if !text.is_empty() {
+                        text.push('\n');
+                    }
+                    file.write_all(text.as_bytes())
+                        .map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Export-Csv cannot write this file",
+                        })?;
+                    return Ok(Some(Vec::new()));
+                }
                 let mut text = lines.join("\n");
                 if !text.is_empty() {
                     text.push('\n');
