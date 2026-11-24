@@ -2871,12 +2871,21 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("membertype"))
                     .map(|(_, value)| value.to_string());
+                let name_filter = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string());
                 let mut outputs = Vec::new();
                 for item in input {
                     let Value::Object(entries) = item else {
                         continue;
                     };
                     for (name, _) in visible_entries(entries) {
+                        if let Some(filter) = &name_filter
+                            && !ops::wildcard_match(name, filter, false)
+                        {
+                            continue;
+                        }
                         if member_type
                             .as_deref()
                             .is_some_and(|wanted| !wanted.eq_ignore_ascii_case("NoteProperty"))
