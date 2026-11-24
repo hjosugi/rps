@@ -8,3 +8,5 @@ echo 'via alias'
 Write-Host a b
 Write-Host 'a', 'b'
 Write-Host 'x'
+Write-Host a b -Separator '-'
+Write-Host 'a' 'b' -Separator ''

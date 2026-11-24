@@ -2360,14 +2360,18 @@ impl Engine {
                 }
             }
             "write-host" => {
-                let (positional, _) = self.evaluate_arguments(arguments)?;
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let separator = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("separator"))
+                    .map_or_else(|| " ".to_owned(), |(_, value)| value.to_string());
                 let mut parts = Vec::new();
                 for value in positional {
                     for item in flatten_value(value) {
                         parts.push(item.to_string());
                     }
                 }
-                Ok(Some(vec![Value::String(parts.join(" ").into())]))
+                Ok(Some(vec![Value::String(parts.join(&separator).into())]))
             }
             "set-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
