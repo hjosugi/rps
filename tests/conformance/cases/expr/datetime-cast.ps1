@@ -16,3 +16,4 @@ $first = [datetime]'2024-01-31'
 ([datetime]'2024-01-31 23:30:00').AddHours(1).ToString('yyyy-MM-dd HH:mm:ss')
 ([datetime]'2024-01-31 23:30:00').AddMinutes(45).ToString('yyyy-MM-dd HH:mm:ss')
 ([datetime]'2024-01-01 00:00:10').AddSeconds(-20).ToString('yyyy-MM-dd HH:mm:ss')
+[datetime]::Parse('2024-03-04').Year

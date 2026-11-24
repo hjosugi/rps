@@ -6,3 +6,4 @@ $v.Build
 $v.Revision
 $v.ToString()
 ([version]'2.0').Build
+[version]::Parse('1.2.3').Build

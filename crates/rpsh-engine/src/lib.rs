@@ -6309,6 +6309,14 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
                 ("__Text".to_owned(), Value::String(text.into())),
             ]))
         }
+        ("version", "parse") => {
+            let value = arguments.first().cloned().unwrap_or(Value::Null);
+            cast_to("version", value)
+        }
+        ("datetime", "parse") => {
+            let value = arguments.first().cloned().unwrap_or(Value::Null);
+            cast_to("datetime", value)
+        }
         ("char", "isdigit") | ("char", "isletter") | ("char", "iswhitespace") => {
             let text = arguments
                 .first()
