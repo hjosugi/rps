@@ -13,3 +13,4 @@ Set-Content rpsh-delim.txt -Value 'a,b,' -NoNewline
 (Get-Content rpsh-delim.txt -Delimiter ',' | ForEach-Object { "[$_]" }) -join ';'
 (Get-Content rpsh-delim.txt -Delimiter ',').Count
 Remove-Item rpsh-delim.txt
+Get-Content fixtures/data.txt -TotalCount 1

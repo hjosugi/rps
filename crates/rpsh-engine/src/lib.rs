@@ -2223,6 +2223,7 @@ impl Engine {
                     name.eq_ignore_ascii_case("totalcount")
                         || name.eq_ignore_ascii_case("first")
                         || name.eq_ignore_ascii_case("head")
+                        || name.eq_ignore_ascii_case("totalcount")
                 }) {
                     let count = convert_int32(count)?.max(0) as usize;
                     lines.truncate(count);
