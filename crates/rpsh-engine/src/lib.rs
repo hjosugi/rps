@@ -6638,11 +6638,13 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
             let needle = needle_units(arguments.first())?;
             Ok(Value::Bool(find_units(&units, &needle).is_some()))
         }
-        "toupper" | "tolower" => {
+        "toupper" | "toupperinvariant" | "tolower" | "tolowerinvariant" => {
             let ascii = text.as_ascii().ok_or(RuntimeError::NotImplemented {
                 feature: "culture-aware case conversion (ICU)",
             })?;
-            let result = if name.eq_ignore_ascii_case("toupper") {
+            let upper = name.eq_ignore_ascii_case("toupper")
+                || name.eq_ignore_ascii_case("toupperinvariant");
+            let result = if upper {
                 ascii.to_ascii_uppercase()
             } else {
                 ascii.to_ascii_lowercase()
