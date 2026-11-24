@@ -22,3 +22,4 @@ Add-Content rpsh-values.txt 'e', 'f'
 (Get-Content rpsh-values.txt) -join ','
 Remove-Item rpsh-values.txt
 Remove-Item rpsh-values2.txt
+(Get-Content fixtures/tree/*.txt) -join ','

@@ -2222,10 +2222,23 @@ impl Engine {
                     }
                     .into());
                 };
-                let text =
-                    std::fs::read_to_string(path).map_err(|_| RuntimeError::NotImplemented {
+                let text = if path.contains(['*', '?']) {
+                    let mut text = String::new();
+                    for matched in expand_glob(&path) {
+                        let Ok(content) = std::fs::read_to_string(&matched) else {
+                            continue;
+                        };
+                        text.push_str(&content);
+                        if !content.ends_with('\n') {
+                            text.push('\n');
+                        }
+                    }
+                    text
+                } else {
+                    std::fs::read_to_string(&path).map_err(|_| RuntimeError::NotImplemented {
                         feature: "Get-Content of a missing file",
-                    })?;
+                    })?
+                };
                 if named
                     .iter()
                     .any(|(name, value)| name.eq_ignore_ascii_case("raw") && ops::is_true(value))
