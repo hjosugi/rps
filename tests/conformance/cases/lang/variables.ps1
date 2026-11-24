@@ -19,3 +19,7 @@ $nv
 (Get-Variable nv2 -ValueOnly) + 1
 (Get-Variable 'nv*' | ForEach-Object Name) -join ','
 (Get-Variable 'nv2*' -ValueOnly) -join ','
+New-Variable rv1 1
+New-Variable rv2 2
+Remove-Variable rv*
+(Get-Variable 'rv*' | Measure-Object).Count

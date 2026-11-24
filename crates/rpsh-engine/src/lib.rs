@@ -2749,9 +2749,22 @@ impl Engine {
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
                 if let Some(name) = name {
-                    let key = strip_scope(&name);
-                    self.variables.remove(key);
-                    self.globals.remove(key);
+                    if name.contains(['*', '?']) {
+                        let keys: Vec<String> = self
+                            .variables
+                            .keys()
+                            .filter(|key| ops::wildcard_match(key, &name, false))
+                            .cloned()
+                            .collect();
+                        for key in keys {
+                            self.variables.remove(&key);
+                            self.globals.remove(&key);
+                        }
+                    } else {
+                        let key = strip_scope(&name);
+                        self.variables.remove(key);
+                        self.globals.remove(key);
+                    }
                 }
                 Ok(Some(Vec::new()))
             }
