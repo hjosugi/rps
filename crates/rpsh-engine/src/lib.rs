@@ -6124,6 +6124,18 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
             let b = convert_double(arguments.get(1).unwrap_or(&Value::Null))?;
             Ok(Value::Double(a.powf(b)))
         }
+        ("double", "parse") => {
+            let value = arguments
+                .first()
+                .map_or_else(String::new, ToString::to_string);
+            convert_double(&Value::String(value.into())).map(Value::Double)
+        }
+        ("bool" | "boolean", "parse") => {
+            let value = arguments
+                .first()
+                .map_or_else(String::new, ToString::to_string);
+            Ok(Value::Bool(value.trim().eq_ignore_ascii_case("true")))
+        }
         ("int32" | "int", "parse") | ("int64" | "long", "parse") => {
             let Some(value) = arguments.first() else {
                 return Err(RuntimeError::NotImplemented {

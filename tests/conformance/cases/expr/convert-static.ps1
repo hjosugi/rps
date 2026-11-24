@@ -5,3 +5,6 @@
 [Convert]::ToDouble('2.5')
 [Convert]::ToString(255, 16)
 [Convert]::ToBoolean('true')
+[double]::Parse('2.5')
+[bool]::Parse('true')
+[bool]::Parse('false')
