@@ -12,3 +12,6 @@ sub/b.txt
 a.txt,sub
 a.txt,sub,sub/b.txt
 a.txt,sub,sub/b.txt
+a.txt
+a.txt,sub
+2

@@ -1956,8 +1956,18 @@ impl Engine {
                     .map(|(_, value)| convert_int32(value))
                     .transpose()?;
                 let recurse = recurse || depth.is_some();
+                let wildcard_path = path.contains(['*', '?']);
                 let mut entries: Vec<(String, bool, u64)> = Vec::new();
-                collect_children(&path, recurse, force, "", &mut entries);
+                if wildcard_path {
+                    for matched in expand_glob(&path) {
+                        let target = std::path::Path::new(&matched);
+                        let is_dir = target.is_dir();
+                        let length = target.metadata().map_or(0, |meta| meta.len());
+                        entries.push((matched, is_dir, length));
+                    }
+                } else {
+                    collect_children(&path, recurse, force, "", &mut entries);
+                }
                 if let Some(depth) = depth {
                     let depth = depth.max(0) as usize;
                     entries.retain(|(name, _, _)| name.matches('/').count() <= depth);
@@ -1991,7 +2001,12 @@ impl Engine {
                         .into_iter()
                         .map(|(name, is_dir, length)| {
                             if names_only {
-                                Value::String(name.into())
+                                let leaf = if wildcard_path {
+                                    name.rsplit('/').next().unwrap_or(&name).to_owned()
+                                } else {
+                                    name.clone()
+                                };
+                                Value::String(leaf.into())
                             } else {
                                 let leaf = name.rsplit('/').next().unwrap_or(&name).to_owned();
                                 Value::object(vec![

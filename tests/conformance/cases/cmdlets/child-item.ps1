@@ -11,3 +11,6 @@
 (Get-ChildItem fixtures/tree -Recurse -Name -Depth 0 | Sort-Object) -join ','
 (Get-ChildItem fixtures/tree -Recurse -Name -Depth 1 | Sort-Object) -join ','
 (Get-ChildItem fixtures/tree -Name -Depth 1 | Sort-Object) -join ','
+(Get-ChildItem fixtures/tree/*.txt -Name) -join ','
+(Get-ChildItem fixtures/tree/* -Name | Sort-Object) -join ','
+(Get-ChildItem fixtures/tree/*.txt).Length
