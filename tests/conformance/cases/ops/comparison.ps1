@@ -14,3 +14,6 @@ $Matches[2]
 'a,b,c' -split ','
 'a', 'b' -join '+'
 $null -eq $null
+'gc' -contains 'gc'
+'gc' -contains 'x'
+$null -contains 'a'

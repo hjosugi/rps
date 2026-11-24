@@ -3319,6 +3319,10 @@ impl Engine {
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
+                let command_type = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("commandtype"))
+                    .map(|(_, value)| value.to_string());
                 let mut names: Vec<(String, &'static str)> = self
                     .functions
                     .values()
@@ -3327,12 +3331,21 @@ impl Engine {
                 for builtin in BUILTIN_COMMANDS {
                     names.push(((*builtin).to_owned(), "Cmdlet"));
                 }
+                for (name, _) in DEFAULT_ALIASES {
+                    names.push(((*name).to_owned(), "Alias"));
+                }
+                for name in self.aliases.keys() {
+                    names.push((name.clone(), "Alias"));
+                }
                 let mut outputs = Vec::new();
                 for (name, kind) in names {
                     let matches = wanted
                         .as_deref()
                         .is_none_or(|wanted| ops::wildcard_match(&name, wanted, false));
-                    if matches {
+                    let type_matches = command_type
+                        .as_deref()
+                        .is_none_or(|wanted| wanted.eq_ignore_ascii_case(kind));
+                    if matches && type_matches {
                         outputs.push(Value::object(vec![
                             ("Name".to_owned(), Value::String(name.into())),
                             ("CommandType".to_owned(), Value::String(kind.into())),

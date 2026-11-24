@@ -605,17 +605,23 @@ pub fn contains(
     needle: &Value,
     case_sensitive: bool,
 ) -> Result<Value, RuntimeError> {
-    let Value::Array(items) = collection else {
-        return Err(RuntimeError::NotImplemented {
-            feature: "contains on a non-array",
-        });
-    };
-    for item in items.iter() {
-        if compare_scalar(item, needle, Comparison::Eq, case_sensitive)? {
-            return Ok(Value::Bool(true));
+    match collection {
+        Value::Array(items) => {
+            for item in items.iter() {
+                if compare_scalar(item, needle, Comparison::Eq, case_sensitive)? {
+                    return Ok(Value::Bool(true));
+                }
+            }
+            Ok(Value::Bool(false))
         }
+        Value::Null | Value::AutomationNull => Ok(Value::Bool(false)),
+        value => Ok(Value::Bool(compare_scalar(
+            value,
+            needle,
+            Comparison::Eq,
+            case_sensitive,
+        )?)),
     }
-    Ok(Value::Bool(false))
 }
 
 /// `-shl` / `-shr`.
