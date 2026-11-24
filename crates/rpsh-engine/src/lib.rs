@@ -2754,17 +2754,23 @@ impl Engine {
                     std::fs::read_to_string(&path).map_err(|_| RuntimeError::NotImplemented {
                         feature: "Import-Csv of a missing file",
                     })?;
+                let delimiter = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("delimiter"))
+                    .map_or(',', |(_, value)| {
+                        value.to_string().chars().next().unwrap_or(',')
+                    });
                 let mut lines = text.lines();
                 let Some(header) = lines.next() else {
                     return Ok(Some(Vec::new()));
                 };
-                let columns = parse_csv_line(header);
+                let columns = parse_csv_line_with(header, delimiter);
                 let mut outputs = Vec::new();
                 for line in lines {
                     if line.trim().is_empty() {
                         continue;
                     }
-                    let cells = parse_csv_line(line);
+                    let cells = parse_csv_line_with(line, delimiter);
                     let mut entries = Vec::new();
                     for (index, column) in columns.iter().enumerate() {
                         let value = cells.get(index).cloned().unwrap_or_default();
@@ -2784,6 +2790,12 @@ impl Engine {
                         lines.push(item.to_string());
                     }
                 }
+                let delimiter = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("delimiter"))
+                    .map_or(',', |(_, value)| {
+                        value.to_string().chars().next().unwrap_or(',')
+                    });
                 let custom_header = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("header"))
@@ -2799,7 +2811,7 @@ impl Engine {
                     let Some(header) = lines.first() else {
                         return Ok(Some(Vec::new()));
                     };
-                    let columns = parse_csv_line(header);
+                    let columns = parse_csv_line_with(header, delimiter);
                     lines.remove(0);
                     columns
                 };
@@ -2808,7 +2820,7 @@ impl Engine {
                     if line.trim().is_empty() {
                         continue;
                     }
-                    let cells = parse_csv_line(line);
+                    let cells = parse_csv_line_with(line, delimiter);
                     let mut entries = Vec::new();
                     for (index, column) in columns.iter().enumerate() {
                         let value = cells.get(index).cloned().unwrap_or_default();
@@ -5390,7 +5402,7 @@ fn csv_quote(text: &str) -> String {
     format!("\"{}\"", text.replace('"', "\"\""))
 }
 
-fn parse_csv_line(line: &str) -> Vec<String> {
+fn parse_csv_line_with(line: &str, delimiter: char) -> Vec<String> {
     let mut cells = Vec::new();
     let mut cell = String::new();
     let mut quoted = false;
@@ -5405,7 +5417,7 @@ fn parse_csv_line(line: &str) -> Vec<String> {
                     quoted = !quoted;
                 }
             }
-            ',' if !quoted => cells.push(std::mem::take(&mut cell)),
+            ch if ch == delimiter && !quoted => cells.push(std::mem::take(&mut cell)),
             other => cell.push(other),
         }
     }

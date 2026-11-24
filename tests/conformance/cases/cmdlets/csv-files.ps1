@@ -16,3 +16,5 @@ Remove-Item rpsh-nh.csv
 [pscustomobject]@{a=1;b='x'} | Export-Csv rpsh-semi.csv -Delimiter ';'
 (Get-Content rpsh-semi.csv) -join '|'
 Remove-Item rpsh-semi.csv
+'1;2', '3;4' | ConvertFrom-Csv -Delimiter ';' -Header A, B | ForEach-Object { "$($_.A)$($_.B)" }
+@('a;b', '1;2') | ConvertFrom-Csv -Delimiter ';' | ForEach-Object { "$($_.a)$($_.b)" }
