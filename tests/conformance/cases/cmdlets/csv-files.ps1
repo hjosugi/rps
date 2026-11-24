@@ -7,3 +7,8 @@ $rows | Export-Csv rpsh-rows.csv
 Remove-Item rpsh-rows.csv
 '1,2', '3,4' | ConvertFrom-Csv -Header A, B | ForEach-Object { "$($_.A)$($_.B)" }
 @('x,y', '1,2') | ConvertFrom-Csv | ForEach-Object { "$($_.x)$($_.y)" }
+[pscustomobject]@{a=1;b='x'} | ConvertTo-Csv -NoHeader
+[pscustomobject]@{a=1;b='x'} | ConvertTo-Csv
+[pscustomobject]@{a=1;b='x'} | Export-Csv rpsh-nh.csv -NoHeader
+(Get-Content rpsh-nh.csv) -join ';'
+Remove-Item rpsh-nh.csv

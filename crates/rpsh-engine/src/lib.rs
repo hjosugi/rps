@@ -2623,6 +2623,10 @@ impl Engine {
                 Ok(Some(input.to_vec()))
             }
             "convertto-csv" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let no_header = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("noheader") && ops::is_true(value)
+                });
                 let mut outputs: Vec<Value> = Vec::new();
                 let mut columns: Vec<String> = Vec::new();
                 for item in input {
@@ -2632,14 +2636,16 @@ impl Engine {
                                 .iter()
                                 .map(|(name, _)| (*name).clone())
                                 .collect();
-                            outputs.push(Value::String(
-                                columns
-                                    .iter()
-                                    .map(|name| csv_quote(name))
-                                    .collect::<Vec<_>>()
-                                    .join(",")
-                                    .into(),
-                            ));
+                            if !no_header {
+                                outputs.push(Value::String(
+                                    columns
+                                        .iter()
+                                        .map(|name| csv_quote(name))
+                                        .collect::<Vec<_>>()
+                                        .join(",")
+                                        .into(),
+                                ));
+                            }
                         }
                         let cells: Vec<String> = columns
                             .iter()
@@ -2674,6 +2680,9 @@ impl Engine {
                     }
                     .into());
                 };
+                let no_header = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("noheader") && ops::is_true(value)
+                });
                 let mut lines: Vec<String> = Vec::new();
                 let mut columns: Vec<String> = Vec::new();
                 for item in input {
@@ -2683,13 +2692,15 @@ impl Engine {
                                 .iter()
                                 .map(|(name, _)| (*name).clone())
                                 .collect();
-                            lines.push(
-                                columns
-                                    .iter()
-                                    .map(|name| csv_quote(name))
-                                    .collect::<Vec<_>>()
-                                    .join(","),
-                            );
+                            if !no_header {
+                                lines.push(
+                                    columns
+                                        .iter()
+                                        .map(|name| csv_quote(name))
+                                        .collect::<Vec<_>>()
+                                        .join(","),
+                                );
+                            }
                         }
                         let cells: Vec<String> = columns
                             .iter()
