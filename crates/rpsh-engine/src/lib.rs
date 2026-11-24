@@ -3247,6 +3247,10 @@ impl Engine {
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.first().map(ToString::to_string));
+                let definition_filter = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("definition"))
+                    .map(|(_, value)| value.to_string());
                 let mut entries: Vec<(String, String)> = self
                     .aliases
                     .iter()
@@ -3264,7 +3268,14 @@ impl Engine {
                             name.eq_ignore_ascii_case(wanted)
                         }
                     });
-                    if matches {
+                    let definition_matches = definition_filter.as_deref().is_none_or(|wanted| {
+                        if wanted.contains(['*', '?']) {
+                            ops::wildcard_match(&definition, wanted, false)
+                        } else {
+                            definition.eq_ignore_ascii_case(wanted)
+                        }
+                    });
+                    if matches && definition_matches {
                         outputs.push(Value::object(vec![
                             ("Name".to_owned(), Value::String(name.clone().into())),
                             ("Definition".to_owned(), Value::String(definition.into())),

@@ -3,3 +3,5 @@ exit=0
 Write-Output
 Get-Content
 hello
+echo,greet
+gc,type
