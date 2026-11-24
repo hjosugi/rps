@@ -6,7 +6,8 @@ rpsh is an implementation of PowerShell in Rust, measured against the latest sta
 
 The aim is to run `.ps1` scripts exactly as `pwsh` does, cover what `pwsh`
 ships, run Linux commands the way a shell should, and find out by measurement
-how much faster that is without a .NET runtime to start. The design is
+how much faster that is without a .NET runtime to start. The user documentation is at
+<https://hjosugi.github.io/rpsh/>. The design is
 [DESIGN.md](DESIGN.md); the work is tracked in the
 [issues](https://github.com/hjosugi/rpsh/issues), starting from the
 [roadmap](https://github.com/hjosugi/rpsh/issues/182).

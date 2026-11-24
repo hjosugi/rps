@@ -10,3 +10,7 @@ bench/results/
 # Python bytecode from the research scripts
 __pycache__/
 *.py[cod]
+
+# MkDocs output
+site/
+.venv/

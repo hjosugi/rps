@@ -1,0 +1,104 @@
+site_name: rpsh
+site_description: PowerShell in Rust, measured against pwsh
+site_url: https://hjosugi.github.io/rpsh/
+repo_url: https://github.com/hjosugi/rpsh
+repo_name: hjosugi/rpsh
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+exclude_docs: |
+  README.md
+
+theme:
+  name: material
+  language: en
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  font: false
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/hjosugi/rpsh
+
+copyright: rpsh is MIT licensed. PowerShell is a trademark of Microsoft Corporation.
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Install: get-started/install.md
+      - Quick start: get-started/quickstart.md
+  - Using rpsh:
+      - Command line: usage/cli.md
+      - Scripting: usage/scripting.md
+      - Compatibility: usage/compatibility.md
+  - Reference:
+      - Status: reference/status.md
+      - Conformance suite: reference/conformance.md
+  - Project:
+      - Architecture: project/architecture.md
+      - Contributing: project/contributing.md
+      - Design notes: project/design-notes.md
+  - Design memos:
+      - Compatibility contract: 01_compat_contract.md
+      - Value model: 02_value_model.md
+      - Memory: 03_memory.md
+      - Execution: 04_execution.md
+      - Startup: 05_startup.md
+      - .NET bridge: 06_dotnet_bridge.md
+      - Dependencies: 07_dependencies.md
+      - Pester plan: 07_pester_plan.md
+      - Corpus: 08_corpus.md
+      - xUnit port: 09_xunit_port.md

@@ -1,0 +1,119 @@
+/*
+ * A quiet approximation of the Microsoft Learn reading experience:
+ * Segoe UI, Fluent blue, restrained borders, light/dark parity.
+ */
+
+:root {
+  --rpsh-brand: #0f6cbd;
+  --rpsh-brand-dark: #115ea3;
+  --rpsh-link: #0067b8;
+  --rpsh-border: #e1dfdd;
+  --rpsh-code-bg: #f3f2f1;
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--rpsh-brand);
+  --md-primary-fg-color--light: #2b88d8;
+  --md-primary-fg-color--dark: var(--rpsh-brand-dark);
+  --md-accent-fg-color: var(--rpsh-link);
+  --md-default-fg-color: #242424;
+  --md-default-fg-color--light: #424242;
+  --md-default-fg-color--lighter: #707070;
+  --md-default-bg-color: #ffffff;
+  --md-typeset-a-color: var(--rpsh-link);
+  --md-code-bg-color: var(--rpsh-code-bg);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: var(--rpsh-brand);
+  --md-primary-fg-color--light: #2b88d8;
+  --md-primary-fg-color--dark: var(--rpsh-brand-dark);
+  --md-accent-fg-color: #479ef5;
+  --md-typeset-a-color: #479ef5;
+  --md-code-bg-color: #2b2b2b;
+}
+
+body,
+input {
+  font-family:
+    "Segoe UI", "Segoe UI Web (West European)", -apple-system,
+    BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+}
+
+.md-header {
+  background-color: var(--rpsh-brand);
+}
+
+.md-tabs {
+  background-color: var(--rpsh-brand);
+}
+
+.md-typeset {
+  font-size: 0.8rem;
+  line-height: 1.75;
+}
+
+.md-typeset h1 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.md-typeset h2 {
+  font-weight: 600;
+  margin-top: 2em;
+  padding-bottom: 0.35em;
+  border-bottom: 1px solid var(--rpsh-border);
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+}
+
+.md-typeset a:hover {
+  text-decoration: underline;
+}
+
+.md-typeset code {
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+}
+
+.md-typeset pre > code {
+  border-radius: 6px;
+}
+
+.md-typeset table:not([class]) {
+  border: 1px solid var(--rpsh-border);
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--rpsh-code-bg);
+  font-weight: 600;
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
+  background-color: #2b2b2b;
+}
+
+/* Material's grid cards, aligned to the same corners. */
+.md-typeset .grid.cards > ul > li {
+  border: 1px solid var(--rpsh-border);
+  border-radius: 8px;
+  box-shadow: none;
+  transition:
+    border-color 125ms,
+    box-shadow 125ms;
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--rpsh-brand);
+  box-shadow: 0 2px 8px rgb(15 108 189 / 12%);
+}
