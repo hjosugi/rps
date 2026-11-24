@@ -6255,15 +6255,10 @@ fn regex_match(
             }
         }
     }
-    variables.insert(
-        "Matches".to_owned(),
-        if object.is_empty() {
-            Value::Null
-        } else {
-            Value::object(object)
-        },
-    );
     let matched = matches.is_some();
+    if matched {
+        variables.insert("Matches".to_owned(), Value::object(object));
+    }
     Ok(Value::Bool(if negate { !matched } else { matched }))
 }
 

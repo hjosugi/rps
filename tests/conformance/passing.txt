@@ -54,6 +54,7 @@ lang/if-else
 lang/int-overflow
 lang/invoke-expression
 lang/loops
+lang/matches-variable
 lang/numeric-literals
 lang/numeric-promotion
 lang/operators
