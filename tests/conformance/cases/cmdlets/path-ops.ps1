@@ -20,3 +20,4 @@ Test-Path '' -IsValid
 Test-Path 'a/b' -IsValid
 Test-Path 'a:b' -IsValid
 Test-Path -IsValid 'foo'
+(Resolve-Path fixtures/tree/*.txt | ForEach-Object { Split-Path $_.Path -Leaf }) -join ','

@@ -1606,6 +1606,18 @@ impl Engine {
                     }
                     .into());
                 };
+                if path.contains(['*', '?']) {
+                    let mut matches: Vec<Value> = expand_glob(&path)
+                        .into_iter()
+                        .map(|path| {
+                            let path = std::fs::canonicalize(&path)
+                                .map_or(path, |path| path.to_string_lossy().into_owned());
+                            Value::object(vec![("Path".to_owned(), Value::String(path.into()))])
+                        })
+                        .collect();
+                    matches.sort_by_key(ToString::to_string);
+                    return Ok(Some(matches));
+                }
                 let resolved = std::fs::canonicalize(&path).map_err(|_| RuntimeError::Script {
                     id: "PathNotFound,Microsoft.PowerShell.Commands.ResolvePathCommand",
                     category: format!(
