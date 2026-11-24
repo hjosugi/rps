@@ -5949,6 +5949,56 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
             let b = convert_double(right)?;
             Ok(Value::Double(if want_max { a.max(b) } else { a.min(b) }))
         }
+        ("math", "sign") => match arguments.first() {
+            Some(Value::Int32(value)) => Ok(Value::Int32(value.signum())),
+            Some(Value::Int64(value)) => Ok(Value::Int32(value.signum() as i32)),
+            Some(value) => {
+                let value = convert_double(value)?;
+                Ok(Value::Int32(if value > 0.0 {
+                    1
+                } else if value < 0.0 {
+                    -1
+                } else {
+                    0
+                }))
+            }
+            None => Err(RuntimeError::NotImplemented {
+                feature: "Sign with no argument",
+            }),
+        },
+        ("math", "clamp") => {
+            let (Some(value), Some(minimum), Some(maximum)) =
+                (arguments.first(), arguments.get(1), arguments.get(2))
+            else {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "Clamp with fewer than three arguments",
+                });
+            };
+            if let (Value::Int32(value), Value::Int32(minimum), Value::Int32(maximum)) =
+                (value, minimum, maximum)
+            {
+                Ok(Value::Int32((*value).clamp(*minimum, *maximum)))
+            } else {
+                Ok(Value::Double(
+                    convert_double(value)?
+                        .clamp(convert_double(minimum)?, convert_double(maximum)?),
+                ))
+            }
+        }
+        ("math", "exp") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.exp(),
+        )),
+        ("math", "log") => {
+            let value = convert_double(arguments.first().unwrap_or(&Value::Null))?;
+            let result = match arguments.get(1) {
+                Some(base) => value.log(convert_double(base)?),
+                None => value.ln(),
+            };
+            Ok(Value::Double(result))
+        }
+        ("math", "log10") => Ok(Value::Double(
+            convert_double(arguments.first().unwrap_or(&Value::Null))?.log10(),
+        )),
         ("math", "sqrt") => Ok(Value::Double(
             convert_double(arguments.first().unwrap_or(&Value::Null))?.sqrt(),
         )),
