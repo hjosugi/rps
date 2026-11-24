@@ -2078,7 +2078,7 @@ impl Engine {
                                 Value::String(leaf.into())
                             } else {
                                 let leaf = name.rsplit('/').next().unwrap_or(&name).to_owned();
-                                Value::object(vec![
+                                let mut entries = vec![
                                     (
                                         "__TypeName".to_owned(),
                                         Value::String(
@@ -2090,11 +2090,35 @@ impl Engine {
                                             .into(),
                                         ),
                                     ),
-                                    ("Name".to_owned(), Value::String(leaf.into())),
+                                    ("Name".to_owned(), Value::String(leaf.clone().into())),
                                     ("FullName".to_owned(), Value::String(name.into())),
                                     ("PSIsContainer".to_owned(), Value::Bool(is_dir)),
                                     ("Length".to_owned(), Value::Int64(length as i64)),
-                                ])
+                                ];
+                                if !is_dir {
+                                    let path = std::path::Path::new(&leaf);
+                                    entries.push((
+                                        "BaseName".to_owned(),
+                                        Value::String(
+                                            path.file_stem()
+                                                .map_or_else(String::new, |value| {
+                                                    value.to_string_lossy().into_owned()
+                                                })
+                                                .into(),
+                                        ),
+                                    ));
+                                    entries.push((
+                                        "Extension".to_owned(),
+                                        Value::String(
+                                            path.extension()
+                                                .map_or_else(String::new, |value| {
+                                                    format!(".{}", value.to_string_lossy())
+                                                })
+                                                .into(),
+                                        ),
+                                    ));
+                                }
+                                Value::object(entries)
                             }
                         })
                         .collect(),
