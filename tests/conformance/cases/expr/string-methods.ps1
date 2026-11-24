@@ -1,0 +1,12 @@
+# rpsh-conformance: level=c2
+'  AbC  '.Trim()
+'abc'.ToUpper()
+'abc'.Substring(1)
+'abc'.Contains('b')
+'abc'.StartsWith('a')
+'abc'.EndsWith('c')
+'x,y'.Split(',')
+[string]::Join(',', @('a', 'b'))
+[string]::Concat('a', 'b')
+[string]::IsNullOrWhiteSpace(' ')
+[string]::IsNullOrWhiteSpace('a')

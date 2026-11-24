@@ -35,6 +35,7 @@ contract/version-table
 expr/int-arithmetic
 expr/path-static
 expr/string-literals
+expr/string-methods
 lang/aliases
 lang/array
 lang/class
