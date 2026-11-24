@@ -2904,9 +2904,13 @@ impl Engine {
                         }
                     }
                 }
+                let not_match = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("notmatch") && ops::is_true(value)
+                });
                 let mut outputs = Vec::new();
                 for (index, line) in lines.iter().enumerate() {
-                    if regex.find(line).is_some() {
+                    let matched = regex.find(line).is_some();
+                    if matched != not_match {
                         outputs.push(Value::object(vec![
                             ("Line".to_owned(), Value::String(line.clone().into())),
                             ("LineNumber".to_owned(), Value::Int32(index as i32 + 1)),
