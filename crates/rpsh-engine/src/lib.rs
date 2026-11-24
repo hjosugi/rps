@@ -1554,6 +1554,9 @@ impl Engine {
                 let no_element = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("noelement") && ops::is_true(value)
                 });
+                let as_hashtable = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("ashashtable") && ops::is_true(value)
+                });
                 let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
                 for item in input {
                     let key = match &property {
@@ -1574,6 +1577,17 @@ impl Engine {
                     }
                 }
                 groups.sort_by_key(|(name, _)| name.to_lowercase());
+                if as_hashtable {
+                    let mut entries: Vec<(String, Value)> = groups
+                        .into_iter()
+                        .map(|(name, group)| (name, Value::array(group)))
+                        .collect();
+                    entries.push((
+                        "__TypeName".to_owned(),
+                        Value::String("System.Collections.Hashtable".into()),
+                    ));
+                    return Ok(Some(vec![Value::object(entries)]));
+                }
                 let outputs = groups
                     .into_iter()
                     .map(|(name, group)| {

@@ -6,3 +6,6 @@ $people = [pscustomobject]@{ Name = 'a'; Age = 20 }, [pscustomobject]@{ Name = '
 ('a', 'A' | Group-Object -CaseSensitive | ForEach-Object { "$($_.Name):$($_.Count)" }) -join ','
 ('a', 'A' | Group-Object | ForEach-Object { "$($_.Name):$($_.Count)" }) -join ','
 ('a', 'b', 'a' | Group-Object -NoElement | ForEach-Object { "$($_.Name):$($_.Count)" }) -join ','
+$h = 'a', 'b', 'a' | Group-Object -AsHashTable
+$h['a'].Count
+$h['b'][0]
