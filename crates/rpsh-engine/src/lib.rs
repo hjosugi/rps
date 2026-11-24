@@ -2016,6 +2016,10 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("outputsuffix"))
                     .map_or_else(String::new, |(_, value)| value.to_string());
+                let format_string = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("formatstring"))
+                    .map(|(_, value)| value.to_string());
                 let values: Vec<String> = input
                     .iter()
                     .map(|item| match &property {
@@ -2031,6 +2035,10 @@ impl Engine {
                         } else {
                             value
                         }
+                    })
+                    .map(|value| match &format_string {
+                        Some(format) => format.replace("{0}", &value),
+                        None => value,
                     })
                     .collect();
                 Ok(Some(vec![Value::String(
