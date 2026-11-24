@@ -2363,7 +2363,7 @@ impl Engine {
                                 _ => None,
                             })
                     });
-                let Some(path_text) = path else {
+                let Some(path_text) = path.map(|path| expand_home(&path)) else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Test-Path without a path",
                     }
@@ -4868,6 +4868,20 @@ impl JsonParser {
 
 /// Expands `dir/pattern*` against the working directory, sorted. The caller
 /// keeps the literal pattern when nothing matches, as pwsh does.
+fn expand_home(path: &str) -> String {
+    if path == "~"
+        && let Ok(home) = std::env::var("HOME")
+    {
+        return home;
+    }
+    if let Some(rest) = path.strip_prefix("~/")
+        && let Ok(home) = std::env::var("HOME")
+    {
+        return format!("{home}/{rest}");
+    }
+    path.to_owned()
+}
+
 fn expand_glob(pattern: &str) -> Vec<String> {
     let path = Path::new(pattern);
     let Some(file) = path.file_name().and_then(|name| name.to_str()) else {
