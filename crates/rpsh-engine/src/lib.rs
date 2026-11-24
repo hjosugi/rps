@@ -6444,6 +6444,25 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         "string" | "system.string" => Ok(Value::String(value.to_string().into())),
         "bool" | "boolean" | "system.boolean" => Ok(Value::Bool(convert_bool(&value))),
         "char" | "system.char" => convert_char(&value),
+        "datetime" | "system.datetime" => {
+            let text = value.to_string();
+            let (year, month, day, hour, minute, second) =
+                parse_datetime_text(&text).ok_or(RuntimeError::NotImplemented {
+                    feature: "this DateTime input",
+                })?;
+            Ok(Value::object(vec![
+                (
+                    "__TypeName".to_owned(),
+                    Value::String("System.DateTime".into()),
+                ),
+                ("__Year".to_owned(), Value::Int32(year)),
+                ("__Month".to_owned(), Value::Int32(month)),
+                ("__Day".to_owned(), Value::Int32(day)),
+                ("__Hour".to_owned(), Value::Int32(hour)),
+                ("__Minute".to_owned(), Value::Int32(minute)),
+                ("__Second".to_owned(), Value::Int32(second)),
+            ]))
+        }
         "version" | "system.version" => {
             let text = value.to_string();
             let parts: Vec<i32> = text
@@ -7056,10 +7075,8 @@ fn object_method(
                         year
                     )
                 }
-                Some(_) => {
-                    return Err(RuntimeError::NotImplemented {
-                        feature: "this DateTime format",
-                    });
+                Some(format) => {
+                    format_datetime(year, month, day, hour, minute, second, format)
                 }
             };
             Ok(Value::String(text.into()))
@@ -7205,6 +7222,17 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
             if let Some((_, value)) = entries
                 .iter()
                 .find(|(key, _)| !is_hidden(key) && key.eq_ignore_ascii_case(name))
+            {
+                return Ok(value.clone());
+            }
+            let is_datetime = entries.iter().any(|(key, value)| {
+                key == "__TypeName"
+                    && matches!(value, Value::String(text) if text.to_string_lossy() == "System.DateTime")
+            });
+            if is_datetime
+                && let Some((_, value)) = entries
+                    .iter()
+                    .find(|(key, _)| key.eq_ignore_ascii_case(&format!("__{name}")))
             {
                 return Ok(value.clone());
             }
