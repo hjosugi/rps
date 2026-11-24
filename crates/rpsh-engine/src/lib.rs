@@ -2361,11 +2361,13 @@ impl Engine {
             }
             "write-host" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
-                let mut outputs = Vec::new();
+                let mut parts = Vec::new();
                 for value in positional {
-                    outputs.extend(flatten_value(value));
+                    for item in flatten_value(value) {
+                        parts.push(item.to_string());
+                    }
                 }
-                Ok(Some(outputs))
+                Ok(Some(vec![Value::String(parts.join(" ").into())]))
             }
             "set-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
