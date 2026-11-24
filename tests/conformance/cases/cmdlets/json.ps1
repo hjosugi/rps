@@ -4,3 +4,5 @@ $o = '{"x":1,"y":[1,2,{"z":null}]}' | ConvertFrom-Json
 $o.x
 $o.y.Count
 $null -eq $o.y[2].z
+('a', 'b' | ConvertTo-Json -AsArray -Compress)
+(1 | ConvertTo-Json -AsArray -Compress)

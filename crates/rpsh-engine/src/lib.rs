@@ -3359,6 +3359,18 @@ impl Engine {
                 } else {
                     input.to_vec()
                 };
+                let as_array = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("asarray") && ops::is_true(value)
+                });
+                if as_array {
+                    let array = Value::array(values);
+                    let text = if compress {
+                        json_stringify(&array)?
+                    } else {
+                        json_stringify_pretty(&array, 0)?
+                    };
+                    return Ok(Some(vec![Value::String(text.into())]));
+                }
                 let mut outputs = Vec::new();
                 for value in values {
                     let text = if compress {
