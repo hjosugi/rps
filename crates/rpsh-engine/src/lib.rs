@@ -3674,7 +3674,23 @@ impl Engine {
                 Ok(Some(vec![Value::Int32(generator.next_max(i32::MAX))]))
             }
             "out-string" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
                 let text = format_out_string(input);
+                let stream = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("stream") && ops::is_true(value)
+                });
+                if stream {
+                    let mut lines: Vec<String> = text.split('\n').map(ToOwned::to_owned).collect();
+                    if text.ends_with('\n') {
+                        lines.pop();
+                    }
+                    return Ok(Some(
+                        lines
+                            .into_iter()
+                            .map(|line| Value::String(line.into()))
+                            .collect(),
+                    ));
+                }
                 Ok(Some(vec![Value::String(text.into())]))
             }
             "convertto-json" => {

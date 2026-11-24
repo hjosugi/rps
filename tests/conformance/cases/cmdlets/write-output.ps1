@@ -13,3 +13,5 @@ Write-Host 'a' 'b' -Separator ''
 Write-Verbose 'hidden'
 Write-Debug 'dbg'
 Write-Output 'visible'
+(1, 2 | Out-String -Stream | Measure-Object).Count
+(1, 2 | Out-String -Stream) -join '|'
