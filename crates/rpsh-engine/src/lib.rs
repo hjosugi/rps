@@ -2889,11 +2889,14 @@ impl Engine {
                 let simple_match = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("simplematch") && ops::is_true(value)
                 });
+                let case_sensitive = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
+                });
                 let regex = if simple_match {
                     None
                 } else {
                     Some(
-                        rpsh_runtime::regex::Regex::new(&pattern, false)
+                        rpsh_runtime::regex::Regex::new(&pattern, case_sensitive)
                             .map_err(|feature| RuntimeError::NotImplemented { feature })?,
                     )
                 };
@@ -2920,7 +2923,8 @@ impl Engine {
                 for (index, line) in lines.iter().enumerate() {
                     let matched = match &regex {
                         Some(regex) => regex.find(line).is_some(),
-                        None => line.contains(&pattern),
+                        None if case_sensitive => line.contains(&pattern),
+                        None => line.to_lowercase().contains(&pattern.to_lowercase()),
                     };
                     if matched != not_match {
                         outputs.push(Value::object(vec![
