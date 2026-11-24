@@ -2886,8 +2886,17 @@ impl Engine {
                     }
                     .into());
                 };
-                let regex = rpsh_runtime::regex::Regex::new(&pattern, false)
-                    .map_err(|feature| RuntimeError::NotImplemented { feature })?;
+                let simple_match = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("simplematch") && ops::is_true(value)
+                });
+                let regex = if simple_match {
+                    None
+                } else {
+                    Some(
+                        rpsh_runtime::regex::Regex::new(&pattern, false)
+                            .map_err(|feature| RuntimeError::NotImplemented { feature })?,
+                    )
+                };
                 let mut lines: Vec<String> = Vec::new();
                 if input.is_empty() {
                     if let Some(path) = positional.get(1).map(ToString::to_string)
@@ -2909,7 +2918,10 @@ impl Engine {
                 });
                 let mut outputs = Vec::new();
                 for (index, line) in lines.iter().enumerate() {
-                    let matched = regex.find(line).is_some();
+                    let matched = match &regex {
+                        Some(regex) => regex.find(line).is_some(),
+                        None => line.contains(&pattern),
+                    };
                     if matched != not_match {
                         outputs.push(Value::object(vec![
                             ("Line".to_owned(), Value::String(line.clone().into())),
