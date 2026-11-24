@@ -10,3 +10,6 @@ Get-Content rpsh-no-nl.txt -Raw
 (Get-Content rpsh-tee.txt) -join ','
 Remove-Item rpsh-tee.txt
 Remove-Item rpsh-no-nl.txt
+1, 2 | Tee-Object -Variable x | Out-Null
+$x -join ','
+$x.Count

@@ -2645,6 +2645,16 @@ impl Engine {
                         })?;
                     }
                 }
+                if let Some((_, variable)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("variable"))
+                {
+                    let variable = variable.to_string();
+                    self.variables.insert(
+                        strip_scope(&variable).to_owned(),
+                        Value::array(input.to_vec()),
+                    );
+                }
                 Ok(Some(input.to_vec()))
             }
             "convertto-csv" => {
