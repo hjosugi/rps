@@ -1719,6 +1719,42 @@ impl Engine {
                 })?;
                 Ok(Some(Vec::new()))
             }
+            "new-object" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let type_name = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("typename"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(type_name) = type_name else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "New-Object without a type name",
+                    }
+                    .into());
+                };
+                if type_name.eq_ignore_ascii_case("PSObject")
+                    || type_name.eq_ignore_ascii_case("PSCustomObject")
+                    || type_name.eq_ignore_ascii_case("System.Management.Automation.PSCustomObject")
+                {
+                    if let Some((_, property)) = named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                        && let Value::Object(entries) = property
+                    {
+                        return Ok(Some(vec![Value::object(
+                            visible_entries(entries)
+                                .iter()
+                                .map(|(name, value)| ((*name).clone(), (*value).clone()))
+                                .collect(),
+                        )]));
+                    }
+                    return Ok(Some(vec![Value::object(Vec::new())]));
+                }
+                Err(RuntimeError::NotImplemented {
+                    feature: "New-Object with this type",
+                }
+                .into())
+            }
             "new-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
@@ -5516,6 +5552,7 @@ fn default_alias(name: &str) -> Option<&'static str> {
 const BUILTIN_COMMANDS: &[&str] = &[
     "Add-Content",
     "ConvertFrom-Json",
+    "New-Object",
     "ConvertTo-Json",
     "Copy-Item",
     "ForEach-Object",

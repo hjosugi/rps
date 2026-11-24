@@ -21,6 +21,7 @@ cmdlets/json
 cmdlets/json-pretty
 cmdlets/locations
 cmdlets/named-paths
+cmdlets/new-object
 cmdlets/path-ops
 cmdlets/remove-glob
 cmdlets/write-input
