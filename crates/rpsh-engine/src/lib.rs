@@ -6777,18 +6777,7 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
                 parse_datetime_text(&text).ok_or(RuntimeError::NotImplemented {
                     feature: "this DateTime input",
                 })?;
-            Ok(Value::object(vec![
-                (
-                    "__TypeName".to_owned(),
-                    Value::String("System.DateTime".into()),
-                ),
-                ("__Year".to_owned(), Value::Int32(year)),
-                ("__Month".to_owned(), Value::Int32(month)),
-                ("__Day".to_owned(), Value::Int32(day)),
-                ("__Hour".to_owned(), Value::Int32(hour)),
-                ("__Minute".to_owned(), Value::Int32(minute)),
-                ("__Second".to_owned(), Value::Int32(second)),
-            ]))
+            Ok(datetime_value(year, month, day, hour, minute, second))
         }
         "version" | "system.version" => {
             let text = value.to_string();
