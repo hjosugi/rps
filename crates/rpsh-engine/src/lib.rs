@@ -6171,6 +6171,36 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         "string" | "system.string" => Ok(Value::String(value.to_string().into())),
         "bool" | "boolean" | "system.boolean" => Ok(Value::Bool(convert_bool(&value))),
         "char" | "system.char" => convert_char(&value),
+        "version" | "system.version" => {
+            let text = value.to_string();
+            let parts: Vec<i32> = text
+                .split('.')
+                .map(|part| part.parse::<i32>().unwrap_or(0))
+                .collect();
+            Ok(Value::object(vec![
+                (
+                    "__TypeName".to_owned(),
+                    Value::String("System.Version".into()),
+                ),
+                (
+                    "Major".to_owned(),
+                    Value::Int32(parts.first().copied().unwrap_or(0)),
+                ),
+                (
+                    "Minor".to_owned(),
+                    Value::Int32(parts.get(1).copied().unwrap_or(0)),
+                ),
+                (
+                    "Build".to_owned(),
+                    Value::Int32(parts.get(2).copied().unwrap_or(-1)),
+                ),
+                (
+                    "Revision".to_owned(),
+                    Value::Int32(parts.get(3).copied().unwrap_or(-1)),
+                ),
+                ("__Text".to_owned(), Value::String(text.into())),
+            ]))
+        }
         "switch" | "system.management.automation.switchparameter" => {
             Ok(Value::Bool(convert_bool(&value)))
         }
@@ -6641,6 +6671,20 @@ fn object_method(
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
     match name.to_ascii_lowercase().as_str() {
+        "tostring"
+            if entries
+                .iter()
+                .any(|(key, value)| {
+                    key == "__TypeName"
+                        && matches!(value, Value::String(text) if text.to_string_lossy() == "System.Version")
+                }) =>
+        {
+            let text = entries
+                .iter()
+                .find(|(key, _)| key == "__Text")
+                .map_or_else(String::new, |(_, value)| value.to_string());
+            Ok(Value::String(text.into()))
+        }
         "tostring" if entries.iter().any(|(key, _)| key == "__Year") => {
             let field = |name: &str| -> i32 {
                 entries
