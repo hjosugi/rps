@@ -1,0 +1,7 @@
+# rpsh-conformance: level=c2
+[Convert]::ToInt32('42')
+[Convert]::ToInt32('ff', 16)
+[Convert]::ToInt64('10')
+[Convert]::ToDouble('2.5')
+[Convert]::ToString(255, 16)
+[Convert]::ToBoolean('true')

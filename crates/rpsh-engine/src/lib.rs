@@ -5798,6 +5798,24 @@ fn static_member(
     }
 }
 
+fn to_radix(value: i64, base: i32) -> String {
+    if value == 0 {
+        return "0".to_owned();
+    }
+    let mut number = value.unsigned_abs();
+    let base = base as u32;
+    let mut digits = Vec::new();
+    while number > 0 {
+        let digit = (number % base as u64) as u32;
+        digits.push(std::char::from_digit(digit, base).unwrap_or('0'));
+        number /= base as u64;
+    }
+    if value < 0 {
+        digits.push('-');
+    }
+    digits.iter().rev().collect()
+}
+
 fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
@@ -5826,6 +5844,61 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
                 ("__Second".to_owned(), Value::Int32(second)),
                 ("__Text".to_owned(), Value::String(text.into())),
             ]))
+        }
+        ("convert", "toint32") | ("convert", "toint64") => {
+            let Some(value) = arguments.first() else {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "Convert without a value",
+                });
+            };
+            let text = value.to_string();
+            let parsed = match arguments.get(1) {
+                Some(base) => {
+                    let base = convert_int32(base)?;
+                    i64::from_str_radix(text.trim(), base as u32).ok()
+                }
+                None => parse_integer_text(text.trim()).and_then(|value| i64::try_from(value).ok()),
+            };
+            let Some(parsed) = parsed else {
+                return Err(RuntimeError::Script {
+                    id: "FormatException",
+                    category: "NotSpecified: (:) [], MethodInvocationException".to_owned(),
+                    exception_type: "System.Management.Automation.MethodInvocationException",
+                    message: format!(
+                        "Exception calling \"ToInt32\" with \"1\" argument(s): \"The input string '{text}' was not in a correct format.\""
+                    ),
+                });
+            };
+            if kind == "convert" && name == "toint32" {
+                i32::try_from(parsed)
+                    .map(Value::Int32)
+                    .map_err(|_| RuntimeError::NotImplemented {
+                        feature: "integer conversion overflow",
+                    })
+            } else {
+                Ok(Value::Int64(parsed))
+            }
+        }
+        ("convert", "todouble") => Ok(Value::Double(convert_double(
+            arguments.first().unwrap_or(&Value::Null),
+        )?)),
+        ("convert", "toboolean") => Ok(Value::Bool(convert_bool(
+            arguments.first().unwrap_or(&Value::Null),
+        ))),
+        ("convert", "tostring") => {
+            let Some(value) = arguments.first() else {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "Convert.ToString without a value",
+                });
+            };
+            match arguments.get(1) {
+                Some(base) => {
+                    let base = convert_int32(base)?;
+                    let number = convert_int64(value)?;
+                    Ok(Value::String(to_radix(number, base).into()))
+                }
+                None => Ok(Value::String(value.to_string().into())),
+            }
         }
         ("io.path", "combine") => {
             let mut path = std::path::PathBuf::new();
