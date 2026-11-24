@@ -1950,8 +1950,17 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("include"))
                     .map(|(_, value)| value.to_string());
+                let depth = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("depth"))
+                    .map(|(_, value)| convert_int32(value))
+                    .transpose()?;
                 let mut entries: Vec<(String, bool, u64)> = Vec::new();
                 collect_children(&path, recurse, force, "", &mut entries);
+                if let Some(depth) = depth {
+                    let depth = depth.max(0) as usize;
+                    entries.retain(|(name, _, _)| name.matches('/').count() <= depth);
+                }
                 entries.retain(|(name, is_dir, _)| {
                     if files_only && *is_dir {
                         return false;

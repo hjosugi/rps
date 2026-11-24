@@ -9,3 +9,5 @@ a.txt
 sub,a.txt
 a.txt
 sub/b.txt
+a.txt,sub
+a.txt,sub,sub/b.txt
