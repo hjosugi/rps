@@ -2093,20 +2093,29 @@ impl Engine {
                     }
                     .into());
                 };
-                let values: Vec<Value> = if input.is_empty() {
-                    named
+                let values: Vec<Value> = if !input.is_empty() {
+                    input.to_vec()
+                } else {
+                    let named_values: Vec<Value> = named
                         .iter()
                         .filter(|(name, _)| name.eq_ignore_ascii_case("value"))
                         .map(|(_, value)| value.clone())
-                        .collect()
-                } else {
-                    input.to_vec()
+                        .collect();
+                    if named_values.is_empty() {
+                        positional
+                            .iter()
+                            .skip(1)
+                            .flat_map(|value| flatten_value(value.clone()))
+                            .collect()
+                    } else {
+                        named_values
+                    }
                 };
                 let no_newline = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("nonewline") && ops::is_true(value)
                 });
                 let mut text = String::new();
-                for value in values {
+                for value in flatten_values(values) {
                     text.push_str(&value.to_string());
                     if !no_newline {
                         text.push('\n');
@@ -2386,16 +2395,25 @@ impl Engine {
                     name.eq_ignore_ascii_case("nonewline") && ops::is_true(value)
                 });
                 let mut text = String::new();
-                let values: Vec<Value> = if input.is_empty() {
-                    named
+                let values: Vec<Value> = if !input.is_empty() {
+                    input.to_vec()
+                } else {
+                    let named_values: Vec<Value> = named
                         .iter()
                         .filter(|(name, _)| name.eq_ignore_ascii_case("value"))
                         .map(|(_, value)| value.clone())
-                        .collect()
-                } else {
-                    input.to_vec()
+                        .collect();
+                    if named_values.is_empty() {
+                        positional
+                            .iter()
+                            .skip(1)
+                            .flat_map(|value| flatten_value(value.clone()))
+                            .collect()
+                    } else {
+                        named_values
+                    }
                 };
-                for item in values {
+                for item in flatten_values(values) {
                     text.push_str(&item.to_string());
                     if !no_newline {
                         text.push('\n');
@@ -5445,6 +5463,10 @@ fn parse_csv_line_with(line: &str, delimiter: char) -> Vec<String> {
     }
     cells.push(cell);
     cells
+}
+
+fn flatten_values(values: Vec<Value>) -> Vec<Value> {
+    values.into_iter().flat_map(flatten_value).collect()
 }
 
 fn culture_rank(text: &str) -> u8 {

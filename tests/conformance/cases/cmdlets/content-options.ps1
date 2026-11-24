@@ -14,3 +14,11 @@ Set-Content rpsh-delim.txt -Value 'a,b,' -NoNewline
 (Get-Content rpsh-delim.txt -Delimiter ',').Count
 Remove-Item rpsh-delim.txt
 Get-Content fixtures/data.txt -TotalCount 1
+Set-Content rpsh-values.txt 'a', 'b'
+(Get-Content rpsh-values.txt) -join ','
+Set-Content rpsh-values2.txt -Value 'c', 'd'
+(Get-Content rpsh-values2.txt) -join ','
+Add-Content rpsh-values.txt 'e', 'f'
+(Get-Content rpsh-values.txt) -join ','
+Remove-Item rpsh-values.txt
+Remove-Item rpsh-values2.txt
