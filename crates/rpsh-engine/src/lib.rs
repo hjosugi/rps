@@ -5900,6 +5900,40 @@ fn format_datetime(
     out
 }
 
+fn add_days_to_date(year: i32, month: i32, day: i32, days: i64) -> (i32, i32, i32) {
+    let (mut year, mut month, mut day) = (year, month.max(1), day.max(1));
+    let mut leftover = days;
+    while leftover > 0 {
+        let remaining = i64::from(days_in_month(year, month) - day);
+        if leftover <= remaining {
+            day += leftover as i32;
+            break;
+        }
+        leftover -= remaining + 1;
+        day = 1;
+        month += 1;
+        if month > 12 {
+            month = 1;
+            year += 1;
+        }
+    }
+    while leftover < 0 {
+        let available = i64::from(day - 1);
+        if -leftover <= available {
+            day += leftover as i32;
+            break;
+        }
+        leftover += available + 1;
+        month -= 1;
+        if month < 1 {
+            month = 12;
+            year -= 1;
+        }
+        day = days_in_month(year, month);
+    }
+    (year, month, day)
+}
+
 fn datetime_value(year: i32, month: i32, day: i32, hour: i32, minute: i32, second: i32) -> Value {
     let text = format!("{month:02}/{day:02}/{year:04} {hour:02}:{minute:02}:{second:02}");
     Value::object(vec![
@@ -7104,25 +7138,12 @@ fn object_method(
                     .unwrap_or(0)
             };
             let days = int_argument(arguments.first())?;
-            let (mut year, mut month, mut day) =
-                (field("__Year"), field("__Month").max(1), field("__Day").max(1));
-            day += days;
-            while day > days_in_month(year, month) {
-                day -= days_in_month(year, month);
-                month += 1;
-                if month > 12 {
-                    month = 1;
-                    year += 1;
-                }
-            }
-            while day < 1 {
-                month -= 1;
-                if month < 1 {
-                    month = 12;
-                    year -= 1;
-                }
-                day += days_in_month(year, month);
-            }
+            let (year, month, day) = add_days_to_date(
+                field("__Year"),
+                field("__Month"),
+                field("__Day"),
+                i64::from(days),
+            );
             Ok(datetime_value(
                 year,
                 month,
@@ -7130,6 +7151,43 @@ fn object_method(
                 field("__Hour"),
                 field("__Minute"),
                 field("__Second"),
+            ))
+        }
+        "addhours" | "addminutes" | "addseconds"
+            if entries.iter().any(|(key, _)| key == "__Year") =>
+        {
+            let field = |name: &str| -> i32 {
+                entries
+                    .iter()
+                    .find(|(key, _)| key == name)
+                    .and_then(|(_, value)| convert_int32(value).ok())
+                    .unwrap_or(0)
+            };
+            let amount = i64::from(int_argument(arguments.first())?);
+            let factor = match name.to_ascii_lowercase().as_str() {
+                "addhours" => 3600,
+                "addminutes" => 60,
+                _ => 1,
+            };
+            let total = i64::from(field("__Hour")) * 3600
+                + i64::from(field("__Minute")) * 60
+                + i64::from(field("__Second"))
+                + amount * factor;
+            let day_delta = total.div_euclid(86_400);
+            let seconds = total.rem_euclid(86_400);
+            let (year, month, day) = add_days_to_date(
+                field("__Year"),
+                field("__Month"),
+                field("__Day"),
+                day_delta,
+            );
+            Ok(datetime_value(
+                year,
+                month,
+                day,
+                (seconds / 3600) as i32,
+                (seconds % 3600 / 60) as i32,
+                (seconds % 60) as i32,
             ))
         }
         "next" => {
