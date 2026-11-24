@@ -7095,6 +7095,43 @@ fn object_method(
             };
             Ok(Value::String(text.into()))
         }
+        "adddays" if entries.iter().any(|(key, _)| key == "__Year") => {
+            let field = |name: &str| -> i32 {
+                entries
+                    .iter()
+                    .find(|(key, _)| key == name)
+                    .and_then(|(_, value)| convert_int32(value).ok())
+                    .unwrap_or(0)
+            };
+            let days = int_argument(arguments.first())?;
+            let (mut year, mut month, mut day) =
+                (field("__Year"), field("__Month").max(1), field("__Day").max(1));
+            day += days;
+            while day > days_in_month(year, month) {
+                day -= days_in_month(year, month);
+                month += 1;
+                if month > 12 {
+                    month = 1;
+                    year += 1;
+                }
+            }
+            while day < 1 {
+                month -= 1;
+                if month < 1 {
+                    month = 12;
+                    year -= 1;
+                }
+                day += days_in_month(year, month);
+            }
+            Ok(datetime_value(
+                year,
+                month,
+                day,
+                field("__Hour"),
+                field("__Minute"),
+                field("__Second"),
+            ))
+        }
         "next" => {
             let raw = entries
                 .iter()
