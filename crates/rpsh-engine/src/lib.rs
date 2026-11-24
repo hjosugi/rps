@@ -2273,38 +2273,46 @@ impl Engine {
             }
             "get-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
-                    .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(path) = path else {
+                let paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-Content without a path",
                     }
                     .into());
-                };
-                let path = expand_home(&path);
-                let text = if path.contains(['*', '?']) {
-                    let mut text = String::new();
-                    for matched in expand_glob(&path) {
-                        let Ok(content) = std::fs::read_to_string(&matched) else {
-                            continue;
-                        };
-                        text.push_str(&content);
-                        if !content.ends_with('\n') {
+                }
+                let mut text = String::new();
+                for path in paths {
+                    let path = expand_home(&path);
+                    if path.contains(['*', '?']) {
+                        for matched in expand_glob(&path) {
+                            let Ok(content) = std::fs::read_to_string(&matched) else {
+                                continue;
+                            };
+                            if !text.is_empty() && !text.ends_with('\n') {
+                                text.push('\n');
+                            }
+                            text.push_str(&content);
+                        }
+                    } else {
+                        let content = std::fs::read_to_string(&path).map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "Get-Content of a missing file",
+                            }
+                        })?;
+                        if !text.is_empty() && !text.ends_with('\n') {
                             text.push('\n');
                         }
+                        text.push_str(&content);
                     }
-                    text
-                } else {
-                    std::fs::read_to_string(&path).map_err(|_| RuntimeError::NotImplemented {
-                        feature: "Get-Content of a missing file",
-                    })?
-                };
+                }
                 if named
                     .iter()
                     .any(|(name, value)| name.eq_ignore_ascii_case("raw") && ops::is_true(value))
