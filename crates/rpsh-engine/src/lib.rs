@@ -2138,6 +2138,20 @@ impl Engine {
                 {
                     return Ok(Some(vec![Value::String(text.into())]));
                 }
+                if let Some((_, delimiter)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("delimiter"))
+                {
+                    let delimiter = delimiter.to_string();
+                    let mut parts: Vec<Value> = text
+                        .split(&delimiter)
+                        .map(|part| Value::String(part.into()))
+                        .collect();
+                    if text.ends_with(&delimiter) {
+                        parts.pop();
+                    }
+                    return Ok(Some(parts));
+                }
                 let mut lines: Vec<Value> = text
                     .split('\n')
                     .map(|line| Value::String(line.trim_end_matches('\r').into()))

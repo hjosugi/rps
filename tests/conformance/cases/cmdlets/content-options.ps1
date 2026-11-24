@@ -9,3 +9,7 @@ Get-Content fixtures/data.txt -Last 1
 (Get-Content rpsh-out-nl.txt -Raw).Length
 Remove-Item rpsh-out-nonl.txt
 Remove-Item rpsh-out-nl.txt
+Set-Content rpsh-delim.txt -Value 'a,b,' -NoNewline
+(Get-Content rpsh-delim.txt -Delimiter ',' | ForEach-Object { "[$_]" }) -join ';'
+(Get-Content rpsh-delim.txt -Delimiter ',').Count
+Remove-Item rpsh-delim.txt
