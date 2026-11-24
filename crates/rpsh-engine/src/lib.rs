@@ -1916,6 +1916,14 @@ impl Engine {
                 let force = named
                     .iter()
                     .any(|(name, value)| name.eq_ignore_ascii_case("force") && ops::is_true(value));
+                let exclude = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("exclude"))
+                    .map(|(_, value)| value.to_string());
+                let include = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("include"))
+                    .map(|(_, value)| value.to_string());
                 let mut entries: Vec<(String, bool, u64)> = Vec::new();
                 collect_children(&path, recurse, force, "", &mut entries);
                 entries.retain(|(name, is_dir, _)| {
@@ -1925,12 +1933,19 @@ impl Engine {
                     if directories_only && !*is_dir {
                         return false;
                     }
+                    let leaf = name.rsplit('/').next().unwrap_or(name);
+                    if let Some(exclude) = &exclude
+                        && ops::wildcard_match(leaf, exclude, false)
+                    {
+                        return false;
+                    }
+                    if let Some(include) = &include
+                        && !ops::wildcard_match(leaf, include, false)
+                    {
+                        return false;
+                    }
                     match &filter {
-                        Some(filter) => ops::wildcard_match(
-                            name.rsplit('/').next().unwrap_or(name),
-                            filter,
-                            false,
-                        ),
+                        Some(filter) => ops::wildcard_match(leaf, filter, false),
                         None => true,
                     }
                 });

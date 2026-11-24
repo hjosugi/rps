@@ -7,3 +7,5 @@ a.txt,sub,sub/b.txt
 sub
 a.txt
 sub,a.txt
+a.txt
+sub/b.txt
