@@ -14,3 +14,6 @@
 [Math]::Sinh(0)
 [Math]::Cosh(0)
 [Math]::Tanh(0)
+[Math]::Round(1.2345, 2)
+[Math]::Round(2.5)
+[Math]::Round(3.5)

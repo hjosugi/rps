@@ -6334,9 +6334,17 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
         ("math", "sqrt") => Ok(Value::Double(
             convert_double(arguments.first().unwrap_or(&Value::Null))?.sqrt(),
         )),
-        ("math", "round") => Ok(Value::Double(
-            convert_double(arguments.first().unwrap_or(&Value::Null))?.round_ties_even(),
-        )),
+        ("math", "round") => {
+            let value = convert_double(arguments.first().unwrap_or(&Value::Null))?;
+            match arguments.get(1) {
+                Some(digits) => {
+                    let digits = convert_int32(digits)?.clamp(0, 15);
+                    let scale = 10f64.powi(digits);
+                    Ok(Value::Double((value * scale).round_ties_even() / scale))
+                }
+                None => Ok(Value::Double(value.round_ties_even())),
+            }
+        }
         ("math", "floor") => Ok(Value::Double(
             convert_double(arguments.first().unwrap_or(&Value::Null))?.floor(),
         )),
