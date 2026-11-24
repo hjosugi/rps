@@ -2627,6 +2627,10 @@ impl Engine {
                 let no_header = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("noheader") && ops::is_true(value)
                 });
+                let delimiter = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("delimiter"))
+                    .map_or_else(|| ",".to_owned(), |(_, value)| value.to_string());
                 let mut outputs: Vec<Value> = Vec::new();
                 let mut columns: Vec<String> = Vec::new();
                 for item in input {
@@ -2642,7 +2646,7 @@ impl Engine {
                                         .iter()
                                         .map(|name| csv_quote(name))
                                         .collect::<Vec<_>>()
-                                        .join(",")
+                                        .join(&delimiter)
                                         .into(),
                                 ));
                             }
@@ -2659,7 +2663,7 @@ impl Engine {
                             })
                             .map(|value| csv_quote(&value))
                             .collect();
-                        outputs.push(Value::String(cells.join(",").into()));
+                        outputs.push(Value::String(cells.join(&delimiter).into()));
                     }
                 }
                 Ok(Some(outputs))
@@ -2683,6 +2687,10 @@ impl Engine {
                 let no_header = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("noheader") && ops::is_true(value)
                 });
+                let delimiter = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("delimiter"))
+                    .map_or_else(|| ",".to_owned(), |(_, value)| value.to_string());
                 let mut lines: Vec<String> = Vec::new();
                 let mut columns: Vec<String> = Vec::new();
                 for item in input {
@@ -2698,7 +2706,7 @@ impl Engine {
                                         .iter()
                                         .map(|name| csv_quote(name))
                                         .collect::<Vec<_>>()
-                                        .join(","),
+                                        .join(&delimiter),
                                 );
                             }
                         }
@@ -2714,7 +2722,7 @@ impl Engine {
                             })
                             .map(|value| csv_quote(&value))
                             .collect();
-                        lines.push(cells.join(","));
+                        lines.push(cells.join(&delimiter));
                     }
                 }
                 let mut text = lines.join("\n");

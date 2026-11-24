@@ -12,3 +12,7 @@ Remove-Item rpsh-rows.csv
 [pscustomobject]@{a=1;b='x'} | Export-Csv rpsh-nh.csv -NoHeader
 (Get-Content rpsh-nh.csv) -join ';'
 Remove-Item rpsh-nh.csv
+[pscustomobject]@{a=1;b='x'} | ConvertTo-Csv -Delimiter ';'
+[pscustomobject]@{a=1;b='x'} | Export-Csv rpsh-semi.csv -Delimiter ';'
+(Get-Content rpsh-semi.csv) -join '|'
+Remove-Item rpsh-semi.csv
