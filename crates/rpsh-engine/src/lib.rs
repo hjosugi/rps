@@ -1847,25 +1847,29 @@ impl Engine {
             }
             "remove-item" | "del" | "rm" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
-                    .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(path) = path else {
+                let paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Remove-Item without a path",
                     }
                     .into());
-                };
-                let targets = if path.contains(['*', '?']) {
-                    expand_glob(&path)
-                } else {
-                    vec![path.clone()]
-                };
+                }
+                let mut targets = Vec::new();
+                for path in paths {
+                    if path.contains(['*', '?']) {
+                        targets.extend(expand_glob(&path));
+                    } else {
+                        targets.push(path);
+                    }
+                }
                 for path in targets {
                     let target = std::path::Path::new(&path);
                     if target.is_dir() {
