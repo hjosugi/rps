@@ -3135,10 +3135,25 @@ impl Engine {
                 };
                 let mut lines: Vec<String> = Vec::new();
                 if input.is_empty() {
-                    if let Some(path) = positional.get(1).map(ToString::to_string)
-                        && let Ok(text) = std::fs::read_to_string(&path)
-                    {
-                        lines.extend(text.lines().map(ToOwned::to_owned));
+                    let path = named
+                        .iter()
+                        .find(|(name, _)| {
+                            name.eq_ignore_ascii_case("path")
+                                || name.eq_ignore_ascii_case("literalpath")
+                        })
+                        .map(|(_, value)| value.to_string())
+                        .or_else(|| positional.get(1).map(ToString::to_string));
+                    if let Some(path) = path {
+                        let paths = if path.contains(['*', '?']) {
+                            expand_glob(&path)
+                        } else {
+                            vec![path]
+                        };
+                        for path in paths {
+                            if let Ok(text) = std::fs::read_to_string(&path) {
+                                lines.extend(text.lines().map(ToOwned::to_owned));
+                            }
+                        }
                     }
                 } else {
                     for item in input {
