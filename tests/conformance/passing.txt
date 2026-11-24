@@ -90,6 +90,7 @@ native/exit-code
 native/glob
 native/pipe
 ops/comparison
+ops/ternary-coalesce
 pipeline/compare-object
 pipeline/csv
 pipeline/foreach-blocks
