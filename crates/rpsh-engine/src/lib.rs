@@ -5130,6 +5130,20 @@ fn order_hashtable(mut entries: Vec<(String, Value)>) -> Vec<(String, Value)> {
     entries
 }
 
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+fn days_in_month(year: i32, month: i32) -> i32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => 30,
+    }
+}
+
 fn weekday(year: i32, month: i32, day: i32) -> i32 {
     // Sakamoto's algorithm; 0 = Sunday.
     const OFFSETS: [i32; 12] = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
@@ -7229,12 +7243,41 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
                 key == "__TypeName"
                     && matches!(value, Value::String(text) if text.to_string_lossy() == "System.DateTime")
             });
-            if is_datetime
-                && let Some((_, value)) = entries
+            if is_datetime {
+                let field = |suffix: &str| -> i32 {
+                    entries
+                        .iter()
+                        .find(|(key, _)| key.eq_ignore_ascii_case(suffix))
+                        .and_then(|(_, value)| convert_int32(value).ok())
+                        .unwrap_or(0)
+                };
+                let (year, month, day) = (field("__Year"), field("__Month"), field("__Day"));
+                if name.eq_ignore_ascii_case("DayOfWeek") {
+                    const WEEKDAYS: [&str; 7] = [
+                        "Sunday",
+                        "Monday",
+                        "Tuesday",
+                        "Wednesday",
+                        "Thursday",
+                        "Friday",
+                        "Saturday",
+                    ];
+                    let index = (weekday(year, month, day).rem_euclid(7)) as usize;
+                    return Ok(Value::String(WEEKDAYS[index].into()));
+                }
+                if name.eq_ignore_ascii_case("DayOfYear") {
+                    let total: i32 = (1..month.max(1))
+                        .map(|month| days_in_month(year, month))
+                        .sum::<i32>()
+                        + day;
+                    return Ok(Value::Int32(total));
+                }
+                if let Some((_, value)) = entries
                     .iter()
                     .find(|(key, _)| key.eq_ignore_ascii_case(&format!("__{name}")))
-            {
-                return Ok(value.clone());
+                {
+                    return Ok(value.clone());
+                }
             }
             let visible: Vec<&(String, Value)> =
                 entries.iter().filter(|(key, _)| !is_hidden(key)).collect();
