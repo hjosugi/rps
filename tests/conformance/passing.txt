@@ -33,6 +33,7 @@ contract/seeded-random
 contract/streams
 contract/version-table
 expr/int-arithmetic
+expr/path-static
 expr/string-literals
 lang/aliases
 lang/array

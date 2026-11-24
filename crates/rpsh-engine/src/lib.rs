@@ -5827,6 +5827,57 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
                 ("__Text".to_owned(), Value::String(text.into())),
             ]))
         }
+        ("io.path", "combine") => {
+            let mut path = std::path::PathBuf::new();
+            for argument in arguments {
+                path.push(argument.to_string());
+            }
+            Ok(Value::String(path.to_string_lossy().into_owned().into()))
+        }
+        ("io.path", "getfilename") => {
+            let path = arguments
+                .first()
+                .map_or_else(String::new, ToString::to_string);
+            Ok(Value::String(
+                std::path::Path::new(&path)
+                    .file_name()
+                    .map_or_else(String::new, |name| name.to_string_lossy().into_owned())
+                    .into(),
+            ))
+        }
+        ("io.path", "getdirectoryname") => {
+            let path = arguments
+                .first()
+                .map_or_else(String::new, ToString::to_string);
+            Ok(Value::String(
+                std::path::Path::new(&path)
+                    .parent()
+                    .map_or_else(String::new, |name| name.to_string_lossy().into_owned())
+                    .into(),
+            ))
+        }
+        ("io.path", "getextension") => {
+            let path = arguments
+                .first()
+                .map_or_else(String::new, ToString::to_string);
+            Ok(Value::String(
+                std::path::Path::new(&path)
+                    .extension()
+                    .map_or_else(String::new, |name| format!(".{}", name.to_string_lossy()))
+                    .into(),
+            ))
+        }
+        ("io.path", "getfilenamewithoutextension") => {
+            let path = arguments
+                .first()
+                .map_or_else(String::new, ToString::to_string);
+            Ok(Value::String(
+                std::path::Path::new(&path)
+                    .file_stem()
+                    .map_or_else(String::new, |name| name.to_string_lossy().into_owned())
+                    .into(),
+            ))
+        }
         ("io.file", "readalltext") => {
             let Some(value) = arguments.first() else {
                 return Err(RuntimeError::NotImplemented {
