@@ -2006,6 +2006,7 @@ impl Engine {
                 ))
             }
             "out-null" => Ok(Some(Vec::new())),
+            "out-host" | "out-default" => Ok(Some(input.to_vec())),
             "join-string" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
                 let separator = named
