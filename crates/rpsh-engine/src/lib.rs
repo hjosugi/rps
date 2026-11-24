@@ -2756,6 +2756,7 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "convertfrom-csv" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
                 let mut lines: Vec<String> = Vec::new();
                 for item in input {
                     if let Value::Array(items) = item {
@@ -2764,12 +2765,27 @@ impl Engine {
                         lines.push(item.to_string());
                     }
                 }
-                let Some(header) = lines.first() else {
-                    return Ok(Some(Vec::new()));
+                let custom_header = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("header"))
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                    });
+                let columns = if let Some(header) = custom_header {
+                    header
+                } else {
+                    let Some(header) = lines.first() else {
+                        return Ok(Some(Vec::new()));
+                    };
+                    let columns = parse_csv_line(header);
+                    lines.remove(0);
+                    columns
                 };
-                let columns = parse_csv_line(header);
                 let mut outputs = Vec::new();
-                for line in &lines[1..] {
+                for line in &lines {
                     if line.trim().is_empty() {
                         continue;
                     }

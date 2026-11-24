@@ -5,3 +5,5 @@ $rows | Export-Csv rpsh-rows.csv
 (Get-Content rpsh-rows.csv) -join ';'
 (Import-Csv rpsh-rows.csv | ForEach-Object { "$($_.a)$($_.b)" }) -join ','
 Remove-Item rpsh-rows.csv
+'1,2', '3,4' | ConvertFrom-Csv -Header A, B | ForEach-Object { "$($_.A)$($_.B)" }
+@('x,y', '1,2') | ConvertFrom-Csv | ForEach-Object { "$($_.x)$($_.y)" }
