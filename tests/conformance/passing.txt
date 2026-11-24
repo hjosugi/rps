@@ -32,6 +32,7 @@ contract/error-records
 contract/seeded-random
 contract/streams
 contract/version-table
+expr/char-static
 expr/convert-static
 expr/datetime-cast
 expr/int-arithmetic

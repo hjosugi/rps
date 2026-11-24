@@ -6081,6 +6081,32 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
                 ("__Text".to_owned(), Value::String(text.into())),
             ]))
         }
+        ("char", "isdigit") | ("char", "isletter") | ("char", "iswhitespace") => {
+            let text = arguments
+                .first()
+                .map_or_else(String::new, ToString::to_string);
+            let ch = text.chars().next().unwrap_or('\0');
+            let result = if name == "isdigit" {
+                ch.is_ascii_digit()
+            } else if name == "isletter" {
+                ch.is_alphabetic()
+            } else {
+                ch.is_whitespace()
+            };
+            Ok(Value::Bool(result))
+        }
+        ("char", "toupper") | ("char", "tolower") => {
+            let text = arguments
+                .first()
+                .map_or_else(String::new, ToString::to_string);
+            let ch = text.chars().next().unwrap_or('\0');
+            let result = if name == "toupper" {
+                ch.to_uppercase().next().unwrap_or(ch)
+            } else {
+                ch.to_lowercase().next().unwrap_or(ch)
+            };
+            Ok(Value::Char(u32::from(result) as u16))
+        }
         ("convert", "toint32") | ("convert", "toint64") => {
             let Some(value) = arguments.first() else {
                 return Err(RuntimeError::NotImplemented {
