@@ -4,29 +4,29 @@ version = 4
 
 [[package]]
 name = "rpsh-bench"
-version = "0.0.168"
+version = "0.0.169"
 dependencies = [
  "rpsh-host",
 ]
 
 [[package]]
 name = "rpsh-cli"
-version = "0.0.168"
+version = "0.0.169"
 dependencies = [
  "rpsh-host",
 ]
 
 [[package]]
 name = "rpsh-commands"
-version = "0.0.168"
+version = "0.0.169"
 
 [[package]]
 name = "rpsh-dotnet"
-version = "0.0.168"
+version = "0.0.169"
 
 [[package]]
 name = "rpsh-engine"
-version = "0.0.168"
+version = "0.0.169"
 dependencies = [
  "rpsh-runtime",
  "rpsh-syntax",
@@ -34,11 +34,11 @@ dependencies = [
 
 [[package]]
 name = "rpsh-format"
-version = "0.0.168"
+version = "0.0.169"
 
 [[package]]
 name = "rpsh-host"
-version = "0.0.168"
+version = "0.0.169"
 dependencies = [
  "rpsh-engine",
  "rpsh-messages",
@@ -46,19 +46,19 @@ dependencies = [
 
 [[package]]
 name = "rpsh-messages"
-version = "0.0.168"
+version = "0.0.169"
 
 [[package]]
 name = "rpsh-native"
-version = "0.0.168"
+version = "0.0.169"
 
 [[package]]
 name = "rpsh-providers"
-version = "0.0.168"
+version = "0.0.169"
 
 [[package]]
 name = "rpsh-research"
-version = "0.0.168"
+version = "0.0.169"
 dependencies = [
  "rpsh-engine",
  "rpsh-runtime",
@@ -67,8 +67,8 @@ dependencies = [
 
 [[package]]
 name = "rpsh-runtime"
-version = "0.0.168"
+version = "0.0.169"
 
 [[package]]
 name = "rpsh-syntax"
-version = "0.0.168"
+version = "0.0.169"
