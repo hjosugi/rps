@@ -8,3 +8,5 @@
 (Get-Item fixtures/tree/*.txt | ForEach-Object Name | Sort-Object) -join ','
 (Get-Item fixtures/tree).PSIsContainer
 (Get-Item fixtures/data.txt).PSIsContainer
+(Get-Item fixtures/data.txt, fixtures/tree/a.txt | ForEach-Object Name) -join ','
+(Get-Item fixtures/data.txt).Name

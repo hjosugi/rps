@@ -1670,42 +1670,46 @@ impl Engine {
             }
             "get-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
-                    .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(path) = path else {
+                let paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-Item without a path",
                     }
                     .into());
-                };
-                let path = expand_home(&path);
-                if path.contains(['*', '?']) {
-                    return Ok(Some(
-                        expand_glob(&path)
-                            .iter()
-                            .map(|path| item_value(path))
-                            .collect(),
-                    ));
                 }
-                if !std::path::Path::new(&path).exists() {
-                    return Err(RuntimeError::Script {
-                        id: "PathNotFound,Microsoft.PowerShell.Commands.GetItemCommand",
-                        category: format!(
-                            "ObjectNotFound: ({path}:String) [Get-Item], ItemNotFoundException"
-                        ),
-                        exception_type: "System.Management.Automation.ItemNotFoundException",
-                        message: format!("Cannot find path '{path}' because it does not exist."),
+                let mut outputs = Vec::new();
+                for path in paths {
+                    let path = expand_home(&path);
+                    if path.contains(['*', '?']) {
+                        for matched in expand_glob(&path) {
+                            outputs.push(item_value(&matched));
+                        }
+                        continue;
                     }
-                    .into());
+                    if !std::path::Path::new(&path).exists() {
+                        return Err(RuntimeError::Script {
+                            id: "PathNotFound,Microsoft.PowerShell.Commands.GetItemCommand",
+                            category: format!(
+                                "ObjectNotFound: ({path}:String) [Get-Item], ItemNotFoundException"
+                            ),
+                            exception_type: "System.Management.Automation.ItemNotFoundException",
+                            message: format!(
+                                "Cannot find path '{path}' because it does not exist."
+                            ),
+                        }
+                        .into());
+                    }
+                    outputs.push(item_value(&path));
                 }
-                Ok(Some(vec![item_value(&path)]))
+                Ok(Some(outputs))
             }
             "rename-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
