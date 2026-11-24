@@ -16,3 +16,8 @@
 'x'.PadLeft(3, '0')
 'x'.PadRight(3, '.')
 'ab'.PadLeft(2)
+'abcabc'.LastIndexOf('b')
+'abc'.Insert(1, 'x')
+'abc'.Remove(1, 1)
+'abc'.Remove(1)
+'abc'.Replace('b', 'X')

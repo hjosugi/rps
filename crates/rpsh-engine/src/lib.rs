@@ -6729,6 +6729,41 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
             }
             Ok(Value::String(PsString::from_units(result)))
         }
+        "lastindexof" => {
+            let needle = needle_units(arguments.first())?;
+            let mut last = None;
+            if !needle.is_empty() && needle.len() <= units.len() {
+                for at in 0..=units.len() - needle.len() {
+                    if units[at..at + needle.len()] == needle {
+                        last = Some(at);
+                    }
+                }
+            }
+            Ok(Value::Int32(last.map_or(-1, |at| at as i32)))
+        }
+        "insert" => {
+            let at = arguments.first().map_or(Ok(0), convert_int32)? as usize;
+            let insert = needle_units(arguments.get(1))?;
+            let at = at.min(units.len());
+            let mut result = Vec::with_capacity(units.len() + insert.len());
+            result.extend_from_slice(&units[..at]);
+            result.extend(insert);
+            result.extend_from_slice(&units[at..]);
+            Ok(Value::String(PsString::from_units(result)))
+        }
+        "remove" => {
+            let at = arguments.first().map_or(Ok(0), convert_int32)? as usize;
+            let count = match arguments.get(1) {
+                Some(value) => convert_int32(value)? as usize,
+                None => units.len().saturating_sub(at),
+            };
+            let at = at.min(units.len());
+            let end = (at + count).min(units.len());
+            let mut result = Vec::with_capacity(units.len() - (end - at));
+            result.extend_from_slice(&units[..at]);
+            result.extend_from_slice(&units[end..]);
+            Ok(Value::String(PsString::from_units(result)))
+        }
         "replace" => {
             let old = needle_units(arguments.first())?;
             let new = needle_units(arguments.get(1))?;
