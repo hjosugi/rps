@@ -1955,6 +1955,7 @@ impl Engine {
                     .find(|(name, _)| name.eq_ignore_ascii_case("depth"))
                     .map(|(_, value)| convert_int32(value))
                     .transpose()?;
+                let recurse = recurse || depth.is_some();
                 let mut entries: Vec<(String, bool, u64)> = Vec::new();
                 collect_children(&path, recurse, force, "", &mut entries);
                 if let Some(depth) = depth {
