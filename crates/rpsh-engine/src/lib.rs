@@ -2092,6 +2092,7 @@ impl Engine {
                                     ),
                                     ("Name".to_owned(), Value::String(leaf.into())),
                                     ("FullName".to_owned(), Value::String(name.into())),
+                                    ("PSIsContainer".to_owned(), Value::Bool(is_dir)),
                                     ("Length".to_owned(), Value::Int64(length as i64)),
                                 ])
                             }

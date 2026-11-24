@@ -14,3 +14,4 @@
 (Get-ChildItem fixtures/tree/*.txt -Name) -join ','
 (Get-ChildItem fixtures/tree/* -Name | Sort-Object) -join ','
 (Get-ChildItem fixtures/tree/*.txt).Length
+(Get-ChildItem fixtures/tree | ForEach-Object PSIsContainer) -join ','

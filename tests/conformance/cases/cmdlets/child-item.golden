@@ -15,3 +15,4 @@ a.txt,sub,sub/b.txt
 a.txt
 a.txt,sub
 2
+True,False
