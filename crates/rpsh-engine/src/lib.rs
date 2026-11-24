@@ -2002,6 +2002,20 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("property"))
                     .map(|(_, value)| value.to_string());
+                let double_quote = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("doublequote") && ops::is_true(value)
+                });
+                let single_quote = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("singlequote") && ops::is_true(value)
+                });
+                let prefix = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("outputprefix"))
+                    .map_or_else(String::new, |(_, value)| value.to_string());
+                let suffix = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("outputsuffix"))
+                    .map_or_else(String::new, |(_, value)| value.to_string());
                 let values: Vec<String> = input
                     .iter()
                     .map(|item| match &property {
@@ -2009,8 +2023,19 @@ impl Engine {
                             .map_or_else(|_| String::new(), |value| value.to_string()),
                         None => item.to_string(),
                     })
+                    .map(|value| {
+                        if double_quote {
+                            format!("\"{}\"", value.replace('"', "\"\""))
+                        } else if single_quote {
+                            format!("'{}'", value.replace('\'', "''"))
+                        } else {
+                            value
+                        }
+                    })
                     .collect();
-                Ok(Some(vec![Value::String(values.join(&separator).into())]))
+                Ok(Some(vec![Value::String(
+                    format!("{prefix}{}{suffix}", values.join(&separator)).into(),
+                )]))
             }
             "clear-content" | "clc" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;

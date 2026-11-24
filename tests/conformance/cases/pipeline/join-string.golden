@@ -2,3 +2,6 @@ rpsh-golden-v2
 exit=0
 a,b,c
 x+y
+"a","b"
+'a','b'
+[1,2]
