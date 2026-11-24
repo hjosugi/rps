@@ -17,3 +17,14 @@ $null -eq $null
 'gc' -contains 'gc'
 'gc' -contains 'x'
 $null -contains 'a'
+'abc' -like 'A*'
+'abc' -clike 'A*'
+'abc' -notlike 'x*'
+'abc' -cnotlike 'A*'
+'abc' -match 'A'
+'abc' -cmatch 'A'
+'abc' -notmatch 'z'
+1 -is [int]
+'x' -is [string]
+'5' -as [int]
+'x' -as [int]
