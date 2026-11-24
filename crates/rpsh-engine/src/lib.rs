@@ -5003,6 +5003,7 @@ fn item_value(text: &str) -> Value {
             ),
         ),
         ("FullName".to_owned(), Value::String(text.to_owned().into())),
+        ("PSIsContainer".to_owned(), Value::Bool(target.is_dir())),
         (
             "Name".to_owned(),
             Value::String(
