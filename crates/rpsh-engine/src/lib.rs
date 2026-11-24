@@ -1978,20 +1978,18 @@ impl Engine {
             }
             "get-childitem" | "ls" | "dir" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
-                    .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| {
-                        positional
-                            .first()
-                            .map_or_else(|| Some(".".to_owned()), |value| Some(value.to_string()))
-                    })
-                    .unwrap_or_else(|| ".".to_owned());
-                let path = expand_home(&path);
+                let mut paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if paths.is_empty() {
+                    paths.push(".".to_owned());
+                }
                 let recurse = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("recurse") && ops::is_true(value)
                 });
@@ -2025,17 +2023,28 @@ impl Engine {
                     .map(|(_, value)| convert_int32(value))
                     .transpose()?;
                 let recurse = recurse || depth.is_some();
-                let wildcard_path = path.contains(['*', '?']);
+                let wildcard_path = paths.iter().any(|path| path.contains(['*', '?']));
                 let mut entries: Vec<(String, bool, u64)> = Vec::new();
-                if wildcard_path {
-                    for matched in expand_glob(&path) {
-                        let target = std::path::Path::new(&matched);
-                        let is_dir = target.is_dir();
-                        let length = target.metadata().map_or(0, |meta| meta.len());
-                        entries.push((matched, is_dir, length));
+                for path in &paths {
+                    let path = expand_home(path);
+                    if path.contains(['*', '?']) {
+                        for matched in expand_glob(&path) {
+                            let target = std::path::Path::new(&matched);
+                            let is_dir = target.is_dir();
+                            let length = target.metadata().map_or(0, |meta| meta.len());
+                            entries.push((matched, is_dir, length));
+                        }
+                    } else if std::path::Path::new(&path).is_file() {
+                        let length = std::fs::metadata(&path).map_or(0, |meta| meta.len());
+                        let name = if names_only {
+                            path.rsplit('/').next().unwrap_or(&path).to_owned()
+                        } else {
+                            path
+                        };
+                        entries.push((name, false, length));
+                    } else {
+                        collect_children(&path, recurse, force, "", &mut entries);
                     }
-                } else {
-                    collect_children(&path, recurse, force, "", &mut entries);
                 }
                 if let Some(depth) = depth {
                     let depth = depth.max(0) as usize;

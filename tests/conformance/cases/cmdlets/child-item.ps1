@@ -16,3 +16,6 @@
 (Get-ChildItem fixtures/tree/*.txt).Length
 (Get-ChildItem fixtures/tree | ForEach-Object PSIsContainer) -join ','
 (Get-ChildItem fixtures/tree -File | ForEach-Object { "$($_.BaseName)$($_.Extension)" }) -join ','
+(Get-ChildItem fixtures/tree/a.txt, fixtures/tree/sub/b.txt -Name) -join ','
+(Get-ChildItem fixtures/tree/a.txt -Name) -join ','
+(Get-ChildItem fixtures/tree/a.txt).Name
