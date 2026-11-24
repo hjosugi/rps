@@ -5,3 +5,5 @@
 'Alpha', 'alpha' | Select-String -Pattern 'alpha' -SimpleMatch | ForEach-Object Line
 'Alpha', 'alpha' | Select-String -Pattern 'alpha' -SimpleMatch -CaseSensitive | ForEach-Object Line
 'Alpha', 'alpha' | Select-String -Pattern 'alpha' -CaseSensitive | ForEach-Object Line
+'alpha', 'beta' | Select-String -Pattern 'ph' -Quiet
+'alpha', 'beta' | Select-String -Pattern 'zz' -Quiet

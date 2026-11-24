@@ -2933,6 +2933,16 @@ impl Engine {
                         ]));
                     }
                 }
+                let quiet = named
+                    .iter()
+                    .any(|(name, value)| name.eq_ignore_ascii_case("quiet") && ops::is_true(value));
+                if quiet {
+                    return Ok(Some(if outputs.is_empty() {
+                        Vec::new()
+                    } else {
+                        vec![Value::Bool(true)]
+                    }));
+                }
                 Ok(Some(outputs))
             }
             "get-date" => {
