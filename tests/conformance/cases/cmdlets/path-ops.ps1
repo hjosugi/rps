@@ -24,3 +24,5 @@ Test-Path -IsValid 'foo'
 Test-Path '~'
 Test-Path '~/'
 Test-Path '~/definitely-not-here'
+(Get-Item '~').PSIsContainer
+(Get-ChildItem '~' -Directory | Measure-Object).Count -gt 0

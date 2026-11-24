@@ -1685,6 +1685,7 @@ impl Engine {
                     }
                     .into());
                 };
+                let path = expand_home(&path);
                 if path.contains(['*', '?']) {
                     return Ok(Some(
                         expand_glob(&path)
@@ -1982,6 +1983,7 @@ impl Engine {
                             .map_or_else(|| Some(".".to_owned()), |value| Some(value.to_string()))
                     })
                     .unwrap_or_else(|| ".".to_owned());
+                let path = expand_home(&path);
                 let recurse = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("recurse") && ops::is_true(value)
                 });
@@ -2281,6 +2283,7 @@ impl Engine {
                     }
                     .into());
                 };
+                let path = expand_home(&path);
                 let text = if path.contains(['*', '?']) {
                     let mut text = String::new();
                     for matched in expand_glob(&path) {
