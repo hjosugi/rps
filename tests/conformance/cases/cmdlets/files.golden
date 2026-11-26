@@ -23,4 +23,6 @@ SymbolicLink
 target.txt
 True
 link.txt|SymbolicLink,target.txt|
+link.txt
+target.txt
 False

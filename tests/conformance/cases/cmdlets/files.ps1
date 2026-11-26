@@ -63,5 +63,7 @@ New-Item -ItemType SymbolicLink -Path rpsh-link-test/link.txt -Target target.txt
 (Get-Item rpsh-link-test/link.txt).Target
 Test-Path rpsh-link-test/link.txt
 (Get-ChildItem rpsh-link-test | ForEach-Object { "$($_.Name)|$($_.LinkType)" } | Sort-Object) -join ','
+(Get-ChildItem rpsh-link-test -Attributes ReparsePoint -Name) -join ','
+(Get-ChildItem rpsh-link-test -Attributes '!ReparsePoint' -Name | Sort-Object) -join ','
 Remove-Item rpsh-link-test -Recurse -Force
 Test-Path rpsh-link-test

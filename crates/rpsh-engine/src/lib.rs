@@ -2711,7 +2711,10 @@ impl Engine {
                     })
                     .unwrap_or_default();
                 for (_, attribute) in &attributes {
-                    if attribute != "directory" && attribute != "hidden" && attribute != "readonly"
+                    if attribute != "directory"
+                        && attribute != "hidden"
+                        && attribute != "readonly"
+                        && attribute != "reparsepoint"
                     {
                         return Err(RuntimeError::NotImplemented {
                             feature: "Get-ChildItem with this attribute",
@@ -2790,11 +2793,25 @@ impl Engine {
                 entries.retain(|(name, is_dir, _)| {
                     let leaf = name.rsplit('/').next().unwrap_or(name);
                     for (negated, attribute) in &attributes {
+                        let metadata_path = metadata_base.as_ref().map_or_else(
+                            || name.clone(),
+                            |base| {
+                                format!(
+                                    "{}/{}",
+                                    base.trim_end_matches('/'),
+                                    name.trim_start_matches('/')
+                                )
+                            },
+                        );
                         let value = if attribute == "directory" {
                             *is_dir
                         } else if attribute == "readonly" {
                             std::fs::metadata(name)
                                 .map(|meta| meta.permissions().readonly())
+                                .unwrap_or(false)
+                        } else if attribute == "reparsepoint" {
+                            std::fs::symlink_metadata(&metadata_path)
+                                .map(|meta| meta.file_type().is_symlink())
                                 .unwrap_or(false)
                         } else {
                             leaf.starts_with('.')
