@@ -1888,20 +1888,36 @@ impl Engine {
             }
             "copy-item" | "cp" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let source = named
+                let destination_named = named
                     .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
+                    .any(|(name, _)| name.eq_ignore_ascii_case("destination"));
+                let mut paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None if destination_named => {
+                        positional.iter().map(ToString::to_string).collect()
+                    }
+                    None => positional
+                        .first()
+                        .map(|value| vec![value.to_string()])
+                        .unwrap_or_default(),
+                };
                 let destination = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("destination"))
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.get(1).map(ToString::to_string));
-                let (Some(source), Some(destination)) = (source, destination) else {
+                if paths.is_empty() {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Copy-Item without source and destination",
+                    }
+                    .into());
+                }
+                let Some(destination) = destination else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Copy-Item without source and destination",
                     }
@@ -1910,11 +1926,14 @@ impl Engine {
                 let recurse = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("recurse") && ops::is_true(value)
                 });
-                let sources = if source.contains(['*', '?']) {
-                    expand_glob(&source)
-                } else {
-                    vec![source.clone()]
-                };
+                let mut sources = Vec::new();
+                for path in paths.drain(..) {
+                    if path.contains(['*', '?']) {
+                        sources.extend(expand_glob(&path));
+                    } else {
+                        sources.push(path);
+                    }
+                }
                 for source in sources {
                     let target = if std::path::Path::new(&destination).is_dir() {
                         let name = std::path::Path::new(&source)

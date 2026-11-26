@@ -18,3 +18,12 @@ Set-Content rpsh-del2.txt -Value 'y'
 Remove-Item rpsh-del1.txt, rpsh-del2.txt
 Test-Path rpsh-del1.txt
 Test-Path rpsh-del2.txt
+if (Test-Path rpsh-copy-many) { Remove-Item rpsh-copy-many -Recurse -Force }
+$null = New-Item -ItemType Directory -Path rpsh-copy-many -Force
+Set-Content rpsh-copy-a.txt -Value 'a'
+Set-Content rpsh-copy-b.txt -Value 'b'
+Copy-Item rpsh-copy-a.txt, rpsh-copy-b.txt -Destination rpsh-copy-many
+(Get-ChildItem rpsh-copy-many -Name | Sort-Object) -join ','
+Remove-Item rpsh-copy-many -Recurse -Force
+Remove-Item rpsh-copy-a.txt
+Remove-Item rpsh-copy-b.txt
