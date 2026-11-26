@@ -12,3 +12,7 @@ Remove-Module module-fixture, module-extra
 (Get-Module -Name module-* | Measure-Object).Count
 Test-Path Function:ModuleFn
 Test-Path Function:Get-Extra
+Import-Module ./module-extra.*
+Get-Extra 1
+(Get-Module -Name module-extra | Measure-Object).Count
+Remove-Module module-extra
