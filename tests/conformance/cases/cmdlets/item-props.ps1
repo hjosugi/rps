@@ -16,3 +16,13 @@ $p.Length
 (Get-ItemProperty fixtures/data.txt).Name
 (Get-ItemProperty fixtures/data.txt).Length
 (Get-Command Get-ItemProperty).CommandType
+$env:RPSH_ITEM = 'v'
+(Get-Item Env:RPSH_ITEM).Name
+(Get-Item Env:RPSH_ITEM).Value
+$iv = 1
+(Get-Item Variable:iv).Name
+(Get-Item Variable:iv).Value
+(Get-Item Alias:gc).Name
+(Get-Item Alias:gc).Definition
+function LocalItem {}
+(Get-Item Function:LocalItem).Name

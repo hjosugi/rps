@@ -1814,6 +1814,10 @@ impl Engine {
                 }
                 let mut outputs = Vec::new();
                 for path in paths {
+                    if let Some(item) = self.provider_item(&path) {
+                        outputs.push(item?);
+                        continue;
+                    }
                     let path = expand_home(&path);
                     if path.contains(['*', '?']) {
                         for matched in expand_glob(&path) {
@@ -4514,6 +4518,76 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    fn provider_item(&self, path: &str) -> Option<Result<Value, RuntimeError>> {
+        let (provider, name) = path.split_once(':')?;
+        let name = name.trim_start_matches("\\");
+        let missing = |path: &str| {
+            Err(RuntimeError::Script {
+                id: "PathNotFound,Microsoft.PowerShell.Commands.GetItemCommand",
+                category: format!(
+                    "ObjectNotFound: ({path}:String) [Get-Item], ItemNotFoundException"
+                ),
+                exception_type: "System.Management.Automation.ItemNotFoundException",
+                message: format!("Cannot find path '{path}' because it does not exist."),
+            })
+        };
+        match provider.to_ascii_lowercase().as_str() {
+            "env" => Some(match self.variables.get(&format!("env:{name}")) {
+                Some(value) => Ok(Value::object(vec![
+                    ("Name".to_owned(), Value::String(name.into())),
+                    ("Value".to_owned(), value.clone()),
+                ])),
+                None => match std::env::var(name) {
+                    Ok(value) => Ok(Value::object(vec![
+                        ("Name".to_owned(), Value::String(name.into())),
+                        ("Value".to_owned(), Value::String(value.into())),
+                    ])),
+                    Err(_) => missing(path),
+                },
+            }),
+            "variable" => {
+                let key = strip_scope(name).to_owned();
+                Some(
+                    match self
+                        .variables
+                        .get(&key)
+                        .cloned()
+                        .or_else(|| automatic_variable(&key))
+                    {
+                        Some(value) => Ok(Value::object(vec![
+                            ("Name".to_owned(), Value::String(key.into())),
+                            ("Value".to_owned(), value),
+                        ])),
+                        None => missing(path),
+                    },
+                )
+            }
+            "alias" => {
+                let lower = name.to_ascii_lowercase();
+                let definition = self
+                    .aliases
+                    .get(&lower)
+                    .cloned()
+                    .or_else(|| default_alias(&lower).map(ToOwned::to_owned));
+                Some(match definition {
+                    Some(definition) => Ok(Value::object(vec![
+                        ("Name".to_owned(), Value::String(name.into())),
+                        ("Definition".to_owned(), Value::String(definition.into())),
+                    ])),
+                    None => missing(path),
+                })
+            }
+            "function" => Some(match self.functions.get(&name.to_ascii_lowercase()) {
+                Some(function) => Ok(Value::object(vec![(
+                    "Name".to_owned(),
+                    Value::String(function.name.clone().into()),
+                )])),
+                None => missing(path),
+            }),
+            _ => None,
+        }
     }
 
     fn provider_path_exists(&self, path: &str) -> Option<bool> {

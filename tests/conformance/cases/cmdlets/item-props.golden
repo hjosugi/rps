@@ -16,3 +16,10 @@ data.txt
 data.txt
 17
 Cmdlet
+RPSH_ITEM
+v
+iv
+1
+gc
+Get-Content
+LocalItem
