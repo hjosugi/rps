@@ -25,3 +25,9 @@ Remove-Item rpsh-values2.txt
 (Get-Content fixtures/tree/*.txt) -join ','
 (Get-Content fixtures/data.txt, fixtures/tree/a.txt) -join ','
 (Get-Content fixtures/data.txt -Raw).Length
+Set-Content -Path rpsh-set-a.txt, rpsh-set-b.txt -Value 'x'
+(Get-Content rpsh-set-a.txt) -join ','
+(Get-Content rpsh-set-b.txt) -join ','
+Set-Content rpsh-set-c.txt 'y'
+(Get-Content rpsh-set-c.txt) -join ','
+Remove-Item rpsh-set-a.txt, rpsh-set-b.txt, rpsh-set-c.txt
