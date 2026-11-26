@@ -2660,6 +2660,12 @@ impl Engine {
                                     ("Name".to_owned(), Value::String(leaf.clone().into())),
                                     ("FullName".to_owned(), Value::String(name.into())),
                                     ("PSIsContainer".to_owned(), Value::Bool(is_dir)),
+                                    (
+                                        "Mode".to_owned(),
+                                        Value::String(
+                                            if is_dir { "d----" } else { "-----" }.into(),
+                                        ),
+                                    ),
                                     ("Length".to_owned(), Value::Int64(length as i64)),
                                 ];
                                 if !is_dir {
@@ -6818,6 +6824,10 @@ fn item_value(text: &str) -> Value {
         ),
         ("FullName".to_owned(), Value::String(text.to_owned().into())),
         ("PSIsContainer".to_owned(), Value::Bool(target.is_dir())),
+        (
+            "Mode".to_owned(),
+            Value::String(if target.is_dir() { "d----" } else { "-----" }.into()),
+        ),
         (
             "IsReadOnly".to_owned(),
             Value::Bool(

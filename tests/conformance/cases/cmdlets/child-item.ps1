@@ -26,3 +26,4 @@
 (Get-ChildItem fixtures/hidden -Force -Attributes Hidden -Name | Sort-Object) -join ','
 (Get-ChildItem fixtures/hidden -Attributes Hidden -Name | Sort-Object) -join ','
 (Get-ChildItem fixtures/hidden -Attributes '!Directory' -Name | Sort-Object) -join ','
+(Get-ChildItem fixtures/tree | ForEach-Object Mode) -join ','

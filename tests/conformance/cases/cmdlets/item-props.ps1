@@ -26,3 +26,5 @@ $iv = 1
 (Get-Item Alias:gc).Definition
 function LocalItem {}
 (Get-Item Function:LocalItem).Name
+(Get-Item fixtures/data.txt).Mode
+(Get-Item fixtures/tree).Mode
