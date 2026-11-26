@@ -88,6 +88,7 @@ pub enum Statement {
     /// `switch [-Wildcard|-Regex] (expr) { label { body } ... }`.
     Switch {
         condition: Expr,
+        file: bool,
         wildcard: bool,
         regex: bool,
         case_sensitive: bool,

@@ -659,12 +659,21 @@ impl Engine {
             }
             Statement::Switch {
                 condition,
+                file,
                 wildcard,
                 regex,
                 case_sensitive,
                 clauses,
                 ..
-            } => self.exec_switch(condition, *wildcard, *regex, *case_sensitive, clauses, out),
+            } => self.exec_switch(
+                condition,
+                *file,
+                *wildcard,
+                *regex,
+                *case_sensitive,
+                clauses,
+                out,
+            ),
             Statement::If {
                 condition,
                 then,
@@ -1020,9 +1029,11 @@ impl Engine {
         Ok(flow)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn exec_switch(
         &mut self,
         condition: &Expr,
+        file: bool,
         wildcard: bool,
         regex: bool,
         case_sensitive: bool,
@@ -1030,7 +1041,18 @@ impl Engine {
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
         let value = self.eval_expression(condition)?;
-        let items = flatten_value(value);
+        let items = if file {
+            let path = value.to_string();
+            let text =
+                std::fs::read_to_string(&path).map_err(|_| RuntimeError::NotImplemented {
+                    feature: "switch -File of a missing file",
+                })?;
+            text.lines()
+                .map(|line| Value::String(line.into()))
+                .collect()
+        } else {
+            flatten_value(value)
+        };
         let previous = self.variables.get("_").cloned();
         let mut result = Flow::Normal;
         'items: for item in items {

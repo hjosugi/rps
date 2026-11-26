@@ -939,6 +939,7 @@ impl Parser {
     fn switch_statement(&mut self) -> Result<Statement, ParseError> {
         let start = self.peek().span;
         self.pos += 1;
+        let mut file = false;
         let mut wildcard = false;
         let mut regex = false;
         let mut case_sensitive = false;
@@ -968,7 +969,9 @@ impl Parser {
                 }
                 _ => break,
             };
-            if flag.eq_ignore_ascii_case("wildcard") {
+            if flag.eq_ignore_ascii_case("file") {
+                file = true;
+            } else if flag.eq_ignore_ascii_case("wildcard") {
                 wildcard = true;
             } else if flag.eq_ignore_ascii_case("regex") {
                 regex = true;
@@ -978,7 +981,22 @@ impl Parser {
                 return self.refuse("this switch flag");
             }
         }
-        let condition = self.condition()?;
+        let condition = if file {
+            match &self.peek().kind {
+                TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
+                    let word = word.clone();
+                    let span = self.peek().span;
+                    self.pos += 1;
+                    Expr {
+                        kind: ExprKind::String(word),
+                        span,
+                    }
+                }
+                _ => self.condition()?,
+            }
+        } else {
+            self.condition()?
+        };
         self.skip_newlines();
         if self.peek().kind != TokenKind::LCurly {
             return self.refuse(SYNTAX_ERRORS);
@@ -1023,6 +1041,7 @@ impl Parser {
         let span = start.to(self.previous_span());
         Ok(Statement::Switch {
             condition,
+            file,
             wildcard,
             regex,
             case_sensitive,
