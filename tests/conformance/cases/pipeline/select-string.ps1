@@ -12,3 +12,4 @@
 'alpha', 'beta', 'gamma' | Select-String -Pattern 'ph', 'et' | ForEach-Object Line
 'alpha', 'beta', 'gamma' | Select-String -Pattern 'ph', 'et' -SimpleMatch | ForEach-Object Line
 'alpha', 'beta', 'gamma' | Select-String -NotMatch -Pattern 'ph', 'et' | ForEach-Object Line
+'alpha', 'beta', 'gamma' | Select-String -Pattern 'ph', 'et' -NotMatch | ForEach-Object Line

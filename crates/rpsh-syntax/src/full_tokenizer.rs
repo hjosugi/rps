@@ -956,6 +956,9 @@ impl Tokenizer<'_> {
                         self.command_seen = false;
                         self.statement_start = true;
                     }
+                    FullTokenKind::Comma if self.mode == Mode::Command && self.command_seen => {
+                        self.statement_start = false;
+                    }
                     _ => {
                         self.mode = Mode::Expression;
                         self.statement_start = false;
