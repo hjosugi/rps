@@ -2226,20 +2226,35 @@ impl Engine {
             }
             "add-content" | "ac" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
-                    .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(path) = path else {
+                let path_named = named.iter().any(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                });
+                let paths: Vec<String> = if path_named {
+                    named
+                        .iter()
+                        .find(|(name, _)| {
+                            name.eq_ignore_ascii_case("path")
+                                || name.eq_ignore_ascii_case("literalpath")
+                        })
+                        .map(|(_, value)| {
+                            flatten_value(value.clone())
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                } else {
+                    positional
+                        .first()
+                        .map(|value| vec![value.to_string()])
+                        .unwrap_or_default()
+                };
+                if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Add-Content without a path",
                     }
                     .into());
-                };
+                }
                 let values: Vec<Value> = if !input.is_empty() {
                     input.to_vec()
                 } else {
@@ -2249,9 +2264,10 @@ impl Engine {
                         .map(|(_, value)| value.clone())
                         .collect();
                     if named_values.is_empty() {
+                        let skip = usize::from(!path_named);
                         positional
                             .iter()
-                            .skip(1)
+                            .skip(skip)
                             .flat_map(|value| flatten_value(value.clone()))
                             .collect()
                     } else {
@@ -2269,17 +2285,19 @@ impl Engine {
                     }
                 }
                 use std::io::Write as _;
-                let mut file = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&path)
-                    .map_err(|_| RuntimeError::NotImplemented {
-                        feature: "Add-Content cannot open this file",
-                    })?;
-                file.write_all(text.as_bytes())
-                    .map_err(|_| RuntimeError::NotImplemented {
-                        feature: "Add-Content cannot write this file",
-                    })?;
+                for path in paths {
+                    let mut file = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&path)
+                        .map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Add-Content cannot open this file",
+                        })?;
+                    file.write_all(text.as_bytes())
+                        .map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Add-Content cannot write this file",
+                        })?;
+                }
                 Ok(Some(Vec::new()))
             }
             "out-file" => {

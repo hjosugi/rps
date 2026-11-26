@@ -31,3 +31,9 @@ Set-Content -Path rpsh-set-a.txt, rpsh-set-b.txt -Value 'x'
 Set-Content rpsh-set-c.txt 'y'
 (Get-Content rpsh-set-c.txt) -join ','
 Remove-Item rpsh-set-a.txt, rpsh-set-b.txt, rpsh-set-c.txt
+Set-Content rpsh-add-a.txt -Value 'x'
+Set-Content rpsh-add-b.txt -Value 'x'
+Add-Content -Path rpsh-add-a.txt, rpsh-add-b.txt -Value 'y'
+(Get-Content rpsh-add-a.txt) -join ','
+(Get-Content rpsh-add-b.txt) -join ','
+Remove-Item rpsh-add-a.txt, rpsh-add-b.txt
