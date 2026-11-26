@@ -18,7 +18,7 @@ default-members = ["crates/rpsh-cli"]
 resolver = "3"
 
 [workspace.package]
-version = "0.0.257"
+version = "0.0.258"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/hjosugi/rpsh"
@@ -28,11 +28,11 @@ publish = false
 # `rpsh`. A crate is added here only together with the issue that needs it,
 # and a workspace crate only once another crate depends on it.
 [workspace.dependencies]
-rpsh-syntax = { version = "0.0.257", path = "crates/rpsh-syntax" }
-rpsh-runtime = { version = "0.0.257", path = "crates/rpsh-runtime" }
-rpsh-engine = { version = "0.0.257", path = "crates/rpsh-engine" }
-rpsh-messages = { version = "0.0.257", path = "crates/rpsh-messages" }
-rpsh-host = { version = "0.0.257", path = "crates/rpsh-host" }
+rpsh-syntax = { version = "0.0.258", path = "crates/rpsh-syntax" }
+rpsh-runtime = { version = "0.0.258", path = "crates/rpsh-runtime" }
+rpsh-engine = { version = "0.0.258", path = "crates/rpsh-engine" }
+rpsh-messages = { version = "0.0.258", path = "crates/rpsh-messages" }
+rpsh-host = { version = "0.0.258", path = "crates/rpsh-host" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"
