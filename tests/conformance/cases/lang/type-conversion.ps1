@@ -12,3 +12,9 @@
 [int]'0x10'
 [bool]''
 [bool]'false'
+[byte]97
+[sbyte]-3
+[int16]5
+[uint16]5
+[uint32]5
+[uint64]5
