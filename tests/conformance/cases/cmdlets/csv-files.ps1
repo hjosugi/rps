@@ -25,3 +25,8 @@ Remove-Item rpsh-append.csv
 [pscustomobject]@{a=1} | Export-Csv rpsh-append2.csv -Append
 (Get-Content rpsh-append2.csv) -join '|'
 Remove-Item rpsh-append2.csv
+Set-Content rpsh-import-a.csv -Value @('a,b', '1,2')
+Set-Content rpsh-import-b.csv -Value @('a,b', '3,4')
+(Import-Csv -Path rpsh-import-a.csv, rpsh-import-b.csv | ForEach-Object { "$($_.a)$($_.b)" }) -join ','
+Remove-Item rpsh-import-a.csv
+Remove-Item rpsh-import-b.csv

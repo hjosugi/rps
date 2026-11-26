@@ -3432,47 +3432,58 @@ impl Engine {
             }
             "import-csv" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
-                    .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(path) = path else {
+                let paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Import-Csv without a path",
                     }
                     .into());
-                };
-                let text =
-                    std::fs::read_to_string(&path).map_err(|_| RuntimeError::NotImplemented {
-                        feature: "Import-Csv of a missing file",
-                    })?;
+                }
                 let delimiter = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("delimiter"))
                     .map_or(',', |(_, value)| {
                         value.to_string().chars().next().unwrap_or(',')
                     });
-                let mut lines = text.lines();
-                let Some(header) = lines.next() else {
-                    return Ok(Some(Vec::new()));
-                };
-                let columns = parse_csv_line_with(header, delimiter);
                 let mut outputs = Vec::new();
-                for line in lines {
-                    if line.trim().is_empty() {
-                        continue;
+                for path in paths {
+                    let files = if path.contains(['*', '?']) {
+                        expand_glob(&path)
+                    } else {
+                        vec![path]
+                    };
+                    for path in files {
+                        let text = std::fs::read_to_string(&path).map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "Import-Csv of a missing file",
+                            }
+                        })?;
+                        let mut lines = text.lines();
+                        let Some(header) = lines.next() else {
+                            continue;
+                        };
+                        let columns = parse_csv_line_with(header, delimiter);
+                        for line in lines {
+                            if line.trim().is_empty() {
+                                continue;
+                            }
+                            let cells = parse_csv_line_with(line, delimiter);
+                            let mut entries = Vec::new();
+                            for (index, column) in columns.iter().enumerate() {
+                                let value = cells.get(index).cloned().unwrap_or_default();
+                                entries.push((column.clone(), Value::String(value.into())));
+                            }
+                            outputs.push(Value::object(entries));
+                        }
                     }
-                    let cells = parse_csv_line_with(line, delimiter);
-                    let mut entries = Vec::new();
-                    for (index, column) in columns.iter().enumerate() {
-                        let value = cells.get(index).cloned().unwrap_or_default();
-                        entries.push((column.clone(), Value::String(value.into())));
-                    }
-                    outputs.push(Value::object(entries));
                 }
                 Ok(Some(outputs))
             }
