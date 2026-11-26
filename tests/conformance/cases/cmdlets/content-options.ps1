@@ -37,3 +37,9 @@ Add-Content -Path rpsh-add-a.txt, rpsh-add-b.txt -Value 'y'
 (Get-Content rpsh-add-a.txt) -join ','
 (Get-Content rpsh-add-b.txt) -join ','
 Remove-Item rpsh-add-a.txt, rpsh-add-b.txt
+Set-Content rpsh-clear-a.txt -Value 'x'
+Set-Content rpsh-clear-b.txt -Value 'y'
+Clear-Content -Path rpsh-clear-a.txt, rpsh-clear-b.txt
+(Get-Content rpsh-clear-a.txt -Raw).Length
+(Get-Content rpsh-clear-b.txt -Raw).Length
+Remove-Item rpsh-clear-a.txt, rpsh-clear-b.txt
