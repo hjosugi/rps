@@ -5156,11 +5156,32 @@ impl Engine {
         {
             return Some(true);
         }
+        let wildcard = name.contains(['*', '?']);
         match provider.to_ascii_lowercase().as_str() {
-            "env" => Some(
-                self.variables.contains_key(&format!("env:{name}")) || std::env::var(name).is_ok(),
-            ),
+            "env" => {
+                if wildcard {
+                    return Some(
+                        self.variables
+                            .keys()
+                            .filter_map(|key| key.strip_prefix("env:"))
+                            .any(|candidate| ops::wildcard_match(candidate, name, false))
+                            || std::env::vars()
+                                .any(|(candidate, _)| ops::wildcard_match(&candidate, name, false)),
+                    );
+                }
+                Some(
+                    self.variables.contains_key(&format!("env:{name}"))
+                        || std::env::var(name).is_ok(),
+                )
+            }
             "variable" => {
+                if wildcard {
+                    return Some(
+                        self.variables
+                            .keys()
+                            .any(|candidate| ops::wildcard_match(candidate, name, false)),
+                    );
+                }
                 let key = strip_scope(name);
                 Some(
                     self.variables.contains_key(key)
@@ -5168,11 +5189,24 @@ impl Engine {
                         || automatic_variable(key).is_some(),
                 )
             }
-            "function" => Some(self.functions.contains_key(&name.to_ascii_lowercase())),
-            "alias" => {
+            "function" => Some(if wildcard {
+                self.functions
+                    .values()
+                    .any(|function| ops::wildcard_match(&function.name, name, false))
+            } else {
+                self.functions.contains_key(&name.to_ascii_lowercase())
+            }),
+            "alias" => Some(if wildcard {
+                self.aliases
+                    .keys()
+                    .any(|candidate| ops::wildcard_match(candidate, name, false))
+                    || DEFAULT_ALIASES
+                        .iter()
+                        .any(|(candidate, _)| ops::wildcard_match(candidate, name, false))
+            } else {
                 let lower = name.to_ascii_lowercase();
-                Some(self.aliases.contains_key(&lower) || default_alias(&lower).is_some())
-            }
+                self.aliases.contains_key(&lower) || default_alias(&lower).is_some()
+            }),
             _ => None,
         }
     }

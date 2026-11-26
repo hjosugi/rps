@@ -94,3 +94,7 @@ Remove-Item Env:RPSH_N
 Remove-Variable pv
 Split-Path -Path /tmp/x -NoQualifier
 Split-Path -Path fixtures/data.txt -NoQualifier
+$wildVar = 1
+Test-Path Variable:wild*
+Test-Path Variable:zzz*
+Test-Path Alias:g*
