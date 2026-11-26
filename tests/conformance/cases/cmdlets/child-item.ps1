@@ -19,3 +19,5 @@
 (Get-ChildItem fixtures/tree/a.txt, fixtures/tree/sub/b.txt -Name) -join ','
 (Get-ChildItem fixtures/tree/a.txt -Name) -join ','
 (Get-ChildItem fixtures/tree/a.txt).Name
+(Get-ChildItem fixtures/tree -Recurse -File -Name -Include 'a*', 'b*' | Sort-Object) -join ','
+(Get-ChildItem fixtures/tree -Recurse -File -Name -Exclude 'a.txt', 'b.txt' | Sort-Object) -join ','

@@ -2046,14 +2046,26 @@ impl Engine {
                 let force = named
                     .iter()
                     .any(|(name, value)| name.eq_ignore_ascii_case("force") && ops::is_true(value));
-                let exclude = named
+                let exclude: Vec<String> = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("exclude"))
-                    .map(|(_, value)| value.to_string());
-                let include = named
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let include: Vec<String> = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("include"))
-                    .map(|(_, value)| value.to_string());
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 let depth = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("depth"))
@@ -2095,13 +2107,16 @@ impl Engine {
                         return false;
                     }
                     let leaf = name.rsplit('/').next().unwrap_or(name);
-                    if let Some(exclude) = &exclude
-                        && ops::wildcard_match(leaf, exclude, false)
+                    if exclude
+                        .iter()
+                        .any(|pattern| ops::wildcard_match(leaf, pattern, false))
                     {
                         return false;
                     }
-                    if let Some(include) = &include
-                        && !ops::wildcard_match(leaf, include, false)
+                    if !include.is_empty()
+                        && !include
+                            .iter()
+                            .any(|pattern| ops::wildcard_match(leaf, pattern, false))
                     {
                         return false;
                     }
