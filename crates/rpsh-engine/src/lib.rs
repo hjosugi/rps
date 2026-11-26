@@ -2002,6 +2002,30 @@ impl Engine {
                     }
                 }
                 for path in targets {
+                    if let Some((provider, name)) = path.split_once(':') {
+                        let name = name.trim_start_matches("\\");
+                        match provider.to_ascii_lowercase().as_str() {
+                            "env" => {
+                                self.variables.remove(&format!("env:{name}"));
+                                continue;
+                            }
+                            "variable" => {
+                                let key = strip_scope(name);
+                                self.variables.remove(key);
+                                self.globals.remove(key);
+                                continue;
+                            }
+                            "alias" => {
+                                self.aliases.remove(&name.to_ascii_lowercase());
+                                continue;
+                            }
+                            "function" => {
+                                self.functions.remove(&name.to_ascii_lowercase());
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
                     let target = std::path::Path::new(&path);
                     if target.is_dir() {
                         std::fs::remove_dir_all(target).map_err(|_| {

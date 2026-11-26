@@ -49,3 +49,15 @@ Set-Alias localalias Write-Output
 (Get-ChildItem Alias:localalias -Name) -join ','
 function LocalChild {}
 (Get-ChildItem Function:LocalChild -Name) -join ','
+$env:RPSH_REMOVE = 'v'
+Remove-Item Env:RPSH_REMOVE
+Test-Path Env:RPSH_REMOVE
+$rv = 1
+Remove-Item Variable:rv
+Test-Path Variable:rv
+Set-Alias localrm Write-Output
+Remove-Item Alias:localrm
+Test-Path Alias:localrm
+function LocalRm {}
+Remove-Item Function:LocalRm
+Test-Path Function:LocalRm
