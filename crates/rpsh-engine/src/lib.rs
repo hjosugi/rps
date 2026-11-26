@@ -1053,7 +1053,7 @@ impl Engine {
                 } else {
                     let expected = evaluate(label, &mut self.variables, self.last_success)?;
                     matches!(
-                        ops::compare(&item, &expected, ops::Comparison::Eq, case_sensitive)?,
+                        compare_values(&item, &expected, ops::Comparison::Eq, case_sensitive)?,
                         Value::Bool(true)
                     )
                 };
@@ -1388,7 +1388,7 @@ impl Engine {
                             for item in input {
                                 let value = member(item, &property).unwrap_or(Value::Null);
                                 if matches!(
-                                    ops::compare(&value, expected, comparison, false)?,
+                                    compare_values(&value, expected, comparison, false)?,
                                     Value::Bool(true)
                                 ) {
                                     outputs.push(item.clone());
