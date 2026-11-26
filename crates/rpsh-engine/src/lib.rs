@@ -3992,7 +3992,30 @@ impl Engine {
                     .find(|(name, _)| name.eq_ignore_ascii_case("expandproperty"))
                     .map(|(_, value)| value.clone());
                 if let Some(property) = property.or(expand.clone()) {
-                    let names = flatten_value(property);
+                    let mut names = flatten_value(property);
+                    if expand.is_none()
+                        && names.iter().any(|name| {
+                            let text = name.to_string();
+                            text != "*" && text.contains(['*', '?'])
+                        })
+                        && let Some(Value::Object(entries)) = items.first()
+                    {
+                        let first_names = visible_entries(entries);
+                        let mut expanded = Vec::new();
+                        for name in names {
+                            let text = name.to_string();
+                            if text != "*" && text.contains(['*', '?']) {
+                                for (candidate, _) in &first_names {
+                                    if ops::wildcard_match(candidate, &text, false) {
+                                        expanded.push(Value::String((*candidate).clone().into()));
+                                    }
+                                }
+                            } else {
+                                expanded.push(name);
+                            }
+                        }
+                        names = expanded;
+                    }
                     items = items
                         .into_iter()
                         .filter_map(|item| {
