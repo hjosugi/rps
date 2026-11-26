@@ -3968,10 +3968,13 @@ impl Engine {
             }
             "format-table" | "ft" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
-                let property = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
-                    .map(|(_, value)| value.clone());
+                let property = expand_property_value(
+                    input,
+                    named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                        .map(|(_, value)| value.clone()),
+                );
                 let hide_headers = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("hidetableheaders") && ops::is_true(value)
                 });
@@ -3979,10 +3982,13 @@ impl Engine {
             }
             "format-list" | "fl" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
-                let property = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
-                    .map(|(_, value)| value.clone());
+                let property = expand_property_value(
+                    input,
+                    named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                        .map(|(_, value)| value.clone()),
+                );
                 Ok(Some(mark_format(input, "List", property, false)))
             }
             "compare-object" | "diff" => {
@@ -6510,6 +6516,39 @@ fn mark_format(
             other => other.clone(),
         })
         .collect()
+}
+
+fn expand_property_value(input: &[Value], property: Option<Value>) -> Option<Value> {
+    let property = property?;
+    let names = flatten_value(property.clone());
+    if !names
+        .iter()
+        .any(|name| name.to_string().contains(['*', '?']))
+    {
+        return Some(property);
+    }
+    let Some(Value::Object(entries)) = input.first() else {
+        return Some(property);
+    };
+    let visible = visible_entries(entries);
+    let mut expanded = Vec::new();
+    for name in names {
+        let text = name.to_string();
+        if text.contains(['*', '?']) {
+            for (candidate, _) in &visible {
+                if ops::wildcard_match(candidate, &text, false) {
+                    expanded.push(Value::String((*candidate).clone().into()));
+                }
+            }
+        } else {
+            expanded.push(name);
+        }
+    }
+    if expanded.is_empty() {
+        Some(property)
+    } else {
+        Some(Value::array(expanded))
+    }
 }
 
 fn format_table_properties(value: &Value) -> Vec<String> {
