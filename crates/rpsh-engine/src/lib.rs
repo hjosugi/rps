@@ -2078,6 +2078,12 @@ impl Engine {
                 }
                 let mut outputs = Vec::new();
                 for path in paths {
+                    if path.contains(['*', '?'])
+                        && let Some(items) = self.provider_children(&path, false, None)
+                    {
+                        outputs.extend(items);
+                        continue;
+                    }
                     if let Some(item) = self.provider_item(&path) {
                         outputs.push(item?);
                         continue;

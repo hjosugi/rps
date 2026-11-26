@@ -28,3 +28,7 @@ function LocalItem {}
 (Get-Item Function:LocalItem).Name
 (Get-Item fixtures/data.txt).Mode
 (Get-Item fixtures/tree).Mode
+$wildItemA = 1
+$wildItemB = 2
+(Get-Item Variable:wildItem* | ForEach-Object Name | Sort-Object) -join ','
+(Get-Item Variable:wildItem* | Measure-Object).Count
