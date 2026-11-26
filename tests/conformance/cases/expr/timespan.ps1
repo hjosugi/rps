@@ -27,3 +27,5 @@ New-TimeSpan -Seconds 90
 [datetime]'2024-01-01' -eq [datetime]'2024-01-01'
 [timespan]::FromSeconds(90) -gt [timespan]::FromSeconds(60)
 [timespan]::FromSeconds(90) -le [timespan]::FromSeconds(90)
+(New-TimeSpan -Start ([datetime]'2024-01-01') -End ([datetime]'2024-01-02')).TotalDays
+(New-TimeSpan -Start '2024-01-01' -End '2024-01-01 12:00:00').TotalHours

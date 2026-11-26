@@ -3787,6 +3787,37 @@ impl Engine {
             }
             "new-timespan" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
+                let start = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("start"))
+                    .map(|(_, value)| value.clone());
+                let end = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("end"))
+                    .map(|(_, value)| value.clone());
+                if start.is_some() || end.is_some() {
+                    let fields = |value: &Value| -> Option<[i32; 6]> {
+                        datetime_fields(value).or_else(|| {
+                            parse_datetime_text(&value.to_string())
+                                .map(|parts| [parts.0, parts.1, parts.2, parts.3, parts.4, parts.5])
+                        })
+                    };
+                    let (Some(start), Some(end)) = (start.as_ref(), end.as_ref()) else {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "New-TimeSpan with only one endpoint",
+                        }
+                        .into());
+                    };
+                    let (Some(start), Some(end)) = (fields(start), fields(end)) else {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "New-TimeSpan with this endpoint",
+                        }
+                        .into());
+                    };
+                    return Ok(Some(vec![timespan_value(
+                        datetime_ticks(end) - datetime_ticks(start),
+                    )]));
+                }
                 let amount = |wanted: &str| -> Result<f64, RuntimeError> {
                     named
                         .iter()
