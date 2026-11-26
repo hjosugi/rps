@@ -2543,9 +2543,16 @@ impl Engine {
                     None => positional.iter().map(ToString::to_string).collect(),
                 };
                 for path in paths {
-                    std::fs::write(&path, b"").map_err(|_| RuntimeError::NotImplemented {
-                        feature: "Clear-Content cannot write this file",
-                    })?;
+                    let files = if path.contains(['*', '?']) {
+                        expand_glob(&path)
+                    } else {
+                        vec![path]
+                    };
+                    for path in files {
+                        std::fs::write(&path, b"").map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Clear-Content cannot write this file",
+                        })?;
+                    }
                 }
                 Ok(Some(Vec::new()))
             }

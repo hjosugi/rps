@@ -47,3 +47,10 @@ Remove-Item rpsh-clear-a.txt, rpsh-clear-b.txt
 Set-Content -Path rpsh-bytes.bin -Value ([byte[]](97, 10)) -AsByteStream
 (Get-Content rpsh-bytes.bin -AsByteStream) -join ','
 Remove-Item rpsh-bytes.bin
+Set-Content rpsh-clear1.txt -Value 'x'
+Set-Content rpsh-clear2.txt -Value 'y'
+Clear-Content rpsh-clear*.txt
+(Get-Content rpsh-clear1.txt -Raw).Length
+(Get-Content rpsh-clear2.txt -Raw).Length
+Remove-Item rpsh-clear1.txt
+Remove-Item rpsh-clear2.txt
