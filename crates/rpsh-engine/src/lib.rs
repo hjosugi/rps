@@ -4339,20 +4339,22 @@ impl Engine {
                 BinaryOp::Multiply => ops::multiply(&left, &right)?,
                 BinaryOp::Divide => ops::divide(&left, &right)?,
                 BinaryOp::Remainder => ops::remainder(&left, &right)?,
-                BinaryOp::Eq => ops::compare(&left, &right, ops::Comparison::Eq, false)?,
-                BinaryOp::Ne => ops::compare(&left, &right, ops::Comparison::Ne, false)?,
-                BinaryOp::Gt => ops::compare(&left, &right, ops::Comparison::Gt, false)?,
-                BinaryOp::Ge => ops::compare(&left, &right, ops::Comparison::Ge, false)?,
-                BinaryOp::Lt => ops::compare(&left, &right, ops::Comparison::Lt, false)?,
-                BinaryOp::Le => ops::compare(&left, &right, ops::Comparison::Le, false)?,
-                BinaryOp::CEq => ops::compare(&left, &right, ops::Comparison::Eq, true)?,
-                BinaryOp::CNe => ops::compare(&left, &right, ops::Comparison::Ne, true)?,
-                BinaryOp::CGt => ops::compare(&left, &right, ops::Comparison::Gt, true)?,
-                BinaryOp::CGe => ops::compare(&left, &right, ops::Comparison::Ge, true)?,
-                BinaryOp::CLt => ops::compare(&left, &right, ops::Comparison::Lt, true)?,
-                BinaryOp::CLe => ops::compare(&left, &right, ops::Comparison::Le, true)?,
-                BinaryOp::Like => ops::compare(&left, &right, ops::Comparison::Like, false)?,
-                BinaryOp::NotLike => ops::compare(&left, &right, ops::Comparison::NotLike, false)?,
+                BinaryOp::Eq => compare_values(&left, &right, ops::Comparison::Eq, false)?,
+                BinaryOp::Ne => compare_values(&left, &right, ops::Comparison::Ne, false)?,
+                BinaryOp::Gt => compare_values(&left, &right, ops::Comparison::Gt, false)?,
+                BinaryOp::Ge => compare_values(&left, &right, ops::Comparison::Ge, false)?,
+                BinaryOp::Lt => compare_values(&left, &right, ops::Comparison::Lt, false)?,
+                BinaryOp::Le => compare_values(&left, &right, ops::Comparison::Le, false)?,
+                BinaryOp::CEq => compare_values(&left, &right, ops::Comparison::Eq, true)?,
+                BinaryOp::CNe => compare_values(&left, &right, ops::Comparison::Ne, true)?,
+                BinaryOp::CGt => compare_values(&left, &right, ops::Comparison::Gt, true)?,
+                BinaryOp::CGe => compare_values(&left, &right, ops::Comparison::Ge, true)?,
+                BinaryOp::CLt => compare_values(&left, &right, ops::Comparison::Lt, true)?,
+                BinaryOp::CLe => compare_values(&left, &right, ops::Comparison::Le, true)?,
+                BinaryOp::Like => compare_values(&left, &right, ops::Comparison::Like, false)?,
+                BinaryOp::NotLike => {
+                    compare_values(&left, &right, ops::Comparison::NotLike, false)?
+                }
                 BinaryOp::Contains => ops::contains(&left, &right, false)?,
                 BinaryOp::NotContains => ops::contains(&left, &right, false)
                     .map(|value| Value::Bool(!matches!(value, Value::Bool(true))))?,
@@ -4724,22 +4726,22 @@ fn evaluate(
                 BinaryOp::Range => ops::range(&left, &right),
                 BinaryOp::Join => ops::join(&left, &right),
                 BinaryOp::Format => ops::format(&left, &right),
-                BinaryOp::Eq => ops::compare(&left, &right, ops::Comparison::Eq, false),
-                BinaryOp::Ne => ops::compare(&left, &right, ops::Comparison::Ne, false),
-                BinaryOp::Ge => ops::compare(&left, &right, ops::Comparison::Ge, false),
-                BinaryOp::Gt => ops::compare(&left, &right, ops::Comparison::Gt, false),
-                BinaryOp::Lt => ops::compare(&left, &right, ops::Comparison::Lt, false),
-                BinaryOp::Le => ops::compare(&left, &right, ops::Comparison::Le, false),
-                BinaryOp::CEq => ops::compare(&left, &right, ops::Comparison::Eq, true),
-                BinaryOp::CNe => ops::compare(&left, &right, ops::Comparison::Ne, true),
-                BinaryOp::CGe => ops::compare(&left, &right, ops::Comparison::Ge, true),
-                BinaryOp::CGt => ops::compare(&left, &right, ops::Comparison::Gt, true),
-                BinaryOp::CLt => ops::compare(&left, &right, ops::Comparison::Lt, true),
-                BinaryOp::CLe => ops::compare(&left, &right, ops::Comparison::Le, true),
-                BinaryOp::Like => ops::compare(&left, &right, ops::Comparison::Like, false),
-                BinaryOp::NotLike => ops::compare(&left, &right, ops::Comparison::NotLike, false),
-                BinaryOp::CLike => ops::compare(&left, &right, ops::Comparison::Like, true),
-                BinaryOp::CNotLike => ops::compare(&left, &right, ops::Comparison::NotLike, true),
+                BinaryOp::Eq => compare_values(&left, &right, ops::Comparison::Eq, false),
+                BinaryOp::Ne => compare_values(&left, &right, ops::Comparison::Ne, false),
+                BinaryOp::Ge => compare_values(&left, &right, ops::Comparison::Ge, false),
+                BinaryOp::Gt => compare_values(&left, &right, ops::Comparison::Gt, false),
+                BinaryOp::Lt => compare_values(&left, &right, ops::Comparison::Lt, false),
+                BinaryOp::Le => compare_values(&left, &right, ops::Comparison::Le, false),
+                BinaryOp::CEq => compare_values(&left, &right, ops::Comparison::Eq, true),
+                BinaryOp::CNe => compare_values(&left, &right, ops::Comparison::Ne, true),
+                BinaryOp::CGe => compare_values(&left, &right, ops::Comparison::Ge, true),
+                BinaryOp::CGt => compare_values(&left, &right, ops::Comparison::Gt, true),
+                BinaryOp::CLt => compare_values(&left, &right, ops::Comparison::Lt, true),
+                BinaryOp::CLe => compare_values(&left, &right, ops::Comparison::Le, true),
+                BinaryOp::Like => compare_values(&left, &right, ops::Comparison::Like, false),
+                BinaryOp::NotLike => compare_values(&left, &right, ops::Comparison::NotLike, false),
+                BinaryOp::CLike => compare_values(&left, &right, ops::Comparison::Like, true),
+                BinaryOp::CNotLike => compare_values(&left, &right, ops::Comparison::NotLike, true),
                 BinaryOp::Contains => ops::contains(&left, &right, false),
                 BinaryOp::NotContains => ops::contains(&left, &right, false)
                     .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
@@ -6633,6 +6635,37 @@ fn subtract_values(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
         return Ok(timespan_value(datetime_ticks(left) - datetime_ticks(right)));
     }
     ops::subtract(left, right)
+}
+
+fn compare_values(
+    left: &Value,
+    right: &Value,
+    comparison: ops::Comparison,
+    case_sensitive: bool,
+) -> Result<Value, RuntimeError> {
+    let ordering =
+        if let (Some(left), Some(right)) = (datetime_fields(left), datetime_fields(right)) {
+            Some(datetime_ticks(left).cmp(&datetime_ticks(right)))
+        } else if let (Some(left), Some(right)) = (timespan_ticks(left), timespan_ticks(right)) {
+            Some(left.cmp(&right))
+        } else {
+            None
+        };
+    if let Some(ordering) = ordering {
+        let result = match comparison {
+            ops::Comparison::Eq => Some(ordering == std::cmp::Ordering::Equal),
+            ops::Comparison::Ne => Some(ordering != std::cmp::Ordering::Equal),
+            ops::Comparison::Gt => Some(ordering == std::cmp::Ordering::Greater),
+            ops::Comparison::Ge => Some(ordering != std::cmp::Ordering::Less),
+            ops::Comparison::Lt => Some(ordering == std::cmp::Ordering::Less),
+            ops::Comparison::Le => Some(ordering != std::cmp::Ordering::Greater),
+            _ => None,
+        };
+        if let Some(result) = result {
+            return Ok(Value::Bool(result));
+        }
+    }
+    ops::compare(left, right, comparison, case_sensitive)
 }
 
 fn negate_value(value: &Value) -> Result<Value, RuntimeError> {

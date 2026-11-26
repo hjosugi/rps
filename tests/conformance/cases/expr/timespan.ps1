@@ -23,3 +23,7 @@ New-TimeSpan -Seconds 90
 ([timespan]::FromMinutes(2) - [timespan]::FromSeconds(30)).TotalSeconds
 (-[timespan]::FromSeconds(90)).TotalSeconds
 (([datetime]'2024-01-31 23:30:00' + [timespan]::FromMinutes(45))).ToString('yyyy-MM-dd HH:mm:ss')
+[datetime]'2024-01-01' -lt [datetime]'2024-02-01'
+[datetime]'2024-01-01' -eq [datetime]'2024-01-01'
+[timespan]::FromSeconds(90) -gt [timespan]::FromSeconds(60)
+[timespan]::FromSeconds(90) -le [timespan]::FromSeconds(90)
