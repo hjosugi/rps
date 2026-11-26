@@ -7200,6 +7200,38 @@ fn copy_directory(source: &str, destination: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+fn unix_mode_string(path: &std::path::Path) -> String {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let Ok(metadata) = std::fs::symlink_metadata(path) else {
+            return String::new();
+        };
+        let kind = if metadata.file_type().is_symlink() {
+            'l'
+        } else if metadata.is_dir() {
+            'd'
+        } else {
+            '-'
+        };
+        let mode = metadata.permissions().mode();
+        let mut text = String::new();
+        text.push(kind);
+        for shift in [6, 3, 0] {
+            let bits = (mode >> shift) & 0o7;
+            text.push(if bits & 0o4 != 0 { 'r' } else { '-' });
+            text.push(if bits & 0o2 != 0 { 'w' } else { '-' });
+            text.push(if bits & 0o1 != 0 { 'x' } else { '-' });
+        }
+        text
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        String::new()
+    }
+}
+
 fn item_value(text: &str) -> Value {
     let target = std::path::Path::new(text);
     let mut entries = vec![
@@ -7219,6 +7251,10 @@ fn item_value(text: &str) -> Value {
         (
             "Mode".to_owned(),
             Value::String(if target.is_dir() { "d----" } else { "-----" }.into()),
+        ),
+        (
+            "UnixMode".to_owned(),
+            Value::String(unix_mode_string(target).into()),
         ),
         (
             "IsReadOnly".to_owned(),

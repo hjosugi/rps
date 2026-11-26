@@ -32,3 +32,5 @@ $wildItemA = 1
 $wildItemB = 2
 (Get-Item Variable:wildItem* | ForEach-Object Name | Sort-Object) -join ','
 (Get-Item Variable:wildItem* | Measure-Object).Count
+(Get-Item fixtures/data.txt).UnixMode
+(Get-Item fixtures/tree).UnixMode
