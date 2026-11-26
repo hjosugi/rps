@@ -9,3 +9,6 @@ $people = [pscustomobject]@{ Name = 'a'; Age = 20 }, [pscustomobject]@{ Name = '
 $h = 'a', 'b', 'a' | Group-Object -AsHashTable
 $h['a'].Count
 $h['b'][0]
+$multi = @([pscustomobject]@{A=1;B='x'}, [pscustomobject]@{A=1;B='x'}, [pscustomobject]@{A=2;B='y'})
+($multi | Group-Object -Property A, B | ForEach-Object { "$($_.Name)|$($_.Count)|$($_.Values.Count)" }) -join ';'
+($multi | Group-Object -Property A, B -NoElement | ForEach-Object { "$($_.Name)|$($_.Count)" }) -join ';'

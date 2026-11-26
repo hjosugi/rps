@@ -1580,6 +1580,85 @@ impl Engine {
                 let as_hashtable = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("ashashtable") && ops::is_true(value)
                 });
+                let properties: Vec<String> = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                if properties.len() > 1 {
+                    let mut groups: Vec<(String, Vec<Value>, Vec<Value>)> = Vec::new();
+                    for item in input {
+                        let components: Vec<Value> = properties
+                            .iter()
+                            .map(|property| member(item, property).unwrap_or(Value::Null))
+                            .collect();
+                        let key = components
+                            .iter()
+                            .map(|value| {
+                                if case_sensitive {
+                                    value.to_string()
+                                } else {
+                                    value.to_string().to_lowercase()
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\u{0}");
+                        if let Some((_, _, members)) =
+                            groups.iter_mut().find(|(group, _, _)| group == &key)
+                        {
+                            members.push(item.clone());
+                        } else {
+                            groups.push((key, components, vec![item.clone()]));
+                        }
+                    }
+                    groups
+                        .sort_by(|left, right| left.2[0].to_string().cmp(&right.2[0].to_string()));
+                    if as_hashtable {
+                        let mut entries: Vec<(String, Value)> = groups
+                            .into_iter()
+                            .map(|(_, components, members)| {
+                                (
+                                    components
+                                        .iter()
+                                        .map(ToString::to_string)
+                                        .collect::<Vec<_>>()
+                                        .join(", "),
+                                    Value::array(members),
+                                )
+                            })
+                            .collect();
+                        entries.push((
+                            "__TypeName".to_owned(),
+                            Value::String("System.Collections.Hashtable".into()),
+                        ));
+                        return Ok(Some(vec![Value::object(entries)]));
+                    }
+                    let outputs = groups
+                        .into_iter()
+                        .map(|(_, components, group)| {
+                            let name = components
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                                .join(", ");
+                            let mut entries = vec![
+                                ("Values".to_owned(), Value::array(components)),
+                                ("Count".to_owned(), Value::Int32(group.len() as i32)),
+                            ];
+                            if !no_element {
+                                entries.push(("Group".to_owned(), Value::array(group)));
+                            }
+                            entries.push(("Name".to_owned(), Value::String(name.into())));
+                            Value::object(entries)
+                        })
+                        .collect();
+                    return Ok(Some(outputs));
+                }
                 let mut groups: Vec<(String, Vec<Value>)> = Vec::new();
                 for item in input {
                     let key = match &property {
