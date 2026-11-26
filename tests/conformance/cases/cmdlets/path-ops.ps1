@@ -111,3 +111,8 @@ Test-Path Variable:rmv2
 Set-Alias localwr Write-Output
 Remove-Item Alias:localwr*
 Test-Path Alias:localwr
+New-Item -Path Alias:newa -Value Write-Output | Out-Null
+newa 'x'
+(Get-Item Alias:newa).Definition
+Remove-Item Alias:newa
+Test-Path Alias:newa

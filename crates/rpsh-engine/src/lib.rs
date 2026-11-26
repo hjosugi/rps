@@ -2208,6 +2208,20 @@ impl Engine {
                     .map_or_else(|| path.clone(), |name| format!("{path}{name}"));
                 if let Some((provider, name)) = provider_path.split_once(':') {
                     let name = name.trim_start_matches("\\");
+                    if !name.is_empty() && provider.eq_ignore_ascii_case("alias") {
+                        let value = named
+                            .iter()
+                            .find(|(name, _)| name.eq_ignore_ascii_case("value"))
+                            .map(|(_, value)| value.clone())
+                            .unwrap_or(Value::Null);
+                        let definition = value.to_string();
+                        self.aliases
+                            .insert(name.to_ascii_lowercase(), definition.clone());
+                        return Ok(Some(vec![Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.into())),
+                            ("Definition".to_owned(), Value::String(definition.into())),
+                        ])]));
+                    }
                     if !name.is_empty()
                         && (provider.eq_ignore_ascii_case("env")
                             || provider.eq_ignore_ascii_case("variable"))
