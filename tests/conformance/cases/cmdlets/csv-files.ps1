@@ -30,3 +30,6 @@ Set-Content rpsh-import-b.csv -Value @('a,b', '3,4')
 (Import-Csv -Path rpsh-import-a.csv, rpsh-import-b.csv | ForEach-Object { "$($_.a)$($_.b)" }) -join ','
 Remove-Item rpsh-import-a.csv
 Remove-Item rpsh-import-b.csv
+Set-Content rpsh-header.csv -Value @('1,2', '3,4')
+(Import-Csv rpsh-header.csv -Header A, B | ForEach-Object { "$($_.A)$($_.B)" }) -join ','
+Remove-Item rpsh-header.csv

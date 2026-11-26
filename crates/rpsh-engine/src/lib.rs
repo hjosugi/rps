@@ -3453,6 +3453,16 @@ impl Engine {
                     .map_or(',', |(_, value)| {
                         value.to_string().chars().next().unwrap_or(',')
                     });
+                let custom_header: Vec<String> = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("header"))
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 let mut outputs = Vec::new();
                 for path in paths {
                     let files = if path.contains(['*', '?']) {
@@ -3467,10 +3477,14 @@ impl Engine {
                             }
                         })?;
                         let mut lines = text.lines();
-                        let Some(header) = lines.next() else {
-                            continue;
+                        let columns = if custom_header.is_empty() {
+                            let Some(header) = lines.next() else {
+                                continue;
+                            };
+                            parse_csv_line_with(header, delimiter)
+                        } else {
+                            custom_header.clone()
                         };
-                        let columns = parse_csv_line_with(header, delimiter);
                         for line in lines {
                             if line.trim().is_empty() {
                                 continue;
