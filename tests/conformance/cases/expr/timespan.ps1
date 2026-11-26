@@ -29,3 +29,5 @@ New-TimeSpan -Seconds 90
 [timespan]::FromSeconds(90) -le [timespan]::FromSeconds(90)
 (New-TimeSpan -Start ([datetime]'2024-01-01') -End ([datetime]'2024-01-02')).TotalDays
 (New-TimeSpan -Start '2024-01-01' -End '2024-01-01 12:00:00').TotalHours
+([datetime]'2024-02-01', [datetime]'2024-01-01' | Sort-Object | ForEach-Object { $_.ToString('yyyy-MM-dd') }) -join ','
+([timespan]::FromSeconds(90), [timespan]::FromSeconds(30) | Sort-Object | ForEach-Object TotalSeconds) -join ','

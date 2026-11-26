@@ -6587,6 +6587,12 @@ fn collect_children(
 }
 
 fn sort_key(value: &Value, property: &Value) -> String {
+    if let Some(fields) = datetime_fields(value) {
+        return format!("{:020}", datetime_ticks(fields));
+    }
+    if let Some(ticks) = timespan_ticks(value) {
+        return format!("{:020}", ticks);
+    }
     if let Value::Array(properties) = property {
         return properties
             .iter()
