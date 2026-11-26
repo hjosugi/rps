@@ -5193,6 +5193,10 @@ impl Engine {
                 self.host_text = true;
                 return Ok(());
             }
+            if datetime_fields(&value).is_some() {
+                self.host_objects.push(value);
+                return Ok(());
+            }
             let text = entries
                 .iter()
                 .find(|(key, _)| key == "__Text")
@@ -6325,6 +6329,50 @@ fn days_in_month(year: i32, month: i32) -> i32 {
     }
 }
 
+fn format_datetime_long(fields: [i32; 6]) -> String {
+    const WEEKDAYS: [&str; 7] = [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+    ];
+    const MONTHS: [&str; 12] = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ];
+    let [year, month, day, hour, minute, second] = fields;
+    let (hour12, ampm) = if hour == 0 {
+        (12, "AM")
+    } else if hour < 12 {
+        (hour, "AM")
+    } else if hour == 12 {
+        (12, "PM")
+    } else {
+        (hour - 12, "PM")
+    };
+    let weekday = (weekday(year, month, day).rem_euclid(7)) as usize;
+    format!(
+        "{}, {} {}, {} {hour12}:{minute:02}:{second:02}\u{202F}{ampm}",
+        WEEKDAYS[weekday],
+        MONTHS[(month as usize).clamp(1, 12) - 1],
+        day,
+        year
+    )
+}
+
 fn weekday(year: i32, month: i32, day: i32) -> i32 {
     // Sakamoto's algorithm; 0 = Sunday.
     const OFFSETS: [i32; 12] = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
@@ -6349,6 +6397,17 @@ fn format_host_stream(objects: &[Value]) -> String {
     let Some(first) = objects.first() else {
         return String::new();
     };
+    if datetime_fields(first).is_some() {
+        let mut text = String::from("\n");
+        for object in objects {
+            if let Some(fields) = datetime_fields(object) {
+                text.push_str(&format_datetime_long(fields));
+                text.push('\n');
+            }
+        }
+        text.push('\n');
+        return text;
+    }
     let columns: Vec<String> = match first {
         Value::Object(entries) => {
             let visible = visible_entries(entries);
