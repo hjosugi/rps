@@ -23,6 +23,7 @@ cmdlets/locations
 cmdlets/named-paths
 cmdlets/new-object
 cmdlets/path-ops
+cmdlets/providers
 cmdlets/remove-glob
 cmdlets/write-input
 cmdlets/write-output

@@ -1,0 +1,5 @@
+rpsh-golden-v2
+exit=0
+/,Alias,Env,Function,Temp,Variable
+Environment
+Alias,Environment,FileSystem,Function,Variable

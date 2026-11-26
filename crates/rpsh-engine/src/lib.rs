@@ -4080,6 +4080,61 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
+            "get-psdrive" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let wanted = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string());
+                let drives = [
+                    ("/", "FileSystem", "FileSystem"),
+                    ("Alias", "Alias", "Alias"),
+                    ("Env", "Environment", "Environment"),
+                    ("Function", "Function", "Function"),
+                    ("Temp", "/tmp", "FileSystem"),
+                    ("Variable", "Variable", "Variable"),
+                ];
+                let mut outputs = Vec::new();
+                for (name, root, provider) in drives {
+                    if let Some(wanted) = &wanted
+                        && !ops::wildcard_match(name, wanted, false)
+                    {
+                        continue;
+                    }
+                    outputs.push(Value::object(vec![
+                        ("Name".to_owned(), Value::String(name.into())),
+                        ("Root".to_owned(), Value::String(root.into())),
+                        (
+                            "Provider".to_owned(),
+                            Value::object(vec![(
+                                "Name".to_owned(),
+                                Value::String(provider.into()),
+                            )]),
+                        ),
+                    ]));
+                }
+                Ok(Some(outputs))
+            }
+            "get-psprovider" => {
+                let providers = [
+                    ("Alias", "Alias"),
+                    ("Environment", "Env"),
+                    ("FileSystem", "FileSystem"),
+                    ("Function", "Function"),
+                    ("Variable", "Variable"),
+                ];
+                Ok(Some(
+                    providers
+                        .into_iter()
+                        .map(|(name, drive)| {
+                            Value::object(vec![
+                                ("Name".to_owned(), Value::String(name.into())),
+                                ("Drives".to_owned(), Value::String(drive.into())),
+                            ])
+                        })
+                        .collect(),
+                ))
+            }
             "get-location" | "pwd" => Ok(Some(vec![Value::object(vec![(
                 "Path".to_owned(),
                 Value::String(
@@ -6551,6 +6606,8 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "Get-ChildItem",
     "Get-Command",
     "Get-ItemProperty",
+    "Get-PSDrive",
+    "Get-PSProvider",
     "Set-ItemProperty",
     "Set-Item",
     "Get-Content",
