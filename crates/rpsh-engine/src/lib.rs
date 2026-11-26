@@ -3310,38 +3310,51 @@ impl Engine {
             }
             "get-filehash" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
-                    .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(path) = path else {
+                let paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-FileHash without a path",
                     }
                     .into());
-                };
-                let bytes = std::fs::read(&path).map_err(|_| RuntimeError::Script {
-                    id: "FileNotFoundException",
-                    category: format!(
-                        "ObjectNotFound: ({path}:String) [Get-FileHash], FileNotFoundException"
-                    ),
-                    exception_type: "System.IO.FileNotFoundException",
-                    message: format!("Cannot find path '{path}' because it does not exist."),
-                })?;
-                let digest = sha256(&bytes);
-                let hash = digest
-                    .iter()
-                    .map(|byte| format!("{byte:02X}"))
-                    .collect::<String>();
-                Ok(Some(vec![Value::object(vec![
-                    ("Hash".to_owned(), Value::String(hash.into())),
-                    ("Algorithm".to_owned(), Value::String("SHA256".into())),
-                    ("Path".to_owned(), Value::String(path.into())),
-                ])]))
+                }
+                let mut targets = Vec::new();
+                for path in paths {
+                    if path.contains(['*', '?']) {
+                        targets.extend(expand_glob(&path));
+                    } else {
+                        targets.push(path);
+                    }
+                }
+                let mut outputs = Vec::new();
+                for path in targets {
+                    let bytes = std::fs::read(&path).map_err(|_| RuntimeError::Script {
+                        id: "FileNotFoundException",
+                        category: format!(
+                            "ObjectNotFound: ({path}:String) [Get-FileHash], FileNotFoundException"
+                        ),
+                        exception_type: "System.IO.FileNotFoundException",
+                        message: format!("Cannot find path '{path}' because it does not exist."),
+                    })?;
+                    let digest = sha256(&bytes);
+                    let hash = digest
+                        .iter()
+                        .map(|byte| format!("{byte:02X}"))
+                        .collect::<String>();
+                    outputs.push(Value::object(vec![
+                        ("Hash".to_owned(), Value::String(hash.into())),
+                        ("Algorithm".to_owned(), Value::String("SHA256".into())),
+                        ("Path".to_owned(), Value::String(path.into())),
+                    ]));
+                }
+                Ok(Some(outputs))
             }
             "select-string" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -7793,7 +7806,18 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
             let visible: Vec<&(String, Value)> =
                 entries.iter().filter(|(key, _)| !is_hidden(key)).collect();
             if name.eq_ignore_ascii_case("Count") {
-                return Ok(Value::Int32(visible.len() as i32));
+                let is_dictionary = entries.iter().any(|(key, value)| {
+                    key == "__TypeName"
+                        && matches!(value, Value::String(text) if {
+                            let name = text.to_string_lossy();
+                            name.contains("Dictionary") || name.contains("Hashtable")
+                        })
+                });
+                return Ok(Value::Int32(if is_dictionary {
+                    visible.len() as i32
+                } else {
+                    1
+                }));
             }
             if name.eq_ignore_ascii_case("Keys") {
                 return Ok(Value::array(

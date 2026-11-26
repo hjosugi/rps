@@ -8,3 +8,5 @@ $props = $p.Properties
 $o -eq $o
 $o -eq ([pscustomobject]@{ 'b' = 2; 'a' = 1 })
 @($null).Count
+([pscustomobject]@{A=1;B=2}).Count
+([ordered]@{A=1;B=2}).Count
