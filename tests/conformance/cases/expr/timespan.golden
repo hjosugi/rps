@@ -1,0 +1,41 @@
+rpsh-golden-v2
+exit=0
+90
+1
+30
+00:01:30
+
+Days              : 0
+Hours             : 0
+Minutes           : 1
+Seconds           : 30
+Milliseconds      : 0
+Ticks             : 900000000
+TotalDays         : 0.00104166666666667
+TotalHours        : 0.025
+TotalMinutes      : 1.5
+TotalSeconds      : 90
+TotalMilliseconds : 90000
+
+Days              : 0
+Hours             : 0
+Minutes           : 1
+Seconds           : 30
+Milliseconds      : 0
+Ticks             : 900000000
+TotalDays         : 0.00104166666666667
+TotalHours        : 0.025
+TotalMinutes      : 1.5
+TotalSeconds      : 90
+TotalMilliseconds : 90000
+
+90
+500
+1
+1
+1.02:03:04
+0
+12345000
+00:00:12.3456789
+1.02:03:04.0050000
+90

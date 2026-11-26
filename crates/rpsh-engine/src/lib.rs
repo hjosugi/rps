@@ -3785,6 +3785,22 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
+            "new-timespan" => {
+                let (_, named) = self.evaluate_arguments(arguments)?;
+                let amount = |wanted: &str| -> Result<f64, RuntimeError> {
+                    named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case(wanted))
+                        .map_or(Ok(0.0), |(_, value)| convert_double(value))
+                };
+                let ticks = (amount("days")? * TICKS_PER_DAY as f64
+                    + amount("hours")? * TICKS_PER_HOUR as f64
+                    + amount("minutes")? * TICKS_PER_MINUTE as f64
+                    + amount("seconds")? * TICKS_PER_SECOND as f64
+                    + amount("milliseconds")? * TICKS_PER_MILLISECOND as f64)
+                    .round() as i64;
+                Ok(Some(vec![timespan_value(ticks)]))
+            }
             "start-sleep" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let seconds = named
@@ -4491,6 +4507,7 @@ impl Engine {
                     _ => None,
                 });
             if let Some(text) = host_text {
+                self.flush_host(out)?;
                 write!(out, "\n{text}\n")?;
                 self.host_text = true;
                 return Ok(());
@@ -4503,6 +4520,7 @@ impl Engine {
                     _ => None,
                 });
             if let Some(text) = text {
+                self.flush_host(out)?;
                 writeln!(out, "{text}")?;
                 return Ok(());
             }
@@ -4517,6 +4535,7 @@ impl Engine {
         }
         match value {
             Value::Array(items) => {
+                self.flush_host(out)?;
                 for item in items.iter() {
                     if !item.is_null_like() {
                         writeln!(out, "{item}")?;
@@ -4524,7 +4543,10 @@ impl Engine {
                 }
             }
             Value::Null | Value::AutomationNull => {}
-            value => writeln!(out, "{value}")?,
+            value => {
+                self.flush_host(out)?;
+                writeln!(out, "{value}")?;
+            }
         }
         Ok(())
     }
@@ -5647,10 +5669,29 @@ fn format_host_stream(objects: &[Value]) -> String {
         return String::new();
     };
     let columns: Vec<String> = match first {
-        Value::Object(entries) => visible_entries(entries)
-            .iter()
-            .map(|(name, _)| (*name).clone())
-            .collect(),
+        Value::Object(entries) => {
+            let visible = visible_entries(entries);
+            if visible.len() > 4 {
+                let width = visible
+                    .iter()
+                    .map(|(name, _)| name.chars().count())
+                    .max()
+                    .unwrap_or(0);
+                let mut text = String::from("\n");
+                for object in objects {
+                    let Value::Object(entries) = object else {
+                        continue;
+                    };
+                    for (name, value) in visible_entries(entries) {
+                        text.push_str(&format!("{:<width$} : {}", name, value, width = width));
+                        text.push('\n');
+                    }
+                    text.push('\n');
+                }
+                return text;
+            }
+            visible.iter().map(|(name, _)| (*name).clone()).collect()
+        }
         _ => return String::new(),
     };
     let mut rows: Vec<Vec<(String, bool)>> = Vec::new();
@@ -5901,6 +5942,7 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "Add-Content",
     "ConvertFrom-Json",
     "New-Object",
+    "New-TimeSpan",
     "ConvertTo-Json",
     "Copy-Item",
     "ForEach-Object",
@@ -6413,6 +6455,83 @@ fn add_days_to_date(year: i32, month: i32, day: i32, days: i64) -> (i32, i32, i3
     (year, month, day)
 }
 
+const TICKS_PER_MILLISECOND: i64 = 10_000;
+const TICKS_PER_SECOND: i64 = 10_000_000;
+const TICKS_PER_MINUTE: i64 = 60 * TICKS_PER_SECOND;
+const TICKS_PER_HOUR: i64 = 60 * TICKS_PER_MINUTE;
+const TICKS_PER_DAY: i64 = 24 * TICKS_PER_HOUR;
+
+fn timespan_value(ticks: i64) -> Value {
+    let total_seconds = ticks / TICKS_PER_SECOND;
+    let total_minutes = ticks / TICKS_PER_MINUTE;
+    let total_hours = ticks / TICKS_PER_HOUR;
+    let days = total_hours / 24;
+    Value::object(vec![
+        ("Days".to_owned(), Value::Int32(days as i32)),
+        ("Hours".to_owned(), Value::Int32((total_hours % 24) as i32)),
+        (
+            "Minutes".to_owned(),
+            Value::Int32((total_minutes % 60) as i32),
+        ),
+        (
+            "Seconds".to_owned(),
+            Value::Int32((total_seconds % 60) as i32),
+        ),
+        (
+            "Milliseconds".to_owned(),
+            Value::Int32(((ticks / TICKS_PER_MILLISECOND) % 1000) as i32),
+        ),
+        ("Ticks".to_owned(), Value::Int64(ticks)),
+        (
+            "TotalDays".to_owned(),
+            Value::Double(ticks as f64 / TICKS_PER_DAY as f64),
+        ),
+        (
+            "TotalHours".to_owned(),
+            Value::Double(ticks as f64 / TICKS_PER_HOUR as f64),
+        ),
+        (
+            "TotalMinutes".to_owned(),
+            Value::Double(ticks as f64 / TICKS_PER_MINUTE as f64),
+        ),
+        (
+            "TotalSeconds".to_owned(),
+            Value::Double(ticks as f64 / TICKS_PER_SECOND as f64),
+        ),
+        (
+            "TotalMilliseconds".to_owned(),
+            Value::Double(ticks as f64 / TICKS_PER_MILLISECOND as f64),
+        ),
+        (
+            "__TypeName".to_owned(),
+            Value::String("System.TimeSpan".into()),
+        ),
+    ])
+}
+
+fn format_timespan(ticks: i64) -> String {
+    let negative = ticks < 0;
+    let absolute = ticks.unsigned_abs();
+    let days = absolute / TICKS_PER_DAY as u64;
+    let rest = absolute % TICKS_PER_DAY as u64;
+    let hours = rest / TICKS_PER_HOUR as u64;
+    let rest = rest % TICKS_PER_HOUR as u64;
+    let minutes = rest / TICKS_PER_MINUTE as u64;
+    let rest = rest % TICKS_PER_MINUTE as u64;
+    let seconds = rest / TICKS_PER_SECOND as u64;
+    let fraction = rest % TICKS_PER_SECOND as u64;
+    let sign = if negative { "-" } else { "" };
+    let mut text = if days > 0 {
+        format!("{sign}{days}.{hours:02}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{sign}{hours:02}:{minutes:02}:{seconds:02}")
+    };
+    if fraction > 0 {
+        text.push_str(&format!(".{fraction:07}"));
+    }
+    text
+}
+
 fn datetime_value(year: i32, month: i32, day: i32, hour: i32, minute: i32, second: i32) -> Value {
     let text = format!("{month:02}/{day:02}/{year:04} {hour:02}:{minute:02}:{second:02}");
     Value::object(vec![
@@ -6441,6 +6560,45 @@ fn culture_value() -> Value {
             )]),
         ),
     ])
+}
+
+fn parse_timespan_text(text: &str) -> Option<i64> {
+    let text = text.trim();
+    let negative = text.starts_with('-');
+    let body = text.trim_start_matches('-');
+    let (days, rest) = match body.split_once('.') {
+        Some((days, rest)) if days.chars().all(|ch| ch.is_ascii_digit()) => {
+            (days.parse::<i64>().ok()?, rest)
+        }
+        _ => (0, body),
+    };
+    let mut parts = rest.split(':');
+    let hours = parts.next()?.parse::<i64>().ok()?;
+    let minutes = parts.next()?.parse::<i64>().ok()?;
+    let seconds_text = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    let (seconds, fraction) = match seconds_text.split_once('.') {
+        Some((seconds, fraction)) => (seconds, fraction),
+        None => (seconds_text, ""),
+    };
+    let seconds = seconds.parse::<i64>().ok()?;
+    let ticks = if fraction.is_empty() {
+        0
+    } else {
+        let mut fraction_text = fraction.chars().take(7).collect::<String>();
+        while fraction_text.len() < 7 {
+            fraction_text.push('0');
+        }
+        fraction_text.parse::<i64>().ok()?
+    };
+    let total = days * TICKS_PER_DAY
+        + hours * TICKS_PER_HOUR
+        + minutes * TICKS_PER_MINUTE
+        + seconds * TICKS_PER_SECOND
+        + ticks;
+    Some(if negative { -total } else { total })
 }
 
 fn static_member(
@@ -6505,6 +6663,7 @@ fn static_member(
         ("double", "minvalue") => Ok(Value::Double(f64::MIN)),
         ("double", "epsilon") => Ok(Value::Double(f64::EPSILON)),
         ("string", "empty") => Ok(Value::String("".into())),
+        ("timespan", "zero") => Ok(timespan_value(0)),
         ("math", "pi") => Ok(Value::Double(std::f64::consts::PI)),
         ("math", "e") => Ok(Value::Double(std::f64::consts::E)),
         _ => Err(RuntimeError::NotImplemented {
@@ -6559,6 +6718,46 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
                 ("__Second".to_owned(), Value::Int32(second)),
                 ("__Text".to_owned(), Value::String(text.into())),
             ]))
+        }
+        ("timespan", "fromdays")
+        | ("timespan", "fromhours")
+        | ("timespan", "fromminutes")
+        | ("timespan", "fromseconds")
+        | ("timespan", "frommilliseconds")
+        | ("timespan", "fromticks") => {
+            let value = arguments.first().unwrap_or(&Value::Null);
+            let ticks = match name.as_str() {
+                "fromticks" => convert_int64(value)?,
+                "frommilliseconds" => {
+                    (convert_double(value)? * TICKS_PER_MILLISECOND as f64).round() as i64
+                }
+                "fromseconds" => (convert_double(value)? * TICKS_PER_SECOND as f64).round() as i64,
+                "fromminutes" => (convert_double(value)? * TICKS_PER_MINUTE as f64).round() as i64,
+                "fromhours" => (convert_double(value)? * TICKS_PER_HOUR as f64).round() as i64,
+                _ => (convert_double(value)? * TICKS_PER_DAY as f64).round() as i64,
+            };
+            Ok(timespan_value(ticks))
+        }
+        ("timespan", "new") => {
+            let number = |index: usize| -> Result<i64, RuntimeError> {
+                arguments.get(index).map_or(Ok(0), convert_int64)
+            };
+            let ticks = number(0)? * TICKS_PER_DAY
+                + number(1)? * TICKS_PER_HOUR
+                + number(2)? * TICKS_PER_MINUTE
+                + number(3)? * TICKS_PER_SECOND
+                + number(4)? * TICKS_PER_MILLISECOND;
+            Ok(timespan_value(ticks))
+        }
+        ("timespan", "parse") => {
+            let text = arguments
+                .first()
+                .map_or_else(String::new, ToString::to_string);
+            parse_timespan_text(&text)
+                .map(timespan_value)
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "this TimeSpan input",
+                })
         }
         ("version", "parse") => {
             let value = arguments.first().cloned().unwrap_or(Value::Null);
@@ -7567,6 +7766,19 @@ fn object_method(
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
     match name.to_ascii_lowercase().as_str() {
+        "tostring"
+            if entries.iter().any(|(key, value)| {
+                key == "__TypeName"
+                    && matches!(value, Value::String(text) if text.to_string_lossy() == "System.TimeSpan")
+            }) =>
+        {
+            let ticks = entries
+                .iter()
+                .find(|(key, _)| key == "Ticks")
+                .and_then(|(_, value)| convert_int64(value).ok())
+                .unwrap_or(0);
+            Ok(Value::String(format_timespan(ticks).into()))
+        }
         "tostring"
             if entries
                 .iter()

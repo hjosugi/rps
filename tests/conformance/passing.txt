@@ -41,6 +41,7 @@ expr/math-static
 expr/path-static
 expr/string-literals
 expr/string-methods
+expr/timespan
 expr/version-type
 lang/aliases
 lang/array
