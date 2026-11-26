@@ -4675,10 +4675,16 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("module"))
                 {
-                    let module = module.to_string();
+                    let modules: Vec<String> = flatten_value(module.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect();
                     let mut outputs = Vec::new();
                     for (name, functions) in &self.module_functions {
-                        if !ops::wildcard_match(name, &module, false) {
+                        if !modules
+                            .iter()
+                            .any(|module| ops::wildcard_match(name, module, false))
+                        {
                             continue;
                         }
                         for function in functions {

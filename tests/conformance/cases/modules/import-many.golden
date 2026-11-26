@@ -4,6 +4,7 @@ module fn
 12
 Get-Extra
 Add-One,ModuleFn
+Add-One,Get-Extra,ModuleFn
 module-extra,module-fixture
 module-extra,module-fixture
 0
