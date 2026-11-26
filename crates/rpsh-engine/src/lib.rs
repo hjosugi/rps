@@ -7729,6 +7729,11 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
     if name.eq_ignore_ascii_case("GetType") {
         return Ok(get_type(value));
     }
+    if (name.eq_ignore_ascii_case("Count") || name.eq_ignore_ascii_case("Length"))
+        && matches!(value, Value::Null | Value::AutomationNull)
+    {
+        return Ok(Value::Int32(0));
+    }
     match value {
         Value::Type(full) if name.eq_ignore_ascii_case("FullName") => {
             Ok(Value::String(full.clone()))
@@ -7805,6 +7810,9 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
             }
             let visible: Vec<&(String, Value)> =
                 entries.iter().filter(|(key, _)| !is_hidden(key)).collect();
+            if name.eq_ignore_ascii_case("Length") {
+                return Ok(Value::Int32(1));
+            }
             if name.eq_ignore_ascii_case("Count") {
                 let is_dictionary = entries.iter().any(|(key, value)| {
                     key == "__TypeName"
@@ -7833,6 +7841,9 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
                 ));
             }
             Ok(Value::Null)
+        }
+        _ if name.eq_ignore_ascii_case("Count") || name.eq_ignore_ascii_case("Length") => {
+            Ok(Value::Int32(1))
         }
         _ => Err(RuntimeError::NotImplemented {
             feature: "member access other than GetType().FullName / .Name",
