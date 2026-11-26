@@ -2519,15 +2519,60 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "join-path" => {
-                let (positional, _) = self.evaluate_arguments(arguments)?;
-                let parts: Vec<String> = positional.iter().map(ToString::to_string).collect();
-                if parts.is_empty() {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let named_paths: Vec<String> = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("path"))
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let child = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("childpath"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| {
+                        if named_paths.is_empty() {
+                            positional.get(1).map(ToString::to_string)
+                        } else {
+                            None
+                        }
+                    });
+                let additional: Vec<String> = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("additionalchildpath"))
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let mut roots = named_paths;
+                if roots.is_empty()
+                    && let Some(first) = positional.first()
+                {
+                    roots.push(first.to_string());
+                }
+                if roots.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Join-Path without a path",
                     }
                     .into());
                 }
-                Ok(Some(vec![Value::String(parts.join("/").into())]))
+                let mut outputs = Vec::new();
+                for root in roots {
+                    let mut parts = vec![root];
+                    if let Some(child) = &child {
+                        parts.push(child.clone());
+                    }
+                    parts.extend(additional.iter().cloned());
+                    outputs.push(Value::String(parts.join("/").into()));
+                }
+                Ok(Some(outputs))
             }
             "split-path" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;

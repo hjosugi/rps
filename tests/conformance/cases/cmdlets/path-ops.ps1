@@ -27,3 +27,6 @@ Test-Path '~/definitely-not-here'
 (Get-Item '~').PSIsContainer
 (Get-ChildItem '~' -Directory | Measure-Object).Count -gt 0
 Test-Path fixtures/data.txt, fixtures/nope
+Join-Path -Path fixtures -ChildPath data.txt
+Join-Path -Path fixtures -ChildPath tree -AdditionalChildPath a.txt
+Join-Path fixtures data.txt
