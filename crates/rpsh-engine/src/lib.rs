@@ -8492,7 +8492,11 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
             let value = arguments.first().cloned().unwrap_or(Value::Null);
             cast_to("datetime", value)
         }
-        ("char", "isdigit") | ("char", "isletter") | ("char", "iswhitespace") => {
+        ("char", "isdigit")
+        | ("char", "isletter")
+        | ("char", "iswhitespace")
+        | ("char", "isupper")
+        | ("char", "islower") => {
             let text = arguments
                 .first()
                 .map_or_else(String::new, ToString::to_string);
@@ -8501,6 +8505,10 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
                 ch.is_ascii_digit()
             } else if name == "isletter" {
                 ch.is_alphabetic()
+            } else if name == "isupper" {
+                ch.is_uppercase()
+            } else if name == "islower" {
+                ch.is_lowercase()
             } else {
                 ch.is_whitespace()
             };

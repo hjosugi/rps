@@ -5,3 +5,7 @@
 [char]::IsWhiteSpace(' ')
 [char]::ToUpper('a')
 [char]::ToLower('A')
+[char]::IsUpper('A')
+[char]::IsUpper('a')
+[char]::IsLower('a')
+[char]::IsLower('A')
