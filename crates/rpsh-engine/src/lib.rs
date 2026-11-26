@@ -46,6 +46,8 @@ pub struct Engine {
     aliases: HashMap<String, String>,
     /// Names of the modules loaded by Import-Module.
     modules: Vec<String>,
+    /// Functions introduced by each imported module.
+    module_functions: HashMap<String, Vec<String>>,
     /// Locations saved by Push-Location.
     locations: Vec<std::path::PathBuf>,
     /// True when a typed host value was written, so the format stream gets a
@@ -3410,6 +3412,29 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
+            "remove-module" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let name = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(name) = name else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Remove-Module without a name",
+                    }
+                    .into());
+                };
+                let lower = name.to_ascii_lowercase();
+                self.modules
+                    .retain(|module| !module.eq_ignore_ascii_case(&name));
+                if let Some(functions) = self.module_functions.remove(&lower) {
+                    for function in functions {
+                        self.functions.remove(&function);
+                    }
+                }
+                Ok(Some(Vec::new()))
+            }
             "import-module" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
@@ -3430,10 +3455,20 @@ impl Engine {
                     message: format!("The specified module '{path}' was not loaded because no valid module file was found."),
                 })?;
                 let script = parse(&source)?;
+                let before: std::collections::HashSet<String> =
+                    self.functions.keys().cloned().collect();
                 self.exec_block(&script.statements, &mut capture_sink())?;
                 let module_name = std::path::Path::new(&path)
                     .file_stem()
                     .map_or_else(|| path.clone(), |stem| stem.to_string_lossy().to_string());
+                let added: Vec<String> = self
+                    .functions
+                    .keys()
+                    .filter(|name| !before.contains(*name))
+                    .cloned()
+                    .collect();
+                self.module_functions
+                    .insert(module_name.to_ascii_lowercase(), added);
                 if !self.modules.contains(&module_name) {
                     self.modules.push(module_name);
                 }
@@ -7153,6 +7188,7 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "Get-ItemProperty",
     "Get-PSDrive",
     "Get-PSProvider",
+    "Remove-Module",
     "Set-ItemProperty",
     "Set-Item",
     "Get-Content",
