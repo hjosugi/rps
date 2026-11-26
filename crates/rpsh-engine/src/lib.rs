@@ -4334,8 +4334,8 @@ impl Engine {
             let right = self.eval_expression(right)?;
             let result = match op {
                 BinaryOp::Join => ops::join(&left, &right)?,
-                BinaryOp::Add => ops::add(&left, &right)?,
-                BinaryOp::Subtract => ops::subtract(&left, &right)?,
+                BinaryOp::Add => add_values(&left, &right)?,
+                BinaryOp::Subtract => subtract_values(&left, &right)?,
                 BinaryOp::Multiply => ops::multiply(&left, &right)?,
                 BinaryOp::Divide => ops::divide(&left, &right)?,
                 BinaryOp::Remainder => ops::remainder(&left, &right)?,
@@ -4699,7 +4699,7 @@ fn evaluate(
         ExprKind::Unary {
             op: UnaryOp::Negate,
             operand,
-        } => ops::negate(&evaluate(operand, variables, last_success)?),
+        } => negate_value(&evaluate(operand, variables, last_success)?),
         ExprKind::Unary {
             op: UnaryOp::Join,
             operand,
@@ -4716,8 +4716,8 @@ fn evaluate(
             let left = evaluate(left, variables, last_success)?;
             let right = evaluate(right, variables, last_success)?;
             match op {
-                BinaryOp::Add => ops::add(&left, &right),
-                BinaryOp::Subtract => ops::subtract(&left, &right),
+                BinaryOp::Add => add_values(&left, &right),
+                BinaryOp::Subtract => subtract_values(&left, &right),
                 BinaryOp::Multiply => ops::multiply(&left, &right),
                 BinaryOp::Divide => ops::divide(&left, &right),
                 BinaryOp::Remainder => ops::remainder(&left, &right),
@@ -6530,6 +6530,116 @@ fn format_timespan(ticks: i64) -> String {
         text.push_str(&format!(".{fraction:07}"));
     }
     text
+}
+
+fn days_from_civil(year: i32, month: i32, day: i32) -> i64 {
+    let year = i64::from(year) - i64::from(month <= 2);
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - era * 400;
+    let month_prime = i64::from(month) + if month > 2 { -3 } else { 9 };
+    let day_of_year = (153 * month_prime + 2) / 5 + i64::from(day) - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era - 719_468
+}
+
+fn timespan_ticks(value: &Value) -> Option<i64> {
+    let Value::Object(entries) = value else {
+        return None;
+    };
+    let is_timespan = entries.iter().any(|(key, value)| {
+        key == "__TypeName"
+            && matches!(value, Value::String(text) if text.to_string_lossy() == "System.TimeSpan")
+    });
+    if !is_timespan {
+        return None;
+    }
+    entries
+        .iter()
+        .find(|(key, _)| key == "Ticks")
+        .and_then(|(_, value)| convert_int64(value).ok())
+}
+
+fn datetime_fields(value: &Value) -> Option<[i32; 6]> {
+    let Value::Object(entries) = value else {
+        return None;
+    };
+    let is_datetime = entries.iter().any(|(key, value)| {
+        key == "__TypeName"
+            && matches!(value, Value::String(text) if text.to_string_lossy() == "System.DateTime")
+    });
+    if !is_datetime {
+        return None;
+    }
+    let field = |name: &str| -> i32 {
+        entries
+            .iter()
+            .find(|(key, _)| key == name)
+            .and_then(|(_, value)| convert_int32(value).ok())
+            .unwrap_or(0)
+    };
+    Some([
+        field("__Year"),
+        field("__Month"),
+        field("__Day"),
+        field("__Hour"),
+        field("__Minute"),
+        field("__Second"),
+    ])
+}
+
+fn datetime_ticks(fields: [i32; 6]) -> i64 {
+    days_from_civil(fields[0], fields[1], fields[2]) * TICKS_PER_DAY
+        + i64::from(fields[3]) * TICKS_PER_HOUR
+        + i64::from(fields[4]) * TICKS_PER_MINUTE
+        + i64::from(fields[5]) * TICKS_PER_SECOND
+}
+
+fn add_ticks_to_datetime(fields: [i32; 6], ticks: i64) -> Value {
+    let days = ticks.div_euclid(TICKS_PER_DAY);
+    let rest = ticks.rem_euclid(TICKS_PER_DAY);
+    let seconds = i64::from(fields[3]) * 3600 + i64::from(fields[4]) * 60 + i64::from(fields[5]);
+    let total = seconds + rest / TICKS_PER_SECOND;
+    let extra_days = total.div_euclid(86_400);
+    let time = total.rem_euclid(86_400);
+    let (year, month, day) = add_days_to_date(fields[0], fields[1], fields[2], days + extra_days);
+    datetime_value(
+        year,
+        month,
+        day,
+        (time / 3600) as i32,
+        (time % 3600 / 60) as i32,
+        (time % 60) as i32,
+    )
+}
+
+fn add_values(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    if let (Some(left), Some(right)) = (timespan_ticks(left), timespan_ticks(right)) {
+        return Ok(timespan_value(left + right));
+    }
+    if let (Some(datetime), Some(ticks)) = (datetime_fields(left), timespan_ticks(right)) {
+        return Ok(add_ticks_to_datetime(datetime, ticks));
+    }
+    ops::add(left, right)
+}
+
+fn subtract_values(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    if let (Some(left), Some(right)) = (timespan_ticks(left), timespan_ticks(right)) {
+        return Ok(timespan_value(left - right));
+    }
+    if let (Some(datetime), Some(ticks)) = (datetime_fields(left), timespan_ticks(right)) {
+        return Ok(add_ticks_to_datetime(datetime, -ticks));
+    }
+    if let (Some(left), Some(right)) = (datetime_fields(left), datetime_fields(right)) {
+        return Ok(timespan_value(datetime_ticks(left) - datetime_ticks(right)));
+    }
+    ops::subtract(left, right)
+}
+
+fn negate_value(value: &Value) -> Result<Value, RuntimeError> {
+    if let Some(ticks) = timespan_ticks(value) {
+        return Ok(timespan_value(-ticks));
+    }
+    ops::negate(value)
 }
 
 fn datetime_value(year: i32, month: i32, day: i32, hour: i32, minute: i32, second: i32) -> Value {

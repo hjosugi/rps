@@ -16,3 +16,10 @@ New-TimeSpan -Seconds 90
 [timespan]::FromTicks(123456789).ToString()
 [timespan]::new(1, 2, 3, 4, 5).ToString()
 [timespan]::Parse('00:01:30').TotalSeconds
+(([datetime]'2024-01-31' + [timespan]::FromDays(1))).ToString('yyyy-MM-dd')
+(([datetime]'2024-02-01' - [timespan]::FromDays(1))).ToString('yyyy-MM-dd')
+([datetime]'2024-02-01' - [datetime]'2024-01-31').TotalDays
+([timespan]::FromMinutes(1) + [timespan]::FromSeconds(30)).TotalSeconds
+([timespan]::FromMinutes(2) - [timespan]::FromSeconds(30)).TotalSeconds
+(-[timespan]::FromSeconds(90)).TotalSeconds
+(([datetime]'2024-01-31 23:30:00' + [timespan]::FromMinutes(45))).ToString('yyyy-MM-dd HH:mm:ss')
