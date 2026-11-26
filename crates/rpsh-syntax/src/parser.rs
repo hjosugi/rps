@@ -705,6 +705,30 @@ impl Parser {
         };
         self.pos += 1;
         self.skip_newlines();
+        let base = match &self.peek().kind {
+            TokenKind::Colon => {
+                self.pos += 1;
+                self.skip_newlines();
+                let base = match &self.peek().kind {
+                    TokenKind::Identifier(name) | TokenKind::Bareword(name) => name.clone(),
+                    _ => return self.refuse(SYNTAX_ERRORS),
+                };
+                self.pos += 1;
+                Some(base)
+            }
+            TokenKind::Bareword(word) if word == ":" => {
+                self.pos += 1;
+                self.skip_newlines();
+                let base = match &self.peek().kind {
+                    TokenKind::Identifier(name) | TokenKind::Bareword(name) => name.clone(),
+                    _ => return self.refuse(SYNTAX_ERRORS),
+                };
+                self.pos += 1;
+                Some(base)
+            }
+            _ => None,
+        };
+        self.skip_newlines();
         if self.peek().kind != TokenKind::LCurly {
             return self.refuse(SYNTAX_ERRORS);
         }
@@ -756,6 +780,7 @@ impl Parser {
         let span = start.to(self.previous_span());
         Ok(Statement::Class {
             name,
+            base,
             properties,
             constructors,
             methods,

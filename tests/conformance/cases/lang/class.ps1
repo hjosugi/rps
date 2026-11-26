@@ -11,3 +11,15 @@ $p.Y
 $p.Sum()
 $p.X = 10
 $p.Sum()
+class Animal {
+    [string] $Name
+    [string] Speak() { return "$($this.Name) speaks" }
+}
+class Dog : Animal {
+    [string] Bark() { return "$($this.Name) barks" }
+}
+$d = [Dog]::new()
+$d.Name = 'Rex'
+$d.Speak()
+$d.Bark()
+$d.GetType().Name

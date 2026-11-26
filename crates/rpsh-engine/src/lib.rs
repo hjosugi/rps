@@ -58,6 +58,7 @@ pub struct Engine {
 #[derive(Debug, Clone)]
 struct ClassDef {
     name: String,
+    base: Option<String>,
     properties: Vec<(String, String)>,
     constructors: Vec<MethodDef>,
     methods: Vec<MethodDef>,
@@ -313,21 +314,38 @@ impl Engine {
         }
     }
 
+    fn class_chain(&self, name: &str) -> Vec<ClassDef> {
+        let mut chain = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let mut current = Some(name.to_ascii_lowercase());
+        while let Some(key) = current {
+            if !seen.insert(key.clone()) {
+                break;
+            }
+            let Some(class) = self.classes.get(&key) else {
+                break;
+            };
+            current = class.base.as_ref().map(|base| base.to_ascii_lowercase());
+            chain.push(class.clone());
+        }
+        chain
+    }
+
     fn construct_class(
         &mut self,
         type_name: &str,
         arguments: &[Value],
     ) -> Result<Value, EngineError> {
-        let Some(class) = self.classes.get(&type_name.to_ascii_lowercase()).cloned() else {
+        let classes = self.class_chain(type_name);
+        let Some(class) = classes.first().cloned() else {
             return Err(RuntimeError::NotImplemented {
                 feature: "construction of this class",
             }
             .into());
         };
-        let mut entries: Vec<(String, Value)> = class
-            .properties
-            .iter()
-            .map(|(kind, name)| {
+        let mut entries: Vec<(String, Value)> = Vec::new();
+        for class in classes.iter().rev() {
+            for (kind, name) in &class.properties {
                 let value = match normalize_type(kind).as_str() {
                     "int32" | "int" | "int64" | "long" | "double" | "uint32" | "uint64"
                     | "int16" | "uint16" | "byte" | "sbyte" => Value::Int32(0),
@@ -335,9 +353,9 @@ impl Engine {
                     "bool" | "boolean" | "switch" => Value::Bool(false),
                     _ => Value::Null,
                 };
-                (name.clone(), value)
-            })
-            .collect();
+                entries.push((name.clone(), value));
+            }
+        }
         entries.push((
             "__Class".to_owned(),
             Value::String(class.name.clone().into()),
@@ -347,10 +365,11 @@ impl Engine {
             Value::String(class.name.clone().into()),
         ));
         let mut object = Value::object(entries);
-        if let Some(constructor) = class
-            .constructors
+        if let Some(constructor) = classes
             .iter()
+            .flat_map(|class| class.constructors.iter())
             .find(|constructor| constructor.parameters.len() == arguments.len())
+            .cloned()
         {
             let saved = std::mem::take(&mut self.variables);
             let mut local = saved.clone();
@@ -382,15 +401,16 @@ impl Engine {
         target: &Value,
         arguments: &[Value],
     ) -> Result<Value, EngineError> {
-        let Some(class) = self.classes.get(&class_name.to_ascii_lowercase()).cloned() else {
+        let classes = self.class_chain(class_name);
+        if classes.is_empty() {
             return Err(RuntimeError::NotImplemented {
                 feature: "this class method",
             }
             .into());
-        };
-        let Some(definition) = class
-            .methods
+        }
+        let Some(definition) = classes
             .iter()
+            .flat_map(|class| class.methods.iter())
             .find(|definition| definition.name.eq_ignore_ascii_case(method))
             .cloned()
         else {
@@ -832,6 +852,7 @@ impl Engine {
             }
             Statement::Class {
                 name,
+                base,
                 properties,
                 constructors,
                 methods,
@@ -841,6 +862,7 @@ impl Engine {
                     name.to_ascii_lowercase(),
                     ClassDef {
                         name: name.clone(),
+                        base: base.clone(),
                         properties: properties.clone(),
                         constructors: constructors.clone(),
                         methods: methods.clone(),
@@ -5434,6 +5456,9 @@ impl Engine {
             let mut values = Vec::with_capacity(arguments.len());
             for argument in arguments {
                 values.push(self.eval_expression(argument)?);
+            }
+            if name.eq_ignore_ascii_case("GetType") && values.is_empty() {
+                return Ok(get_type(&target));
             }
             if let Value::Object(entries) = &target
                 && let Some(class) = object_class(entries)

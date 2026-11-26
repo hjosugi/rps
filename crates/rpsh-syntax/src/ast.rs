@@ -146,6 +146,7 @@ pub enum Statement {
     /// `class Name { ... }`.
     Class {
         name: String,
+        base: Option<String>,
         properties: Vec<(String, String)>,
         constructors: Vec<MethodDef>,
         methods: Vec<MethodDef>,
