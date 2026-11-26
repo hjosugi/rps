@@ -2229,7 +2229,15 @@ impl Engine {
                     }
                     .into());
                 }
-                for source in paths {
+                let mut sources = Vec::new();
+                for path in paths {
+                    if path.contains(['*', '?']) {
+                        sources.extend(expand_glob(&path));
+                    } else {
+                        sources.push(path);
+                    }
+                }
+                for source in sources {
                     let target = if std::path::Path::new(&destination).is_dir() {
                         let name = std::path::Path::new(&source)
                             .file_name()

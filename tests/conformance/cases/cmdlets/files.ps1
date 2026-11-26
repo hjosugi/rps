@@ -47,3 +47,11 @@ Set-ItemProperty -Path rpsh-prop.txt -Name IsReadOnly -Value $true
 Set-ItemProperty -Path rpsh-prop.txt -Name IsReadOnly -Value $false
 (Get-ItemProperty -Path rpsh-prop.txt).IsReadOnly
 Remove-Item rpsh-prop.txt
+if (Test-Path rpsh-move-glob) { Remove-Item rpsh-move-glob -Recurse -Force }
+$null = New-Item -ItemType Directory -Path rpsh-move-glob -Force
+Set-Content rpsh-glob1.txt -Value 'a'
+Set-Content rpsh-glob2.txt -Value 'b'
+Move-Item rpsh-glob*.txt -Destination rpsh-move-glob
+(Get-ChildItem rpsh-move-glob -Name | Sort-Object) -join ','
+Test-Path rpsh-glob1.txt
+Remove-Item rpsh-move-glob -Recurse -Force
