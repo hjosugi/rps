@@ -3449,14 +3449,31 @@ impl Engine {
                         exception_type: "System.IO.FileNotFoundException",
                         message: format!("Cannot find path '{path}' because it does not exist."),
                     })?;
-                    let digest = sha256(&bytes);
+                    let algorithm = named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("algorithm"))
+                        .map_or_else(
+                            || "SHA256".to_owned(),
+                            |(_, value)| value.to_string().to_ascii_uppercase(),
+                        );
+                    let digest: Vec<u8> = match algorithm.as_str() {
+                        "SHA256" => sha256(&bytes).to_vec(),
+                        "SHA1" => sha1(&bytes).to_vec(),
+                        "MD5" => md5(&bytes).to_vec(),
+                        _ => {
+                            return Err(RuntimeError::NotImplemented {
+                                feature: "Get-FileHash with this algorithm",
+                            }
+                            .into());
+                        }
+                    };
                     let hash = digest
                         .iter()
                         .map(|byte| format!("{byte:02X}"))
                         .collect::<String>();
                     outputs.push(Value::object(vec![
                         ("Hash".to_owned(), Value::String(hash.into())),
-                        ("Algorithm".to_owned(), Value::String("SHA256".into())),
+                        ("Algorithm".to_owned(), Value::String(algorithm.into())),
                         ("Path".to_owned(), Value::String(path.into())),
                     ]));
                 }
@@ -6056,6 +6073,108 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "Write-Verbose",
     "Write-Warning",
 ];
+
+fn sha1(data: &[u8]) -> [u8; 20] {
+    let mut h: [u32; 5] = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
+    let mut message = data.to_vec();
+    let bit_len = (data.len() as u64) * 8;
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_len.to_be_bytes());
+    for chunk in message.as_chunks::<64>().0 {
+        let mut w = [0u32; 80];
+        for (index, word) in chunk.as_chunks::<4>().0.iter().enumerate() {
+            w[index] = u32::from_be_bytes([word[0], word[1], word[2], word[3]]);
+        }
+        for index in 16..80 {
+            w[index] = (w[index - 3] ^ w[index - 8] ^ w[index - 14] ^ w[index - 16]).rotate_left(1);
+        }
+        let (mut a, mut b, mut c, mut d, mut e) = (h[0], h[1], h[2], h[3], h[4]);
+        for (index, word) in w.iter().enumerate() {
+            let (f, k) = match index {
+                0..=19 => ((b & c) | (!b & d), 0x5A827999),
+                20..=39 => (b ^ c ^ d, 0x6ED9EBA1),
+                40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDC),
+                _ => (b ^ c ^ d, 0xCA62C1D6),
+            };
+            let temp = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(k)
+                .wrapping_add(*word);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = temp;
+        }
+        h[0] = h[0].wrapping_add(a);
+        h[1] = h[1].wrapping_add(b);
+        h[2] = h[2].wrapping_add(c);
+        h[3] = h[3].wrapping_add(d);
+        h[4] = h[4].wrapping_add(e);
+    }
+    let mut digest = [0u8; 20];
+    for (index, word) in h.iter().enumerate() {
+        digest[index * 4..index * 4 + 4].copy_from_slice(&word.to_be_bytes());
+    }
+    digest
+}
+
+fn md5(data: &[u8]) -> [u8; 16] {
+    const SHIFTS: [u32; 64] = [
+        7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5,
+        9, 14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10,
+        15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+    ];
+    let mut h: [u32; 4] = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476];
+    let mut message = data.to_vec();
+    let bit_len = (data.len() as u64) * 8;
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_len.to_le_bytes());
+    for chunk in message.as_chunks::<64>().0 {
+        let mut m = [0u32; 16];
+        for (index, word) in chunk.as_chunks::<4>().0.iter().enumerate() {
+            m[index] = u32::from_le_bytes([word[0], word[1], word[2], word[3]]);
+        }
+        let (mut a, mut b, mut c, mut d) = (h[0], h[1], h[2], h[3]);
+        for (index, shift) in SHIFTS.iter().enumerate() {
+            let (f, g) = match index {
+                0..=15 => ((b & c) | (!b & d), index),
+                16..=31 => ((d & b) | (!d & c), (5 * index + 1) % 16),
+                32..=47 => (b ^ c ^ d, (3 * index + 5) % 16),
+                _ => (c ^ (b | !d), (7 * index) % 16),
+            };
+            let k = ((index + 1) as f64).sin().abs() * 4_294_967_296.0;
+            let k = k as u32;
+            let temp = d;
+            d = c;
+            c = b;
+            b = b.wrapping_add(
+                a.wrapping_add(f)
+                    .wrapping_add(k)
+                    .wrapping_add(m[g])
+                    .rotate_left(*shift),
+            );
+            a = temp;
+        }
+        h[0] = h[0].wrapping_add(a);
+        h[1] = h[1].wrapping_add(b);
+        h[2] = h[2].wrapping_add(c);
+        h[3] = h[3].wrapping_add(d);
+    }
+    let mut digest = [0u8; 16];
+    for (index, word) in h.iter().enumerate() {
+        digest[index * 4..index * 4 + 4].copy_from_slice(&word.to_le_bytes());
+    }
+    digest
+}
 
 fn sha256(data: &[u8]) -> [u8; 32] {
     const K: [u32; 64] = [
