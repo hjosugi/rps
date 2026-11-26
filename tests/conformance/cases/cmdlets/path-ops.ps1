@@ -72,3 +72,11 @@ $sv
 Test-Path Env:RPSH_SET
 Remove-Item Env:RPSH_SET
 Remove-Variable sv
+New-Item -Path Env:RPSH_NEW -Value 'v' | Out-Null
+$env:RPSH_NEW
+Test-Path Env:RPSH_NEW
+New-Item -Path Variable:nv -Value 2 | Out-Null
+$nv
+Test-Path Variable:nv
+Remove-Item Env:RPSH_NEW
+Remove-Variable nv

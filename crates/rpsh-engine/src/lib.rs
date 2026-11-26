@@ -1979,6 +1979,29 @@ impl Engine {
                     }
                     .into());
                 };
+                if let Some((provider, name)) = path.split_once(':') {
+                    let name = name.trim_start_matches("\\");
+                    if !name.is_empty()
+                        && (provider.eq_ignore_ascii_case("env")
+                            || provider.eq_ignore_ascii_case("variable"))
+                    {
+                        let value = named
+                            .iter()
+                            .find(|(name, _)| name.eq_ignore_ascii_case("value"))
+                            .map(|(_, value)| value.clone())
+                            .unwrap_or(Value::Null);
+                        let key = if provider.eq_ignore_ascii_case("env") {
+                            format!("env:{name}")
+                        } else {
+                            strip_scope(name).to_owned()
+                        };
+                        self.variables.insert(key, value.clone());
+                        return Ok(Some(vec![Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.into())),
+                            ("Value".to_owned(), value),
+                        ])]));
+                    }
+                }
                 let item_type = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("itemtype"))
