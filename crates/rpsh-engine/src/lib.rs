@@ -4609,11 +4609,16 @@ impl Engine {
             }
             "get-alias" | "gal" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let wanted = named
+                let wanted: Vec<String> = match named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
+                {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
                 let definition_filter = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("definition"))
@@ -4628,13 +4633,14 @@ impl Engine {
                 }
                 let mut outputs = Vec::new();
                 for (name, definition) in entries {
-                    let matches = wanted.as_deref().is_none_or(|wanted| {
-                        if wanted.contains(['*', '?']) {
-                            ops::wildcard_match(&name, wanted, false)
-                        } else {
-                            name.eq_ignore_ascii_case(wanted)
-                        }
-                    });
+                    let matches = wanted.is_empty()
+                        || wanted.iter().any(|wanted| {
+                            if wanted.contains(['*', '?']) {
+                                ops::wildcard_match(&name, wanted, false)
+                            } else {
+                                name.eq_ignore_ascii_case(wanted)
+                            }
+                        });
                     let definition_matches = definition_filter.as_deref().is_none_or(|wanted| {
                         if wanted.contains(['*', '?']) {
                             ops::wildcard_match(&definition, wanted, false)

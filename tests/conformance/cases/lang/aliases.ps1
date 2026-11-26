@@ -5,3 +5,5 @@ Set-Alias greet Write-Output
 greet 'hello'
 (Get-Alias -Definition Write-Output | ForEach-Object Name) -join ','
 (Get-Alias -Definition Get-Content | ForEach-Object Name) -join ','
+(Get-Alias -Name echo, gc | ForEach-Object Name | Sort-Object) -join ','
+(Get-Alias echo, gc | ForEach-Object Name | Sort-Object) -join ','
