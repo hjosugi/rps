@@ -2339,6 +2339,35 @@ impl Engine {
                     None => path,
                 };
                 let target = std::path::Path::new(&path);
+                if item_type.eq_ignore_ascii_case("symboliclink") {
+                    let Some(link_target) = named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("target"))
+                        .map(|(_, value)| value.to_string())
+                    else {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "New-Item SymbolicLink without -Target",
+                        }
+                        .into());
+                    };
+                    #[cfg(unix)]
+                    {
+                        std::os::unix::fs::symlink(&link_target, target).map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "New-Item cannot create this symlink",
+                            }
+                        })?;
+                        return Ok(Some(Vec::new()));
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        let _ = link_target;
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "New-Item SymbolicLink on this platform",
+                        }
+                        .into());
+                    }
+                }
                 if item_type.eq_ignore_ascii_case("directory") {
                     std::fs::create_dir_all(target).map_err(|_| RuntimeError::NotImplemented {
                         feature: "New-Item cannot create this directory",
@@ -2821,7 +2850,7 @@ impl Engine {
                                         ),
                                     ),
                                     ("Name".to_owned(), Value::String(leaf.clone().into())),
-                                    ("FullName".to_owned(), Value::String(name.into())),
+                                    ("FullName".to_owned(), Value::String(name.clone().into())),
                                     ("PSIsContainer".to_owned(), Value::Bool(is_dir)),
                                     (
                                         "Mode".to_owned(),
@@ -2831,6 +2860,25 @@ impl Engine {
                                     ),
                                     ("Length".to_owned(), Value::Int64(length as i64)),
                                 ];
+                                if let Ok(metadata) = std::fs::symlink_metadata(&name)
+                                    && metadata.file_type().is_symlink()
+                                {
+                                    entries.push((
+                                        "LinkType".to_owned(),
+                                        Value::String("SymbolicLink".into()),
+                                    ));
+                                    entries.push((
+                                        "Target".to_owned(),
+                                        Value::String(
+                                            std::fs::read_link(&name)
+                                                .map_or_else(
+                                                    |_| String::new(),
+                                                    |path| path.to_string_lossy().into_owned(),
+                                                )
+                                                .into(),
+                                        ),
+                                    ));
+                                }
                                 if !is_dir {
                                     let path = std::path::Path::new(&leaf);
                                     entries.push((
@@ -7159,6 +7207,22 @@ fn item_value(text: &str) -> Value {
             ),
         ),
     ];
+    if let Ok(metadata) = std::fs::symlink_metadata(target)
+        && metadata.file_type().is_symlink()
+    {
+        entries.push(("LinkType".to_owned(), Value::String("SymbolicLink".into())));
+        entries.push((
+            "Target".to_owned(),
+            Value::String(
+                std::fs::read_link(target)
+                    .map_or_else(
+                        |_| String::new(),
+                        |path| path.to_string_lossy().into_owned(),
+                    )
+                    .into(),
+            ),
+        ));
+    }
     if target.is_file() {
         entries.push((
             "Length".to_owned(),

@@ -55,3 +55,12 @@ Move-Item rpsh-glob*.txt -Destination rpsh-move-glob
 (Get-ChildItem rpsh-move-glob -Name | Sort-Object) -join ','
 Test-Path rpsh-glob1.txt
 Remove-Item rpsh-move-glob -Recurse -Force
+if (Test-Path rpsh-link-test) { Remove-Item rpsh-link-test -Recurse -Force }
+$null = New-Item -ItemType Directory -Path rpsh-link-test -Force
+Set-Content rpsh-link-test/target.txt -Value 'hello'
+New-Item -ItemType SymbolicLink -Path rpsh-link-test/link.txt -Target target.txt | Out-Null
+(Get-Item rpsh-link-test/link.txt).LinkType
+(Get-Item rpsh-link-test/link.txt).Target
+Test-Path rpsh-link-test/link.txt
+Remove-Item rpsh-link-test -Recurse -Force
+Test-Path rpsh-link-test

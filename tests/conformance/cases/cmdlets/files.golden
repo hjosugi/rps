@@ -19,3 +19,7 @@ True
 False
 rpsh-glob1.txt,rpsh-glob2.txt
 False
+SymbolicLink
+target.txt
+True
+False
