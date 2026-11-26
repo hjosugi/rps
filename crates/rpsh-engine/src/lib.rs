@@ -2436,6 +2436,27 @@ impl Engine {
                     }
                     .into());
                 }
+                if named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("asbytestream") && ops::is_true(value)
+                }) {
+                    let mut outputs = Vec::new();
+                    for path in paths {
+                        let path = expand_home(&path);
+                        let files = if path.contains(['*', '?']) {
+                            expand_glob(&path)
+                        } else {
+                            vec![path]
+                        };
+                        for file in files {
+                            let bytes =
+                                std::fs::read(&file).map_err(|_| RuntimeError::NotImplemented {
+                                    feature: "Get-Content of a missing file",
+                                })?;
+                            outputs.extend(bytes.into_iter().map(Value::Byte));
+                        }
+                    }
+                    return Ok(Some(outputs));
+                }
                 let mut text = String::new();
                 for path in paths {
                     let path = expand_home(&path);

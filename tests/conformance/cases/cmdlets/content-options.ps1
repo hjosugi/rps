@@ -43,3 +43,4 @@ Clear-Content -Path rpsh-clear-a.txt, rpsh-clear-b.txt
 (Get-Content rpsh-clear-a.txt -Raw).Length
 (Get-Content rpsh-clear-b.txt -Raw).Length
 Remove-Item rpsh-clear-a.txt, rpsh-clear-b.txt
+(Get-Content fixtures/tree/a.txt -AsByteStream) -join ','
