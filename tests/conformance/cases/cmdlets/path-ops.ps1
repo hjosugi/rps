@@ -30,3 +30,6 @@ Test-Path fixtures/data.txt, fixtures/nope
 Join-Path -Path fixtures -ChildPath data.txt
 Join-Path -Path fixtures -ChildPath tree -AdditionalChildPath a.txt
 Join-Path fixtures data.txt
+Split-Path -Path /tmp/x -Leaf
+Split-Path -Path fixtures/data.txt -Parent
+Split-Path -Path /tmp/a.txt -Extension

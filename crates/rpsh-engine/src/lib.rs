@@ -2576,13 +2576,20 @@ impl Engine {
             }
             "split-path" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let Some(path) = positional.first() else {
+                let path = named
+                    .iter()
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Split-Path without a path",
                     }
                     .into());
                 };
-                let path = path.to_string();
                 let path = std::path::Path::new(&path);
                 if named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("isabsolute") && ops::is_true(value)
