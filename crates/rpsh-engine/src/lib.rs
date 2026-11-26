@@ -3799,21 +3799,26 @@ impl Engine {
                 };
                 let mut lines: Vec<String> = Vec::new();
                 if input.is_empty() {
-                    let path = named
-                        .iter()
-                        .find(|(name, _)| {
-                            name.eq_ignore_ascii_case("path")
-                                || name.eq_ignore_ascii_case("literalpath")
-                        })
-                        .map(|(_, value)| value.to_string())
-                        .or_else(|| positional.get(1).map(ToString::to_string));
-                    if let Some(path) = path {
-                        let paths = if path.contains(['*', '?']) {
+                    let paths: Vec<String> = match named.iter().find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    }) {
+                        Some((_, value)) => flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect(),
+                        None => positional
+                            .get(1)
+                            .map(|value| vec![value.to_string()])
+                            .unwrap_or_default(),
+                    };
+                    for path in paths {
+                        let files = if path.contains(['*', '?']) {
                             expand_glob(&path)
                         } else {
                             vec![path]
                         };
-                        for path in paths {
+                        for path in files {
                             if let Ok(text) = std::fs::read_to_string(&path) {
                                 lines.extend(text.lines().map(ToOwned::to_owned));
                             }

@@ -13,3 +13,4 @@
 'alpha', 'beta', 'gamma' | Select-String -Pattern 'ph', 'et' -SimpleMatch | ForEach-Object Line
 'alpha', 'beta', 'gamma' | Select-String -NotMatch -Pattern 'ph', 'et' | ForEach-Object Line
 'alpha', 'beta', 'gamma' | Select-String -Pattern 'ph', 'et' -NotMatch | ForEach-Object Line
+(Select-String -Pattern '.' -Path ../cmdlets/fixtures/tree/a.txt, ../cmdlets/fixtures/tree/sub/b.txt | ForEach-Object Line) -join ','
