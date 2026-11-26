@@ -98,3 +98,16 @@ $wildVar = 1
 Test-Path Variable:wild*
 Test-Path Variable:zzz*
 Test-Path Alias:g*
+$env:RPSH_RM_A = '1'
+$env:RPSH_RM_B = '2'
+Remove-Item Env:RPSH_RM_*
+Test-Path Env:RPSH_RM_A
+Test-Path Env:RPSH_RM_B
+$rmv1 = 1
+$rmv2 = 2
+Remove-Item Variable:rmv*
+Test-Path Variable:rmv1
+Test-Path Variable:rmv2
+Set-Alias localwr Write-Output
+Remove-Item Alias:localwr*
+Test-Path Alias:localwr

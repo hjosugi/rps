@@ -2294,7 +2294,13 @@ impl Engine {
                 }
                 let mut targets = Vec::new();
                 for path in paths {
-                    if path.contains(['*', '?']) {
+                    let provider_path = path.split_once(':').is_some_and(|(provider, _)| {
+                        matches!(
+                            provider.to_ascii_lowercase().as_str(),
+                            "env" | "variable" | "alias" | "function"
+                        )
+                    });
+                    if path.contains(['*', '?']) && !provider_path {
                         targets.extend(expand_glob(&path));
                     } else {
                         targets.push(path);
@@ -2303,23 +2309,77 @@ impl Engine {
                 for path in targets {
                     if let Some((provider, name)) = path.split_once(':') {
                         let name = name.trim_start_matches("\\");
+                        let wildcard = name.contains(['*', '?']);
                         match provider.to_ascii_lowercase().as_str() {
                             "env" => {
-                                self.variables.remove(&format!("env:{name}"));
+                                if wildcard {
+                                    let keys: Vec<String> = self
+                                        .variables
+                                        .keys()
+                                        .filter(|key| {
+                                            key.strip_prefix("env:").is_some_and(|candidate| {
+                                                ops::wildcard_match(candidate, name, false)
+                                            })
+                                        })
+                                        .cloned()
+                                        .collect();
+                                    for key in keys {
+                                        self.variables.remove(&key);
+                                    }
+                                } else {
+                                    self.variables.remove(&format!("env:{name}"));
+                                }
                                 continue;
                             }
                             "variable" => {
-                                let key = strip_scope(name);
-                                self.variables.remove(key);
-                                self.globals.remove(key);
+                                if wildcard {
+                                    let keys: Vec<String> = self
+                                        .variables
+                                        .keys()
+                                        .filter(|key| ops::wildcard_match(key, name, false))
+                                        .cloned()
+                                        .collect();
+                                    for key in keys {
+                                        self.variables.remove(&key);
+                                        self.globals.remove(&key);
+                                    }
+                                } else {
+                                    let key = strip_scope(name);
+                                    self.variables.remove(key);
+                                    self.globals.remove(key);
+                                }
                                 continue;
                             }
                             "alias" => {
-                                self.aliases.remove(&name.to_ascii_lowercase());
+                                if wildcard {
+                                    let keys: Vec<String> = self
+                                        .aliases
+                                        .keys()
+                                        .filter(|key| ops::wildcard_match(key, name, false))
+                                        .cloned()
+                                        .collect();
+                                    for key in keys {
+                                        self.aliases.remove(&key);
+                                    }
+                                } else {
+                                    self.aliases.remove(&name.to_ascii_lowercase());
+                                }
                                 continue;
                             }
                             "function" => {
-                                self.functions.remove(&name.to_ascii_lowercase());
+                                if wildcard {
+                                    let keys: Vec<String> = self
+                                        .functions
+                                        .keys()
+                                        .filter(|key| ops::wildcard_match(key, name, false))
+                                        .cloned()
+                                        .collect();
+                                    for key in keys {
+                                        self.functions.remove(&key);
+                                    }
+                                } else {
+                                    self.functions.remove(&name.to_ascii_lowercase());
+                                }
                                 continue;
                             }
                             _ => {}
