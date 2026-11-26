@@ -21,3 +21,8 @@
 (Get-ChildItem fixtures/tree/a.txt).Name
 (Get-ChildItem fixtures/tree -Recurse -File -Name -Include 'a*', 'b*' | Sort-Object) -join ','
 (Get-ChildItem fixtures/tree -Recurse -File -Name -Exclude 'a.txt', 'b.txt' | Sort-Object) -join ','
+(Get-ChildItem fixtures/tree -Attributes Directory -Name) -join ','
+(Get-ChildItem fixtures/tree -Attributes '!Directory' -Name | Sort-Object) -join ','
+(Get-ChildItem fixtures/hidden -Force -Attributes Hidden -Name | Sort-Object) -join ','
+(Get-ChildItem fixtures/hidden -Attributes Hidden -Name | Sort-Object) -join ','
+(Get-ChildItem fixtures/hidden -Attributes '!Directory' -Name | Sort-Object) -join ','

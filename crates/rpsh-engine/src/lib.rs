@@ -2046,6 +2046,30 @@ impl Engine {
                 let force = named
                     .iter()
                     .any(|(name, value)| name.eq_ignore_ascii_case("force") && ops::is_true(value));
+                let attributes: Vec<(bool, String)> = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("attributes"))
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(|value| {
+                                let text = value.to_string();
+                                match text.strip_prefix('!') {
+                                    Some(rest) => (true, rest.to_ascii_lowercase()),
+                                    None => (false, text.to_ascii_lowercase()),
+                                }
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                for (_, attribute) in &attributes {
+                    if attribute != "directory" && attribute != "hidden" {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "Get-ChildItem with this attribute",
+                        }
+                        .into());
+                    }
+                }
                 let exclude: Vec<String> = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("exclude"))
@@ -2092,7 +2116,11 @@ impl Engine {
                         };
                         entries.push((name, false, length));
                     } else {
-                        collect_children(&path, recurse, force, "", &mut entries);
+                        let include_hidden = force
+                            || attributes
+                                .iter()
+                                .any(|(negated, attribute)| !negated && attribute == "hidden");
+                        collect_children(&path, recurse, include_hidden, "", &mut entries);
                     }
                 }
                 if let Some(depth) = depth {
@@ -2100,6 +2128,17 @@ impl Engine {
                     entries.retain(|(name, _, _)| name.matches('/').count() <= depth);
                 }
                 entries.retain(|(name, is_dir, _)| {
+                    let leaf = name.rsplit('/').next().unwrap_or(name);
+                    for (negated, attribute) in &attributes {
+                        let value = if attribute == "directory" {
+                            *is_dir
+                        } else {
+                            leaf.starts_with('.')
+                        };
+                        if value == *negated {
+                            return false;
+                        }
+                    }
                     if files_only && *is_dir {
                         return false;
                     }

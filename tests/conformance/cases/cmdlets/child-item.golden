@@ -22,3 +22,8 @@ a.txt
 a.txt
 a.txt,sub/b.txt
 
+sub
+a.txt
+.secret
+.secret
+visible.txt
