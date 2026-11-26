@@ -1431,10 +1431,100 @@ impl Engine {
                         .iter()
                         .any(|(name, _)| name.eq_ignore_ascii_case(wanted))
                 };
-                let property = named
+                let properties: Vec<String> = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("property"))
-                    .map(|(_, value)| value.to_string());
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                if properties.len() > 1 {
+                    let mut outputs = Vec::new();
+                    for property in &properties {
+                        let total = input.len() as i32;
+                        let mut sum = Value::Int32(0);
+                        let mut minimum: Option<Value> = None;
+                        let mut maximum: Option<Value> = None;
+                        let mut average = 0.0;
+                        let mut count = 0;
+                        let mut words = 0;
+                        let mut lines = 0;
+                        let mut characters = 0;
+                        for item in input {
+                            let item = match member(item, property) {
+                                Ok(value) => value,
+                                Err(_) => continue,
+                            };
+                            let item = &item;
+                            let text = item.to_string();
+                            words += text.split_whitespace().count();
+                            lines += text.lines().count().max(1);
+                            characters += text.chars().count();
+                            if !is_numeric_value(item) {
+                                continue;
+                            }
+                            count += 1;
+                            sum = ops::add(&sum, item)?;
+                            average += convert_double(item)?;
+                            let compare = |a: &Value, b: &Value| {
+                                matches!(
+                                    ops::compare(a, b, ops::Comparison::Lt, false),
+                                    Ok(Value::Bool(true))
+                                )
+                            };
+                            if minimum
+                                .as_ref()
+                                .is_none_or(|current| compare(item, current))
+                            {
+                                minimum = Some(item.clone());
+                            }
+                            if maximum
+                                .as_ref()
+                                .is_none_or(|current| compare(current, item))
+                            {
+                                maximum = Some(item.clone());
+                            }
+                        }
+                        let average = if count > 0 {
+                            average / f64::from(count)
+                        } else {
+                            0.0
+                        };
+                        let mut entries = vec![("Count".to_owned(), Value::Int32(total))];
+                        if flag("sum") {
+                            entries.push(("Sum".to_owned(), sum));
+                        }
+                        if flag("average") {
+                            entries.push(("Average".to_owned(), Value::Double(average)));
+                        }
+                        if flag("minimum") {
+                            entries.push(("Minimum".to_owned(), minimum.unwrap_or(Value::Null)));
+                        }
+                        if flag("maximum") {
+                            entries.push(("Maximum".to_owned(), maximum.unwrap_or(Value::Null)));
+                        }
+                        if flag("word") {
+                            entries.push(("Words".to_owned(), Value::Int32(words as i32)));
+                        }
+                        if flag("line") {
+                            entries.push(("Lines".to_owned(), Value::Int32(lines as i32)));
+                        }
+                        if flag("character") {
+                            entries
+                                .push(("Characters".to_owned(), Value::Int32(characters as i32)));
+                        }
+                        entries.push((
+                            "Property".to_owned(),
+                            Value::String(property.clone().into()),
+                        ));
+                        outputs.push(Value::object(entries));
+                    }
+                    return Ok(Some(outputs));
+                }
+                let property = properties.first().cloned();
                 let total = input.len() as i32;
                 let mut sum = Value::Int32(0);
                 let mut minimum: Option<Value> = None;

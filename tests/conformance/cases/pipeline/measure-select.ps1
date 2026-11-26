@@ -6,3 +6,5 @@
 (1,1,2,2,3,1 | Get-Unique) -join ','
 ('a', 'b', 'c' | Measure-Object).Count
 (0..4 | Select-Object -Index (1, 3)) -join ','
+$measure = @([pscustomobject]@{A=1;B=10}, [pscustomobject]@{A=2;B=20})
+($measure | Measure-Object -Property A, B -Sum | ForEach-Object { "$($_.Property)|$($_.Count)|$($_.Sum)" }) -join ';'
