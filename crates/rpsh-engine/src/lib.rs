@@ -3612,7 +3612,27 @@ impl Engine {
                     }
                     .into());
                 }
+                let mut files = Vec::new();
                 for path in paths {
+                    if path.contains(['*', '?']) {
+                        let matches = expand_glob(&path);
+                        if matches.len() != 1 {
+                            return Err(RuntimeError::Script {
+                                id: "Modules_InvalidModulePath",
+                                category: format!(
+                                    "InvalidArgument: ({path}:String) [Import-Module], ArgumentException"
+                                ),
+                                exception_type: "System.ArgumentException",
+                                message: "The path cannot be processed because it resolved to more than one file; only one file at a time can be processed.".to_owned(),
+                            }
+                            .into());
+                        }
+                        files.push(matches[0].clone());
+                    } else {
+                        files.push(path);
+                    }
+                }
+                for path in files {
                     let source =
                         std::fs::read_to_string(&path).map_err(|_| RuntimeError::Script {
                             id: "Modules_ModuleNotFound",
