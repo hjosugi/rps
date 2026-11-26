@@ -4553,16 +4553,22 @@ impl Engine {
             ])),
             "get-module" | "gmo" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let wanted = named
+                let wanted: Vec<String> = match named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
+                {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
                 let mut outputs = Vec::new();
                 for name in &self.modules {
-                    let matches = wanted
-                        .as_deref()
-                        .is_none_or(|wanted| ops::wildcard_match(name, wanted, false));
+                    let matches = wanted.is_empty()
+                        || wanted
+                            .iter()
+                            .any(|wanted| ops::wildcard_match(name, wanted, false));
                     if matches {
                         outputs.push(Value::object(vec![
                             ("Name".to_owned(), Value::String(name.clone().into())),

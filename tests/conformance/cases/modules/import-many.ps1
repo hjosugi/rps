@@ -5,4 +5,5 @@ Get-Extra 2
 (Get-Command -Module module-extra | ForEach-Object Name) -join ','
 (Get-Command -Module module-fixture | ForEach-Object Name | Sort-Object) -join ','
 (Get-Module -Name module-* | ForEach-Object Name | Sort-Object) -join ','
+(Get-Module -Name module-fixture, module-extra | ForEach-Object Name | Sort-Object) -join ','
 Remove-Module module-*
