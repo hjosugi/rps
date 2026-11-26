@@ -364,6 +364,16 @@ impl Engine {
             "__TypeName".to_owned(),
             Value::String(class.name.clone().into()),
         ));
+        entries.push((
+            "__BaseClasses".to_owned(),
+            Value::array(
+                classes
+                    .iter()
+                    .skip(1)
+                    .map(|class| Value::String(class.name.clone().into()))
+                    .collect(),
+            ),
+        ));
         let mut object = Value::object(entries);
         if let Some(constructor) = classes
             .iter()
@@ -5432,6 +5442,11 @@ impl Engine {
     }
 
     fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
+        if let ExprKind::TypeLiteral(name) = &expr.kind
+            && self.classes.contains_key(&name.to_ascii_lowercase())
+        {
+            return Ok(Value::Type(name.clone().into()));
+        }
         if let ExprKind::InvokeStatic {
             type_name,
             name,
@@ -5801,7 +5816,7 @@ fn evaluate(
                 evaluate(when_false, variables, last_success)
             }
         }
-        ExprKind::TypeLiteral(name) => Ok(Value::Type(type_full_name(name).to_owned().into())),
+        ExprKind::TypeLiteral(name) => Ok(Value::Type(type_full_name(name).into())),
         ExprKind::Coalesce { left, right } => {
             let value = evaluate(left, variables, last_success)?;
             if matches!(value, Value::Null) {
@@ -7667,25 +7682,25 @@ fn automatic_variable(name: &str) -> Option<Value> {
     }
 }
 
-fn type_full_name(name: &str) -> &'static str {
+fn type_full_name(name: &str) -> String {
     match name.to_ascii_lowercase().as_str() {
-        "int" | "int32" => "System.Int32",
-        "long" | "int64" => "System.Int64",
-        "uint" | "uint32" => "System.UInt32",
-        "ulong" | "uint64" => "System.UInt64",
-        "short" | "int16" => "System.Int16",
-        "ushort" | "uint16" => "System.UInt16",
-        "byte" => "System.Byte",
-        "sbyte" => "System.SByte",
-        "string" => "System.String",
-        "bool" | "boolean" => "System.Boolean",
-        "double" => "System.Double",
-        "decimal" => "System.Decimal",
-        "biginteger" => "System.Numerics.BigInteger",
-        _ => "System.Object",
+        "int" | "int32" => "System.Int32".to_owned(),
+        "long" | "int64" => "System.Int64".to_owned(),
+        "uint" | "uint32" => "System.UInt32".to_owned(),
+        "ulong" | "uint64" => "System.UInt64".to_owned(),
+        "short" | "int16" => "System.Int16".to_owned(),
+        "ushort" | "uint16" => "System.UInt16".to_owned(),
+        "byte" => "System.Byte".to_owned(),
+        "sbyte" => "System.SByte".to_owned(),
+        "string" => "System.String".to_owned(),
+        "bool" | "boolean" => "System.Boolean".to_owned(),
+        "double" => "System.Double".to_owned(),
+        "decimal" => "System.Decimal".to_owned(),
+        "biginteger" => "System.Numerics.BigInteger".to_owned(),
+        "pscustomobject" => "System.Management.Automation.PSCustomObject".to_owned(),
+        _ => name.to_owned(),
     }
 }
-
 fn normalize_type(type_name: &str) -> String {
     let lower = type_name.to_ascii_lowercase();
     lower
@@ -8976,7 +8991,28 @@ fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeEr
             feature: "-is / -as with a non-type right operand",
         });
     };
-    let same = full.as_ascii() == Some(left.type_name());
+    let left_name: String = match left {
+        Value::Object(entries) => entries
+            .iter()
+            .find(|(key, _)| key == "__TypeName")
+            .and_then(|(_, value)| match value {
+                Value::String(text) => Some(text.to_string_lossy()),
+                _ => None,
+            })
+            .unwrap_or_else(|| left.type_name().to_owned()),
+        _ => left.type_name().to_owned(),
+    };
+    let mut same = full.as_ascii() == Some(left_name.as_str());
+    if !same
+        && let Value::Object(entries) = left
+        && let Some((_, Value::Array(bases))) =
+            entries.iter().find(|(key, _)| key == "__BaseClasses")
+    {
+        let wanted = full.to_string_lossy();
+        same = bases
+            .iter()
+            .any(|base| base.to_string().eq_ignore_ascii_case(&wanted));
+    }
     Ok(Value::Bool(if negate { !same } else { same }))
 }
 

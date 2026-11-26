@@ -23,3 +23,6 @@ $d.Name = 'Rex'
 $d.Speak()
 $d.Bark()
 $d.GetType().Name
+$d -is [Dog]
+$d -is [Animal]
+$d -is [string]
