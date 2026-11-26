@@ -1979,7 +1979,13 @@ impl Engine {
                     }
                     .into());
                 };
-                if let Some((provider, name)) = path.split_once(':') {
+                let provider_path = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string())
+                    .filter(|_| path.ends_with(':'))
+                    .map_or_else(|| path.clone(), |name| format!("{path}{name}"));
+                if let Some((provider, name)) = provider_path.split_once(':') {
                     let name = name.trim_start_matches("\\");
                     if !name.is_empty()
                         && (provider.eq_ignore_ascii_case("env")

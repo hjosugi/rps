@@ -84,3 +84,11 @@ $x = New-Item -Path Env:RPSH_ASSIGN -Value 'v'
 $x.Name
 $env:RPSH_ASSIGN
 Remove-Item Env:RPSH_ASSIGN
+New-Item -Path Env: -Name RPSH_N -Value 'v' | Out-Null
+$env:RPSH_N
+New-Item -Path Variable: -Name pv -Value 3 | Out-Null
+$pv
+Test-Path Env:RPSH_N
+Test-Path Variable:pv
+Remove-Item Env:RPSH_N
+Remove-Variable pv
