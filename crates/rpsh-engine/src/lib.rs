@@ -2774,7 +2774,24 @@ impl Engine {
                         named_values
                     }
                 };
-                for item in flatten_values(values) {
+                let values = flatten_values(values);
+                if named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("asbytestream") && ops::is_true(value)
+                }) {
+                    let bytes: Vec<u8> = values
+                        .iter()
+                        .map(|value| convert_int32(value).map(|value| value as u8))
+                        .collect::<Result<_, _>>()?;
+                    for path in paths {
+                        std::fs::write(&path, &bytes).map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "Set-Content of an unwritable file",
+                            }
+                        })?;
+                    }
+                    return Ok(Some(Vec::new()));
+                }
+                for item in values {
                     text.push_str(&item.to_string());
                     if !no_newline {
                         text.push('\n');
