@@ -10,3 +10,9 @@
 (Get-Item fixtures/data.txt).PSIsContainer
 (Get-Item fixtures/data.txt, fixtures/tree/a.txt | ForEach-Object Name) -join ','
 (Get-Item fixtures/data.txt).Name
+$p = Get-ItemProperty -Path fixtures/data.txt -Name Name, Length
+$p.Name
+$p.Length
+(Get-ItemProperty fixtures/data.txt).Name
+(Get-ItemProperty fixtures/data.txt).Length
+(Get-Command Get-ItemProperty).CommandType

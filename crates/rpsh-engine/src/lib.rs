@@ -1668,6 +1668,78 @@ impl Engine {
                     Value::String(resolved.to_string_lossy().to_string().into()),
                 )])]))
             }
+            "get-itemproperty" | "gp" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if paths.is_empty() {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Get-ItemProperty without a path",
+                    }
+                    .into());
+                }
+                let names: Vec<String> = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let mut outputs = Vec::new();
+                for path in paths {
+                    let path = expand_home(&path);
+                    let matched = if path.contains(['*', '?']) {
+                        expand_glob(&path)
+                    } else {
+                        vec![path]
+                    };
+                    for path in matched {
+                        if !std::path::Path::new(&path).exists() {
+                            return Err(RuntimeError::Script {
+                                id: "PathNotFound,Microsoft.PowerShell.Commands.GetItemPropertyCommand",
+                                category: format!(
+                                    "ObjectNotFound: ({path}:String) [Get-ItemProperty], ItemNotFoundException"
+                                ),
+                                exception_type: "System.Management.Automation.ItemNotFoundException",
+                                message: format!(
+                                    "Cannot find path '{path}' because it does not exist."
+                                ),
+                            }
+                            .into());
+                        }
+                        let value = item_value(&path);
+                        if !names.is_empty()
+                            && let Value::Object(entries) = &value
+                        {
+                            outputs.push(Value::object(
+                                entries
+                                    .iter()
+                                    .filter(|(key, _)| {
+                                        key == "__TypeName"
+                                            || names
+                                                .iter()
+                                                .any(|name| name.eq_ignore_ascii_case(key))
+                                    })
+                                    .map(|(key, value)| (key.clone(), value.clone()))
+                                    .collect(),
+                            ));
+                            continue;
+                        }
+                        outputs.push(value);
+                    }
+                }
+                Ok(Some(outputs))
+            }
             "get-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let paths: Vec<String> = match named.iter().find(|(name, _)| {
@@ -6080,6 +6152,7 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "ForEach-Object",
     "Get-ChildItem",
     "Get-Command",
+    "Get-ItemProperty",
     "Get-Content",
     "Get-Culture",
     "Get-Item",
