@@ -3684,71 +3684,71 @@ impl Engine {
             }
             "get-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let name = named
+                let wanted: Vec<String> = match named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
+                {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
                 let value_only = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("valueonly") && ops::is_true(value)
                 });
-                match name {
-                    Some(name) if name.contains(['*', '?']) => {
-                        let mut names: Vec<&String> = self
+                let make = |key: &str, value: Value, value_only: bool| {
+                    if value_only {
+                        value
+                    } else {
+                        Value::object(vec![
+                            ("Name".to_owned(), Value::String(key.into())),
+                            ("Value".to_owned(), value),
+                        ])
+                    }
+                };
+                if wanted.is_empty() {
+                    let mut names: Vec<&String> = self.variables.keys().collect();
+                    names.sort();
+                    return Ok(Some(
+                        names
+                            .into_iter()
+                            .map(|key| {
+                                make(
+                                    key,
+                                    self.variables.get(key).cloned().unwrap_or(Value::Null),
+                                    value_only,
+                                )
+                            })
+                            .collect(),
+                    ));
+                }
+                let mut outputs = Vec::new();
+                for name in wanted {
+                    if name.contains(['*', '?']) {
+                        let mut keys: Vec<&String> = self
                             .variables
                             .keys()
                             .filter(|key| ops::wildcard_match(key, &name, false))
                             .collect();
-                        names.sort();
-                        let values: Vec<Value> = names
-                            .into_iter()
-                            .map(|key| {
-                                let value = self.variables.get(key).cloned().unwrap_or(Value::Null);
-                                if value_only {
-                                    value
-                                } else {
-                                    Value::object(vec![
-                                        ("Name".to_owned(), Value::String(key.clone().into())),
-                                        ("Value".to_owned(), value),
-                                    ])
-                                }
-                            })
-                            .collect();
-                        Ok(Some(values))
-                    }
-                    Some(name) => {
-                        let key = strip_scope(&name).to_owned();
-                        let value = self.variables.get(&key).cloned().unwrap_or(Value::Null);
-                        if value_only {
-                            return Ok(Some(vec![value]));
+                        keys.sort();
+                        for key in keys {
+                            outputs.push(make(
+                                key,
+                                self.variables.get(key).cloned().unwrap_or(Value::Null),
+                                value_only,
+                            ));
                         }
-                        Ok(Some(vec![Value::object(vec![
-                            ("Name".to_owned(), Value::String(key.into())),
-                            ("Value".to_owned(), value),
-                        ])]))
-                    }
-                    None => {
-                        let mut names: Vec<&String> = self.variables.keys().collect();
-                        names.sort();
-                        Ok(Some(
-                            names
-                                .into_iter()
-                                .map(|name| {
-                                    Value::object(vec![
-                                        ("Name".to_owned(), Value::String(name.clone().into())),
-                                        (
-                                            "Value".to_owned(),
-                                            self.variables
-                                                .get(name)
-                                                .cloned()
-                                                .unwrap_or(Value::Null),
-                                        ),
-                                    ])
-                                })
-                                .collect(),
-                        ))
+                    } else {
+                        let key = strip_scope(&name);
+                        outputs.push(make(
+                            key,
+                            self.variables.get(key).cloned().unwrap_or(Value::Null),
+                            value_only,
+                        ));
                     }
                 }
+                Ok(Some(outputs))
             }
             "set-variable" | "new-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;

@@ -27,3 +27,7 @@ New-Variable cv1 1
 New-Variable cv2 2
 Clear-Variable cv*
 ($null -eq $cv1) -and ($null -eq $cv2)
+New-Variable mv1 1
+New-Variable mv2 2
+(Get-Variable mv1, mv2 | ForEach-Object Name | Sort-Object) -join ','
+(Get-Variable -Name mv1, mv2 -ValueOnly) -join ','
