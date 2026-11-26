@@ -35,3 +35,9 @@ Move-Item rpsh-move-a.txt, rpsh-move-b.txt -Destination rpsh-move-many
 (Get-ChildItem rpsh-move-many -Name | Sort-Object) -join ','
 Test-Path rpsh-move-a.txt
 Remove-Item rpsh-move-many -Recurse -Force
+Set-Content rpsh-ro.txt -Value 'x'
+chmod 444 rpsh-ro.txt
+(Get-ChildItem rpsh-ro.txt -Attributes ReadOnly -Name) -join ','
+(Get-ChildItem rpsh-ro.txt -Attributes '!ReadOnly' -Name) -join ','
+chmod 644 rpsh-ro.txt
+Remove-Item rpsh-ro.txt

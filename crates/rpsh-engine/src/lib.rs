@@ -2063,7 +2063,8 @@ impl Engine {
                     })
                     .unwrap_or_default();
                 for (_, attribute) in &attributes {
-                    if attribute != "directory" && attribute != "hidden" {
+                    if attribute != "directory" && attribute != "hidden" && attribute != "readonly"
+                    {
                         return Err(RuntimeError::NotImplemented {
                             feature: "Get-ChildItem with this attribute",
                         }
@@ -2132,6 +2133,10 @@ impl Engine {
                     for (negated, attribute) in &attributes {
                         let value = if attribute == "directory" {
                             *is_dir
+                        } else if attribute == "readonly" {
+                            std::fs::metadata(name)
+                                .map(|meta| meta.permissions().readonly())
+                                .unwrap_or(false)
                         } else {
                             leaf.starts_with('.')
                         };

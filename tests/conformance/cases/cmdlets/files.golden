@@ -13,3 +13,5 @@ False
 rpsh-copy-a.txt,rpsh-copy-b.txt
 rpsh-move-a.txt,rpsh-move-b.txt
 False
+rpsh-ro.txt
+
