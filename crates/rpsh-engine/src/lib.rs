@@ -3425,12 +3425,23 @@ impl Engine {
                     }
                     .into());
                 };
-                let lower = name.to_ascii_lowercase();
-                self.modules
-                    .retain(|module| !module.eq_ignore_ascii_case(&name));
-                if let Some(functions) = self.module_functions.remove(&lower) {
-                    for function in functions {
-                        self.functions.remove(&function);
+                let targets: Vec<String> = if name.contains(['*', '?']) {
+                    self.modules
+                        .iter()
+                        .filter(|module| ops::wildcard_match(module, &name, false))
+                        .cloned()
+                        .collect()
+                } else {
+                    vec![name]
+                };
+                for target in targets {
+                    let lower = target.to_ascii_lowercase();
+                    self.modules
+                        .retain(|module| !module.eq_ignore_ascii_case(&target));
+                    if let Some(functions) = self.module_functions.remove(&lower) {
+                        for function in functions {
+                            self.functions.remove(&function);
+                        }
                     }
                 }
                 Ok(Some(Vec::new()))
