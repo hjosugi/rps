@@ -26,3 +26,12 @@ $d.GetType().Name
 $d -is [Dog]
 $d -is [Animal]
 $d -is [string]
+class BaseC { [int] $X; BaseC() { $this.X = 1 } }
+class DerivedC : BaseC { [int] $Y; DerivedC() { $this.Y = 2 } }
+$dc = [DerivedC]::new()
+$dc.X
+$dc.Y
+class ImplicitC : BaseC { [int] $Z }
+$ic = [ImplicitC]::new()
+$ic.X
+$ic.Z

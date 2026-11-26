@@ -375,9 +375,36 @@ impl Engine {
             ),
         ));
         let mut object = Value::object(entries);
-        if let Some(constructor) = classes
+        if class.constructors.is_empty() && !arguments.is_empty() {
+            return Err(RuntimeError::NotImplemented {
+                feature: "this class constructor",
+            }
+            .into());
+        }
+        for ancestor in classes.iter().skip(1).rev() {
+            if let Some(constructor) = ancestor
+                .constructors
+                .iter()
+                .find(|constructor| constructor.parameters.is_empty())
+                .cloned()
+            {
+                let saved = std::mem::take(&mut self.variables);
+                let mut local = saved.clone();
+                local.insert("this".to_owned(), object.clone());
+                self.variables = local;
+                let flow = self.exec_block(&constructor.body, &mut capture_sink());
+                if let Value::Object(entries) =
+                    self.variables.get("this").cloned().unwrap_or(Value::Null)
+                {
+                    object = Value::Object(entries);
+                }
+                self.restore_variables(saved);
+                flow?;
+            }
+        }
+        if let Some(constructor) = class
+            .constructors
             .iter()
-            .flat_map(|class| class.constructors.iter())
             .find(|constructor| constructor.parameters.len() == arguments.len())
             .cloned()
         {
