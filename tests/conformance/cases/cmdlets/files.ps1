@@ -41,3 +41,9 @@ chmod 444 rpsh-ro.txt
 (Get-ChildItem rpsh-ro.txt -Attributes '!ReadOnly' -Name) -join ','
 chmod 644 rpsh-ro.txt
 Remove-Item rpsh-ro.txt
+Set-Content rpsh-prop.txt -Value 'x'
+Set-ItemProperty -Path rpsh-prop.txt -Name IsReadOnly -Value $true
+(Get-ItemProperty -Path rpsh-prop.txt).IsReadOnly
+Set-ItemProperty -Path rpsh-prop.txt -Name IsReadOnly -Value $false
+(Get-ItemProperty -Path rpsh-prop.txt).IsReadOnly
+Remove-Item rpsh-prop.txt

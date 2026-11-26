@@ -1668,6 +1668,61 @@ impl Engine {
                     Value::String(resolved.to_string_lossy().to_string().into()),
                 )])]))
             }
+            "set-itemproperty" | "sp" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional
+                        .first()
+                        .map(|value| vec![value.to_string()])
+                        .unwrap_or_default(),
+                };
+                let name = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
+                    .map(|(_, value)| value.to_string());
+                let value = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("value"))
+                    .map(|(_, value)| value.clone())
+                    .or_else(|| positional.get(1).cloned());
+                let (Some(name), Some(value)) = (name, value) else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Set-ItemProperty without a name and value",
+                    }
+                    .into());
+                };
+                if !name.eq_ignore_ascii_case("IsReadOnly") {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Set-ItemProperty with this property",
+                    }
+                    .into());
+                }
+                let readonly = ops::is_true(&value);
+                for path in paths {
+                    let metadata = std::fs::metadata(&path).map_err(|_| RuntimeError::Script {
+                        id: "PathNotFound,Microsoft.PowerShell.Commands.SetItemPropertyCommand",
+                        category: format!(
+                            "ObjectNotFound: ({path}:String) [Set-ItemProperty], ItemNotFoundException"
+                        ),
+                        exception_type: "System.Management.Automation.ItemNotFoundException",
+                        message: format!("Cannot find path '{path}' because it does not exist."),
+                    })?;
+                    let mut permissions = metadata.permissions();
+                    permissions.set_readonly(readonly);
+                    std::fs::set_permissions(&path, permissions).map_err(|_| {
+                        RuntimeError::NotImplemented {
+                            feature: "Set-ItemProperty cannot write this file",
+                        }
+                    })?;
+                }
+                Ok(Some(Vec::new()))
+            }
             "get-itemproperty" | "gp" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let paths: Vec<String> = match named.iter().find(|(name, _)| {
@@ -6033,6 +6088,15 @@ fn item_value(text: &str) -> Value {
         ("FullName".to_owned(), Value::String(text.to_owned().into())),
         ("PSIsContainer".to_owned(), Value::Bool(target.is_dir())),
         (
+            "IsReadOnly".to_owned(),
+            Value::Bool(
+                target
+                    .metadata()
+                    .map(|meta| meta.permissions().readonly())
+                    .unwrap_or(false),
+            ),
+        ),
+        (
             "Name".to_owned(),
             Value::String(
                 target
@@ -6153,6 +6217,7 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "Get-ChildItem",
     "Get-Command",
     "Get-ItemProperty",
+    "Set-ItemProperty",
     "Get-Content",
     "Get-Culture",
     "Get-Item",
