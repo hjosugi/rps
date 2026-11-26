@@ -3480,8 +3480,20 @@ impl Engine {
                     }
                     .into());
                 };
-                self.variables
-                    .insert(strip_scope(&name).to_owned(), Value::Null);
+                if name.contains(['*', '?']) {
+                    let keys: Vec<String> = self
+                        .variables
+                        .keys()
+                        .filter(|key| ops::wildcard_match(key, &name, false))
+                        .cloned()
+                        .collect();
+                    for key in keys {
+                        self.variables.insert(key, Value::Null);
+                    }
+                } else {
+                    self.variables
+                        .insert(strip_scope(&name).to_owned(), Value::Null);
+                }
                 Ok(Some(Vec::new()))
             }
             "remove-variable" => {

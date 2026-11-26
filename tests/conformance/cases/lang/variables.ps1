@@ -23,3 +23,7 @@ New-Variable rv1 1
 New-Variable rv2 2
 Remove-Variable rv*
 (Get-Variable 'rv*' | Measure-Object).Count
+New-Variable cv1 1
+New-Variable cv2 2
+Clear-Variable cv*
+($null -eq $cv1) -and ($null -eq $cv2)
