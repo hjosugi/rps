@@ -3651,30 +3651,41 @@ impl Engine {
             }
             "select-string" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let pattern = named
+                let patterns: Vec<String> = match named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("pattern"))
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(pattern) = pattern else {
+                {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional
+                        .first()
+                        .map(|value| vec![value.to_string()])
+                        .unwrap_or_default(),
+                };
+                if patterns.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Select-String without a pattern",
                     }
                     .into());
-                };
+                }
                 let simple_match = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("simplematch") && ops::is_true(value)
                 });
                 let case_sensitive = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
                 });
-                let regex = if simple_match {
-                    None
+                let regexes: Vec<rpsh_runtime::regex::Regex> = if simple_match {
+                    Vec::new()
                 } else {
-                    Some(
-                        rpsh_runtime::regex::Regex::new(&pattern, case_sensitive)
-                            .map_err(|feature| RuntimeError::NotImplemented { feature })?,
-                    )
+                    patterns
+                        .iter()
+                        .map(|pattern| {
+                            rpsh_runtime::regex::Regex::new(pattern, case_sensitive)
+                                .map_err(|feature| RuntimeError::NotImplemented { feature })
+                        })
+                        .collect::<Result<_, _>>()?
                 };
                 let mut lines: Vec<String> = Vec::new();
                 if input.is_empty() {
@@ -3712,10 +3723,16 @@ impl Engine {
                 });
                 let mut outputs = Vec::new();
                 for (index, line) in lines.iter().enumerate() {
-                    let matched = match &regex {
-                        Some(regex) => regex.find(line).is_some(),
-                        None if case_sensitive => line.contains(&pattern),
-                        None => line.to_lowercase().contains(&pattern.to_lowercase()),
+                    let matched = if simple_match {
+                        patterns.iter().any(|pattern| {
+                            if case_sensitive {
+                                line.contains(pattern)
+                            } else {
+                                line.to_lowercase().contains(&pattern.to_lowercase())
+                            }
+                        })
+                    } else {
+                        regexes.iter().any(|regex| regex.find(line).is_some())
                     };
                     if matched != not_match {
                         outputs.push(Value::object(vec![
