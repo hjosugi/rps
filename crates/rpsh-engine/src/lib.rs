@@ -1668,6 +1668,55 @@ impl Engine {
                     Value::String(resolved.to_string_lossy().to_string().into()),
                 )])]))
             }
+            "set-item" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let path = named
+                    .iter()
+                    .find(|(name, _)| {
+                        name.eq_ignore_ascii_case("path")
+                            || name.eq_ignore_ascii_case("literalpath")
+                    })
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
+                let Some(path) = path else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Set-Item without a path",
+                    }
+                    .into());
+                };
+                let value = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("value"))
+                    .map(|(_, value)| value.clone())
+                    .or_else(|| positional.get(1).cloned())
+                    .unwrap_or(Value::Null);
+                let Some((provider, name)) = path.split_once(':') else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Set-Item outside a provider",
+                    }
+                    .into());
+                };
+                let name = name.trim_start_matches("\\");
+                match provider.to_ascii_lowercase().as_str() {
+                    "env" => {
+                        self.variables.insert(format!("env:{name}"), value);
+                    }
+                    "variable" => {
+                        let key = strip_scope(name).to_owned();
+                        if is_global_scope(name) {
+                            self.globals.insert(key.clone(), value.clone());
+                        }
+                        self.variables.insert(key, value);
+                    }
+                    _ => {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "Set-Item for this provider",
+                        }
+                        .into());
+                    }
+                }
+                Ok(Some(Vec::new()))
+            }
             "set-itemproperty" | "sp" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let paths: Vec<String> = match named.iter().find(|(name, _)| {
@@ -6480,6 +6529,7 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "Get-Command",
     "Get-ItemProperty",
     "Set-ItemProperty",
+    "Set-Item",
     "Get-Content",
     "Get-Culture",
     "Get-Item",

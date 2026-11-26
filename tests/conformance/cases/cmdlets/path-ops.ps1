@@ -65,3 +65,10 @@ Test-Path Env:
 Test-Path Variable:
 Test-Path Alias:
 Test-Path Function:
+Set-Item -Path Env:RPSH_SET -Value 'v'
+$env:RPSH_SET
+Set-Item -Path Variable:sv -Value 1
+$sv
+Test-Path Env:RPSH_SET
+Remove-Item Env:RPSH_SET
+Remove-Variable sv
