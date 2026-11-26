@@ -3151,6 +3151,11 @@ impl Engine {
                     }
                     .into());
                 };
+                if named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("noqualifier") && ops::is_true(value)
+                }) {
+                    return Ok(Some(vec![Value::String(path.into())]));
+                }
                 let path = std::path::Path::new(&path);
                 if named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("isabsolute") && ops::is_true(value)

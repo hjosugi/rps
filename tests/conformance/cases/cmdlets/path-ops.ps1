@@ -92,3 +92,5 @@ Test-Path Env:RPSH_N
 Test-Path Variable:pv
 Remove-Item Env:RPSH_N
 Remove-Variable pv
+Split-Path -Path /tmp/x -NoQualifier
+Split-Path -Path fixtures/data.txt -NoQualifier
