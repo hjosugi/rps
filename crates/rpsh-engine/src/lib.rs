@@ -2702,6 +2702,10 @@ impl Engine {
                         outputs.push(Value::Bool(valid));
                         continue;
                     }
+                    if let Some(found) = self.provider_path_exists(&path_text) {
+                        outputs.push(Value::Bool(found));
+                        continue;
+                    }
                     let matches = if path_text.contains(['*', '?']) {
                         expand_glob(&path_text).into_iter().any(|path| {
                             let target = std::path::Path::new(&path);
@@ -4510,6 +4514,30 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    fn provider_path_exists(&self, path: &str) -> Option<bool> {
+        let (provider, name) = path.split_once(':')?;
+        let name = name.trim_start_matches("\\");
+        match provider.to_ascii_lowercase().as_str() {
+            "env" => Some(
+                self.variables.contains_key(&format!("env:{name}")) || std::env::var(name).is_ok(),
+            ),
+            "variable" => {
+                let key = strip_scope(name);
+                Some(
+                    self.variables.contains_key(key)
+                        || self.globals.contains_key(key)
+                        || automatic_variable(key).is_some(),
+                )
+            }
+            "function" => Some(self.functions.contains_key(&name.to_ascii_lowercase())),
+            "alias" => {
+                let lower = name.to_ascii_lowercase();
+                Some(self.aliases.contains_key(&lower) || default_alias(&lower).is_some())
+            }
+            _ => None,
+        }
     }
 
     fn resolve_alias(&self, name: &str) -> Option<String> {

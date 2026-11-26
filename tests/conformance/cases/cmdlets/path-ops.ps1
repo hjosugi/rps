@@ -33,3 +33,10 @@ Join-Path fixtures data.txt
 Split-Path -Path /tmp/x -Leaf
 Split-Path -Path fixtures/data.txt -Parent
 Split-Path -Path /tmp/a.txt -Extension
+$env:RPSH_PROVIDER_TEST = 'v'
+Test-Path Env:RPSH_PROVIDER_TEST
+Test-Path Env:RPSH_PROVIDER_NOPE
+$provider = 1
+Test-Path Variable:provider
+Test-Path Variable:nope
+Test-Path Alias:gc
