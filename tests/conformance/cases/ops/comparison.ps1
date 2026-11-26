@@ -28,3 +28,7 @@ $null -contains 'a'
 'x' -is [string]
 '5' -as [int]
 'x' -as [int]
+('a,b;c' -split '[,;]') -join '|'
+('aXbXc' -csplit 'x') -join '|'
+'abc' -creplace 'B', 'X'
+'abc' -replace 'B', 'X'
