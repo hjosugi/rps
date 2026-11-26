@@ -4728,6 +4728,14 @@ impl Engine {
     fn provider_path_exists(&self, path: &str) -> Option<bool> {
         let (provider, name) = path.split_once(':')?;
         let name = name.trim_start_matches("\\");
+        if name.is_empty()
+            && matches!(
+                provider.to_ascii_lowercase().as_str(),
+                "env" | "variable" | "function" | "alias"
+            )
+        {
+            return Some(true);
+        }
         match provider.to_ascii_lowercase().as_str() {
             "env" => Some(
                 self.variables.contains_key(&format!("env:{name}")) || std::env::var(name).is_ok(),

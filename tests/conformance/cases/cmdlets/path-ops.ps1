@@ -61,3 +61,7 @@ Test-Path Alias:localrm
 function LocalRm {}
 Remove-Item Function:LocalRm
 Test-Path Function:LocalRm
+Test-Path Env:
+Test-Path Variable:
+Test-Path Alias:
+Test-Path Function:
