@@ -1609,10 +1609,36 @@ impl Engine {
                 let case_sensitive = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
                 });
-                let property = named
+                let mut property = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("property"))
                     .map(|(_, value)| value.clone());
+                if let Some(property_names) = &property {
+                    let names = flatten_value(property_names.clone());
+                    if names
+                        .iter()
+                        .any(|name| name.to_string().contains(['*', '?']))
+                        && let Some(Value::Object(entries)) = input.first()
+                    {
+                        let visible = visible_entries(entries);
+                        let mut expanded = Vec::new();
+                        for name in &names {
+                            let text = name.to_string();
+                            if text.contains(['*', '?']) {
+                                for (candidate, _) in &visible {
+                                    if ops::wildcard_match(candidate, &text, false) {
+                                        expanded.push(Value::String((*candidate).clone().into()));
+                                    }
+                                }
+                            } else {
+                                expanded.push(name.clone());
+                            }
+                        }
+                        if !expanded.is_empty() {
+                            property = Some(Value::array(expanded));
+                        }
+                    }
+                }
                 let mut items = input.to_vec();
                 items.sort_by(|a, b| {
                     let left = match &property {
