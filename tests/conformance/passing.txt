@@ -87,6 +87,7 @@ lang/variable-paths
 lang/variables
 lang/wildcard
 modules/import
+modules/import-many
 native/capture
 native/environment
 native/exit-code

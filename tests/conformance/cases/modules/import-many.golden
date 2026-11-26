@@ -1,0 +1,5 @@
+rpsh-golden-v2
+exit=0
+module fn
+12
+module-extra,module-fixture

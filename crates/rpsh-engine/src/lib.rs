@@ -3448,40 +3448,52 @@ impl Engine {
             }
             "import-module" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
+                let paths: Vec<String> = match named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(path) = path else {
+                {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Import-Module without a name",
                     }
                     .into());
-                };
-                let source = std::fs::read_to_string(&path).map_err(|_| RuntimeError::Script {
-                    id: "Modules_ModuleNotFound",
-                    category: format!("ResourceUnavailable: ({path}:String) [Import-Module], FileNotFoundException"),
-                    exception_type: "System.IO.FileNotFoundException",
-                    message: format!("The specified module '{path}' was not loaded because no valid module file was found."),
-                })?;
-                let script = parse(&source)?;
-                let before: std::collections::HashSet<String> =
-                    self.functions.keys().cloned().collect();
-                self.exec_block(&script.statements, &mut capture_sink())?;
-                let module_name = std::path::Path::new(&path)
-                    .file_stem()
-                    .map_or_else(|| path.clone(), |stem| stem.to_string_lossy().to_string());
-                let added: Vec<String> = self
-                    .functions
-                    .keys()
-                    .filter(|name| !before.contains(*name))
-                    .cloned()
-                    .collect();
-                self.module_functions
-                    .insert(module_name.to_ascii_lowercase(), added);
-                if !self.modules.contains(&module_name) {
-                    self.modules.push(module_name);
+                }
+                for path in paths {
+                    let source =
+                        std::fs::read_to_string(&path).map_err(|_| RuntimeError::Script {
+                            id: "Modules_ModuleNotFound",
+                            category: format!("ResourceUnavailable: ({path}:String) [Import-Module], FileNotFoundException"),
+                            exception_type: "System.IO.FileNotFoundException",
+                            message: format!("The specified module '{path}' was not loaded because no valid module file was found."),
+                        })?;
+                    let script = parse(&source)?;
+                    let before: std::collections::HashSet<String> =
+                        self.functions.keys().cloned().collect();
+                    self.exec_block(&script.statements, &mut capture_sink())?;
+                    let module_name = std::path::Path::new(&path)
+                        .file_stem()
+                        .map_or_else(|| path.clone(), |stem| stem.to_string_lossy().to_string());
+                    let added: Vec<String> = self
+                        .functions
+                        .keys()
+                        .filter(|name| !before.contains(*name))
+                        .cloned()
+                        .collect();
+                    self.module_functions
+                        .insert(module_name.to_ascii_lowercase(), added);
+                    if !self
+                        .modules
+                        .iter()
+                        .any(|module| module.eq_ignore_ascii_case(&module_name))
+                    {
+                        self.modules.push(module_name);
+                    }
                 }
                 Ok(Some(Vec::new()))
             }
