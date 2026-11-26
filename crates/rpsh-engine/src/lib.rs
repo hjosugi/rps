@@ -1961,38 +1961,56 @@ impl Engine {
             }
             "move-item" | "mv" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let source = named
+                let destination_named = named
                     .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
+                    .any(|(name, _)| name.eq_ignore_ascii_case("destination"));
+                let paths: Vec<String> = match named.iter().find(|(name, _)| {
+                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
+                }) {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None if destination_named => {
+                        positional.iter().map(ToString::to_string).collect()
+                    }
+                    None => positional
+                        .first()
+                        .map(|value| vec![value.to_string()])
+                        .unwrap_or_default(),
+                };
                 let destination = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("destination"))
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.get(1).map(ToString::to_string));
-                let (Some(source), Some(destination)) = (source, destination) else {
+                let Some(destination) = destination else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Move-Item without source and destination",
                     }
                     .into());
                 };
-                let destination = if std::path::Path::new(&destination).is_dir() {
-                    let name = std::path::Path::new(&source)
-                        .file_name()
-                        .map_or_else(String::new, |name| name.to_string_lossy().to_string());
-                    format!("{destination}/{name}")
-                } else {
-                    destination
-                };
-                std::fs::rename(&source, &destination).map_err(|_| {
-                    RuntimeError::NotImplemented {
-                        feature: "Move-Item cannot move this file",
+                if paths.is_empty() {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Move-Item without source and destination",
                     }
-                })?;
+                    .into());
+                }
+                for source in paths {
+                    let target = if std::path::Path::new(&destination).is_dir() {
+                        let name = std::path::Path::new(&source)
+                            .file_name()
+                            .map_or_else(String::new, |name| name.to_string_lossy().to_string());
+                        format!("{destination}/{name}")
+                    } else {
+                        destination.clone()
+                    };
+                    std::fs::rename(&source, &target).map_err(|_| {
+                        RuntimeError::NotImplemented {
+                            feature: "Move-Item cannot move this file",
+                        }
+                    })?;
+                }
                 Ok(Some(Vec::new()))
             }
             "get-childitem" | "ls" | "dir" => {

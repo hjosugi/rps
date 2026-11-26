@@ -27,3 +27,11 @@ Copy-Item rpsh-copy-a.txt, rpsh-copy-b.txt -Destination rpsh-copy-many
 Remove-Item rpsh-copy-many -Recurse -Force
 Remove-Item rpsh-copy-a.txt
 Remove-Item rpsh-copy-b.txt
+if (Test-Path rpsh-move-many) { Remove-Item rpsh-move-many -Recurse -Force }
+$null = New-Item -ItemType Directory -Path rpsh-move-many -Force
+Set-Content rpsh-move-a.txt -Value 'a'
+Set-Content rpsh-move-b.txt -Value 'b'
+Move-Item rpsh-move-a.txt, rpsh-move-b.txt -Destination rpsh-move-many
+(Get-ChildItem rpsh-move-many -Name | Sort-Object) -join ','
+Test-Path rpsh-move-a.txt
+Remove-Item rpsh-move-many -Recurse -Force
