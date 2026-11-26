@@ -9,3 +9,5 @@ function Local { }
 (Get-Command -CommandType Alias | ForEach-Object Name) -contains 'gc'
 (Get-Command -CommandType Alias | ForEach-Object Name) -contains 'Get-Content'
 (Get-Command -CommandType Cmdlet | ForEach-Object Name) -contains 'Get-Content'
+(Get-Command Get-Item, Get-Content | ForEach-Object Name | Sort-Object) -join ','
+(Get-Command -Name Get-Item, Get-Content | ForEach-Object Name | Sort-Object) -join ','

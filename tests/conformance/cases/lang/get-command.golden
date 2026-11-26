@@ -9,3 +9,5 @@ Alias
 True
 False
 True
+Get-Content,Get-Item
+Get-Content,Get-Item

@@ -4702,11 +4702,16 @@ impl Engine {
                     outputs.sort_by_key(|value| value.to_string());
                     return Ok(Some(outputs));
                 }
-                let wanted = named
+                let wanted: Vec<String> = match named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
+                {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
                 let command_type = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("commandtype"))
@@ -4727,9 +4732,10 @@ impl Engine {
                 }
                 let mut outputs = Vec::new();
                 for (name, kind) in names {
-                    let matches = wanted
-                        .as_deref()
-                        .is_none_or(|wanted| ops::wildcard_match(&name, wanted, false));
+                    let matches = wanted.is_empty()
+                        || wanted
+                            .iter()
+                            .any(|wanted| ops::wildcard_match(&name, wanted, false));
                     let type_matches = command_type
                         .as_deref()
                         .is_none_or(|wanted| wanted.eq_ignore_ascii_case(kind));
