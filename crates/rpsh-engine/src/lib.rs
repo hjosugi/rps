@@ -2752,6 +2752,11 @@ impl Engine {
                     .transpose()?;
                 let recurse = recurse || depth.is_some();
                 let wildcard_path = paths.iter().any(|path| path.contains(['*', '?']));
+                let metadata_base = if paths.len() == 1 && !wildcard_path {
+                    Some(expand_home(&paths[0]))
+                } else {
+                    None
+                };
                 let mut entries: Vec<(String, bool, u64)> = Vec::new();
                 for path in &paths {
                     let path = expand_home(path);
@@ -2860,7 +2865,17 @@ impl Engine {
                                     ),
                                     ("Length".to_owned(), Value::Int64(length as i64)),
                                 ];
-                                if let Ok(metadata) = std::fs::symlink_metadata(&name)
+                                let metadata_path = metadata_base.as_ref().map_or_else(
+                                    || name.clone(),
+                                    |base| {
+                                        format!(
+                                            "{}/{}",
+                                            base.trim_end_matches('/'),
+                                            name.trim_start_matches('/')
+                                        )
+                                    },
+                                );
+                                if let Ok(metadata) = std::fs::symlink_metadata(&metadata_path)
                                     && metadata.file_type().is_symlink()
                                 {
                                     entries.push((
@@ -2870,7 +2885,7 @@ impl Engine {
                                     entries.push((
                                         "Target".to_owned(),
                                         Value::String(
-                                            std::fs::read_link(&name)
+                                            std::fs::read_link(&metadata_path)
                                                 .map_or_else(
                                                     |_| String::new(),
                                                     |path| path.to_string_lossy().into_owned(),
