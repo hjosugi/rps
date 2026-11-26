@@ -1431,7 +1431,7 @@ impl Engine {
                         .iter()
                         .any(|(name, _)| name.eq_ignore_ascii_case(wanted))
                 };
-                let properties: Vec<String> = named
+                let mut properties: Vec<String> = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("property"))
                     .map(|(_, value)| {
@@ -1441,6 +1441,26 @@ impl Engine {
                             .collect()
                     })
                     .unwrap_or_default();
+                if properties.iter().any(|name| name.contains(['*', '?']))
+                    && let Some(Value::Object(entries)) = input.first()
+                {
+                    let visible = visible_entries(entries);
+                    let mut expanded = Vec::new();
+                    for name in &properties {
+                        if name.contains(['*', '?']) {
+                            for (candidate, _) in &visible {
+                                if ops::wildcard_match(candidate, name, false) {
+                                    expanded.push((*candidate).clone());
+                                }
+                            }
+                        } else {
+                            expanded.push(name.clone());
+                        }
+                    }
+                    if !expanded.is_empty() {
+                        properties = expanded;
+                    }
+                }
                 if properties.len() > 1 {
                     let mut outputs = Vec::new();
                     for property in &properties {

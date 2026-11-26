@@ -8,3 +8,5 @@
 (0..4 | Select-Object -Index (1, 3)) -join ','
 $measure = @([pscustomobject]@{A=1;B=10}, [pscustomobject]@{A=2;B=20})
 ($measure | Measure-Object -Property A, B -Sum | ForEach-Object { "$($_.Property)|$($_.Count)|$($_.Sum)" }) -join ';'
+$wildMeasure = @([pscustomobject]@{A1=1;A2=2}, [pscustomobject]@{A1=3;A2=4})
+($wildMeasure | Measure-Object -Property 'A*' -Sum | ForEach-Object { "$($_.Property)|$($_.Sum)" }) -join ';'
