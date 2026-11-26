@@ -7257,6 +7257,23 @@ fn item_value(text: &str) -> Value {
             Value::String(unix_mode_string(target).into()),
         ),
         (
+            "Attributes".to_owned(),
+            Value::String(
+                if target
+                    .metadata()
+                    .map(|meta| meta.permissions().readonly())
+                    .unwrap_or(false)
+                {
+                    "ReadOnly"
+                } else if target.is_dir() {
+                    "Directory"
+                } else {
+                    "Normal"
+                }
+                .into(),
+            ),
+        ),
+        (
             "IsReadOnly".to_owned(),
             Value::Bool(
                 target

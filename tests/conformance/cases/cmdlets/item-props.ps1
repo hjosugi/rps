@@ -34,3 +34,5 @@ $wildItemB = 2
 (Get-Item Variable:wildItem* | Measure-Object).Count
 (Get-Item fixtures/data.txt).UnixMode
 (Get-Item fixtures/tree).UnixMode
+(Get-Item fixtures/data.txt).Attributes
+(Get-Item fixtures/tree).Attributes
