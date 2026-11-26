@@ -4636,6 +4636,31 @@ impl Engine {
             }
             "get-command" | "gcm" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
+                if let Some((_, module)) = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("module"))
+                {
+                    let module = module.to_string();
+                    let mut outputs = Vec::new();
+                    for (name, functions) in &self.module_functions {
+                        if !ops::wildcard_match(name, &module, false) {
+                            continue;
+                        }
+                        for function in functions {
+                            if let Some(definition) = self.functions.get(function) {
+                                outputs.push(Value::object(vec![
+                                    (
+                                        "Name".to_owned(),
+                                        Value::String(definition.name.clone().into()),
+                                    ),
+                                    ("CommandType".to_owned(), Value::String("Function".into())),
+                                ]));
+                            }
+                        }
+                    }
+                    outputs.sort_by_key(|value| value.to_string());
+                    return Ok(Some(outputs));
+                }
                 let wanted = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))

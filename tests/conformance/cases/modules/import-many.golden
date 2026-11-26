@@ -2,4 +2,6 @@ rpsh-golden-v2
 exit=0
 module fn
 12
+Get-Extra
+Add-One,ModuleFn
 module-extra,module-fixture
