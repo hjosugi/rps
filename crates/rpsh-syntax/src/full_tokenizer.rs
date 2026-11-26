@@ -942,6 +942,25 @@ impl Tokenizer<'_> {
                     self.ternary_depth += 1;
                 }
                 self.push(kind, start, end);
+                let assignment_command = kind == FullTokenKind::Equals
+                    && self.tokens.len() >= 2
+                    && matches!(
+                        self.tokens[self.tokens.len() - 2].kind,
+                        FullTokenKind::Variable
+                            | FullTokenKind::Identifier
+                            | FullTokenKind::Generic
+                    )
+                    && (self.tokens.len() < 3
+                        || matches!(
+                            self.tokens[self.tokens.len() - 3].kind,
+                            FullTokenKind::NewLine | FullTokenKind::Semi | FullTokenKind::LCurly
+                        ));
+                if assignment_command {
+                    self.mode = Mode::Command;
+                    self.command_seen = false;
+                    self.statement_start = true;
+                    return true;
+                }
                 match kind {
                     FullTokenKind::Pipe
                     | FullTokenKind::AndAnd

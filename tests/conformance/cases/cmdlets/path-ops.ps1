@@ -80,3 +80,7 @@ $nv
 Test-Path Variable:nv
 Remove-Item Env:RPSH_NEW
 Remove-Variable nv
+$x = New-Item -Path Env:RPSH_ASSIGN -Value 'v'
+$x.Name
+$env:RPSH_ASSIGN
+Remove-Item Env:RPSH_ASSIGN
