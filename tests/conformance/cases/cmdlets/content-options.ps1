@@ -54,3 +54,13 @@ Clear-Content rpsh-clear*.txt
 (Get-Content rpsh-clear2.txt -Raw).Length
 Remove-Item rpsh-clear1.txt
 Remove-Item rpsh-clear2.txt
+Set-Content rpsh-globw1.txt -Value 'old'
+Set-Content rpsh-globw2.txt -Value 'old'
+Set-Content rpsh-globw*.txt -Value 'x'
+(Get-Content rpsh-globw1.txt) -join ','
+(Get-Content rpsh-globw2.txt) -join ','
+Add-Content rpsh-globw*.txt -Value 'y'
+(Get-Content rpsh-globw1.txt) -join ','
+(Get-Content rpsh-globw2.txt) -join ','
+Remove-Item rpsh-globw1.txt
+Remove-Item rpsh-globw2.txt

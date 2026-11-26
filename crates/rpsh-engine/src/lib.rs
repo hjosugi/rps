@@ -2618,17 +2618,25 @@ impl Engine {
                 }
                 use std::io::Write as _;
                 for path in paths {
-                    let mut file = std::fs::OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(&path)
-                        .map_err(|_| RuntimeError::NotImplemented {
-                            feature: "Add-Content cannot open this file",
+                    let files = if path.contains(['*', '?']) {
+                        expand_glob(&path)
+                    } else {
+                        vec![path]
+                    };
+                    for path in files {
+                        let mut file = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(&path)
+                            .map_err(|_| RuntimeError::NotImplemented {
+                                feature: "Add-Content cannot open this file",
+                            })?;
+                        file.write_all(text.as_bytes()).map_err(|_| {
+                            RuntimeError::NotImplemented {
+                                feature: "Add-Content cannot write this file",
+                            }
                         })?;
-                    file.write_all(text.as_bytes())
-                        .map_err(|_| RuntimeError::NotImplemented {
-                            feature: "Add-Content cannot write this file",
-                        })?;
+                    }
                 }
                 Ok(Some(Vec::new()))
             }
@@ -3061,9 +3069,16 @@ impl Engine {
                     }
                 }
                 for path in paths {
-                    std::fs::write(&path, &text).map_err(|_| RuntimeError::NotImplemented {
-                        feature: "Set-Content of an unwritable file",
-                    })?;
+                    let files = if path.contains(['*', '?']) {
+                        expand_glob(&path)
+                    } else {
+                        vec![path]
+                    };
+                    for path in files {
+                        std::fs::write(&path, &text).map_err(|_| RuntimeError::NotImplemented {
+                            feature: "Set-Content of an unwritable file",
+                        })?;
+                    }
                 }
                 Ok(Some(Vec::new()))
             }
