@@ -3794,9 +3794,26 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "convertfrom-json" => {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let as_hashtable = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("ashashtable") && ops::is_true(value)
+                });
+                let values: Vec<Value> = if input.is_empty() {
+                    positional
+                        .iter()
+                        .flat_map(|value| flatten_value(value.clone()))
+                        .collect()
+                } else {
+                    input.to_vec()
+                };
                 let mut outputs = Vec::new();
-                for item in input {
-                    outputs.push(json_parse(&item.to_string())?);
+                for item in values {
+                    let value = json_parse(&item.to_string())?;
+                    outputs.push(if as_hashtable {
+                        mark_json_hashtables(value)
+                    } else {
+                        value
+                    });
                 }
                 Ok(Some(outputs))
             }
@@ -4746,6 +4763,31 @@ fn json_quote(text: &str) -> String {
     }
     out.push('"');
     out
+}
+
+fn mark_json_hashtables(value: Value) -> Value {
+    match value {
+        Value::Object(entries) => {
+            let mut entries: Vec<(String, Value)> = entries
+                .as_ref()
+                .iter()
+                .map(|(name, value)| (name.clone(), mark_json_hashtables(value.clone())))
+                .collect();
+            entries.push((
+                "__TypeName".to_owned(),
+                Value::String("System.Management.Automation.OrderedHashtable".into()),
+            ));
+            Value::object(entries)
+        }
+        Value::Array(items) => Value::array(
+            items
+                .as_ref()
+                .iter()
+                .map(|item| mark_json_hashtables(item.clone()))
+                .collect(),
+        ),
+        other => other,
+    }
 }
 
 fn json_parse(text: &str) -> Result<Value, RuntimeError> {

@@ -6,3 +6,11 @@ $o.y.Count
 $null -eq $o.y[2].z
 ('a', 'b' | ConvertTo-Json -AsArray -Compress)
 (1 | ConvertTo-Json -AsArray -Compress)
+$h = '{"a":1,"b":{"c":2}}' | ConvertFrom-Json -AsHashtable
+$h.GetType().Name
+$h.a
+$h.b.GetType().Name
+$h.b.c
+$h.ContainsKey('a')
+$p = ConvertFrom-Json '{"x":3}'
+$p.x

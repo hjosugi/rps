@@ -6,3 +6,9 @@ exit=0
 True
 ["a","b"]
 [1]
+OrderedHashtable
+1
+OrderedHashtable
+2
+True
+3
