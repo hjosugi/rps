@@ -9106,6 +9106,15 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
                         + day;
                     return Ok(Value::Int32(total));
                 }
+                if name.eq_ignore_ascii_case("Date") {
+                    return Ok(datetime_value(year, month, day, 0, 0, 0));
+                }
+                if name.eq_ignore_ascii_case("TimeOfDay") {
+                    let ticks = i64::from(field("__Hour")) * TICKS_PER_HOUR
+                        + i64::from(field("__Minute")) * TICKS_PER_MINUTE
+                        + i64::from(field("__Second")) * TICKS_PER_SECOND;
+                    return Ok(timespan_value(ticks));
+                }
                 if let Some((_, value)) = entries
                     .iter()
                     .find(|(key, _)| key.eq_ignore_ascii_case(&format!("__{name}")))

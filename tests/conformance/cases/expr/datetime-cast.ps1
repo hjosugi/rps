@@ -18,5 +18,7 @@ $first = [datetime]'2024-01-31'
 ([datetime]'2024-01-01 00:00:10').AddSeconds(-20).ToString('yyyy-MM-dd HH:mm:ss')
 [datetime]::Parse('2024-03-04').Year
 ([datetime]'2024-01-01', [datetime]'2024-02-01' | Where-Object { $_ -gt [datetime]'2024-01-15' } | ForEach-Object { $_.ToString('yyyy-MM-dd') }) -join ','
+([datetime]'2024-03-04 13:05:06').Date.ToString('yyyy-MM-dd')
+([datetime]'2024-03-04 13:05:06').TimeOfDay.TotalSeconds
 [datetime]'2024-03-04'
 [datetime]'2024-03-04 13:05:06'
