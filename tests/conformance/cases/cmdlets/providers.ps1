@@ -3,3 +3,5 @@
 $d = Get-PSDrive -Name Env
 $d.Provider.Name
 (Get-PSProvider | ForEach-Object Name | Sort-Object) -join ','
+(Get-PSDrive Env).Provider.Name
+(Get-PSDrive Env).Name

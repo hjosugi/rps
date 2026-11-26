@@ -4081,11 +4081,12 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "get-psdrive" => {
-                let (_, named) = self.evaluate_arguments(arguments)?;
+                let (positional, named) = self.evaluate_arguments(arguments)?;
                 let wanted = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                    .map(|(_, value)| value.to_string());
+                    .map(|(_, value)| value.to_string())
+                    .or_else(|| positional.first().map(ToString::to_string));
                 let drives = [
                     ("/", "FileSystem", "FileSystem"),
                     ("Alias", "Alias", "Alias"),
@@ -4960,16 +4961,12 @@ impl Engine {
             }
             return Ok(Value::String(text.into()));
         }
-        if let ExprKind::Member { target, name } = &expr.kind
-            && let ExprKind::Group(statements) = &target.kind
-        {
-            let target = self.eval_group(statements)?;
+        if let ExprKind::Member { target, name } = &expr.kind {
+            let target = self.eval_expression(target)?;
             return Ok(member(&target, name)?);
         }
-        if let ExprKind::Index { target, index } = &expr.kind
-            && let ExprKind::Group(statements) = &target.kind
-        {
-            let target = self.eval_group(statements)?;
+        if let ExprKind::Index { target, index } = &expr.kind {
+            let target = self.eval_expression(target)?;
             let index = self.eval_expression(index)?;
             return Ok(index_value(&target, &index)?);
         }
