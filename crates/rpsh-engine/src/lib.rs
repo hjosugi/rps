@@ -8942,12 +8942,36 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         }
         "int" | "int32" | "system.int32" => Ok(Value::Int32(convert_int32(&value)?)),
         "long" | "int64" | "system.int64" => Ok(Value::Int64(convert_int64(&value)?)),
-        "byte" | "system.byte" => Ok(Value::Byte(convert_int64(&value)? as u8)),
-        "sbyte" | "system.sbyte" => Ok(Value::SByte(convert_int64(&value)? as i8)),
-        "int16" | "short" | "system.int16" => Ok(Value::Int16(convert_int64(&value)? as i16)),
-        "uint16" | "ushort" | "system.uint16" => Ok(Value::UInt16(convert_int64(&value)? as u16)),
-        "uint32" | "uint" | "system.uint32" => Ok(Value::UInt32(convert_int64(&value)? as u32)),
-        "uint64" | "ulong" | "system.uint64" => Ok(Value::UInt64(convert_int64(&value)? as u64)),
+        "byte" | "system.byte" => u8::try_from(convert_int64(&value)?)
+            .map(Value::Byte)
+            .map_err(|_| RuntimeError::NotImplemented {
+                feature: "integer conversion overflow",
+            }),
+        "sbyte" | "system.sbyte" => i8::try_from(convert_int64(&value)?)
+            .map(Value::SByte)
+            .map_err(|_| RuntimeError::NotImplemented {
+                feature: "integer conversion overflow",
+            }),
+        "int16" | "short" | "system.int16" => i16::try_from(convert_int64(&value)?)
+            .map(Value::Int16)
+            .map_err(|_| RuntimeError::NotImplemented {
+                feature: "integer conversion overflow",
+            }),
+        "uint16" | "ushort" | "system.uint16" => u16::try_from(convert_int64(&value)?)
+            .map(Value::UInt16)
+            .map_err(|_| RuntimeError::NotImplemented {
+                feature: "integer conversion overflow",
+            }),
+        "uint32" | "uint" | "system.uint32" => u32::try_from(convert_int64(&value)?)
+            .map(Value::UInt32)
+            .map_err(|_| RuntimeError::NotImplemented {
+                feature: "integer conversion overflow",
+            }),
+        "uint64" | "ulong" | "system.uint64" => u64::try_from(convert_int64(&value)?)
+            .map(Value::UInt64)
+            .map_err(|_| RuntimeError::NotImplemented {
+                feature: "integer conversion overflow",
+            }),
         "double" | "system.double" => Ok(Value::Double(convert_double(&value)?)),
         "string" | "system.string" => Ok(Value::String(value.to_string().into())),
         "bool" | "boolean" | "system.boolean" => Ok(Value::Bool(convert_bool(&value))),
