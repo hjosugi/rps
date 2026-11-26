@@ -40,3 +40,12 @@ $provider = 1
 Test-Path Variable:provider
 Test-Path Variable:nope
 Test-Path Alias:gc
+$env:RPSH_CHILD_A = '1'
+$env:RPSH_CHILD_B = '2'
+(Get-ChildItem Env: | Where-Object Name -like 'RPSH_CHILD_*' | ForEach-Object Name | Sort-Object) -join ','
+$childVar = 1
+(Get-ChildItem Variable:child* | ForEach-Object Name | Sort-Object) -join ','
+Set-Alias localalias Write-Output
+(Get-ChildItem Alias:localalias -Name) -join ','
+function LocalChild {}
+(Get-ChildItem Function:LocalChild -Name) -join ','

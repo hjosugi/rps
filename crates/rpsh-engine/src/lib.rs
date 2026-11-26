@@ -2202,6 +2202,12 @@ impl Engine {
                         .into());
                     }
                 }
+                if paths.len() == 1
+                    && let Some(items) =
+                        self.provider_children(&paths[0], names_only, filter.as_deref())
+                {
+                    return Ok(Some(items));
+                }
                 let exclude: Vec<String> = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("exclude"))
@@ -4518,6 +4524,111 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    fn provider_children(
+        &self,
+        path: &str,
+        names_only: bool,
+        filter: Option<&str>,
+    ) -> Option<Vec<Value>> {
+        let (provider, name) = path.split_once(':')?;
+        let pattern = if name.is_empty() { "*" } else { name };
+        let matches = |candidate: &str| {
+            ops::wildcard_match(candidate, pattern, false)
+                && filter.is_none_or(|filter| ops::wildcard_match(candidate, filter, false))
+        };
+        let mut outputs = Vec::new();
+        match provider.to_ascii_lowercase().as_str() {
+            "env" => {
+                let mut entries: std::collections::BTreeMap<String, Value> = std::env::vars()
+                    .map(|(name, value)| (name, Value::String(value.into())))
+                    .collect();
+                for (key, value) in &self.variables {
+                    if let Some(env_name) = key.strip_prefix("env:") {
+                        if value.is_null_like() {
+                            entries.remove(env_name);
+                        } else {
+                            entries.insert(env_name.to_owned(), value.clone());
+                        }
+                    }
+                }
+                for (name, value) in entries {
+                    if !matches(&name) {
+                        continue;
+                    }
+                    outputs.push(if names_only {
+                        Value::String(name.into())
+                    } else {
+                        Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.into())),
+                            ("Value".to_owned(), value),
+                        ])
+                    });
+                }
+            }
+            "variable" => {
+                let mut names: Vec<&String> = self.variables.keys().collect();
+                names.sort();
+                for name in names {
+                    if !matches(name) {
+                        continue;
+                    }
+                    outputs.push(if names_only {
+                        Value::String(name.clone().into())
+                    } else {
+                        Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.clone().into())),
+                            (
+                                "Value".to_owned(),
+                                self.variables.get(name).cloned().unwrap_or(Value::Null),
+                            ),
+                        ])
+                    });
+                }
+            }
+            "alias" => {
+                let mut entries: std::collections::BTreeMap<String, String> = DEFAULT_ALIASES
+                    .iter()
+                    .map(|(name, definition)| ((*name).to_owned(), (*definition).to_owned()))
+                    .collect();
+                for (name, definition) in &self.aliases {
+                    entries.insert(name.clone(), definition.clone());
+                }
+                for (name, definition) in entries {
+                    if !matches(&name) {
+                        continue;
+                    }
+                    outputs.push(if names_only {
+                        Value::String(name.into())
+                    } else {
+                        Value::object(vec![
+                            ("Name".to_owned(), Value::String(name.into())),
+                            ("Definition".to_owned(), Value::String(definition.into())),
+                        ])
+                    });
+                }
+            }
+            "function" => {
+                let mut functions: Vec<&FunctionDef> = self.functions.values().collect();
+                functions.sort_by_key(|function| function.name.to_lowercase());
+                for function in functions {
+                    if !matches(&function.name) {
+                        continue;
+                    }
+                    outputs.push(if names_only {
+                        Value::String(function.name.clone().into())
+                    } else {
+                        Value::object(vec![(
+                            "Name".to_owned(),
+                            Value::String(function.name.clone().into()),
+                        )])
+                    });
+                }
+            }
+            _ => return None,
+        }
+        Some(outputs)
     }
 
     fn provider_item(&self, path: &str) -> Option<Result<Value, RuntimeError>> {
