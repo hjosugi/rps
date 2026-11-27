@@ -3820,12 +3820,17 @@ impl Engine {
             }
             "remove-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let name = named
+                let names: Vec<String> = match named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                if let Some(name) = name {
+                {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                for name in names {
                     if name.contains(['*', '?']) {
                         let keys: Vec<String> = self
                             .variables

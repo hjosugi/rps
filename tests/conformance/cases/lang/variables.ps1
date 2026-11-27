@@ -31,3 +31,7 @@ New-Variable mv1 1
 New-Variable mv2 2
 (Get-Variable mv1, mv2 | ForEach-Object Name | Sort-Object) -join ','
 (Get-Variable -Name mv1, mv2 -ValueOnly) -join ','
+New-Variable rm1 1
+New-Variable rm2 2
+Remove-Variable rm1, rm2
+(Get-Variable 'rm*' | Measure-Object).Count
