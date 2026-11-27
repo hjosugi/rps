@@ -3190,6 +3190,36 @@ impl Engine {
                 }
                 let mut text = String::new();
                 for path in paths {
+                    if let Some((provider, name)) = path.split_once(':') {
+                        let name = name.trim_start_matches("\\");
+                        if !name.is_empty() {
+                            let value = if provider.eq_ignore_ascii_case("env") {
+                                self.variables
+                                    .get(&format!("env:{name}"))
+                                    .cloned()
+                                    .or_else(|| {
+                                        std::env::var(name)
+                                            .ok()
+                                            .map(|value| Value::String(value.into()))
+                                    })
+                            } else if provider.eq_ignore_ascii_case("variable") {
+                                let key = strip_scope(name);
+                                self.variables
+                                    .get(key)
+                                    .cloned()
+                                    .or_else(|| automatic_variable(key))
+                            } else {
+                                None
+                            };
+                            if let Some(value) = value {
+                                if !text.is_empty() && !text.ends_with('\n') {
+                                    text.push('\n');
+                                }
+                                text.push_str(&value.to_string());
+                                continue;
+                            }
+                        }
+                    }
                     let path = expand_home(&path);
                     if path.contains(['*', '?']) {
                         for matched in expand_glob(&path) {

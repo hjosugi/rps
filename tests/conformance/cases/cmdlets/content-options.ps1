@@ -64,3 +64,9 @@ Add-Content rpsh-globw*.txt -Value 'y'
 (Get-Content rpsh-globw2.txt) -join ','
 Remove-Item rpsh-globw1.txt
 Remove-Item rpsh-globw2.txt
+$env:RPSH_GC = 'abc'
+(Get-Content Env:RPSH_GC) -join ','
+$gcv = 'xyz'
+(Get-Content Variable:gcv) -join ','
+Remove-Item Env:RPSH_GC
+Remove-Variable gcv
