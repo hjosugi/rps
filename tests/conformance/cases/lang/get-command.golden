@@ -11,3 +11,5 @@ False
 True
 Get-Content,Get-Item
 Get-Content,Get-Item
+Get-Item
+Get-ChildItem

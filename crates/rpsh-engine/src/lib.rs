@@ -4897,6 +4897,14 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("commandtype"))
                     .map(|(_, value)| value.to_string());
+                let verb = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("verb"))
+                    .map(|(_, value)| value.to_string());
+                let noun = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("noun"))
+                    .map(|(_, value)| value.to_string());
                 let mut names: Vec<(String, &'static str)> = self
                     .functions
                     .values()
@@ -4920,7 +4928,17 @@ impl Engine {
                     let type_matches = command_type
                         .as_deref()
                         .is_none_or(|wanted| wanted.eq_ignore_ascii_case(kind));
-                    if matches && type_matches {
+                    let (name_verb, name_noun) = match name.split_once('-') {
+                        Some((verb, noun)) => (verb, noun),
+                        None => ("", name.as_str()),
+                    };
+                    let verb_matches = verb
+                        .as_deref()
+                        .is_none_or(|wanted| ops::wildcard_match(name_verb, wanted, false));
+                    let noun_matches = noun
+                        .as_deref()
+                        .is_none_or(|wanted| ops::wildcard_match(name_noun, wanted, false));
+                    if matches && type_matches && verb_matches && noun_matches {
                         outputs.push(Value::object(vec![
                             ("Name".to_owned(), Value::String(name.into())),
                             ("CommandType".to_owned(), Value::String(kind.into())),

@@ -11,3 +11,5 @@ function Local { }
 (Get-Command -CommandType Cmdlet | ForEach-Object Name) -contains 'Get-Content'
 (Get-Command Get-Item, Get-Content | ForEach-Object Name | Sort-Object) -join ','
 (Get-Command -Name Get-Item, Get-Content | ForEach-Object Name | Sort-Object) -join ','
+(Get-Command -Verb Get -Noun Item | ForEach-Object Name | Sort-Object) -join ','
+(Get-Command -Verb Get -Noun ChildItem | ForEach-Object Name | Sort-Object) -join ','
