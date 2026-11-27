@@ -1460,8 +1460,12 @@ impl Engine {
             "where-object" | "where" => {
                 if script_block_argument(arguments).is_none() {
                     let (positional, named) = self.evaluate_arguments(arguments)?;
-                    if let Some(property) = positional.first() {
-                        let property = property.to_string();
+                    let property = named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("property"))
+                        .map(|(_, value)| value.to_string())
+                        .or_else(|| positional.first().map(ToString::to_string));
+                    if let Some(property) = property {
                         if let Some((comparison, expected)) =
                             named.iter().find_map(|(name, value)| {
                                 comparison_for(name).map(|comparison| (comparison, value))
@@ -1479,6 +1483,14 @@ impl Engine {
                             }
                             return Ok(Some(outputs));
                         }
+                        let outputs = input
+                            .iter()
+                            .filter(|item| {
+                                member(item, &property).is_ok_and(|value| ops::is_true(&value))
+                            })
+                            .cloned()
+                            .collect();
+                        return Ok(Some(outputs));
                     }
                 }
                 let Some(script) = script_block_argument(arguments) else {
