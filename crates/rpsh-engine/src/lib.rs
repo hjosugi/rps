@@ -1552,6 +1552,7 @@ impl Engine {
                         let mut minimum: Option<Value> = None;
                         let mut maximum: Option<Value> = None;
                         let mut average = 0.0;
+                        let mut sum_squares = 0.0;
                         let mut count = 0;
                         let mut words = 0;
                         let mut lines = 0;
@@ -1571,7 +1572,9 @@ impl Engine {
                             }
                             count += 1;
                             sum = ops::add(&sum, item)?;
-                            average += convert_double(item)?;
+                            let number = convert_double(item)?;
+                            average += number;
+                            sum_squares += number * number;
                             let compare = |a: &Value, b: &Value| {
                                 matches!(
                                     ops::compare(a, b, ops::Comparison::Lt, false),
@@ -1619,6 +1622,19 @@ impl Engine {
                             entries
                                 .push(("Characters".to_owned(), Value::Int32(characters as i32)));
                         }
+                        if flag("standarddeviation") {
+                            let deviation = if count > 1 {
+                                let mean = average;
+                                ((sum_squares / f64::from(count) - mean * mean) * f64::from(count)
+                                    / f64::from(count - 1))
+                                .max(0.0)
+                                .sqrt()
+                            } else {
+                                0.0
+                            };
+                            entries
+                                .push(("StandardDeviation".to_owned(), Value::Double(deviation)));
+                        }
                         entries.push((
                             "Property".to_owned(),
                             Value::String(property.clone().into()),
@@ -1633,6 +1649,7 @@ impl Engine {
                 let mut minimum: Option<Value> = None;
                 let mut maximum: Option<Value> = None;
                 let mut average = 0.0;
+                let mut sum_squares = 0.0;
                 let mut count = 0;
                 let mut words = 0;
                 let mut lines = 0;
@@ -1655,7 +1672,9 @@ impl Engine {
                     }
                     count += 1;
                     sum = ops::add(&sum, item)?;
-                    average += convert_double(item)?;
+                    let number = convert_double(item)?;
+                    average += number;
+                    sum_squares += number * number;
                     let compare = |a: &Value, b: &Value| {
                         matches!(
                             ops::compare(a, b, ops::Comparison::Lt, false),
@@ -1701,6 +1720,18 @@ impl Engine {
                 }
                 if flag("character") {
                     entries.push(("Characters".to_owned(), Value::Int32(characters as i32)));
+                }
+                if flag("standarddeviation") {
+                    let deviation = if count > 1 {
+                        let mean = average;
+                        ((sum_squares / f64::from(count) - mean * mean) * f64::from(count)
+                            / f64::from(count - 1))
+                        .max(0.0)
+                        .sqrt()
+                    } else {
+                        0.0
+                    };
+                    entries.push(("StandardDeviation".to_owned(), Value::Double(deviation)));
                 }
                 Ok(Some(vec![Value::object(entries)]))
             }
