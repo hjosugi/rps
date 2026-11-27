@@ -3791,30 +3791,37 @@ impl Engine {
             }
             "clear-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let name = named
+                let names: Vec<String> = match named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(name) = name else {
+                {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None => positional.iter().map(ToString::to_string).collect(),
+                };
+                if names.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Clear-Variable without a name",
                     }
                     .into());
-                };
-                if name.contains(['*', '?']) {
-                    let keys: Vec<String> = self
-                        .variables
-                        .keys()
-                        .filter(|key| ops::wildcard_match(key, &name, false))
-                        .cloned()
-                        .collect();
-                    for key in keys {
-                        self.variables.insert(key, Value::Null);
+                }
+                for name in names {
+                    if name.contains(['*', '?']) {
+                        let keys: Vec<String> = self
+                            .variables
+                            .keys()
+                            .filter(|key| ops::wildcard_match(key, &name, false))
+                            .cloned()
+                            .collect();
+                        for key in keys {
+                            self.variables.insert(key, Value::Null);
+                        }
+                    } else {
+                        self.variables
+                            .insert(strip_scope(&name).to_owned(), Value::Null);
                     }
-                } else {
-                    self.variables
-                        .insert(strip_scope(&name).to_owned(), Value::Null);
                 }
                 Ok(Some(Vec::new()))
             }

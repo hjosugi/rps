@@ -35,3 +35,8 @@ New-Variable rm1 1
 New-Variable rm2 2
 Remove-Variable rm1, rm2
 (Get-Variable 'rm*' | Measure-Object).Count
+New-Variable c1 1
+New-Variable c2 2
+Clear-Variable c1, c2
+($null -eq $c1) -and ($null -eq $c2)
+Remove-Variable c1, c2
