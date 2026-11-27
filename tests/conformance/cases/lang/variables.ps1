@@ -40,3 +40,7 @@ New-Variable c2 2
 Clear-Variable c1, c2
 ($null -eq $c1) -and ($null -eq $c2)
 Remove-Variable c1, c2
+Set-Variable s1, s2 -Value 1
+$s1
+$s2
+(Set-Variable s3, s4 -Value 2 -PassThru | ForEach-Object { "$($_.Name)=$($_.Value)" } | Sort-Object) -join ','

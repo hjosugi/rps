@@ -3752,42 +3752,53 @@ impl Engine {
             }
             "set-variable" | "new-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let name = named
+                let value_named = named
+                    .iter()
+                    .any(|(name, _)| name.eq_ignore_ascii_case("value"));
+                let names: Vec<String> = match named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
+                {
+                    Some((_, value)) => flatten_value(value.clone())
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect(),
+                    None if value_named => positional.iter().map(ToString::to_string).collect(),
+                    None => positional
+                        .first()
+                        .map(|value| vec![value.to_string()])
+                        .unwrap_or_default(),
+                };
                 let value = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("value"))
                     .map(|(_, value)| value.clone())
                     .or_else(|| positional.get(1).cloned())
                     .unwrap_or(Value::Null);
-                let Some(name) = name else {
+                if names.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Set-Variable without a name",
                     }
                     .into());
-                };
-                let key = strip_scope(&name).to_owned();
-                if is_global_scope(&name) {
-                    self.globals.insert(key.clone(), value.clone());
                 }
-                self.variables.insert(key, value.clone());
                 let pass_thru = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("passthru") && ops::is_true(value)
                 });
-                Ok(Some(if pass_thru {
-                    vec![Value::object(vec![
-                        (
-                            "Name".to_owned(),
-                            Value::String(strip_scope(&name).to_owned().into()),
-                        ),
-                        ("Value".to_owned(), value),
-                    ])]
-                } else {
-                    Vec::new()
-                }))
+                let mut outputs = Vec::new();
+                for name in names {
+                    let key = strip_scope(&name).to_owned();
+                    if is_global_scope(&name) {
+                        self.globals.insert(key.clone(), value.clone());
+                    }
+                    self.variables.insert(key.clone(), value.clone());
+                    if pass_thru {
+                        outputs.push(Value::object(vec![
+                            ("Name".to_owned(), Value::String(key.into())),
+                            ("Value".to_owned(), value.clone()),
+                        ]));
+                    }
+                }
+                Ok(Some(outputs))
             }
             "clear-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
