@@ -7,3 +7,4 @@ echo,greet
 gc,type
 echo,gc
 echo,gc
+echo,gc,greet,type

@@ -4794,10 +4794,16 @@ impl Engine {
                         .collect(),
                     None => positional.iter().map(ToString::to_string).collect(),
                 };
-                let definition_filter = named
+                let definitions: Vec<String> = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("definition"))
-                    .map(|(_, value)| value.to_string());
+                    .map(|(_, value)| {
+                        flatten_value(value.clone())
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default();
                 let mut entries: Vec<(String, String)> = self
                     .aliases
                     .iter()
@@ -4816,13 +4822,14 @@ impl Engine {
                                 name.eq_ignore_ascii_case(wanted)
                             }
                         });
-                    let definition_matches = definition_filter.as_deref().is_none_or(|wanted| {
-                        if wanted.contains(['*', '?']) {
-                            ops::wildcard_match(&definition, wanted, false)
-                        } else {
-                            definition.eq_ignore_ascii_case(wanted)
-                        }
-                    });
+                    let definition_matches = definitions.is_empty()
+                        || definitions.iter().any(|wanted| {
+                            if wanted.contains(['*', '?']) {
+                                ops::wildcard_match(&definition, wanted, false)
+                            } else {
+                                definition.eq_ignore_ascii_case(wanted)
+                            }
+                        });
                     if matches && definition_matches {
                         outputs.push(Value::object(vec![
                             ("Name".to_owned(), Value::String(name.clone().into())),
