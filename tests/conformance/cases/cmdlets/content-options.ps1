@@ -70,3 +70,9 @@ $gcv = 'xyz'
 (Get-Content Variable:gcv) -join ','
 Remove-Item Env:RPSH_GC
 Remove-Variable gcv
+Set-Content Env:RPSH_SC -Value 'abc'
+($env:RPSH_SC).Length
+Set-Content Variable:svc -Value 'xyz'
+($svc).Length
+Remove-Item Env:RPSH_SC
+Remove-Variable svc

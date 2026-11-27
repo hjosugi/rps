@@ -3545,6 +3545,34 @@ impl Engine {
                     }
                 };
                 let values = flatten_values(values);
+                let provider_paths = paths.iter().all(|path| {
+                    path.split_once(':').is_some_and(|(provider, name)| {
+                        !name.is_empty()
+                            && (provider.eq_ignore_ascii_case("env")
+                                || provider.eq_ignore_ascii_case("variable"))
+                    })
+                });
+                if provider_paths {
+                    let text = values
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    for path in paths {
+                        let Some((provider, name)) = path.split_once(':') else {
+                            continue;
+                        };
+                        let name = name.trim_start_matches("\\");
+                        let key = if provider.eq_ignore_ascii_case("env") {
+                            format!("env:{name}")
+                        } else {
+                            strip_scope(name).to_owned()
+                        };
+                        self.variables
+                            .insert(key, Value::String(text.clone().into()));
+                    }
+                    return Ok(Some(Vec::new()));
+                }
                 if named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("asbytestream") && ops::is_true(value)
                 }) {
