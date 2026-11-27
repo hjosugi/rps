@@ -3037,6 +3037,20 @@ impl Engine {
                         .collect(),
                     None => positional.iter().map(ToString::to_string).collect(),
                 };
+                if paths.iter().any(|path| {
+                    path.split_once(':').is_some_and(|(provider, name)| {
+                        !name.is_empty()
+                            && matches!(
+                                provider.to_ascii_lowercase().as_str(),
+                                "env" | "variable" | "alias" | "function"
+                            )
+                    })
+                }) {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Clear-Content for this provider",
+                    }
+                    .into());
+                }
                 for path in paths {
                     let files = if path.contains(['*', '?']) {
                         expand_glob(&path)
@@ -3079,6 +3093,20 @@ impl Engine {
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Add-Content without a path",
+                    }
+                    .into());
+                }
+                if paths.iter().any(|path| {
+                    path.split_once(':').is_some_and(|(provider, name)| {
+                        !name.is_empty()
+                            && matches!(
+                                provider.to_ascii_lowercase().as_str(),
+                                "env" | "variable" | "alias" | "function"
+                            )
+                    })
+                }) {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Add-Content for this provider",
                     }
                     .into());
                 }
@@ -3195,6 +3223,20 @@ impl Engine {
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-Content without a path",
+                    }
+                    .into());
+                }
+                if paths.iter().any(|path| {
+                    path.split_once(':').is_some_and(|(provider, name)| {
+                        !name.is_empty()
+                            && matches!(
+                                provider.to_ascii_lowercase().as_str(),
+                                "alias" | "function"
+                            )
+                    })
+                }) {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Set-Content for this provider",
                     }
                     .into());
                 }
