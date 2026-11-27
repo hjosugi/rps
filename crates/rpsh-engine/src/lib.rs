@@ -1852,6 +1852,15 @@ impl Engine {
                             .collect()
                     })
                     .unwrap_or_default();
+                if properties
+                    .iter()
+                    .any(|property| property.contains(['*', '?']))
+                {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Group-Object with wildcard properties",
+                    }
+                    .into());
+                }
                 if properties.len() > 1 {
                     let mut groups: Vec<(String, Vec<Value>, Vec<Value>)> = Vec::new();
                     for item in input {
