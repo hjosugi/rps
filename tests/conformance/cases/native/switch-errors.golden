@@ -1,0 +1,89 @@
+rpsh-golden-v2
+exit=0
+System.String[]|5|1||a b|True|1 2
+CommandNotFound,Microsoft.PowerShell.Commands.SwitchProcessCommand
+System.Management.Automation.CommandNotFoundException
+Command 'Get-Command' was not found. The specified command must be an executable.
+
+Category   : InvalidArgument
+Activity   : Switch-Process
+Reason     : CommandNotFoundException
+TargetName : Get-Command
+TargetType : String
+
+Get-Command
+System.NullReferenceException,Microsoft.PowerShell.Commands.SwitchProcessCommand
+System.NullReferenceException
+Object reference not set to an instance of an object.
+Category   : NotSpecified
+Activity   : Switch-Process
+Reason     : NullReferenceException
+TargetName : 
+TargetType : 
+
+MissingArgument,Microsoft.PowerShell.Commands.SwitchProcessCommand
+System.Management.Automation.ParameterBindingException
+Missing an argument for parameter 'WithCommand'. Specify a parameter of type 'System.String[]' and try again.
+Category   : InvalidArgument
+Activity   : Switch-Process
+Reason     : ParameterBindingException
+TargetName : 
+TargetType : 
+
+PositionalParameterNotFound,Microsoft.PowerShell.Commands.SwitchProcessCommand
+System.Management.Automation.ParameterBindingException
+A positional parameter cannot be found that accepts argument 'other'.
+Category   : InvalidArgument
+Activity   : Switch-Process
+Reason     : ParameterBindingException
+TargetName : 
+TargetType : 
+
+PositionalParameterNotFound,Microsoft.PowerShell.Commands.SwitchProcessCommand
+System.Management.Automation.ParameterBindingException
+A positional parameter cannot be found that accepts argument '/bin/echo'.
+Category   : InvalidArgument
+Activity   : Switch-Process
+Reason     : ParameterBindingException
+TargetName : 
+TargetType : 
+
+ParameterAlreadyBound,Microsoft.PowerShell.Commands.SwitchProcessCommand
+System.Management.Automation.ParameterBindingException
+Cannot bind parameter because parameter 'WithCommand' is specified more than once. To provide multiple values to parameters that can accept multiple values, use the array syntax. For example, "-parameter value1,value2,value3".
+Category   : InvalidArgument
+Activity   : Switch-Process
+Reason     : ParameterBindingException
+TargetName : 
+TargetType : 
+
+CannotConvertArgument,Microsoft.PowerShell.Commands.SwitchProcessCommand
+System.Management.Automation.ParameterBindingException
+Cannot convert 'System.Object[]' to the type 'System.String' required by parameter 'WithCommand'. Specified method is not supported.
+Category   : InvalidArgument
+Activity   : Switch-Process
+Reason     : ParameterBindingException
+TargetName : 
+TargetType : 
+
+CommandNotFound,Microsoft.PowerShell.Commands.SwitchProcessCommand
+System.Management.Automation.CommandNotFoundException
+Command '' was not found. The specified command must be an executable.
+Category   : InvalidArgument
+Activity   : Switch-Process
+Reason     : CommandNotFoundException
+TargetName : 
+TargetType : 
+
+ExecutionFailed,Microsoft.PowerShell.Commands.SwitchProcessCommand|InvalidOperation: (System.String[]:String[]) [Switch-Process], Exception|System.Exception
+True
+System.String[]
+True
+False
+True
+hello
+Ignore|False|0|
+SilentlyContinue|False|2|b
+Stop|False|1|InputObjectNotBound,Microsoft.PowerShell.Commands.SwitchProcessCommand|a
+override=one -w 2 -f: True -g
+False

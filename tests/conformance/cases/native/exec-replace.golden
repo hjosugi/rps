@@ -1,0 +1,15 @@
+rpsh-golden-v2
+exit=19
+before exec
+same-pid
+argv0=child
+env=a b=ü
+gone=unset
+<a b>
+<>
+<-w>
+<2>
+<-flag:>
+<True>
+<--two>
+<2>&1>

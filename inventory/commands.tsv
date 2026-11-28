@@ -3,7 +3,7 @@ module	name	kind	platform	status
 (session)	cd\	Function	linux-x64	todo
 (session)	cd~	Function	linux-x64	todo
 (session)	Clear-Host	Function	linux-x64	todo
-(session)	exec	Function	linux-x64	todo
+(session)	exec	Function	linux-x64	done
 (session)	help	Function	linux-x64	todo
 (session)	oss	Function	linux-x64	todo
 (session)	Pause	Function	linux-x64	todo
@@ -54,7 +54,7 @@ Microsoft.PowerShell.Core	Set-PSDebug	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	Set-StrictMode	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	Start-Job	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	Stop-Job	Cmdlet	linux-x64	todo
-Microsoft.PowerShell.Core	Switch-Process	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Switch-Process	Cmdlet	linux-x64	partial
 Microsoft.PowerShell.Core	Test-ModuleManifest	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	Update-Help	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	Wait-Job	Cmdlet	linux-x64	todo

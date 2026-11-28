@@ -614,6 +614,7 @@ impl Parser<'_> {
         self.pos += 1;
         let mut redirections = Vec::new();
         let mut arguments = Vec::new();
+        let mut end_parameters = false;
         while (!self.at_statement_end() || self.peek().kind == TokenKind::Comma)
             && self.peek().kind != TokenKind::Pipe
             && self.chain_operator().is_none()
@@ -626,9 +627,30 @@ impl Parser<'_> {
                 self.read_redirection(&mut redirections)?;
                 continue;
             }
+            if self.peek().span.text(self.source) == "--" {
+                self.pos += 1;
+                if end_parameters {
+                    arguments.push(CommandArgument::Bareword("--".into()));
+                } else {
+                    arguments.push(CommandArgument::Parameter {
+                        name: "-".into(),
+                        value: None,
+                        separator: crate::ArgumentSeparator::Space,
+                    });
+                    end_parameters = true;
+                }
+                continue;
+            }
+            if end_parameters && let TokenKind::Parameter(_) = &self.peek().kind {
+                arguments.push(CommandArgument::Bareword(
+                    self.peek().span.text(self.source).into(),
+                ));
+                self.pos += 1;
+                continue;
+            }
             let parameter = match &self.peek().kind {
                 TokenKind::Identifier(word) | TokenKind::Bareword(word)
-                    if word.starts_with('-') =>
+                    if !end_parameters && word.starts_with('-') && !word.starts_with("--") =>
                 {
                     let parameter = word.trim_start_matches('-').to_owned();
                     self.pos += 1;
@@ -661,6 +683,7 @@ impl Parser<'_> {
                     (parameter, crate::ArgumentSeparator::Space)
                 };
                 let value = match &self.peek().kind {
+                    _ if self.peek().span.text(self.source) == "--" => None,
                     TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
                         let word = word.clone();
                         let span = self.peek().span;

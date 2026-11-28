@@ -28,6 +28,8 @@ mod application;
 mod pipe;
 
 pub use application::application_command;
+#[cfg(unix)]
+pub use application::replace_process;
 pub use pipe::{
     Destination, FailedStage, PipelineError, PipelineStatus, run_pipeline, run_pipeline_with_input,
 };

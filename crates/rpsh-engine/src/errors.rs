@@ -277,6 +277,12 @@ impl ScriptException {
         if self.explicit_throw {
             return "Exception".into();
         }
+        if let Ok(category) = member(&self.record, "CategoryInfo")
+            && let Ok(Value::String(activity)) = member(&category, "Activity")
+            && !activity.is_empty()
+        {
+            return activity.to_string_lossy();
+        }
         let ty = self.exception_type();
         if ty.ends_with(".CommandNotFoundException")
             && let Ok(category) = member(&self.record, "CategoryInfo")

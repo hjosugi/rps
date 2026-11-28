@@ -221,7 +221,9 @@ fn equals_in_mode(
 
 fn object_equals(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (Value::Array(a), Value::Array(b)) => Rc::ptr_eq(a, b),
+        (Value::Array(a), Value::Array(b)) | (Value::StringArray(a), Value::StringArray(b)) => {
+            Rc::ptr_eq(a, b)
+        }
         (Value::Object(x), Value::Object(y)) => match hidden_type(a) {
             Some(ty)
                 if hidden_type(b).as_ref() == Some(&ty)

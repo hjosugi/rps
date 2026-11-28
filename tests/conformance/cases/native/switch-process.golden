@@ -1,0 +1,15 @@
+rpsh-golden-v2
+exit=23
+Switch-Process|Cmdlet|System.Management.Automation.CmdletInfo|Microsoft.PowerShell.Core|Public|ReadOnly
+True
+Switch-Process [[-WithCommand] <string[]>] [<CommonParameters>]
+exec|Function|System.Management.Automation.FunctionInfo||Public|None
+True
+Switch-Process -WithCommand $args
+True
+same-pid
+<child>
+<>
+<--flag>
+<a b>
+<ü>

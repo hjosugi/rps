@@ -27,7 +27,7 @@ pub(super) fn cast(value: Value) -> Result<Value, RuntimeError> {
     match value {
         Value::ArrayList(_) | Value::Null => Ok(value),
         Value::AutomationNull => Ok(Value::Null),
-        Value::Array(values) => Ok(value_list(values.to_vec())),
+        Value::Array(values) | Value::StringArray(values) => Ok(value_list(values.to_vec())),
         other => Err(RuntimeError::Script {
             id: if matches!(other, Value::Bool(_)) {
                 "InvalidCastIConvertible"
@@ -68,9 +68,13 @@ fn collection(value: &Value, method: &str, arity: usize) -> Result<Vec<Value>, R
 pub(super) fn construct(arguments: &[Value]) -> Result<Value, RuntimeError> {
     match arguments {
         [] => Ok(value_list(Vec::new())),
-        [value @ (Value::Array(_) | Value::ArrayList(_) | Value::Null | Value::AutomationNull)] => {
-            Ok(value_list(collection(value, ".ctor", 1)?))
-        }
+        [
+            value @ (Value::Array(_)
+            | Value::StringArray(_)
+            | Value::ArrayList(_)
+            | Value::Null
+            | Value::AutomationNull),
+        ] => Ok(value_list(collection(value, ".ctor", 1)?)),
         [Value::Bool(_)] => Err(ambiguous_overload("new", 1)),
         [Value::Object(_)] => Err(overload_error("new", 1)),
         [capacity] => {
@@ -170,7 +174,9 @@ pub(super) fn set_capacity(list: &ArrayList, value: &Value) -> Result<(), Runtim
 // and reference identity for arrays and ordinary property bags.
 fn equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
-        (Value::Array(x), Value::Array(y)) => Rc::ptr_eq(x, y),
+        (Value::Array(x), Value::Array(y)) | (Value::StringArray(x), Value::StringArray(y)) => {
+            Rc::ptr_eq(x, y)
+        }
         (Value::Object(x), Value::Object(y)) => Rc::ptr_eq(x, y),
         (Value::Double(x), Value::Double(y)) => x == y || x.is_nan() && y.is_nan(),
         _ => a == b,

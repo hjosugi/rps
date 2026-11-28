@@ -111,6 +111,7 @@ native/capture
 native/console-encoding
 native/environment
 native/environment-process
+native/exec-replace
 native/exit-code
 native/exit-errors
 native/glob
@@ -125,6 +126,8 @@ native/pipe-encoding
 native/pipeline-chain
 native/pipeline-status
 native/stderr-redirection
+native/switch-errors
+native/switch-process
 native/unix-command-names
 ops/comparison
 ops/string-collation

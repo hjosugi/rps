@@ -17,6 +17,7 @@ mod encoding;
 mod enum_table;
 mod environment;
 mod errors;
+mod functions;
 mod globalization;
 mod method_error;
 mod native;
@@ -25,6 +26,8 @@ mod redirection;
 mod sorting;
 mod string_compare;
 mod string_search;
+#[cfg(unix)]
+mod switch_process;
 mod variables;
 mod wildcards;
 
@@ -54,7 +57,7 @@ use rpsh_syntax::{
 #[derive(Debug, Default)]
 pub struct Engine {
     variables: Variables,
-    functions: HashMap<String, FunctionDef>,
+    functions: functions::Functions,
     last_failed: bool,
     /// The console host can hand its actual descriptors to native children.
     /// Embedded engines continue to use the caller's Write implementation.
@@ -70,6 +73,9 @@ pub struct Engine {
     current_exception: Option<ScriptException>,
     /// Objects written to the host, formatted as one table at the end.
     host_objects: Vec<Value>,
+    /// Out-Default opens an implicit list once per format stream, even
+    /// when individual strings appear between its objects.
+    host_list_started: bool,
     // ConsoleHost keeps its text writer once the first host value is rendered.
     // Native stdout bypasses that writer and does not select its encoding.
     host_encoding: Option<Encoding>,
@@ -235,9 +241,17 @@ impl RandomGenerator {
 
 type BoundArguments = (Vec<Value>, Vec<(String, Value)>);
 
+#[derive(PartialEq)]
+enum ArgumentBinding {
+    Named,
+    Switch,
+    Unbound,
+}
+
 #[derive(Debug, Clone)]
 struct FunctionDef {
     name: String,
+    definition: Option<&'static str>,
     parameters: Vec<Parameter>,
     begin: Vec<Statement>,
     process: Vec<Statement>,
@@ -249,6 +263,19 @@ struct FunctionDef {
 impl FunctionDef {
     fn has_blocks(&self) -> bool {
         !self.begin.is_empty() || !self.process.is_empty() || !self.end.is_empty()
+    }
+}
+
+fn command_name(name: &str) -> &str {
+    if let Some((module, command)) = name.split_once('\\')
+        && module.eq_ignore_ascii_case("Microsoft.PowerShell.Core")
+        && rpsh_commands::CORE_CMDLETS
+            .binary_search(&command.to_ascii_lowercase().as_str())
+            .is_ok()
+    {
+        command
+    } else {
+        name
     }
 }
 
@@ -396,6 +423,7 @@ impl Engine {
     ) -> Result<i32, EngineError> {
         let flow = self.exec_block(&script.statements, out);
         self.flush_host(out)?;
+        self.host_list_started = false;
         if self.host_text {
             self.write_host(out, format_args!("\n"))?;
             self.host_text = false;
@@ -754,6 +782,7 @@ impl Engine {
                     name.to_ascii_lowercase(),
                     FunctionDef {
                         name: name.clone(),
+                        definition: None,
                         parameters: parameters.clone(),
                         begin: begin.clone(),
                         process: process.clone(),
@@ -987,7 +1016,7 @@ impl Engine {
             }
             Statement::Param { parameters, .. } => {
                 let positional = match self.variables.get("args") {
-                    Some(Value::Array(items)) => items.as_ref().clone(),
+                    Some(Value::Array(items) | Value::StringArray(items)) => items.as_ref().clone(),
                     _ => Vec::new(),
                 };
                 let mut bound = 0;
@@ -1219,6 +1248,12 @@ impl Engine {
     ) -> Result<Flow, EngineError> {
         let resolved = self.discover_alias(name);
         let name = resolved.as_deref().unwrap_or(name);
+        if command_name(name).eq_ignore_ascii_case("Switch-Process")
+            || name.eq_ignore_ascii_case("exec")
+        {
+            self.flush_host(out)?;
+            out.flush()?;
+        }
         if !self.functions.contains_key(&name.to_ascii_lowercase()) {
             if let Some(outputs) = self.invoke_builtin(name, arguments, &[])? {
                 for value in outputs {
@@ -1238,7 +1273,7 @@ impl Engine {
             return Ok(Flow::Normal);
         }
         let function = self.function(name)?;
-        let (positional, named) = self.evaluate_arguments(arguments)?;
+        let (positional, named) = self.function_arguments(arguments, &function)?;
         let mut local = self.variables.child();
         let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
         local.insert(
@@ -1561,7 +1596,7 @@ impl Engine {
             return self.run_native(name, arguments, Some(&input), destination);
         }
         let function = self.function(name)?;
-        let (positional, named) = self.evaluate_arguments(arguments)?;
+        let (positional, named) = self.function_arguments(arguments, &function)?;
         let saved_trap = self.trap.take();
         let saved_capture = self.capture.take();
         let result = self.pipeline_function_output(&function, &positional, &named, input);
@@ -1651,7 +1686,9 @@ impl Engine {
         input: &[Value],
     ) -> Result<Option<Vec<Value>>, EngineError> {
         let outputs = self.run_builtin(name, arguments, input)?;
-        if outputs.is_some() {
+        if outputs.is_some()
+            && !(command_name(name).eq_ignore_ascii_case("Switch-Process") && !input.is_empty())
+        {
             self.last_failed = name.eq_ignore_ascii_case("Write-Error");
         }
         Ok(outputs)
@@ -1665,7 +1702,7 @@ impl Engine {
         arguments: &[CommandArgument],
         input: &[Value],
     ) -> Result<Option<Vec<Value>>, EngineError> {
-        let lower = name.to_ascii_lowercase();
+        let lower = command_name(name).to_ascii_lowercase();
         let module = MODULES.iter().find(|module| module.exports_cmdlet(&lower));
         if let Some(module) = module
             && !self.builtin_loaded(module)
@@ -1676,6 +1713,11 @@ impl Engine {
             self.import_builtin(module);
         }
         match lower.as_str() {
+            #[cfg(unix)]
+            "switch-process" => {
+                self.switch_process(arguments, input)?;
+                Ok(Some(Vec::new()))
+            }
             "write-verbose" | "write-debug" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let is_verbose = name.eq_ignore_ascii_case("write-verbose");
@@ -4635,7 +4677,7 @@ impl Engine {
                 let (_, named) = self.evaluate_arguments(arguments)?;
                 let mut lines: Vec<String> = Vec::new();
                 for item in input {
-                    if let Value::Array(items) = item {
+                    if let Value::Array(items) | Value::StringArray(items) = item {
                         lines.extend(items.iter().map(ToString::to_string));
                     } else {
                         lines.push(item.to_string());
@@ -4996,7 +5038,7 @@ impl Engine {
                     }
                 } else {
                     for item in input {
-                        if let Value::Array(items) = item {
+                        if let Value::Array(items) | Value::StringArray(items) = item {
                             lines.extend(items.iter().map(ToString::to_string));
                         } else {
                             lines.push(item.to_string());
@@ -5301,6 +5343,15 @@ impl Engine {
                             {
                                 outputs.push(aliases::available_export(&name, module));
                             }
+                        } else if let Some(info) = functions::session_info(
+                            &name,
+                            kind,
+                            self.functions
+                                .get(&name.to_ascii_lowercase())
+                                .and_then(|f| f.definition)
+                                .filter(|_| kind == "Function"),
+                        ) {
+                            outputs.push(info);
                         } else {
                             outputs.push(Value::object(vec![
                                 ("Name".to_owned(), Value::String(name.into())),
@@ -5939,6 +5990,10 @@ impl Engine {
                     }
                     outputs.push(if names_only {
                         Value::String(function.name.clone().into())
+                    } else if let Some(info) =
+                        functions::session_info(&function.name, "Function", function.definition)
+                    {
+                        info
                     } else {
                         Value::object(vec![(
                             "Name".to_owned(),
@@ -5995,10 +6050,17 @@ impl Engine {
                 None => missing(path),
             }),
             "function" => Some(match self.functions.get(&name.to_ascii_lowercase()) {
-                Some(function) => Ok(Value::object(vec![(
-                    "Name".to_owned(),
-                    Value::String(function.name.clone().into()),
-                )])),
+                Some(function) => {
+                    Ok(
+                        functions::session_info(&function.name, "Function", function.definition)
+                            .unwrap_or_else(|| {
+                                Value::object(vec![(
+                                    "Name".to_owned(),
+                                    Value::String(function.name.clone().into()),
+                                )])
+                            }),
+                    )
+                }
                 None => missing(path),
             }),
             _ => None,
@@ -6059,15 +6121,17 @@ impl Engine {
     }
 
     fn function(&self, name: &str) -> Result<FunctionDef, EngineError> {
-        self.functions
+        let mut function = self
+            .functions
             .get(&name.to_ascii_lowercase())
             .cloned()
-            .ok_or_else(|| {
-                RuntimeError::NotImplemented {
-                    feature: "command invocation other than a defined function",
-                }
-                .into()
-            })
+            .ok_or(RuntimeError::NotImplemented {
+                feature: "command invocation other than a defined function",
+            })?;
+        if let Some(source) = function.definition {
+            function.body = rpsh_syntax::parse(source)?.statements;
+        }
+        Ok(function)
     }
 
     fn eval_pipeline_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
@@ -6222,6 +6286,28 @@ impl Engine {
         &mut self,
         arguments: &[CommandArgument],
     ) -> Result<BoundArguments, EngineError> {
+        self.evaluate_arguments_matching(arguments, |_| ArgumentBinding::Named)
+    }
+
+    fn function_arguments(
+        &mut self,
+        arguments: &[CommandArgument],
+        function: &FunctionDef,
+    ) -> Result<BoundArguments, EngineError> {
+        self.evaluate_arguments_matching(arguments, |_| {
+            if function.parameters.is_empty() {
+                ArgumentBinding::Unbound
+            } else {
+                ArgumentBinding::Named
+            }
+        })
+    }
+
+    fn evaluate_arguments_matching(
+        &mut self,
+        arguments: &[CommandArgument],
+        binding: impl Fn(&str) -> ArgumentBinding,
+    ) -> Result<BoundArguments, EngineError> {
         let mut positional = Vec::new();
         let mut named = Vec::new();
         for argument in arguments {
@@ -6232,7 +6318,28 @@ impl Engine {
                 CommandArgument::Bareword(word) => {
                     positional.push(Value::String(word.clone().into()));
                 }
-                CommandArgument::Parameter { name, value, .. } => {
+                CommandArgument::Parameter { name, .. } if name == "-" => {}
+                CommandArgument::Parameter {
+                    name,
+                    value,
+                    separator,
+                } => {
+                    let binding = binding(name);
+                    let spaced = *separator == rpsh_syntax::ArgumentSeparator::Space;
+                    if binding == ArgumentBinding::Unbound
+                        || binding == ArgumentBinding::Switch && spaced
+                    {
+                        if binding == ArgumentBinding::Unbound {
+                            let colon = if spaced { "" } else { ":" };
+                            positional.push(Value::String(format!("-{name}{colon}").into()));
+                        } else {
+                            named.push((name.clone(), Value::Bool(true)));
+                        }
+                        if let Some(expr) = value {
+                            positional.push(self.eval_expression(expr)?);
+                        }
+                        continue;
+                    }
                     let value = match value {
                         Some(expr) => self.eval_expression(expr)?,
                         None => Value::Bool(true),
@@ -6320,7 +6427,19 @@ impl Engine {
             return Ok(());
         }
         let text = format_host_stream(&self.host_objects);
+        let first = &self.host_objects[0];
+        let list = matches!(first, Value::Object(entries) if visible_entries(entries).len() > 4)
+            && !is_command_info(first)
+            && datetime_fields(first).is_none()
+            && format_marker(first).is_none();
+        let continuation = list && self.host_list_started;
+        self.host_list_started = list;
         self.host_objects.clear();
+        let text = if continuation {
+            text.strip_prefix('\n').unwrap_or(&text)
+        } else {
+            &text
+        };
         self.write_host(out, format_args!("{text}"))?;
         Ok(())
     }
@@ -6331,7 +6450,9 @@ impl Engine {
         }
         if let Some(capture) = &mut self.capture {
             match value {
-                Value::Array(items) => capture.extend(items.iter().cloned()),
+                Value::Array(items) | Value::StringArray(items) => {
+                    capture.extend(items.iter().cloned())
+                }
                 Value::Null | Value::AutomationNull => {}
                 value => capture.push(value),
             }
@@ -6346,7 +6467,7 @@ impl Engine {
             }
             return Ok(());
         }
-        if let Value::Array(items) = &value
+        if let Value::Array(items) | Value::StringArray(items) = &value
             && items.iter().any(|v| native::error_prefix(v).is_some())
         {
             for item in items.iter().cloned() {
@@ -6377,7 +6498,11 @@ impl Engine {
                 self.host_text = true;
                 return Ok(());
             }
-            if datetime_fields(&value).is_some() || is_command_info(&value) {
+            if datetime_fields(&value).is_some()
+                || is_command_info(&value)
+                || hidden_type(&value).as_deref()
+                    == Some("System.Management.Automation.ErrorCategoryInfo")
+            {
                 self.host_objects.push(value);
                 return Ok(());
             }
@@ -6396,14 +6521,14 @@ impl Engine {
             self.host_objects.push(value);
             return Ok(());
         }
-        if let Value::Array(items) = &value
+        if let Value::Array(items) | Value::StringArray(items) = &value
             && items.iter().any(|item| matches!(item, Value::Object(_)))
         {
             self.host_objects.extend(items.iter().cloned());
             return Ok(());
         }
         match value {
-            Value::Array(items) => {
+            Value::Array(items) | Value::StringArray(items) => {
                 self.flush_host(out)?;
                 for item in items.iter() {
                     if !item.is_null_like() {
@@ -6752,7 +6877,7 @@ fn json_stringify(value: &Value) -> Result<String, RuntimeError> {
         | Value::SByte(_)
         | Value::Double(_) => Ok(value.to_string()),
         Value::String(text) => Ok(json_quote(&text.to_string_lossy())),
-        Value::Array(items) => {
+        Value::Array(items) | Value::StringArray(items) => {
             let mut parts = Vec::with_capacity(items.len());
             for item in items.iter() {
                 parts.push(json_stringify(item)?);
@@ -6779,7 +6904,7 @@ fn json_stringify_pretty(value: &Value, indent: usize) -> Result<String, Runtime
     let pad = " ".repeat(indent);
     let inner = " ".repeat(indent + 2);
     match value {
-        Value::Array(items) if !items.is_empty() => {
+        Value::Array(items) | Value::StringArray(items) if !items.is_empty() => {
             let mut parts = Vec::with_capacity(items.len());
             for item in items.iter() {
                 parts.push(format!(
@@ -6841,7 +6966,7 @@ fn mark_json_hashtables(value: Value) -> Value {
             ));
             Value::object(entries)
         }
-        Value::Array(items) => Value::array(
+        Value::Array(items) | Value::StringArray(items) => Value::array(
             items
                 .as_ref()
                 .iter()
@@ -7250,7 +7375,9 @@ fn format_table_properties(value: &Value) -> Vec<String> {
         return Vec::new();
     };
     match property {
-        Value::Array(values) => values.iter().map(ToString::to_string).collect(),
+        Value::Array(values) | Value::StringArray(values) => {
+            values.iter().map(ToString::to_string).collect()
+        }
         other => vec![other.to_string()],
     }
 }
@@ -7274,7 +7401,9 @@ fn format_marker(value: &Value) -> Option<String> {
 fn is_command_info(value: &Value) -> bool {
     matches!(
         hidden_type(value).as_deref(),
-        Some(aliases::TYPE_NAME | native::APPLICATION_TYPE)
+        Some(
+            aliases::TYPE_NAME | native::APPLICATION_TYPE | functions::FUNCTION | functions::CMDLET
+        )
     )
 }
 
@@ -7927,6 +8056,8 @@ fn collect_children(
 }
 
 const BUILTIN_COMMANDS: &[&str] = &[
+    #[cfg(unix)]
+    "Switch-Process",
     "Add-Content",
     "ConvertFrom-Json",
     "New-Object",
@@ -8206,7 +8337,7 @@ fn contains_group(expr: &Expr) -> bool {
 
 fn flatten_value(value: Value) -> Vec<Value> {
     match value {
-        Value::Array(items) => items.as_ref().clone(),
+        Value::Array(items) | Value::StringArray(items) => items.as_ref().clone(),
         Value::ArrayList(list) => list.items().to_vec(),
         Value::Null | Value::AutomationNull => Vec::new(),
         value => vec![value],
@@ -8388,6 +8519,9 @@ fn automatic_variable(name: &str) -> Option<Value> {
 }
 
 fn type_full_name(name: &str) -> String {
+    if let Some(element) = name.strip_suffix("[]") {
+        return format!("{}[]", type_full_name(element));
+    }
     match name.to_ascii_lowercase().as_str() {
         "object" => "System.Object".to_owned(),
         "array" => "System.Array".to_owned(),
@@ -9572,9 +9706,23 @@ fn version_value(text: String) -> Value {
 /// `[type]value`, the subset of `LanguagePrimitives.ConvertTo` the skeleton
 /// needs. Failing conversions are refused rather than approximated.
 fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
+    if type_name.eq_ignore_ascii_case("string[]")
+        || type_name.eq_ignore_ascii_case("system.string[]")
+    {
+        if value.is_null_like() || matches!(&value, Value::StringArray(_)) {
+            return Ok(value);
+        }
+        let sequence = value.sequence();
+        let items = sequence
+            .as_deref()
+            .unwrap_or_else(|| std::slice::from_ref(&value));
+        return Ok(Value::string_array(
+            items.iter().map(|v| Some(v.to_ps_string())),
+        ));
+    }
     if type_name.ends_with("[]") {
         return Ok(match value {
-            Value::Array(_) => value,
+            Value::Array(_) | Value::StringArray(_) => value,
             Value::ArrayList(list) => Value::array(list.items().to_vec()),
             other => Value::array(vec![other]),
         });
@@ -9760,7 +9908,7 @@ fn convert_bool(value: &Value) -> bool {
         Value::SByte(value) => *value != 0,
         Value::Double(value) => *value != 0.0,
         Value::String(text) => !text.is_empty(),
-        Value::Array(_) | Value::ArrayList(_) => ops::is_true(value),
+        Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) => ops::is_true(value),
         Value::Decimal(_)
         | Value::BigInteger(_)
         | Value::ScriptBlock(_)
@@ -9836,13 +9984,16 @@ fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeEr
         && full.as_ascii().is_some_and(|name| {
             name.eq_ignore_ascii_case(&left_name)
                 || name == "System.Object" && !left.is_null_like()
-                || name == "System.Array" && matches!(left, Value::Array(_))
+                || name == "System.Array" && matches!(left, Value::Array(_) | Value::StringArray(_))
                 || matches!(
                     name,
                     "System.Collections.IList"
                         | "System.Collections.ICollection"
                         | "System.Collections.IEnumerable"
-                ) && matches!(left, Value::Array(_) | Value::ArrayList(_))
+                ) && matches!(
+                    left,
+                    Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_)
+                )
         });
     if !same
         && let Value::Object(entries) = left
@@ -9887,7 +10038,7 @@ fn regex_match(
 
 fn regex_replace(left: &Value, right: &Value, case_sensitive: bool) -> Result<Value, RuntimeError> {
     let (pattern, replacement) = match right {
-        Value::Array(items) => (
+        Value::Array(items) | Value::StringArray(items) => (
             items.first().map_or_else(String::new, ToString::to_string),
             items.get(1).map_or_else(String::new, ToString::to_string),
         ),
@@ -10407,7 +10558,7 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
     let mut found = false;
     for item in items {
         match member(item, name) {
-            Ok(Value::Array(more)) => {
+            Ok(Value::Array(more) | Value::StringArray(more)) => {
                 values.extend(more.iter().cloned());
                 found = true;
             }
@@ -10458,6 +10609,7 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
         return Ok(Value::Int32(0));
     }
     match value {
+        Value::Null | Value::AutomationNull => Ok(Value::Null),
         Value::Type(full) if name.eq_ignore_ascii_case("FullName") => {
             Ok(Value::String(full.clone()))
         }
@@ -10471,13 +10623,15 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
             Ok(Value::Int32(text.len() as i32))
         }
         Value::ArrayList(list) => array_list::property(list, name),
-        Value::Array(items) if name.eq_ignore_ascii_case("Count") => {
+        Value::Array(items) | Value::StringArray(items) if name.eq_ignore_ascii_case("Count") => {
             Ok(Value::Int32(items.len() as i32))
         }
-        Value::Array(items) if name.eq_ignore_ascii_case("Length") => {
+        Value::Array(items) | Value::StringArray(items) if name.eq_ignore_ascii_case("Length") => {
             Ok(Value::Int32(items.len() as i32))
         }
-        Value::Array(items) => member_enumeration(items.as_slice(), name),
+        Value::Array(items) | Value::StringArray(items) => {
+            member_enumeration(items.as_slice(), name)
+        }
         Value::Object(entries) => {
             if name.eq_ignore_ascii_case("psobject") || name.eq_ignore_ascii_case("pscustomobject")
             {

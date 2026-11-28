@@ -11,7 +11,7 @@
 mod cli;
 
 use std::fs;
-use std::io::{self, BufWriter, Write};
+use std::io::{self, Write};
 use std::path::Path;
 
 use rpsh_engine::{Engine, EngineError};
@@ -115,7 +115,7 @@ fn run_source_with(
     path: Option<&Path>,
     non_interactive: bool,
 ) -> i32 {
-    let mut out = BufWriter::new(io::stdout().lock());
+    let mut out = io::stdout().lock();
     let mut engine = Engine::for_console_with_mode(non_interactive);
     let result = if let Some(path) = path {
         engine.run_script_with(source, args, Some(path), &mut out)

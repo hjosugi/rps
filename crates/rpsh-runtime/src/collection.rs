@@ -82,7 +82,9 @@ pub(crate) fn sequence_text(items: &[Value], separator: &PsString) -> PsString {
             units.extend(separator.units());
         }
         match item {
-            Value::Array(_) | Value::ArrayList(_) => units.extend(item.type_name().encode_utf16()),
+            Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) => {
+                units.extend(item.type_name().encode_utf16())
+            }
             other => units.extend(other.to_ps_string().units()),
         }
     }

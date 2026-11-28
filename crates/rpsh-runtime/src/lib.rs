@@ -69,6 +69,8 @@ pub enum Value {
     ScriptBlock(PsString),
     /// A PowerShell array. The `Rc` keeps `Value` 16 bytes.
     Array(Rc<Vec<Value>>),
+    /// A covariant System.String[] containing strings and null references.
+    StringArray(Rc<Vec<Value>>),
     ArrayList(ArrayList),
     /// A PowerShell object/hashtable with ordered keys. The `Rc` is the
     /// object's identity, so `$o -eq $o` compares the same object, not its
@@ -103,6 +105,7 @@ impl Value {
             Value::BigInteger(_) => "System.Numerics.BigInteger",
             Value::ScriptBlock(_) => "System.Management.Automation.ScriptBlock",
             Value::Array(_) => "System.Object[]",
+            Value::StringArray(_) => "System.String[]",
             Value::ArrayList(_) => ArrayList::TYPE,
             Value::Object(_) => "System.Management.Automation.PSCustomObject",
             Value::Type(_) => "System.RuntimeType",
@@ -117,9 +120,18 @@ impl Value {
         Value::Array(Rc::new(items))
     }
 
+    pub fn string_array(strings: impl IntoIterator<Item = Option<PsString>>) -> Value {
+        Value::StringArray(Rc::new(
+            strings
+                .into_iter()
+                .map(|s| s.map_or(Value::Null, Value::String))
+                .collect(),
+        ))
+    }
+
     pub fn sequence(&self) -> Option<Sequence<'_>> {
         match self {
-            Self::Array(items) => Some(Sequence::Array(items)),
+            Self::Array(items) | Self::StringArray(items) => Some(Sequence::Array(items)),
             Self::ArrayList(list) => Some(Sequence::List(list.items())),
             _ => None,
         }
@@ -140,7 +152,9 @@ impl Value {
         match self {
             Self::String(text) | Self::ScriptBlock(text) => text.clone(),
             Self::Char(unit) => PsString::from_units(vec![*unit]),
-            Self::Array(items) => collection::sequence_text(items, &" ".into()),
+            Self::Array(items) | Self::StringArray(items) => {
+                collection::sequence_text(items, &" ".into())
+            }
             Self::ArrayList(list) => collection::sequence_text(&list.items(), &" ".into()),
             _ => PsString::from(self.to_string()),
         }
@@ -171,7 +185,9 @@ impl fmt::Display for Value {
             }
             Value::Double(value) => f.write_str(&format_double(*value)),
             Value::ScriptBlock(text) => fmt::Display::fmt(text, f),
-            Value::Array(_) | Value::ArrayList(_) => fmt::Display::fmt(&self.to_ps_string(), f),
+            Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) => {
+                fmt::Display::fmt(&self.to_ps_string(), f)
+            }
             Value::Object(entries) => {
                 if let Some((_, Value::String(text))) =
                     entries.iter().find(|(key, _)| key == "__Text")

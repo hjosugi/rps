@@ -143,34 +143,7 @@ fn sort_parameter(name: &str) -> Result<&str, RuntimeError> {
         .filter(|key| key.to_ascii_lowercase().starts_with(&lower));
     let Some(first) = matches.next() else {
         // Common parameter names are valid for every cmdlet.
-        if [
-            "verbose",
-            "vb",
-            "debug",
-            "db",
-            "erroraction",
-            "ea",
-            "errorvariable",
-            "ev",
-            "warningaction",
-            "wa",
-            "warningvariable",
-            "wv",
-            "informationaction",
-            "infa",
-            "informationvariable",
-            "iv",
-            "progressaction",
-            "proga",
-            "outvariable",
-            "ov",
-            "outbuffer",
-            "ob",
-            "pipelinevariable",
-            "pv",
-        ]
-        .contains(&lower.as_str())
-        {
+        if crate::functions::common_binding(&lower).is_some() {
             return Ok(name);
         }
         return Err(binding_error(

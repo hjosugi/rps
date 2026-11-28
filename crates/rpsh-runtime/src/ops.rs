@@ -633,7 +633,7 @@ pub fn is_true(value: &Value) -> bool {
         Value::SByte(value) => *value != 0,
         Value::Double(value) => *value != 0.0,
         Value::String(value) => !value.is_empty(),
-        Value::Array(_) | Value::ArrayList(_) => {
+        Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) => {
             let items = value.sequence().expect("array or ArrayList");
             match &*items {
                 [] => false,
@@ -691,7 +691,7 @@ pub fn format(template: &Value, arguments: &Value) -> Result<Value, RuntimeError
         return refuse("format string is not a string");
     };
     let args: Vec<&Value> = match arguments {
-        Value::Array(items) => items.iter().collect(),
+        Value::Array(items) | Value::StringArray(items) => items.iter().collect(),
         other => vec![other],
     };
     let chars: Vec<char> = text.to_string_lossy().chars().collect();

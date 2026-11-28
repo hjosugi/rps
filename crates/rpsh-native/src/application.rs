@@ -12,6 +12,17 @@ pub fn application_command<'a>(
     environment: impl IntoIterator<Item = (&'a str, Option<Cow<'a, str>>)>,
 ) -> io::Result<Command> {
     let mut command = Command::new(program);
+    configure(&mut command, arguments, environment);
+    #[cfg(target_os = "macos")]
+    exact_exec::configure(&mut command)?;
+    Ok(command)
+}
+
+fn configure<'a>(
+    command: &mut Command,
+    arguments: &[String],
+    environment: impl IntoIterator<Item = (&'a str, Option<Cow<'a, str>>)>,
+) {
     command.args(arguments);
     for (key, value) in environment {
         match value {
@@ -19,21 +30,36 @@ pub fn application_command<'a>(
             None => command.env_remove(key),
         };
     }
-    #[cfg(target_os = "macos")]
-    exact_exec::configure(&mut command)?;
-    Ok(command)
+}
+
+/// Replace the calling process without shell fallback, using the basename as
+/// argv[0] as Switch-Process does. Success never returns.
+#[cfg(unix)]
+pub fn replace_process<'a>(
+    program: &Path,
+    arguments: &[String],
+    environment: impl IntoIterator<Item = (&'a str, Option<Cow<'a, str>>)>,
+) -> io::Error {
+    let mut command = Command::new(program);
+    configure(&mut command, arguments, environment);
+    let argv0 = program.file_name().unwrap_or(program.as_os_str());
+    match exact_exec::Image::new(&command, argv0) {
+        Ok(image) => image.replace(),
+        Err(error) => error,
+    }
 }
 
 // Darwin's posix_spawnp and execvp both start /bin/sh on ENOEXEC, even for
 // absolute paths. PowerShell uses the kernel's result for an application.
-// Compile this path into Unix tests so Linux exercises the same system call.
-#[cfg(any(target_os = "macos", all(unix, test)))]
+// Use the same exact syscall for Unix process replacement.
+#[cfg(unix)]
 mod exact_exec {
     #![allow(unsafe_code)]
     use std::collections::BTreeMap;
     use std::ffi::{CString, OsStr, OsString, c_char};
     use std::io;
     use std::os::unix::ffi::OsStrExt;
+    #[cfg(any(target_os = "macos", test))]
     use std::os::unix::process::CommandExt;
     use std::process::Command;
 
@@ -80,33 +106,59 @@ mod exact_exec {
         }
     }
 
-    pub(super) fn configure(command: &mut Command) -> io::Result<()> {
-        let program = CString::new(command.get_program().as_bytes())?;
-        let argv = Strings::new(std::iter::once(command.get_program()).chain(command.get_args()))?;
-        let mut environment: BTreeMap<OsString, OsString> = std::env::vars_os().collect();
-        for (key, value) in command.get_envs() {
-            match value {
-                Some(value) => {
-                    environment.insert(key.into(), value.into());
-                }
-                None => {
-                    environment.remove(key);
+    pub(super) struct Image {
+        program: CString,
+        argv: Strings,
+        envp: Strings,
+    }
+
+    impl Image {
+        pub(super) fn new(command: &Command, argv0: &OsStr) -> io::Result<Self> {
+            let program = CString::new(command.get_program().as_bytes())?;
+            let argv = Strings::new(std::iter::once(argv0).chain(command.get_args()))?;
+            let mut environment: BTreeMap<OsString, OsString> = std::env::vars_os().collect();
+            for (key, value) in command.get_envs() {
+                match value {
+                    Some(value) => {
+                        environment.insert(key.into(), value.into());
+                    }
+                    None => {
+                        environment.remove(key);
+                    }
                 }
             }
+            let envp = Strings::new(environment.into_iter().map(|(mut key, value)| {
+                key.push("=");
+                key.push(value);
+                key
+            }))?;
+            Ok(Self {
+                program,
+                argv,
+                envp,
+            })
         }
-        let envp = Strings::new(environment.into_iter().map(|(mut key, value)| {
-            key.push("=");
-            key.push(value);
-            key
-        }))?;
-        // SAFETY: after std configures the child's descriptors and signals,
-        // the callback makes only the async-signal-safe execve and reads errno.
-        // All allocations, PATH lookup and environment access preceded the fork.
+
+        pub(super) fn replace(&self) -> io::Error {
+            // SAFETY: the null-terminated pointers borrow this immutable image.
+            // Only the async-signal-safe execve and errno access occur here.
+            unsafe {
+                execve(
+                    self.program.as_ptr(),
+                    self.argv.as_ptr(),
+                    self.envp.as_ptr(),
+                );
+            }
+            io::Error::last_os_error()
+        }
+    }
+
+    #[cfg(any(target_os = "macos", test))]
+    pub(super) fn configure(command: &mut Command) -> io::Result<()> {
+        let image = Image::new(command, command.get_program())?;
+        // SAFETY: replace() only calls execve and reads errno after the fork.
         unsafe {
-            command.pre_exec(move || {
-                execve(program.as_ptr(), argv.as_ptr(), envp.as_ptr());
-                Err(io::Error::last_os_error())
-            });
+            command.pre_exec(move || Err(image.replace()));
         }
         Ok(())
     }

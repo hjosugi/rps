@@ -430,7 +430,7 @@ Stop-Job	Job	System.Management.Automation.Job[]	JobParameterSet		linux-x64	todo
 Stop-Job	Name	System.String[]	NameParameterSet		linux-x64	todo
 Stop-Job	PassThru	System.Management.Automation.SwitchParameter	*		linux-x64	todo
 Stop-Job	State	System.Management.Automation.JobState	StateParameterSet		linux-x64	todo
-Switch-Process	WithCommand	System.String[]	*		linux-x64	todo
+Switch-Process	WithCommand	System.String[]	*		linux-x64	done
 Test-ModuleManifest	Path	System.String	*		linux-x64	todo
 Update-Help	Credential	System.Management.Automation.PSCredential	*		linux-x64	todo
 Update-Help	Force	System.Management.Automation.SwitchParameter	*		linux-x64	todo
