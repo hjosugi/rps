@@ -266,11 +266,11 @@ pub fn add(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
     {
         return Ok(Value::String(text.clone()));
     }
-    if let Value::Array(items) = left {
-        let mut result = items.as_ref().clone();
-        match right {
-            Value::Array(more) => result.extend(more.iter().cloned()),
-            value => result.push(value.clone()),
+    if let Some(items) = left.sequence() {
+        let mut result = items.to_vec();
+        match right.sequence() {
+            Some(more) => result.extend(more.iter().cloned()),
+            None => result.push(right.clone()),
         }
         return Ok(Value::array(result));
     }
@@ -304,7 +304,7 @@ pub fn subtract(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
 /// Binary `*`. A string on the left repeats when the right is an `Int32`:
 /// `'ab' * 3` is `"ababab"`.
 pub fn multiply(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
-    if let (Value::Array(items), Value::Int32(times)) = (left, right) {
+    if let (Some(items), Value::Int32(times)) = (left.sequence(), right) {
         let times = usize::try_from(*times).map_err(|_| RuntimeError::NotImplemented {
             feature: "negative array repetition",
         })?;
@@ -393,8 +393,8 @@ pub fn compare(
     case_sensitive: bool,
 ) -> Result<Value, RuntimeError> {
     if matches!(op, Comparison::Like | Comparison::NotLike) {
-        if matches!(left, Value::Array(items) if items.is_empty()) {
-            return Ok(left.clone());
+        if left.sequence().is_some_and(|items| items.is_empty()) {
+            return Ok(Value::array(Vec::new()));
         }
         let (pattern, options) = match right {
             Value::Object(entries)
@@ -406,7 +406,7 @@ pub fn compare(
         };
         let matcher = crate::wildcard::operator_pattern(&pattern, options)?;
         let negate = matches!(op, Comparison::NotLike);
-        if let Value::Array(items) = left {
+        if let Some(items) = left.sequence() {
             let mut kept = Vec::new();
             for item in items.iter() {
                 let text = item.to_ps_string();
@@ -420,7 +420,7 @@ pub fn compare(
             matcher.is_match(Some(&left.to_ps_string()))? != negate,
         ));
     }
-    if let Value::Array(items) = left {
+    if let Some(items) = left.sequence() {
         let mut kept = Vec::new();
         for item in items.iter() {
             if compare_scalar(item, right, op, case_sensitive)? {
@@ -548,8 +548,8 @@ pub fn contains(
     needle: &Value,
     case_sensitive: bool,
 ) -> Result<Value, RuntimeError> {
-    match collection {
-        Value::Array(items) => {
+    match collection.sequence() {
+        Some(items) => {
             for item in items.iter() {
                 if compare_scalar(item, needle, Comparison::Eq, case_sensitive)? {
                     return Ok(Value::Bool(true));
@@ -557,9 +557,9 @@ pub fn contains(
             }
             Ok(Value::Bool(false))
         }
-        Value::Null | Value::AutomationNull => Ok(Value::Bool(false)),
-        value => Ok(Value::Bool(compare_scalar(
-            value,
+        None if collection.is_null_like() => Ok(Value::Bool(false)),
+        None => Ok(Value::Bool(compare_scalar(
+            collection,
             needle,
             Comparison::Eq,
             case_sensitive,
@@ -633,7 +633,16 @@ pub fn is_true(value: &Value) -> bool {
         Value::SByte(value) => *value != 0,
         Value::Double(value) => *value != 0.0,
         Value::String(value) => !value.is_empty(),
-        Value::Array(items) => !items.is_empty(),
+        Value::Array(_) | Value::ArrayList(_) => {
+            let items = value.sequence().expect("array or ArrayList");
+            match &*items {
+                [] => false,
+                [one] => one
+                    .sequence()
+                    .map_or_else(|| is_true(one), |inner| !inner.is_empty()),
+                _ => true,
+            }
+        }
         Value::Object(_)
         | Value::Type(_)
         | Value::Decimal(_)
@@ -665,19 +674,15 @@ pub fn range(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
 /// Binary and unary `-join`.
 pub fn join(left: &Value, separator: &Value) -> Result<Value, RuntimeError> {
     let separator = match separator {
-        Value::String(text) => text.to_string_lossy(),
+        Value::String(text) => text,
         Value::Int32(value) => return join(left, &Value::String(value.to_string().into())),
         _ => return refuse("join separator other than a string"),
     };
-    let text = match left {
-        Value::Array(items) => items
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(&separator),
-        other => other.to_string(),
+    let text = match left.sequence() {
+        Some(items) => crate::collection::sequence_text(&items, separator),
+        None => left.to_ps_string(),
     };
-    Ok(Value::String(text.into()))
+    Ok(Value::String(text))
 }
 
 /// The `-f` format operator: `{index[:spec]}` placeholders and `{{`/`}}`.

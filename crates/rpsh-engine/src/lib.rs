@@ -12,9 +12,11 @@
 //! on first use.
 
 mod aliases;
+mod array_list;
 mod encoding;
 mod environment;
 mod globalization;
+mod method_error;
 mod native;
 mod redirection;
 mod sorting;
@@ -24,6 +26,7 @@ mod wildcards;
 
 use aliases::Aliases;
 use encoding::Encoding;
+use method_error::{ambiguous_overload, overload_error};
 use native::NativeOutput;
 use redirection::{OutputTarget, record_prefix};
 use std::collections::HashMap;
@@ -741,12 +744,17 @@ impl Engine {
             } => {
                 let value = self.eval_expression(value)?;
                 let index = self.eval_expression(index)?;
-                self.assign_property(
-                    target,
-                    &index.to_string(),
-                    value,
-                    "index assignment on a value that is not an object",
-                )?;
+                let key = assignment_key(target)?;
+                if let Some(Value::ArrayList(list)) = self.variables.get(key) {
+                    array_list::set_index(list, &index, value)?;
+                } else {
+                    self.assign_property(
+                        target,
+                        &index.to_string(),
+                        value,
+                        "index assignment on a value that is not an object",
+                    )?;
+                }
                 self.last_failed = false;
                 Ok(Flow::Normal)
             }
@@ -877,11 +885,7 @@ impl Engine {
                 ..
             } => {
                 let value = self.eval_expression(collection)?;
-                let items = match value {
-                    Value::Array(items) => (*items).clone(),
-                    Value::Null => Vec::new(),
-                    value => vec![value],
-                };
+                let items = flatten_value(value);
                 let key = strip_scope(name).to_owned();
                 for item in items {
                     self.variables.insert(key.clone(), item);
@@ -1121,6 +1125,11 @@ impl Engine {
         unsupported: &'static str,
     ) -> Result<(), EngineError> {
         let key = assignment_key(target)?;
+        if let Some(Value::ArrayList(list)) = self.variables.get(key)
+            && name.eq_ignore_ascii_case("Capacity")
+        {
+            return Ok(array_list::set_capacity(list, &value)?);
+        }
         let Some(Value::Object(entries)) = self.variables.get(key) else {
             return Err(RuntimeError::NotImplemented {
                 feature: unsupported,
@@ -6334,6 +6343,9 @@ impl Engine {
     }
 
     fn write_value(&mut self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
+        if let Value::ArrayList(list) = value {
+            return self.write_value(Value::array(list.items().to_vec()), out);
+        }
         if let Some(capture) = &mut self.capture {
             match value {
                 Value::Array(items) => capture.extend(items.iter().cloned()),
@@ -6666,27 +6678,21 @@ fn increment(
 }
 
 fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
-    match (target, index) {
-        (Value::Array(items), Value::Int32(at)) => {
-            let at = if *at < 0 {
-                items.len() as i32 + *at
-            } else {
-                *at
+    if let Some(items) = target.sequence() {
+        let at =
+            |index: &Value| -> Result<Value, RuntimeError> {
+                let index = convert_int32(index)?;
+                Ok(array_list::position(index, items.len())
+                    .map_or(Value::Null, |at| items[at].clone()))
             };
-            usize::try_from(at)
-                .ok()
-                .and_then(|at| items.get(at).cloned())
-                .ok_or(RuntimeError::NotImplemented {
-                    feature: "index out of range",
-                })
-        }
-        (Value::Array(items), Value::Array(indices)) => {
-            let mut values = Vec::new();
-            for index in indices.iter() {
-                values.push(index_value(&Value::Array(items.clone()), index)?);
-            }
-            Ok(Value::array(values))
-        }
+        return match index.sequence() {
+            Some(indices) => Ok(Value::array(
+                indices.iter().map(at).collect::<Result<_, _>>()?,
+            )),
+            None => at(index),
+        };
+    }
+    match (target, index) {
         (Value::String(text), Value::Int32(at)) => {
             let at = if *at < 0 {
                 text.len() as i32 + *at
@@ -8272,6 +8278,7 @@ fn contains_group(expr: &Expr) -> bool {
 fn flatten_value(value: Value) -> Vec<Value> {
     match value {
         Value::Array(items) => items.as_ref().clone(),
+        Value::ArrayList(list) => list.items().to_vec(),
         Value::Null | Value::AutomationNull => Vec::new(),
         value => vec![value],
     }
@@ -8454,6 +8461,8 @@ fn automatic_variable(name: &str) -> Option<Value> {
 
 fn type_full_name(name: &str) -> String {
     match name.to_ascii_lowercase().as_str() {
+        "object" => "System.Object".to_owned(),
+        "array" => "System.Array".to_owned(),
         "int" | "int32" => "System.Int32".to_owned(),
         "long" | "int64" => "System.Int64".to_owned(),
         "uint" | "uint32" => "System.UInt32".to_owned(),
@@ -8467,6 +8476,16 @@ fn type_full_name(name: &str) -> String {
         "double" => "System.Double".to_owned(),
         "decimal" => "System.Decimal".to_owned(),
         "biginteger" => "System.Numerics.BigInteger".to_owned(),
+        "collections.arraylist" | "system.collections.arraylist" => {
+            rpsh_runtime::ArrayList::TYPE.into()
+        }
+        "collections.ilist" | "system.collections.ilist" => "System.Collections.IList".into(),
+        "collections.icollection" | "system.collections.icollection" => {
+            "System.Collections.ICollection".into()
+        }
+        "collections.ienumerable" | "system.collections.ienumerable" => {
+            "System.Collections.IEnumerable".into()
+        }
         "cultureinfo" | "globalization.cultureinfo" => globalization::CULTURE_TYPE.to_owned(),
         "text.normalizationform" => globalization::FORM_TYPE.to_owned(),
         "stringcomparison" => globalization::COMPARISON_TYPE.to_owned(),
@@ -9037,28 +9056,6 @@ fn dotnet_string_argument(value: &Value) -> Option<PsString> {
     }
 }
 
-fn ambiguous_overload(method: &str, arity: usize) -> RuntimeError {
-    RuntimeError::Script {
-        id: "MethodCountCouldNotFindBest",
-        category: "NotSpecified: (:) [], MethodException".into(),
-        exception_type: "System.Management.Automation.MethodException",
-        message: format!(
-            "Multiple ambiguous overloads found for \"{method}\" and the argument count: \"{arity}\"."
-        ),
-    }
-}
-
-fn overload_error(method: &str, arity: usize) -> RuntimeError {
-    RuntimeError::Script {
-        id: "MethodCountCouldNotFindBest",
-        category: "NotSpecified: (:) [], MethodException".into(),
-        exception_type: "System.Management.Automation.MethodException",
-        message: format!(
-            "Cannot find an overload for \"{method}\" and the argument count: \"{arity}\"."
-        ),
-    }
-}
-
 fn invoke_static(
     type_name: &str,
     name: &str,
@@ -9068,6 +9065,7 @@ fn invoke_static(
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        ("collections.arraylist", "new") => array_list::construct(arguments),
         ("cultureinfo" | "globalization.cultureinfo", method @ ("new" | "getcultureinfo")) => {
             globalization::culture_method(method, arguments)
         }
@@ -9644,10 +9642,12 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
     if type_name.ends_with("[]") {
         return Ok(match value {
             Value::Array(_) => value,
+            Value::ArrayList(list) => Value::array(list.items().to_vec()),
             other => Value::array(vec![other]),
         });
     }
     match type_name.to_ascii_lowercase().as_str() {
+        "collections.arraylist" | "system.collections.arraylist" => array_list::cast(value),
         "cultureinfo" | "globalization.cultureinfo" | "system.globalization.cultureinfo" => {
             globalization::cast_culture(&value)
         }
@@ -9825,11 +9825,7 @@ fn convert_bool(value: &Value) -> bool {
         Value::SByte(value) => *value != 0,
         Value::Double(value) => *value != 0.0,
         Value::String(text) => !text.is_empty(),
-        Value::Array(items) => match items.len() {
-            0 => false,
-            1 => convert_bool(&items[0]),
-            _ => true,
-        },
+        Value::Array(_) | Value::ArrayList(_) => ops::is_true(value),
         Value::Decimal(_)
         | Value::BigInteger(_)
         | Value::ScriptBlock(_)
@@ -9901,7 +9897,18 @@ fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeEr
             .unwrap_or_else(|| left.type_name().to_owned()),
         _ => left.type_name().to_owned(),
     };
-    let mut same = full.as_ascii() == Some(left_name.as_str());
+    let mut same = !left.is_null_like()
+        && full.as_ascii().is_some_and(|name| {
+            name.eq_ignore_ascii_case(&left_name)
+                || name == "System.Object" && !left.is_null_like()
+                || name == "System.Array" && matches!(left, Value::Array(_))
+                || matches!(
+                    name,
+                    "System.Collections.IList"
+                        | "System.Collections.ICollection"
+                        | "System.Collections.IEnumerable"
+                ) && matches!(left, Value::Array(_) | Value::ArrayList(_))
+        });
     if !same
         && let Value::Object(entries) = left
         && let Some((_, Value::Array(bases))) =
@@ -10022,6 +10029,9 @@ fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
 fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
     if name.eq_ignore_ascii_case("GetType") && arguments.is_empty() {
         return Ok(get_type(target));
+    }
+    if let Value::ArrayList(list) = target {
+        return array_list::method(list, name, arguments);
     }
     if name.eq_ignore_ascii_case("ToString")
         && !matches!(target, Value::String(_) | Value::Object(_))
@@ -10520,6 +10530,7 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
         Value::String(text) if name.eq_ignore_ascii_case("Length") => {
             Ok(Value::Int32(text.len() as i32))
         }
+        Value::ArrayList(list) => array_list::property(list, name),
         Value::Array(items) if name.eq_ignore_ascii_case("Count") => {
             Ok(Value::Int32(items.len() as i32))
         }

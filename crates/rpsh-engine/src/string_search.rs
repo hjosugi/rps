@@ -1,6 +1,11 @@
 //! .NET string overloads bind a char or a string before choosing a search
 //! range. Indices and counts always address UTF-16 code units.
-use super::{convert_int32, globalization, hidden_type, overload_error};
+use super::convert_int32;
+use super::{
+    globalization, hidden_type,
+    method_error::{self, integer, nonnegative},
+    overload_error,
+};
 use rpsh_runtime::{
     PsString, RuntimeError, Value,
     culture::{self, StringComparison},
@@ -20,7 +25,7 @@ impl Term {
         allow_char: bool,
     ) -> Result<Self, RuntimeError> {
         if super::is_null_string(value) {
-            return Err(globalization::invocation(
+            return Err(method_error::invocation(
                 "ArgumentNullException",
                 method,
                 arity,
@@ -41,7 +46,7 @@ impl Term {
                 | Value::SByte(_) => {
                     let unit=convert_int32(value).ok().and_then(|n|u16::try_from(n).ok()).ok_or_else(||{
                         let why=format!("Cannot convert value \"{value}\" to type \"System.Char\". Error: \"Value was either too large or too small for a character.\"");
-                        globalization::argument_error(method,"value","System.Char",&value.to_string(),&why)
+                        method_error::argument_error(method,"value","System.Char",&value.to_string(),&why)
                     })?;
                     Some(unit)
                 }
@@ -62,22 +67,6 @@ impl Term {
             character: character.is_some(),
         })
     }
-}
-
-pub(super) fn integer(method: &str, name: &str, value: &Value) -> Result<i32, RuntimeError> {
-    if matches!(value,Value::String(text) if text.is_empty()) {
-        return Ok(0);
-    }
-    convert_int32(value).map_err(|_|{
-        let why=format!("Cannot convert value \"{value}\" to type \"System.Int32\". Error: \"The input string '{value}' was not in a correct format.\"");
-        globalization::argument_error(method,name,"System.Int32",&value.to_string(),&why)
-    })
-}
-
-pub(super) fn nonnegative(name: &str, value: i64) -> String {
-    format!(
-        "{name} ('{value}') must be a non-negative value. (Parameter '{name}')\nActual value was {value}."
-    )
 }
 
 fn char_ignore_case_range(
@@ -123,7 +112,7 @@ fn char_ignore_case_range(
 pub(super) fn substring(text: &PsString, arguments: &[Value]) -> Result<Value, RuntimeError> {
     let method = "Substring";
     let fail = |detail: &str| {
-        globalization::invocation(
+        method_error::invocation(
             "ArgumentOutOfRangeException",
             method,
             arguments.len(),
@@ -205,7 +194,7 @@ pub(super) fn index(
         .map(|v| integer(method, "count", v).map(i64::from))
         .transpose()?;
     let fail = |detail: &str| {
-        globalization::invocation(
+        method_error::invocation(
             "ArgumentOutOfRangeException",
             method,
             arguments.len(),

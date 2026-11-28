@@ -1,8 +1,9 @@
 //! PowerShell chooses between the System.Object, string, Boolean and enum
 //! overloads before .NET validates the two UTF-16 ranges.
 use super::{
-    ambiguous_overload, dotnet_string_argument, globalization, hidden_type, overload_error,
-    string_search::{integer, nonnegative},
+    ambiguous_overload, dotnet_string_argument, globalization, hidden_type,
+    method_error::{self, integer, nonnegative},
+    overload_error,
 };
 use rpsh_runtime::{
     PsString, RuntimeError, Value,
@@ -186,7 +187,7 @@ pub(super) fn compare(arguments: &[Value], ordinal: bool) -> Result<Value, Runti
         .map(|r| r.bounds(&a, &b, explicit_mode))
         .transpose()
         .map_err(|detail| {
-            globalization::invocation(
+            method_error::invocation(
                 "ArgumentOutOfRangeException",
                 method,
                 arguments.len(),
@@ -275,7 +276,7 @@ pub(super) fn compare_to(text: &PsString, arguments: &[Value]) -> Result<Value, 
     match arguments {
         [Value::String(right)] => culture::compare_to(text, right).map(Value::Int32),
         [value] if value.is_null_like() || super::is_null_string(value) => Ok(Value::Int32(1)),
-        [_] => Err(globalization::invocation(
+        [_] => Err(method_error::invocation(
             "ArgumentException",
             "CompareTo",
             1,

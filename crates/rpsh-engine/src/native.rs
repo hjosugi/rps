@@ -236,10 +236,10 @@ impl Engine {
             ExprKind::String(_) | ExprKind::ExpandableString(_)
         );
         let value = self.eval_expression(expr)?;
-        let items = match &value {
-            Value::Array(items) => items.as_slice(),
-            value => std::slice::from_ref(value),
-        };
+        let sequence = value.sequence();
+        let items = sequence
+            .as_deref()
+            .unwrap_or_else(|| std::slice::from_ref(&value));
         for item in items.iter().filter(|item| !item.is_null_like()) {
             glob::append(out, item.to_string(), quoted);
         }

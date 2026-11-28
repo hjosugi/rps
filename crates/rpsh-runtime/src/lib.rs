@@ -12,6 +12,7 @@
 //! value. `Int32` overflow, for instance, promotes to `Double` upstream, so
 //! here it is refused until `Double` exists.
 
+mod collection;
 pub mod culture;
 pub mod ops;
 pub mod regex;
@@ -21,6 +22,7 @@ pub mod wildcard;
 use std::fmt;
 use std::rc::Rc;
 
+pub use collection::{ArrayList, Sequence};
 pub use string::PsString;
 
 /// A PowerShell value.
@@ -67,6 +69,7 @@ pub enum Value {
     ScriptBlock(PsString),
     /// A PowerShell array. The `Rc` keeps `Value` 16 bytes.
     Array(Rc<Vec<Value>>),
+    ArrayList(ArrayList),
     /// A PowerShell object/hashtable with ordered keys. The `Rc` is the
     /// object's identity, so `$o -eq $o` compares the same object, not its
     /// contents.
@@ -100,6 +103,7 @@ impl Value {
             Value::BigInteger(_) => "System.Numerics.BigInteger",
             Value::ScriptBlock(_) => "System.Management.Automation.ScriptBlock",
             Value::Array(_) => "System.Object[]",
+            Value::ArrayList(_) => ArrayList::TYPE,
             Value::Object(_) => "System.Management.Automation.PSCustomObject",
             Value::Type(_) => "System.RuntimeType",
             Value::String(_) => "System.String",
@@ -111,6 +115,14 @@ impl Value {
     /// Builds a PowerShell array.
     pub fn array(items: Vec<Value>) -> Value {
         Value::Array(Rc::new(items))
+    }
+
+    pub fn sequence(&self) -> Option<Sequence<'_>> {
+        match self {
+            Self::Array(items) => Some(Sequence::Array(items)),
+            Self::ArrayList(list) => Some(Sequence::List(list.items())),
+            _ => None,
+        }
     }
 
     /// Builds an ordered object from its properties.
@@ -128,16 +140,8 @@ impl Value {
         match self {
             Self::String(text) | Self::ScriptBlock(text) => text.clone(),
             Self::Char(unit) => PsString::from_units(vec![*unit]),
-            Self::Array(items) => {
-                let mut units = Vec::new();
-                for (index, item) in items.iter().enumerate() {
-                    if index != 0 {
-                        units.push(b' ' as u16);
-                    }
-                    units.extend(item.to_ps_string().units());
-                }
-                PsString::from_units(units)
-            }
+            Self::Array(items) => collection::sequence_text(items, &" ".into()),
+            Self::ArrayList(list) => collection::sequence_text(&list.items(), &" ".into()),
             _ => PsString::from(self.to_string()),
         }
     }
@@ -167,15 +171,7 @@ impl fmt::Display for Value {
             }
             Value::Double(value) => f.write_str(&format_double(*value)),
             Value::ScriptBlock(text) => fmt::Display::fmt(text, f),
-            Value::Array(items) => {
-                for (index, item) in items.iter().enumerate() {
-                    if index > 0 {
-                        f.write_str(" ")?;
-                    }
-                    write!(f, "{item}")?;
-                }
-                Ok(())
-            }
+            Value::Array(_) | Value::ArrayList(_) => fmt::Display::fmt(&self.to_ps_string(), f),
             Value::Object(entries) => {
                 if let Some((_, Value::String(text))) =
                     entries.iter().find(|(key, _)| key == "__Text")

@@ -1,5 +1,9 @@
 //! CultureInfo and normalization arguments for System.String.
-use super::{hidden_type, overload_error};
+use super::{
+    hidden_type,
+    method_error::{argument_error, invocation},
+    overload_error,
+};
 use culture::{NormalizationError, NormalizationForm, StringComparison};
 use rpsh_runtime::{PsString, RuntimeError, Value, culture};
 
@@ -24,39 +28,6 @@ const COMPARISONS: EnumTable<StringComparison> = EnumTable {
     ty: COMPARISON_TYPE,
     entries: StringComparison::ENTRIES,
 };
-
-pub(super) fn invocation(
-    id: &'static str,
-    method: &str,
-    count: usize,
-    detail: &str,
-) -> RuntimeError {
-    RuntimeError::Script {
-        id,
-        category: "NotSpecified: (:) [], MethodInvocationException".into(),
-        exception_type: "System.Management.Automation.MethodInvocationException",
-        message: format!(
-            "Exception calling \"{method}\" with \"{count}\" argument(s): \"{detail}\""
-        ),
-    }
-}
-
-pub(super) fn argument_error(
-    method: &str,
-    parameter: &str,
-    ty: &str,
-    text: &str,
-    detail: &str,
-) -> RuntimeError {
-    RuntimeError::Script {
-        id: "MethodArgumentConversionInvalidCastArgument",
-        category: "NotSpecified: (:) [], MethodException".into(),
-        exception_type: "System.Management.Automation.MethodException",
-        message: format!(
-            "Cannot convert argument \"{parameter}\", with value: \"{text}\", for \"{method}\" to type \"{ty}\": \"{detail}\""
-        ),
-    }
-}
 
 fn cast_error(id: &'static str, detail: String) -> RuntimeError {
     RuntimeError::Script {

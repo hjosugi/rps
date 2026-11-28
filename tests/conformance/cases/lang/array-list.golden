@@ -1,0 +1,52 @@
+rpsh-golden-v2
+exit=0
+System.Collections.ArrayList
+System.Collections.ArrayList
+0
+1
+False
+0
+False
+1
+2
+3
+4
+0|middle|two
+two
+True
+1
+False
+two
+4
+4
+3
+System.Object[]
+one,two,three,four
+four,one
+two
+True
+one,three,four
+0
+4
+foreach=two
+item=one,item=three,item=four
+False
+False
+False
+True
+True
+False
+True
+5
+four,three,one,right,left
+first
+ExceptionWhenSetting
+Exception setting "Capacity": "capacity was less than the current size. (Parameter 'value')"
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "capacity", with value: "bad", for ".ctor" to type "System.Int32": "Cannot convert value "bad" to type "System.Int32". Error: "The input string 'bad' was not in a correct format.""
+ArgumentOutOfRangeException
+Exception calling "RemoveAt" with "1" argument(s): "Index was out of range. Must be non-negative and less than the size of the collection. (Parameter 'index')"
+ArgumentOutOfRangeException
+Exception calling "Insert" with "2" argument(s): "Index was out of range. Must be non-negative and less than or equal to the size of the collection. (Parameter 'index')"
+ArgumentOutOfRangeException
+Exception calling ".ctor" with "1" argument(s): "'capacity' must be non-negative. (Parameter 'capacity')"
