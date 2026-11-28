@@ -4,14 +4,19 @@ use super::{
     errors::record_with_exception, hidden_type, input,
 };
 use rpsh_commands::framework::{BoundParameters, CommandRuntime, Registration};
-use rpsh_commands::signature::{COMMON_PARAMETERS, Parameter, ParameterType};
+use rpsh_commands::signature::{COMMON_PARAMETERS, Parameter, ParameterType, Signature};
 use rpsh_runtime::{ArrayList, PsString, RuntimeError, Value, ops};
 use rpsh_syntax::ArgumentSeparator;
 use std::io::{self, Write};
 
 type Entry = Registration<EngineError>;
 
-fn binding_record(entry: &Entry, id: &str, args: &[&str], target: Value) -> Value {
+pub(super) fn binding_record(
+    signature: &Signature,
+    id: &str,
+    args: &[&str],
+    target: Value,
+) -> Value {
     let ty = "System.Management.Automation.ParameterBindingException";
     let text = rpsh_messages::format(&format!("ParameterBinderStrings/{id}"), args);
     let full_type = hidden_type(&target).unwrap_or_else(|| target.type_name().to_owned());
@@ -35,10 +40,10 @@ fn binding_record(entry: &Entry, id: &str, args: &[&str], target: Value) -> Valu
         ("InnerException".into(), Value::Null),
     ]);
     record_with_exception(
-        &format!("{id},{}", entry.signature.implementation),
+        &format!("{id},{}", signature.implementation),
         &format!(
             "InvalidArgument: ({subject}) [{}], ParameterBindingException",
-            entry.signature.name
+            signature.name
         ),
         exception,
         &text,
@@ -46,9 +51,9 @@ fn binding_record(entry: &Entry, id: &str, args: &[&str], target: Value) -> Valu
     )
 }
 
-fn binding_error(entry: &Entry, id: &str, args: &[&str]) -> EngineError {
+pub(super) fn binding_error(signature: &Signature, id: &str, args: &[&str]) -> EngineError {
     EngineError::Script(ScriptException::new(binding_record(
-        entry,
+        signature,
         id,
         args,
         Value::Null,
@@ -56,7 +61,7 @@ fn binding_error(entry: &Entry, id: &str, args: &[&str]) -> EngineError {
 }
 
 fn resolve_in(
-    entry: &Entry,
+    signature: &Signature,
     parameters: &'static [Parameter],
     name: &str,
 ) -> Result<Option<&'static Parameter>, EngineError> {
@@ -74,7 +79,7 @@ fn resolve_in(
             .map(|p| format!(" -{}", p.name))
             .collect::<String>();
         return Err(binding_error(
-            entry,
+            signature,
             "AmbiguousParameter",
             &["", name, "", "", "", "", &options],
         ));
@@ -82,19 +87,22 @@ fn resolve_in(
     Ok(Some(first))
 }
 
-fn resolve(entry: &Entry, name: &str) -> Result<Option<(&'static Parameter, bool)>, EngineError> {
-    if let Some(p) = resolve_in(entry, entry.signature.parameters, name)? {
+fn resolve(
+    signature: &Signature,
+    name: &str,
+) -> Result<Option<(&'static Parameter, bool)>, EngineError> {
+    if let Some(p) = resolve_in(signature, signature.parameters, name)? {
         return Ok(Some((p, false)));
     }
-    Ok(resolve_in(entry, COMMON_PARAMETERS, name)?.map(|p| (p, true)))
+    Ok(resolve_in(signature, COMMON_PARAMETERS, name)?.map(|p| (p, true)))
 }
 
-struct Invocation {
-    bound: BoundParameters,
-    common: Vec<(String, Value)>,
+pub(super) struct Invocation {
+    pub(super) bound: BoundParameters,
+    pub(super) common: Vec<(String, Value)>,
 }
 
-fn switch(entry: &Entry, param: &Parameter, value: Value) -> Result<Value, EngineError> {
+fn switch(signature: &Signature, param: &Parameter, value: Value) -> Result<Value, EngineError> {
     match value.base_value() {
         Value::Null | Value::AutomationNull => Ok(Value::Bool(true)),
         Value::Bool(_)
@@ -109,7 +117,7 @@ fn switch(entry: &Entry, param: &Parameter, value: Value) -> Result<Value, Engin
         | Value::Decimal(_)
         | Value::Double(_) => Ok(Value::Bool(ops::is_true(&value))),
         _ => Err(binding_error(
-            entry,
+            signature,
             "CannotConvertArgument",
             &[
                 "",
@@ -125,7 +133,20 @@ fn switch(entry: &Entry, param: &Parameter, value: Value) -> Result<Value, Engin
     }
 }
 
-fn mandatory_error(entry: &Entry, param: &Parameter, value: &Value) -> Option<Value> {
+fn validation_record(sig: &Signature, id: &str, message: &str) -> Value {
+    super::error_record(
+        &format!("{id},{}", sig.implementation),
+        &format!(
+            "InvalidData: (:) [{}], ParameterBindingValidationException",
+            sig.name
+        ),
+        "System.Management.Automation.ParameterBindingValidationException",
+        message,
+        message,
+    )
+}
+
+fn mandatory_error(signature: &Signature, param: &Parameter, value: &Value) -> Option<Value> {
     if !param.mandatory {
         return None;
     }
@@ -141,16 +162,88 @@ fn mandatory_error(entry: &Entry, param: &Parameter, value: &Value) -> Option<Va
         return None;
     };
     let message = rpsh_messages::format(&format!("ParameterBinderStrings/{id}"), &["", param.name]);
-    Some(super::error_record(
-        &format!("{id},{}", entry.signature.implementation),
-        &format!(
-            "InvalidData: (:) [{}], ParameterBindingValidationException",
-            entry.signature.name
-        ),
-        "System.Management.Automation.ParameterBindingValidationException",
-        &message,
-        &message,
-    ))
+    Some(validation_record(signature, id, &message))
+}
+
+fn declared_value(
+    signature: &Signature,
+    param: &Parameter,
+    value: &Value,
+) -> Result<Value, EngineError> {
+    let value = match param.ty {
+        ParameterType::String if value.sequence().is_some() => {
+            return Err(binding_error(
+                signature,
+                "CannotConvertArgument",
+                &[
+                    "",
+                    param.name,
+                    param.ty.full_name(),
+                    "",
+                    "",
+                    "",
+                    value.type_name(),
+                    "Specified method is not supported.",
+                ],
+            ));
+        }
+        ParameterType::String => Value::String(value.to_ps_string()),
+        ParameterType::StringArray if !value.is_null_like() => {
+            let element = |v: &Value| (!v.is_null_like()).then(|| v.to_ps_string());
+            match value.sequence() {
+                Some(items) => Value::string_array(items.iter().map(element)),
+                None => Value::string_array([element(value)]),
+            }
+        }
+        _ => value.clone(),
+    };
+    let detail = if param.not_null_or_empty
+        && (value.is_null_like() || matches!(&value,Value::String(s) if s.is_empty()))
+    {
+        Some(rpsh_messages::text("Metadata/ValidateNotNullOrEmptyFailure").into())
+    } else if !param.valid_values.is_empty() {
+        if value.is_null_like() {
+            Some(rpsh_messages::text("Metadata/ValidateNotNullOrEmptyCollectionFailure").into())
+        } else {
+            let items = value.sequence();
+            let values = items.as_deref().unwrap_or(std::slice::from_ref(&value));
+            values.iter().find_map(|v| {
+                if v.is_null_like() {
+                    return Some(
+                        rpsh_messages::text("Metadata/ValidateNotNullOrEmptyCollectionFailure")
+                            .into(),
+                    );
+                }
+                let text = v.to_string();
+                (!param
+                    .valid_values
+                    .iter()
+                    .any(|s| s.eq_ignore_ascii_case(&text)))
+                .then(|| {
+                    rpsh_messages::format(
+                        "Metadata/ValidateSetFailure",
+                        &[&text, &param.valid_values.join(",")],
+                    )
+                })
+            })
+        }
+    } else {
+        None
+    };
+    let record = if let Some(detail) = detail {
+        let id = "ParameterArgumentValidationError";
+        let message = rpsh_messages::format(
+            "ParameterBinderStrings/ParameterArgumentValidationError",
+            &["", param.name, "", "", "", "", &detail],
+        );
+        Some(validation_record(signature, id, &message))
+    } else {
+        mandatory_error(signature, param, &value)
+    };
+    match record {
+        Some(error) => Err(EngineError::Script(ScriptException::new(error))),
+        None => Ok(value),
+    }
 }
 
 fn remaining_arguments(mut items: Vec<Value>) -> Value {
@@ -164,7 +257,10 @@ fn remaining_arguments(mut items: Vec<Value>) -> Value {
     Value::ObjectList(ArrayList::from_values(list))
 }
 
-fn bind(entry: &Entry, args: &PreparedArguments<'_>) -> Result<Invocation, EngineError> {
+pub(super) fn bind(
+    signature: &Signature,
+    args: &PreparedArguments<'_>,
+) -> Result<Invocation, EngineError> {
     let mut bound = BoundParameters::default();
     let mut common = Vec::new();
     let mut positional = Vec::new();
@@ -177,13 +273,13 @@ fn bind(entry: &Entry, args: &PreparedArguments<'_>) -> Result<Invocation, Engin
             from_hashtable: false,
             ..
         } = arg
-            && let Some((p, _)) = resolve(entry, &name)?
+            && let Some((p, _)) = resolve(signature, &name)?
         {
             explicit.push(p.name);
         }
     }
     let mut args = args.for_binding().peekable();
-    let rest = entry.signature.parameters.iter().find(|p| p.remaining);
+    let rest = signature.parameters.iter().find(|p| p.remaining);
     while let Some(arg) = args.next() {
         let CallArgument::Parameter {
             name,
@@ -198,9 +294,13 @@ fn bind(entry: &Entry, args: &PreparedArguments<'_>) -> Result<Invocation, Engin
             }
             continue;
         };
-        let Some((p, is_common)) = resolve(entry, &name)? else {
+        let Some((p, is_common)) = resolve(signature, &name)? else {
             if rest.is_none() {
-                return Err(binding_error(entry, "NamedParameterNotFound", &["", &name]));
+                return Err(binding_error(
+                    signature,
+                    "NamedParameterNotFound",
+                    &["", &name],
+                ));
             }
             positional.push(Value::String(PsString::command_parameter(&text, &name)));
             positional.extend(value);
@@ -216,7 +316,7 @@ fn bind(entry: &Entry, args: &PreparedArguments<'_>) -> Result<Invocation, Engin
                 p.name
             };
             return Err(binding_error(
-                entry,
+                signature,
                 "ParameterAlreadyBound",
                 &["", reported],
             ));
@@ -236,10 +336,14 @@ fn bind(entry: &Entry, args: &PreparedArguments<'_>) -> Result<Invocation, Engin
                     }
                 })
                 .ok_or_else(|| {
-                    binding_error(entry, "MissingArgument", &["", p.name, p.ty.full_name()])
+                    binding_error(
+                        signature,
+                        "MissingArgument",
+                        &["", p.name, p.ty.full_name()],
+                    )
                 })?;
             if p.ty == ParameterType::Switch {
-                switch(entry, p, value)?
+                switch(signature, p, value)?
             } else {
                 value
             }
@@ -249,8 +353,7 @@ fn bind(entry: &Entry, args: &PreparedArguments<'_>) -> Result<Invocation, Engin
         }
         bound.set(p.name, value);
     }
-    let mut positionals = entry
-        .signature
+    let mut positionals = signature
         .parameters
         .iter()
         .filter(|p| p.position.is_some())
@@ -277,7 +380,11 @@ fn bind(entry: &Entry, args: &PreparedArguments<'_>) -> Result<Invocation, Engin
         if let Value::String(text) = &extra
             && let Some(name) = text.command_parameter_name()
         {
-            return Err(binding_error(entry, "NamedParameterNotFound", &["", name]));
+            return Err(binding_error(
+                signature,
+                "NamedParameterNotFound",
+                &["", name],
+            ));
         }
         let text = match &extra {
             Value::Null | Value::AutomationNull => "$null".to_owned(),
@@ -288,16 +395,15 @@ fn bind(entry: &Entry, args: &PreparedArguments<'_>) -> Result<Invocation, Engin
             value => value.to_string(),
         };
         return Err(binding_error(
-            entry,
+            signature,
             "PositionalParameterNotFound",
             &["", &text],
         ));
     }
-    for param in entry.signature.parameters {
-        if let Some(value) = bound.get(param.name)
-            && let Some(record) = mandatory_error(entry, param, value)
-        {
-            return Err(EngineError::Script(ScriptException::new(record)));
+    for param in signature.parameters {
+        if let Some(value) = bound.get(param.name) {
+            let converted = declared_value(signature, param, value)?;
+            bound.set(param.name, converted);
         }
     }
     Ok(Invocation { bound, common })
@@ -465,7 +571,7 @@ impl Engine {
         args: &PreparedArguments<'_>,
         pipeline: Option<&[Value]>,
     ) -> Result<Vec<Value>, EngineError> {
-        let Invocation { mut bound, common } = bind(entry, args)?;
+        let Invocation { mut bound, common } = bind(entry.signature, args)?;
         let out_variable = capture_target(entry, &bound, "OutVariable")?;
         let error_variable = capture_target(entry, &bound, "ErrorVariable")?;
         let pipeline_param = entry
@@ -486,7 +592,7 @@ impl Engine {
             .collect::<Vec<_>>();
         if !missing.is_empty() {
             return Err(binding_error(
-                entry,
+                entry.signature,
                 "MissingMandatoryParameter",
                 &["", &format!(" {}", missing.join(" "))],
             ));
@@ -507,7 +613,7 @@ impl Engine {
                 Some(inputs) => {
                     for value in inputs {
                         if let Some(param) = pipeline_param {
-                            if let Some(record) = mandatory_error(entry, param, value) {
+                            if let Some(record) = mandatory_error(entry.signature, param, value) {
                                 runtime.write_error(record)?;
                                 continue;
                             }
@@ -515,7 +621,7 @@ impl Engine {
                             cmdlet.process(&bound, &mut runtime)?;
                         } else {
                             runtime.write_error(binding_record(
-                                entry,
+                                entry.signature,
                                 "InputObjectNotBound",
                                 &[],
                                 value.clone(),
@@ -641,7 +747,7 @@ mod tests {
                 "ParameterArgumentValidationErrorEmptyCollectionNotAllowed",
             ),
         ] {
-            let record = mandatory_error(&entry, param, &value).unwrap();
+            let record = mandatory_error(entry.signature, param, &value).unwrap();
             assert_eq!(
                 super::super::member(&record, "FullyQualifiedErrorId")
                     .unwrap()
@@ -649,7 +755,12 @@ mod tests {
                 format!("{id},Test.Input")
             );
             assert!(
-                mandatory_error(permitted, &permitted.signature.parameters[0], &value).is_none()
+                mandatory_error(
+                    permitted.signature,
+                    &permitted.signature.parameters[0],
+                    &value
+                )
+                .is_none()
             );
         }
     }

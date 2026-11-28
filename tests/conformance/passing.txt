@@ -17,6 +17,7 @@ cmdlets/files
 cmdlets/format-list-table
 cmdlets/format-mixed-stream
 cmdlets/format-table
+cmdlets/get-help
 cmdlets/hidden
 cmdlets/item-props
 cmdlets/json

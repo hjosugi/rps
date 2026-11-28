@@ -97,19 +97,11 @@ impl Engine {
             return Ok((path.clone(), path, true));
         }
         let invoked = qualified.unwrap_or(&name);
-        let mut target = name.clone();
-        if kind == "Alias" {
-            let mut visited = std::collections::HashSet::new();
-            while let Some(next) = self.discover_alias(&target) {
-                if !visited.insert(target.to_ascii_lowercase()) {
-                    return Err(RuntimeError::NotImplemented {
-                        feature: "Get-Command -Syntax for a cyclic alias",
-                    }
-                    .into());
-                }
-                target = next;
-            }
-        }
+        let target = if kind == "Alias" {
+            self.resolve_alias(&name)?.unwrap_or_else(|| name.clone())
+        } else {
+            name.clone()
+        };
         if (kind == "Cmdlet"
             || (kind == "Alias" && !self.functions.contains_key(&target.to_ascii_lowercase())))
             && let Some(signature) = signature::lookup(&target)

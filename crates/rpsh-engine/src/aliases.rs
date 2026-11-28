@@ -93,10 +93,12 @@ fn alias_info(
 pub(super) struct Aliases {
     // Keys are case-insensitive. A removed default must stay hidden.
     changes: HashMap<String, Option<StoredAlias>>,
+    revision: u64,
 }
 
 #[derive(Debug, Clone)]
 struct StoredAlias {
+    revision: u64,
     name: String,
     definition: String,
     module: Option<&'static BuiltinModule>,
@@ -137,6 +139,27 @@ impl Aliases {
             .copied()
             .map(default_alias);
         defaults.chain(self.changes.values().flatten().map(StoredAlias::as_alias))
+    }
+
+    /// Get-Help lists defaults followed by session aliases in the order their
+    /// definitions were assigned. Reassigning an existing alias moves it last.
+    pub fn names_for_command(&self, command: &str) -> Vec<&str> {
+        let mut names: Vec<_> = DEFAULTS
+            .iter()
+            .filter(|(name, definition, _)| {
+                !self.changes.contains_key(*name) && definition.eq_ignore_ascii_case(command)
+            })
+            .map(|(name, _, _)| *name)
+            .collect();
+        let mut added: Vec<_> = self
+            .changes
+            .values()
+            .flatten()
+            .filter(|a| a.definition.eq_ignore_ascii_case(command))
+            .collect();
+        added.sort_by_key(|a| a.revision);
+        names.extend(added.into_iter().map(|a| a.name.as_str()));
+        names
     }
 
     /// Get-Alias writes a sorted group for each input pattern, including
@@ -200,9 +223,11 @@ impl Aliases {
     }
 
     pub fn set(&mut self, name: String, definition: String) -> Alias<'_> {
+        self.revision += 1;
         let change = self.changes.entry(name.to_ascii_lowercase()).or_default();
         change
             .insert(StoredAlias {
+                revision: self.revision,
                 name,
                 definition,
                 module: None,
@@ -212,9 +237,11 @@ impl Aliases {
 
     pub fn import(&mut self, module: &'static BuiltinModule) {
         for &(name, definition) in module.aliases {
+            self.revision += 1;
             self.changes.insert(
                 name.to_ascii_lowercase(),
                 Some(StoredAlias {
+                    revision: self.revision,
                     name: name.to_owned(),
                     definition: definition.to_owned(),
                     module: Some(module),

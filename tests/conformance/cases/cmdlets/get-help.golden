@@ -1,0 +1,155 @@
+rpsh-golden-v2
+exit=0
+Write-Output|Cmdlet|Microsoft.PowerShell.Utility|Write|Output
+True
+ExtendedCmdletHelpInfo,CmdletHelpInfo,HelpInfo
+1|2|https://go.microsoft.com/fwlink/?LinkID=2097117
+InputObject:0:true (ByValue, FromRemainingArguments):(All)
+NoEnumerate:Named:false:(All)
+
+.SYNOPSIS
+
+
+Write-Output [-InputObject] <psobject> [-NoEnumerate] [<CommonParameters>]
+
+
+Sort-Object|Cmdlet|Microsoft.PowerShell.Utility|Sort|Object
+True
+ExtendedCmdletHelpInfo,CmdletHelpInfo,HelpInfo
+3|9|https://go.microsoft.com/fwlink/?LinkID=2097038
+Bottom:Named:false:Bottom
+CaseSensitive:Named:false:(All)
+Culture:Named:false:(All)
+Descending:Named:false:(All)
+InputObject:Named:true (ByValue):(All)
+Property:0:false:(All)
+Stable:Named:false:Default
+Top:Named:false:Top
+Unique:Named:false:(All)
+
+.SYNOPSIS
+
+
+Sort-Object [[-Property] <Object[]>] [-Stable] [-Descending] [-Unique] [-InputObject <psobject>] [-Culture <string>] [-CaseSensitive] [<CommonParameters>]
+
+Sort-Object [[-Property] <Object[]>] -Top <int> [-Descending] [-Unique] [-InputObject <psobject>] [-Culture <string>] [-CaseSensitive] [<CommonParameters>]
+
+Sort-Object [[-Property] <Object[]>] -Bottom <int> [-Descending] [-Unique] [-InputObject <psobject>] [-Culture <string>] [-CaseSensitive] [<CommonParameters>]
+
+
+Switch-Process|Cmdlet|Microsoft.PowerShell.Core|Switch|Process
+True
+ExtendedCmdletHelpInfo,CmdletHelpInfo,HelpInfo
+1|1|https://go.microsoft.com/fwlink/?linkid=2181448
+WithCommand:0:true (FromRemainingArguments):(All)
+
+.SYNOPSIS
+
+
+Switch-Process [[-WithCommand] <string[]>] [<CommonParameters>]
+
+
+Get-Help|Cmdlet|Microsoft.PowerShell.Core|Get|Help
+True
+ExtendedCmdletHelpInfo,CmdletHelpInfo,HelpInfo
+5|11|https://go.microsoft.com/fwlink/?LinkID=2096483
+Category:Named:false:(All)
+Component:Named:false:(All)
+Detailed:Named:false:DetailedView
+Examples:Named:false:Examples
+Full:Named:false:AllUsersView
+Functionality:Named:false:(All)
+Name:0:true (ByPropertyName):(All)
+Online:Named:false:Online
+Parameter:Named:false:Parameters
+Path:Named:false:(All)
+Role:Named:false:(All)
+
+.SYNOPSIS
+
+
+Get-Help [[-Name] <string>] [-Path <string>] [-Category <string[]>] [-Full] [-Component <string[]>] [-Functionality <string[]>] [-Role <string[]>] [<CommonParameters>]
+
+Get-Help [[-Name] <string>] -Detailed [-Path <string>] [-Category <string[]>] [-Component <string[]>] [-Functionality <string[]>] [-Role <string[]>] [<CommonParameters>]
+
+Get-Help [[-Name] <string>] -Examples [-Path <string>] [-Category <string[]>] [-Component <string[]>] [-Functionality <string[]>] [-Role <string[]>] [<CommonParameters>]
+
+Get-Help [[-Name] <string>] -Parameter <string[]> [-Path <string>] [-Category <string[]>] [-Component <string[]>] [-Functionality <string[]>] [-Role <string[]>] [<CommonParameters>]
+
+Get-Help [[-Name] <string>] -Online [-Path <string>] [-Category <string[]>] [-Component <string[]>] [-Functionality <string[]>] [-Role <string[]>] [<CommonParameters>]
+
+
+ExtendedCmdletHelpInfo#FullView,CmdletHelpInfo#FullView,HelpInfo#FullView,ExtendedCmdletHelpInfo,CmdletHelpInfo,HelpInfo
+InputObject|true|psobject|true|False
+Top,Top
+Write-Output
+True
+Microsoft.PowerShell.Core
+Alias,Cmdlet,Provider,General,FAQ,Glossary,HelpFile,ScriptCommand,Function,Filter,ExternalScript,All,DefaultHelp,DscResource,Class,Configuration
+Write-Output
+-?
+-?
+
+NAME
+    Write-Output
+    
+SYNTAX
+    Write-Output [-InputObject] <psobject> 
+    [-NoEnumerate] [<CommonParameters>]
+    
+
+ALIASES
+    echo
+    
+
+REMARKS
+    Get-Help cannot find the Help files for 
+    this cmdlet on this computer. It is 
+    displaying only partial help.
+        -- To download and install Help 
+    files for the module that includes this 
+    cmdlet, use Update-Help.
+        -- To view the Help topic for this 
+    cmdlet online, type: "Get-Help 
+    Write-Output -Online" or
+           go to https://go.microsoft.com/fwl
+    ink/?LinkID=2097117.
+
+
+
+
+-NoEnumerate
+    
+    Required?                    false
+    Position?                    Named
+    Accept pipeline input?       false
+    Parameter set name           (All)
+    Aliases                      None
+    Dynamic?                     false
+    Accept wildcard characters?  false
+    
+
+
+
+Write-Output
+NoParmsFound,Microsoft.PowerShell.Commands.GetHelpCommand
+No parameter matches criteria notAParameter.
+AmbiguousParameterSet,Microsoft.PowerShell.Commands.GetHelpCommand
+Parameter set cannot be resolved using the specified named parameters. One or more parameters issued cannot be used together or an insufficient number of parameters were provided.
+ParameterArgumentValidationError,Microsoft.PowerShell.Commands.GetHelpCommand
+Cannot validate argument on parameter 'Category'. The argument "invalid" does not belong to the set "Alias,Cmdlet,Provider,General,FAQ,Glossary,HelpFile,ScriptCommand,Function,Filter,ExternalScript,All,DefaultHelp,DscResource,Class,Configuration" specified by the ValidateSet attribute. Supply an argument that is in the set and then try the command again.
+psobject|System.String|System.String,System.Object
+|
+InputObjectNotBound,Microsoft.PowerShell.Commands.GetHelpCommand
+The input object cannot be bound to any parameters for the command either because the command does not take pipeline input or the input and its properties do not match any of the parameters that take pipeline input.
+ParameterArgumentValidationError,Microsoft.PowerShell.Commands.GetHelpCommand
+Cannot validate argument on parameter 'Name'. The argument is null or empty. Provide an argument that is not null or empty, and then try the command again.
+echo
+zHelpOut
+aHelpOut
+
+echo
+aHelpOut
+zHelpOut
+
+Write-Output

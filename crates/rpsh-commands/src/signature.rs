@@ -26,7 +26,7 @@ impl ParameterType {
         }
     }
 
-    fn display_name(self) -> &'static str {
+    pub fn display_name(self) -> &'static str {
         match self {
             Self::Switch => "switch",
             Self::Int32 => "int",
@@ -82,6 +82,9 @@ pub struct Parameter {
     pub position: Option<u16>,
     pub mandatory: bool,
     pub from_pipeline: bool,
+    pub from_property: bool,
+    pub not_null_or_empty: bool,
+    pub valid_values: &'static [&'static str],
     pub remaining: bool,
     pub allow_null: bool,
     pub allow_empty_collection: bool,
@@ -99,6 +102,9 @@ impl Parameter {
             position: None,
             mandatory: false,
             from_pipeline: false,
+            from_property: false,
+            not_null_or_empty: false,
+            valid_values: &[],
             remaining: false,
             allow_null: false,
             allow_empty_collection: false,
@@ -124,6 +130,19 @@ impl Parameter {
         self.from_pipeline = true;
         self
     }
+    pub const fn pipeline_by_property(mut self) -> Self {
+        self.from_property = true;
+        self
+    }
+    pub const fn not_null_or_empty(mut self) -> Self {
+        self.not_null_or_empty = true;
+        self
+    }
+    pub const fn validate_set(mut self, values: &'static [&'static str]) -> Self {
+        self.valid_values = values;
+        self
+    }
+
     pub const fn remaining(mut self) -> Self {
         self.remaining = true;
         self
@@ -251,8 +270,22 @@ impl Signature {
         })
     }
 
+    pub fn sets(&self) -> &'static [&'static str] {
+        self.sets
+    }
+
     /// PowerShell renders positioned parameters first, followed by mandatory
     /// named parameters and then the other named parameters in declaration order.
+    pub fn parameters_in_display_order(&self, set: &str) -> Vec<&'static Parameter> {
+        let mut parameters: Vec<_> = self
+            .parameters
+            .iter()
+            .filter(|p| p.sets.is_empty() || p.sets.contains(&set))
+            .collect();
+        parameters.sort_by_key(|p| (p.position.unwrap_or(u16::MAX), !p.mandatory));
+        parameters
+    }
+
     pub fn syntax(&self, invoked_as: &str) -> String {
         let mut output = if self.name.eq_ignore_ascii_case(invoked_as) {
             String::new()
@@ -262,13 +295,7 @@ impl Signature {
         for set in self.sets {
             output.push('\n');
             output.push_str(invoked_as);
-            let mut parameters: Vec<_> = self
-                .parameters
-                .iter()
-                .filter(|p| p.sets.is_empty() || p.sets.contains(set))
-                .collect();
-            parameters.sort_by_key(|p| (p.position.unwrap_or(u16::MAX), !p.mandatory));
-            for parameter in parameters {
+            for parameter in self.parameters_in_display_order(set) {
                 output.push(' ');
                 parameter.write_syntax(&mut output);
             }
@@ -281,6 +308,64 @@ impl Signature {
 use ParameterType::{Int32, ObjectArray, PsObject, String as Text, StringArray, Switch};
 
 // Declaration order is also the order returned for ambiguous abbreviations.
+pub static GET_HELP: Signature = Signature {
+    name: "Get-Help",
+    module: "Microsoft.PowerShell.Core",
+    remoting_capability: "PowerShell",
+    implementation: "Microsoft.PowerShell.Commands.GetHelpCommand",
+    help_uri: "https://go.microsoft.com/fwlink/?LinkID=2096483",
+    default_set: Some("AllUsersView"),
+    sets: &[
+        "AllUsersView",
+        "DetailedView",
+        "Examples",
+        "Parameters",
+        "Online",
+    ],
+    unix_only: false,
+    parameters: &[
+        Parameter::new("Name", Text)
+            .positional(0)
+            .pipeline_by_property()
+            .not_null_or_empty(),
+        Parameter::new("Path", Text),
+        Parameter::new("Category", StringArray).validate_set(&[
+            "Alias",
+            "Cmdlet",
+            "Provider",
+            "General",
+            "FAQ",
+            "Glossary",
+            "HelpFile",
+            "ScriptCommand",
+            "Function",
+            "Filter",
+            "ExternalScript",
+            "All",
+            "DefaultHelp",
+            "DscResource",
+            "Class",
+            "Configuration",
+        ]),
+        Parameter::new("Detailed", Switch)
+            .in_sets(&["DetailedView"])
+            .mandatory(),
+        Parameter::new("Full", Switch).in_sets(&["AllUsersView"]),
+        Parameter::new("Examples", Switch)
+            .in_sets(&["Examples"])
+            .mandatory(),
+        Parameter::new("Parameter", StringArray)
+            .in_sets(&["Parameters"])
+            .mandatory(),
+        Parameter::new("Component", StringArray),
+        Parameter::new("Functionality", StringArray),
+        Parameter::new("Role", StringArray),
+        Parameter::new("Online", Switch)
+            .in_sets(&["Online"])
+            .mandatory(),
+    ],
+};
+
 pub static SORT_OBJECT: Signature = Signature {
     name: "Sort-Object",
     module: "Microsoft.PowerShell.Utility",
@@ -360,7 +445,7 @@ pub static COMMON_PARAMETERS: &[Parameter] = &[
         .aliases(&["pv"]),
 ];
 
-pub static SIGNATURES: &[&Signature] = &[&SORT_OBJECT, &SWITCH_PROCESS, &WRITE_OUTPUT];
+pub static SIGNATURES: &[&Signature] = &[&GET_HELP, &SORT_OBJECT, &SWITCH_PROCESS, &WRITE_OUTPUT];
 
 pub fn lookup(name: &str) -> Option<&'static Signature> {
     SIGNATURES

@@ -21,5 +21,7 @@
 #![forbid(unsafe_code)]
 
 mod command;
+mod flow;
 
 pub use command::{CommandTableItem, command_table};
+pub use flow::{wraps_words, write_field};

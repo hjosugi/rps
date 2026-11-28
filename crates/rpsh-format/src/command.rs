@@ -119,13 +119,13 @@ fn write_row(out: &mut String, fields: &[String; 4], widths: &[usize; 4]) {
     out.push('\n');
 }
 
-fn cells(text: &str) -> usize {
+pub(crate) fn cells(text: &str) -> usize {
     text.chars().map(cell_width).sum()
 }
 
 // ConsoleControl.LengthInBufferCells counts UTF-16 units and doubles these
 // BMP ranges for a wide terminal cell. A supplementary scalar uses two units.
-fn cell_width(ch: char) -> usize {
+pub(crate) fn cell_width(ch: char) -> usize {
     match ch as u32 {
         0x1100..=0x115f
         | 0x2329..=0x232a

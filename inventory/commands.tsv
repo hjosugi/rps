@@ -24,7 +24,7 @@ Microsoft.PowerShell.Core	Export-ModuleMember	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	ForEach-Object	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	Get-Command	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	Get-ExperimentalFeature	Cmdlet	linux-x64	todo
-Microsoft.PowerShell.Core	Get-Help	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Core	Get-Help	Cmdlet	linux-x64	partial
 Microsoft.PowerShell.Core	Get-History	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	Get-Job	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Core	Get-Module	Cmdlet	linux-x64	todo

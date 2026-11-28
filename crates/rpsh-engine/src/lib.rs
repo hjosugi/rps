@@ -24,6 +24,7 @@ mod function_drive;
 mod functions;
 mod get_command;
 mod globalization;
+mod help;
 mod input;
 mod invocation;
 mod metadata;
@@ -1250,13 +1251,29 @@ impl Engine {
         None
     }
 
+    fn resolve_alias(&mut self, name: &str) -> Result<Option<String>, RuntimeError> {
+        let Some(mut target) = self.discover_alias(name) else {
+            return Ok(None);
+        };
+        let mut visited = std::collections::HashSet::from([name.to_ascii_lowercase()]);
+        while let Some(next) = self.discover_alias(&target) {
+            if !visited.insert(target.to_ascii_lowercase()) {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "resolving a cyclic alias",
+                });
+            }
+            target = next;
+        }
+        Ok(Some(target))
+    }
+
     fn call_function(
         &mut self,
         name: &str,
         arguments: &PreparedArguments<'_>,
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
-        let resolved = self.discover_alias(name);
+        let resolved = self.resolve_alias(name)?;
         let name = resolved.as_deref().unwrap_or(name);
         if command_name(name).eq_ignore_ascii_case("Switch-Process")
             || name.eq_ignore_ascii_case("exec")
@@ -1586,7 +1603,7 @@ impl Engine {
         has_upstream: bool,
         output: Option<&OutputTarget>,
     ) -> Result<Vec<Value>, EngineError> {
-        let resolved = self.discover_alias(name);
+        let resolved = self.resolve_alias(name)?;
         let name = resolved.as_deref().unwrap_or(name);
         if let Some(outputs) =
             self.invoke_builtin(name, arguments, has_upstream.then_some(input))?
@@ -1631,6 +1648,11 @@ impl Engine {
                 return Ok(None);
             }
             self.import_builtin(module);
+        }
+        if help::requested(arguments)
+            && let Some(sig) = rpsh_commands::signature::lookup(&lower)
+        {
+            return self.shorthand_help(sig, pipeline).map(Some);
         }
         if let Some(entry) = rpsh_commands::framework::Registration::lookup(&lower) {
             return self.run_registered(entry, arguments, pipeline).map(Some);
@@ -4930,6 +4952,7 @@ impl Engine {
                 Ok(Some(Vec::new()))
             }
             "get-command" => self.get_command(arguments).map(Some),
+            "get-help" => self.get_help(arguments, pipeline).map(Some),
             "get-unique" => {
                 let mut outputs = Vec::new();
                 let mut previous: Option<String> = None;
@@ -5994,6 +6017,7 @@ impl Engine {
         let first = &self.host_objects[0];
         let list = matches!(first, Value::Object(entries) if visible_entries(entries).len() > 4)
             && !is_command_info(first)
+            && !help::format::supported(first)
             && datetime_fields(first).is_none()
             && format_marker(first).is_none();
         let continuation = list && self.host_list_started;
@@ -6505,7 +6529,15 @@ fn script_block_argument(arguments: &[CommandArgument]) -> Option<&ScriptBlockAs
     })
 }
 
+fn extended_string(value: &Value) -> Option<String> {
+    (matches!(value, Value::Object(_)) && hidden_type(value).as_deref() == Some("System.String"))
+        .then(|| value.to_string())
+}
+
 fn json_stringify(value: &Value) -> Result<String, RuntimeError> {
+    if let Some(text) = extended_string(value) {
+        return Ok(json_quote(&text));
+    }
     let value = value.base_value();
     match value {
         Value::Null | Value::AutomationNull => Ok("null".to_owned()),
@@ -6548,6 +6580,9 @@ fn json_stringify(value: &Value) -> Result<String, RuntimeError> {
 }
 
 fn json_stringify_pretty(value: &Value, indent: usize) -> Result<String, RuntimeError> {
+    if let Some(text) = extended_string(value) {
+        return Ok(json_quote(&text));
+    }
     let pad = " ".repeat(indent);
     let inner = " ".repeat(indent + 2);
     match value {
@@ -7117,6 +7152,9 @@ fn format_value_group(input: &[Value], width: usize) -> String {
     let Some(first) = input.first() else {
         return String::new();
     };
+    if let Some(text) = help::format::group(input, width) {
+        return text;
+    }
     if uses_command_table(first) {
         return format_command_table(first, input, width);
     }
@@ -7380,6 +7418,9 @@ fn format_host_stream(objects: &[Value]) -> String {
     let Some(first) = objects.first() else {
         return String::new();
     };
+    if let Some(text) = help::format::group(objects, 79) {
+        return text;
+    }
     // ConsoleHost reserves the last column of the reference 80-column
     // buffer when emitting newlines.
     if uses_command_table(first) {
@@ -7723,6 +7764,7 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "Get-Alias",
     "Get-ChildItem",
     "Get-Command",
+    "Get-Help",
     "Get-ItemProperty",
     "Get-PSDrive",
     "Get-PSProvider",
@@ -9936,7 +9978,10 @@ fn number_value(value: &NumberLiteral) -> Value {
 /// The type names of a PowerShell object, most specific first. Upstream's
 /// `PSObject.TypeNames`. A `[pscustomobject]` is a `PSCustomObject` backed by
 /// `System.Object`.
-fn pstypenames() -> Value {
+fn pstypenames(fields: &[(String, Value)]) -> Value {
+    if let Some((_, names)) = fields.iter().find(|(key, _)| key == "__PSTypeNames") {
+        return names.clone();
+    }
     Value::array(vec![
         Value::String("System.Management.Automation.PSCustomObject".into()),
         Value::String("System.Object".into()),
@@ -9956,7 +10001,7 @@ fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
         })
         .collect();
     Value::object(vec![
-        ("TypeNames".to_owned(), pstypenames()),
+        ("TypeNames".to_owned(), pstypenames(entries)),
         ("BaseObject".to_owned(), value.clone()),
         ("Properties".to_owned(), Value::array(properties)),
         ("Members".to_owned(), Value::array(Vec::new())),
@@ -10146,6 +10191,12 @@ fn object_method(
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
     if arguments.is_empty() && name.eq_ignore_ascii_case("ToString") {
+        if entries.iter().any(|(key, _)| key == "__PSTypeNames") {
+            return Ok(entries
+                .iter()
+                .find(|(key, _)| key == "__Text")
+                .map_or_else(|| Value::String("".into()), |(_, v)| v.clone()));
+        }
         let text_type = entries.iter().any(|(key,value)| key == "__TypeName" && matches!(value, Value::String(ty) if matches!(ty.as_ascii(), Some(
             globalization::CULTURE_TYPE | globalization::FORM_TYPE | globalization::COMPARISON_TYPE
             | preferences::TYPE | preferences::ARGUMENT_TYPE | "System.Management.Automation.ErrorRecord" | "System.Management.Automation.ErrorCategoryInfo"
@@ -10553,7 +10604,7 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
                 return Ok(psobject_view(value, entries.as_slice()));
             }
             if name.eq_ignore_ascii_case("pstypenames") {
-                return Ok(pstypenames());
+                return Ok(pstypenames(entries));
             }
             if let Some((_, value)) = entries
                 .iter()

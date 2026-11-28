@@ -164,7 +164,10 @@ fn set_properties(p: &Parameter) -> Vec<(String, Value)> {
             Value::Int32(p.position.map_or(i32::MIN, i32::from)),
         ),
         ("ValueFromPipeline".into(), Value::Bool(p.from_pipeline)),
-        ("ValueFromPipelineByPropertyName".into(), Value::Bool(false)),
+        (
+            "ValueFromPipelineByPropertyName".into(),
+            Value::Bool(p.from_property),
+        ),
         (
             "ValueFromRemainingArguments".into(),
             Value::Bool(p.remaining),
@@ -206,6 +209,22 @@ fn parameter(p: &Parameter) -> Value {
             ),
         ]);
         attrs.push(attribute("ParameterAttribute", props));
+    }
+    if p.not_null_or_empty {
+        attrs.push(attribute("ValidateNotNullOrEmptyAttribute", vec![]));
+    }
+    if !p.valid_values.is_empty() {
+        attrs.push(attribute(
+            "ValidateSetAttribute",
+            vec![
+                (
+                    "ValidValues".into(),
+                    Value::string_array(p.valid_values.iter().map(|&v| Some(v.into()))),
+                ),
+                ("IgnoreCase".into(), Value::Bool(true)),
+                ("ErrorMessage".into(), Value::Null),
+            ],
+        ));
     }
     if p.allow_null {
         attrs.push(attribute("AllowNullAttribute", vec![]));

@@ -154,6 +154,12 @@ fn parameter(out: &mut String, name: &str, param: &Value) {
                 | "ValidateNotNullOrEmptyAttribute" => {
                     line(&format!("[{}()]", simple.trim_end_matches("Attribute")));
                 }
+                "ValidateSetAttribute" => {
+                    if let Some(values) = property(attr, "ValidValues").and_then(Value::sequence) {
+                        let items: Vec<_> = values.iter().map(|v| quoted(&v.to_string())).collect();
+                        line(&format!("[ValidateSet({})]", items.join(",")));
+                    }
+                }
                 "ValidateRangeAttribute" => {
                     line(&format!(
                         "[ValidateRange({}, {})]",
@@ -305,6 +311,9 @@ pub(super) fn invoke(name: &str, args: &[Value]) -> Result<Value, RuntimeError> 
     }
     let source = &args[0];
     if method == "GetHelpComments" {
+        if let Some(comment) = super::help::proxy_comments(source) {
+            return Ok(Value::String(comment.into()));
+        }
         let (id, message) = if source.is_null_like() {
             (
                 "ArgumentNullException",
