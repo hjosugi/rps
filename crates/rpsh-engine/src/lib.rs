@@ -34,7 +34,7 @@ use rpsh_syntax::{
 pub struct Engine {
     variables: HashMap<String, Value>,
     functions: HashMap<String, FunctionDef>,
-    last_success: bool,
+    last_failed: bool,
     /// While running a pipeline stage, output is collected here instead of
     /// being written to the host.
     capture: Option<Vec<Value>>,
@@ -284,6 +284,18 @@ impl Engine {
         self.run_script_with(source, &[], None, out)
     }
 
+    /// ConsoleHost's -Command mode returns 1 when its final pipeline failed.
+    pub fn run_command_text(
+        &mut self,
+        source: &str,
+        out: &mut dyn Write,
+    ) -> Result<i32, EngineError> {
+        let script = parse(source)?;
+        self.variables
+            .insert("args".to_owned(), Value::array(Vec::new()));
+        self.run_ast_with_status(&script, out, true)
+    }
+
     /// Runs a script file or command with its arguments and path, so `param`,
     /// `$args`, `$PSScriptRoot` and `$PSCommandPath` work.
     pub fn run_script_with(
@@ -325,20 +337,30 @@ impl Engine {
         script: &ScriptBlockAst,
         out: &mut dyn Write,
     ) -> Result<i32, EngineError> {
+        self.run_ast_with_status(script, out, false)
+    }
+
+    fn run_ast_with_status(
+        &mut self,
+        script: &ScriptBlockAst,
+        out: &mut dyn Write,
+        command_mode: bool,
+    ) -> Result<i32, EngineError> {
         let flow = self.exec_block(&script.statements, out)?;
         self.flush_host(out)?;
         if self.host_text {
             out.write_all(b"\n")?;
             self.host_text = false;
         }
+        let implicit_exit = i32::from(command_mode && self.last_failed);
         match flow {
-            Flow::Normal => Ok(0),
+            Flow::Normal => Ok(implicit_exit),
             Flow::Exit(code) => Ok(code),
             Flow::Return(value) => {
                 if let Some(value) = value {
                     self.write_value(value, out)?;
                 }
-                Ok(0)
+                Ok(implicit_exit)
             }
             Flow::Throw(_) => Err(RuntimeError::NotImplemented {
                 feature: "uncaught throw",
@@ -575,7 +597,7 @@ impl Engine {
     ) -> Result<Flow, EngineError> {
         match statement {
             Statement::Expression(expr) => {
-                let value = self.eval_expression(expr)?;
+                let value = self.eval_pipeline_expression(expr)?;
                 if !matches!(
                     expr.kind,
                     ExprKind::Unary {
@@ -588,7 +610,6 @@ impl Engine {
                 ) {
                     self.write_value(value, out)?;
                 }
-                self.last_success = true;
                 Ok(Flow::Normal)
             }
             Statement::CoalesceAssign { name, value, .. } => {
@@ -600,7 +621,7 @@ impl Engine {
                     }
                     self.variables.insert(key.to_owned(), value);
                 }
-                self.last_success = true;
+                self.last_failed = false;
                 Ok(Flow::Normal)
             }
             Statement::AppendAssign { name, value, .. } => {
@@ -612,7 +633,7 @@ impl Engine {
                     self.globals.insert(key.to_owned(), updated.clone());
                 }
                 self.variables.insert(key.to_owned(), updated);
-                self.last_success = true;
+                self.last_failed = false;
                 Ok(Flow::Normal)
             }
             Statement::CompoundAssign {
@@ -637,13 +658,12 @@ impl Engine {
                     self.globals.insert(key.to_owned(), updated.clone());
                 }
                 self.variables.insert(key.to_owned(), updated);
-                self.last_success = true;
+                self.last_failed = false;
                 Ok(Flow::Normal)
             }
             Statement::Assign { name, value, .. } => {
-                let value = self.eval_expression(value)?;
+                let value = self.eval_pipeline_expression(value)?;
                 self.assign_variable(name, value);
-                self.last_success = true;
                 Ok(Flow::Normal)
             }
             Statement::MemberAssign {
@@ -659,7 +679,7 @@ impl Engine {
                     value,
                     "member assignment on a value that is not an object",
                 )?;
-                self.last_success = true;
+                self.last_failed = false;
                 Ok(Flow::Normal)
             }
             Statement::IndexAssign {
@@ -676,7 +696,7 @@ impl Engine {
                     value,
                     "index assignment on a value that is not an object",
                 )?;
-                self.last_success = true;
+                self.last_failed = false;
                 Ok(Flow::Normal)
             }
             Statement::Function {
@@ -714,15 +734,12 @@ impl Engine {
             }
             Statement::MultiAssign { targets, value, .. } => {
                 let result = match value {
-                    AssignmentValue::Expression(expr) => self.eval_expression(expr)?,
+                    AssignmentValue::Expression(expr) => self.eval_pipeline_expression(expr)?,
                     AssignmentValue::Pipeline(commands) => {
                         scalar_or_array(self.pipeline_output(commands)?.into_iter())
                     }
                 };
                 self.assign_multiple(targets, result)?;
-                if matches!(value, AssignmentValue::Expression(_)) {
-                    self.last_success = true;
-                }
                 Ok(Flow::Normal)
             }
             Statement::Switch {
@@ -751,17 +768,17 @@ impl Engine {
             } => {
                 let value = self.eval_expression(condition)?;
                 if ops::is_true(&value) {
-                    self.last_success = true;
+                    self.last_failed = false;
                     return self.exec_block(then, out);
                 }
                 for (condition, body) in elseif {
                     let value = self.eval_expression(condition)?;
                     if ops::is_true(&value) {
-                        self.last_success = true;
+                        self.last_failed = false;
                         return self.exec_block(body, out);
                     }
                 }
-                self.last_success = true;
+                self.last_failed = false;
                 self.exec_block(otherwise, out)
             }
             Statement::While {
@@ -954,7 +971,7 @@ impl Engine {
                         bound += 1;
                         value.clone()
                     } else if let Some(default) = &parameter.default {
-                        evaluate(default, &mut self.variables, self.last_success)?
+                        evaluate(default, &mut self.variables, !self.last_failed)?
                     } else {
                         Value::Null
                     };
@@ -1124,7 +1141,7 @@ impl Engine {
         let resolved = self.discover_alias(name);
         let name = resolved.as_deref().unwrap_or(name);
         if !self.functions.contains_key(&name.to_ascii_lowercase()) {
-            if let Some(outputs) = self.run_builtin(name, arguments, &[])? {
+            if let Some(outputs) = self.invoke_builtin(name, arguments, &[])? {
                 for value in outputs {
                     self.write_value(value, out)?;
                 }
@@ -1159,6 +1176,9 @@ impl Engine {
         };
         self.restore_variables(saved);
         self.trap = saved_trap;
+        if matches!(flow, Ok(Flow::Normal | Flow::Return(_))) {
+            self.last_failed = false;
+        }
         Ok(match flow? {
             Flow::Return(value) => {
                 if let Some(value) = value {
@@ -1245,10 +1265,10 @@ impl Engine {
                 let label = clause.label.as_ref().unwrap();
                 let is_match = if wildcard {
                     let pattern =
-                        evaluate(label, &mut self.variables, self.last_success)?.to_string();
+                        evaluate(label, &mut self.variables, !self.last_failed)?.to_string();
                     ops::wildcard_match(&item.to_string(), &pattern, case_sensitive)
                 } else if regex {
-                    let pattern = evaluate(label, &mut self.variables, self.last_success)?;
+                    let pattern = evaluate(label, &mut self.variables, !self.last_failed)?;
                     matches!(
                         regex_match(&item, &pattern, case_sensitive, false, &mut self.variables)?,
                         Value::Bool(true)
@@ -1256,7 +1276,7 @@ impl Engine {
                 } else if matches!(label.kind, ExprKind::ScriptBlock(_)) {
                     self.scriptblock_truth(label)?
                 } else {
-                    let expected = evaluate(label, &mut self.variables, self.last_success)?;
+                    let expected = evaluate(label, &mut self.variables, !self.last_failed)?;
                     matches!(
                         compare_values(&item, &expected, ops::Comparison::Eq, case_sensitive)?,
                         Value::Bool(true)
@@ -1331,22 +1351,20 @@ impl Engine {
 
     fn pipeline_output(&mut self, commands: &[PipelineCommand]) -> Result<Vec<Value>, EngineError> {
         let mut input = Vec::new();
-        for (index, command) in commands.iter().enumerate() {
-            let last = index + 1 == commands.len();
-            let outputs = match command {
+        let mut failed = false;
+        for command in commands {
+            input = match command {
                 PipelineCommand::Expression(expr) => {
-                    let value = evaluate(expr, &mut self.variables, self.last_success)?;
+                    let value = self.eval_pipeline_expression(expr)?;
                     flatten_value(value)
                 }
                 PipelineCommand::Command { name, arguments } => {
-                    self.run_command(name, arguments, input.clone())?
+                    self.run_command(name, arguments, input)?
                 }
             };
-            if last {
-                return Ok(outputs);
-            }
-            input = outputs;
+            failed |= self.last_failed;
         }
+        self.last_failed = failed;
         Ok(input)
     }
 
@@ -1360,7 +1378,7 @@ impl Engine {
         let resolved = self.discover_alias(name);
         let name = resolved.as_deref().unwrap_or(name);
         if !self.functions.contains_key(&name.to_ascii_lowercase()) {
-            if let Some(outputs) = self.run_builtin(name, arguments, &input)? {
+            if let Some(outputs) = self.invoke_builtin(name, arguments, &input)? {
                 return Ok(outputs);
             }
             if let Some(outputs) = self.run_native(name, arguments, &input)? {
@@ -1435,6 +1453,20 @@ impl Engine {
             }
         }
         self.trap = saved_trap;
+        self.last_failed = false;
+        Ok(outputs)
+    }
+
+    fn invoke_builtin(
+        &mut self,
+        name: &str,
+        arguments: &[CommandArgument],
+        input: &[Value],
+    ) -> Result<Option<Vec<Value>>, EngineError> {
+        let outputs = self.run_builtin(name, arguments, input)?;
+        if outputs.is_some() {
+            self.last_failed = name.eq_ignore_ascii_case("Write-Error");
+        }
         Ok(outputs)
     }
 
@@ -1483,6 +1515,24 @@ impl Engine {
             }
             "write-output" | "write-warning" | "write-information" | "write-error" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
+                if lower == "write-error" {
+                    let action = named
+                        .iter()
+                        .find(|(key, _)| {
+                            key.eq_ignore_ascii_case("ErrorAction")
+                                || key.eq_ignore_ascii_case("ea")
+                        })
+                        .map(|(_, value)| value)
+                        .or_else(|| self.variables.get("ErrorActionPreference"));
+                    if action.is_some_and(|value| {
+                        matches!(
+                            value.to_string().to_ascii_lowercase().as_str(),
+                            "silentlycontinue" | "ignore"
+                        )
+                    }) {
+                        return Ok(Some(Vec::new()));
+                    }
+                }
                 let no_enumerate = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("noenumerate") && ops::is_true(value)
                 });
@@ -1493,6 +1543,9 @@ impl Engine {
                         .filter(|(name, _)| name.eq_ignore_ascii_case("inputobject"))
                         .map(|(_, value)| value.clone()),
                 );
+                if values.is_empty() && lower == "write-output" {
+                    values.extend_from_slice(input);
+                }
                 let mut outputs = Vec::new();
                 for value in values {
                     if no_enumerate {
@@ -5707,10 +5760,9 @@ impl Engine {
             .map_err(|_| RuntimeError::NotImplemented {
                 feature: "waiting for a native command",
             })?;
-        let code = output.status.code().unwrap_or(1);
-        self.last_success = output.status.success();
-        self.variables
-            .insert("LASTEXITCODE".to_owned(), Value::Int32(code));
+        let code = native_exit_code(output.status);
+        self.last_failed = !output.status.success();
+        self.assign_variable("global:LASTEXITCODE", Value::Int32(code));
         let text = String::from_utf8_lossy(&output.stdout);
         let mut lines = Vec::new();
         let mut rest = text.as_ref();
@@ -5745,13 +5797,13 @@ impl Engine {
                     }
                 }
                 CommandArgument::Value(expr) => {
-                    let value = evaluate(expr, &mut self.variables, self.last_success)?;
+                    let value = evaluate(expr, &mut self.variables, !self.last_failed)?;
                     out.push(value.to_string());
                 }
                 CommandArgument::Parameter { name, value } => {
                     out.push(format!("-{name}"));
                     if let Some(expr) = value {
-                        let value = evaluate(expr, &mut self.variables, self.last_success)?;
+                        let value = evaluate(expr, &mut self.variables, !self.last_failed)?;
                         out.push(value.to_string());
                     }
                 }
@@ -5991,6 +6043,18 @@ impl Engine {
             })
     }
 
+    fn eval_pipeline_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
+        let value = self.eval_expression(expr)?;
+        let mut root = expr;
+        while let ExprKind::Paren(inner) | ExprKind::Subexpression(inner) = &root.kind {
+            root = inner;
+        }
+        if !matches!(root.kind, ExprKind::Group(_)) {
+            self.last_failed = false;
+        }
+        Ok(value)
+    }
+
     fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
         if let ExprKind::TypeLiteral(name) = &expr.kind
             && self.classes.contains_key(&name.to_ascii_lowercase())
@@ -6042,7 +6106,7 @@ impl Engine {
                 match part {
                     rpsh_syntax::StringPart::Literal(value) => text.push_str(value),
                     rpsh_syntax::StringPart::Variable(name) => {
-                        if let Some(value) = lookup(name, &self.variables, self.last_success) {
+                        if let Some(value) = lookup(name, &self.variables, !self.last_failed) {
                             use std::fmt::Write as _;
                             let _ = write!(text, "{value}");
                         }
@@ -6109,7 +6173,7 @@ impl Engine {
             };
             return Ok(result);
         }
-        Ok(evaluate(expr, &mut self.variables, self.last_success)?)
+        Ok(evaluate(expr, &mut self.variables, !self.last_failed)?)
     }
 
     fn eval_group(&mut self, statements: &[Statement]) -> Result<Value, EngineError> {
@@ -6172,7 +6236,7 @@ impl Engine {
                 bound += 1;
                 value.clone()
             } else if let Some(default) = &parameter.default {
-                evaluate(default, local, self.last_success)?
+                evaluate(default, local, !self.last_failed)?
             } else {
                 Value::Null
             };
@@ -8191,6 +8255,17 @@ fn scalar_or_array(mut values: std::vec::IntoIter<Value>) -> Value {
         0 | 1 => values.next().unwrap_or(Value::Null),
         _ => Value::array(values.collect()),
     }
+}
+
+fn native_exit_code(status: std::process::ExitStatus) -> i32 {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if let Some(signal) = status.signal() {
+            return 128 + signal;
+        }
+    }
+    status.code().unwrap_or(1)
 }
 
 fn capture_sink() -> io::Sink {

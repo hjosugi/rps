@@ -1,0 +1,15 @@
+rpsh-golden-v2
+exit=0
+entry=True
+first=False|3
+last=False|2
+both=False|0
+False
+output=True|4
+function=True|5
+error=False
+group=False|6
+assigned group=False
+multiple group=False
+assignment=False|7|result
+signal=False|143
