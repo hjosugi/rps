@@ -1,8 +1,9 @@
 use crate::command_text::{self, Delimiter};
 use crate::{
     AssignmentValue, BinaryOp, CatchClause, ChainOperator, CommandArgument, Expr, ExprKind,
-    MethodDef, Parameter, ParseError, PipelineChain, PipelineCommand, Redirection, ScriptBlockAst,
-    Span, Statement, Stream, StringPart, SwitchClause, Token, TokenKind, UnaryOp, tokenize,
+    InvocationOperator, MethodDef, Parameter, ParseError, PipelineChain, PipelineCommand,
+    Redirection, ScriptBlockAst, Span, Statement, Stream, StringPart, SwitchClause, Token,
+    TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -68,7 +69,15 @@ impl Parser<'_> {
     }
 
     fn starts_command(&self) -> bool {
-        self.command_name().is_some() || self.peek().kind == TokenKind::Ampersand
+        self.command_name().is_some() || self.invocation_operator().is_some()
+    }
+
+    fn invocation_operator(&self) -> Option<InvocationOperator> {
+        match self.peek().kind {
+            TokenKind::Dot => Some(InvocationOperator::Dot),
+            TokenKind::Ampersand => Some(InvocationOperator::Ampersand),
+            _ => None,
+        }
     }
 
     /// At the start of a statement or assignment RHS, configuration introduces
@@ -188,19 +197,6 @@ impl Parser<'_> {
                 value,
                 span,
             });
-        }
-        if self.peek().kind == TokenKind::Dot {
-            let start = self.peek().span;
-            self.pos += 1;
-            let Token { kind, .. } = self.peek().clone();
-            let path = match kind {
-                TokenKind::Identifier(path) | TokenKind::Bareword(path) => path,
-                TokenKind::StringLiteral(path) => path,
-                _ => return self.refuse("dot-sourcing"),
-            };
-            self.pos += 1;
-            let span = start.to(self.previous_span());
-            return Ok(Statement::DotSource { path, span });
         }
         if self.starts_statement_command()? {
             let statement = self.command_statement()?;
@@ -616,11 +612,18 @@ impl Parser<'_> {
     /// Parses `Name arg -Param value ...` in command mode.
     fn command_statement(&mut self) -> Result<Statement, ParseError> {
         let start = self.peek().span;
-        let (command, redirections) = if self.peek().kind == TokenKind::Ampersand {
+        let (command, redirections) = if let Some(operator) = self.invocation_operator() {
             self.pos += 1;
             let target = self.command_element()?;
             let (arguments, redirections) = self.command_tail()?;
-            (PipelineCommand::Call { target, arguments }, redirections)
+            (
+                PipelineCommand::Call {
+                    operator,
+                    target,
+                    arguments,
+                },
+                redirections,
+            )
         } else {
             let name = self.command_name().unwrap_or("foreach").to_owned();
             self.pos += 1;
@@ -1157,7 +1160,10 @@ impl Parser<'_> {
             self.skip_newlines();
             let default = if self.peek().kind == TokenKind::Equals {
                 self.pos += 1;
-                Some(self.nested_expression()?)
+                let previous = std::mem::replace(&mut self.stop_comma, true);
+                let value = self.expression();
+                self.stop_comma = previous;
+                Some(value?)
             } else {
                 None
             };
@@ -2650,10 +2656,11 @@ mod tests {
         match stage {
             PipelineCommand::Expression(expr) => show(expr),
             PipelineCommand::Call {
+                operator,
                 target,
                 arguments: args,
             } => {
-                let name = format!("& {}", show(target));
+                let name = format!("{} {}", operator.symbol(), show(target));
                 if arguments {
                     show_command(&name, args)
                 } else {
@@ -2892,7 +2899,6 @@ mod tests {
                     .collect::<Vec<_>>()
                     .join(",")
             ),
-            Statement::DotSource { path, .. } => format!(". {path}"),
             Statement::Param { parameters, .. } => format!(
                 "param({})",
                 parameters
@@ -2999,6 +3005,7 @@ mod tests {
         assert_eq!(refused("(1"), SYNTAX_ERRORS);
         assert_eq!(refused("()"), SYNTAX_ERRORS);
         assert_eq!(refused("1 +"), SYNTAX_ERRORS);
+        assert_eq!(refused("Write-Output ready &"), "background pipelines");
         assert_eq!(refused("+1"), "unary plus");
         assert_eq!(refused("(1\n)"), "newlines inside parentheses");
         assert_eq!(refused("1 2"), "syntax error reporting");

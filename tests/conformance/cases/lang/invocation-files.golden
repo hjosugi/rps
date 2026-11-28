@@ -1,0 +1,22 @@
+rpsh-golden-v2
+exit=0
+info=ExternalScriptInfo|ExternalScript|invocation-file with spaces.ps1|invocation-file with spaces.ps1
+file=called|2|extra|invocation-file with spaces.ps1|fixtures
+returned
+after-call=parent|False
+file=dotted|4||invocation-file with spaces.ps1|fixtures
+returned
+after-dot=dotted|dotted|4|function:dotted|invocation-files.ps1
+captured=file=next|3|rest|invocation-file with spaces.ps1|fixtures/returned
+file=exit|1||invocation-file with spaces.ps1|fixtures
+call-exit=False/7
+file=exit|1||invocation-file with spaces.ps1|fixtures
+dot-exit=False/7
+restored=invocation-files.ps1
+enter=caller||root
+finish=nested-script|nested-script|root
+child=caller|root|root
+enter=caller|root|root
+finish=caller|nested-script|nested-script
+dot=caller|nested-script|nested-script
+root=nested-script

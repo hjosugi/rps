@@ -1,7 +1,10 @@
 use std::borrow::Cow;
+use std::path::{Path, PathBuf};
 
 use rpsh_runtime::{RuntimeError, Value};
-use rpsh_syntax::{Expr, ExprKind, PipelineCommand, Redirection, Statement, parse};
+use rpsh_syntax::{
+    Expr, ExprKind, InvocationOperator, PipelineCommand, Redirection, Statement, parse,
+};
 
 use super::{
     Engine, EngineError, FunctionDef, OutputTarget, PreparedArguments, flatten_value, hidden_type,
@@ -11,7 +14,72 @@ use super::{
 pub(super) enum CallTarget<'a> {
     Name(Cow<'a, str>),
     Cmdlet(String),
-    Block(Box<FunctionDef>),
+    Block(Box<ScriptCall>),
+}
+
+pub(super) struct ScriptCall {
+    pub function: FunctionDef,
+    pub operator: InvocationOperator,
+    pub path: Option<PathBuf>,
+}
+
+impl ScriptCall {
+    pub(super) fn new(function: FunctionDef, operator: InvocationOperator) -> Self {
+        Self {
+            function,
+            operator,
+            path: None,
+        }
+    }
+
+    fn from_file(path: PathBuf, operator: InvocationOperator) -> Result<Self, EngineError> {
+        let bytes = std::fs::read(&path)?;
+        let text = std::str::from_utf8(bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes))
+            .map_err(|_| RuntimeError::NotImplemented {
+                feature: "script files that are not UTF-8",
+            })?;
+        let mut function = FunctionDef::from_script_block(parse(text)?.statements);
+        function.name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        Ok(Self {
+            function,
+            operator,
+            path: Some(path),
+        })
+    }
+}
+
+pub(super) fn script_name(name: &str) -> bool {
+    Path::new(name)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("ps1"))
+}
+
+pub(super) const EXTERNAL_SCRIPT: &str = "System.Management.Automation.ExternalScriptInfo";
+
+pub(super) fn script_info(path: PathBuf) -> Value {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let full = Value::String(path.to_string_lossy().as_ref().into());
+    Value::object(vec![
+        ("Name".into(), Value::String(name.as_ref().into())),
+        ("__Text".into(), Value::String(name.as_ref().into())),
+        ("__TypeName".into(), Value::String(EXTERNAL_SCRIPT.into())),
+        (
+            "__BaseClasses".into(),
+            Value::array(vec![Value::String(
+                "System.Management.Automation.CommandInfo".into(),
+            )]),
+        ),
+        ("CommandType".into(), Value::String("ExternalScript".into())),
+        ("Path".into(), full.clone()),
+        ("Definition".into(), full.clone()),
+        ("Source".into(), full),
+        ("ModuleName".into(), Value::String("".into())),
+        ("Visibility".into(), Value::String("Public".into())),
+    ])
 }
 
 pub(super) enum StageCommand<'a> {
@@ -47,54 +115,203 @@ impl FunctionDef {
 }
 
 impl Engine {
+    pub(super) fn call_definition(
+        &mut self,
+        call: &ScriptCall,
+        arguments: &PreparedArguments<'_>,
+        input: Option<Vec<Value>>,
+        out: &mut dyn std::io::Write,
+    ) -> Result<super::Flow, EngineError> {
+        use super::Flow;
+        let function = &call.function;
+        let (positional, named) = self.function_arguments(arguments, function)?;
+        let child = call.operator == InvocationOperator::Ampersand;
+        let mut local = if child {
+            self.variables.child()
+        } else {
+            self.variables.clone()
+        };
+        if let Some(path) = &call.path {
+            if child {
+                local.start_script_scope();
+            }
+            local.set_script_path(path);
+        }
+        self.bind_parameters(function, &positional, &named, &mut local)?;
+        let caller = std::mem::replace(&mut self.variables, local);
+        let caller_trap = self.trap.take();
+        let aliases = child.then(|| {
+            self.functions.enter_scope();
+            self.aliases.clone()
+        });
+        let flow = self.execute_definition_body(function, input, out);
+        if let Some(aliases) = aliases {
+            self.aliases = aliases;
+            self.functions.leave_scope();
+            self.restore_variables(caller);
+        } else {
+            self.variables.restore_invocation(caller);
+        }
+        self.trap = caller_trap;
+        match flow? {
+            Flow::Exit(code) if call.path.is_some() => {
+                self.assign_variable("global:LASTEXITCODE", Value::Int32(code))?;
+                self.last_failed = code != 0;
+            }
+            Flow::Return(value) => {
+                if let Some(value) = value {
+                    self.write_value(value, out)?;
+                }
+                self.last_failed = false;
+            }
+            Flow::Normal => self.last_failed = false,
+            Flow::Break(_) | Flow::Continue(_) => {}
+            flow => return Ok(flow),
+        }
+        Ok(Flow::Normal)
+    }
+
+    fn execute_definition_body(
+        &mut self,
+        function: &FunctionDef,
+        input: Option<Vec<Value>>,
+        out: &mut dyn std::io::Write,
+    ) -> Result<super::Flow, EngineError> {
+        use super::Flow;
+        if function.has_blocks() {
+            return self.exec_named_blocks(function, input, out);
+        }
+        if function.filter
+            && let Some(items) = input
+        {
+            for item in items {
+                self.variables.insert("_".into(), item);
+                match self.exec_block(&function.body, out)? {
+                    Flow::Return(Some(value)) => self.write_value(value, out)?,
+                    Flow::Normal | Flow::Return(None) | Flow::Continue(_) => {}
+                    flow => return Ok(flow),
+                }
+            }
+            return Ok(Flow::Normal);
+        }
+        self.variables
+            .insert("input".into(), Value::array(input.unwrap_or_default()));
+        self.exec_block(&function.body, out)
+    }
+
+    pub(super) fn function_output(
+        &mut self,
+        call: &ScriptCall,
+        args: &PreparedArguments<'_>,
+        input: Vec<Value>,
+    ) -> Result<Vec<Value>, EngineError> {
+        let outer = self.capture.replace(Vec::new());
+        let flow = self.call_definition(call, args, Some(input), &mut super::capture_sink());
+        let values = std::mem::replace(&mut self.capture, outer).unwrap_or_default();
+        match flow? {
+            super::Flow::Normal => Ok(values),
+            _ => Err(RuntimeError::NotImplemented {
+                feature: "exit inside a pipeline function",
+            }
+            .into()),
+        }
+    }
+
+    pub(super) fn named_target<'a>(
+        &mut self,
+        name: Cow<'a, str>,
+        operator: InvocationOperator,
+    ) -> Result<CallTarget<'a>, EngineError> {
+        if operator == InvocationOperator::Dot || script_name(&name) {
+            let resolved = self.discover_alias(&name);
+            let resolved = resolved.as_deref().unwrap_or(&name);
+            if self.functions.contains_key(&resolved.to_ascii_lowercase()) {
+                return Ok(CallTarget::Block(Box::new(ScriptCall::new(
+                    self.function(resolved)?,
+                    operator,
+                ))));
+            }
+            if script_name(resolved) {
+                let path = self
+                    .script_paths(resolved, false)
+                    .into_iter()
+                    .next()
+                    .ok_or_else(|| super::command_not_found(resolved))?;
+                return Ok(CallTarget::Block(Box::new(ScriptCall::from_file(
+                    path, operator,
+                )?)));
+            }
+        }
+        Ok(CallTarget::Name(name))
+    }
+
+    pub(super) fn script_paths(&mut self, name: &str, all: bool) -> Vec<PathBuf> {
+        let name = name.replace('\\', "/");
+        let name = name
+            .strip_prefix("~/")
+            .and_then(|suffix| {
+                super::environment::get(&self.variables, "HOME").map(|home| {
+                    Path::new(&home.to_string())
+                        .join(suffix)
+                        .to_string_lossy()
+                        .into_owned()
+                })
+            })
+            .unwrap_or(name);
+        self.application_paths(&name, all)
+    }
+
     pub(super) fn call_target(
         &mut self,
         target: &Expr,
+        operator: InvocationOperator,
     ) -> Result<CallTarget<'static>, EngineError> {
+        let block = |statements| {
+            CallTarget::Block(Box::new(ScriptCall::new(
+                FunctionDef::from_script_block(statements),
+                operator,
+            )))
+        };
         if let ExprKind::ScriptBlock { statements, .. } = &target.kind {
-            return Ok(CallTarget::Block(Box::new(FunctionDef::from_script_block(
-                statements.clone(),
-            ))));
+            return Ok(block(statements.clone()));
         }
         let value = self.eval_expression(target)?;
-        let name = match &value {
-            Value::ScriptBlock(source) => {
-                let script = parse(&source.to_string_lossy())?;
-                return Ok(CallTarget::Block(Box::new(FunctionDef::from_script_block(
-                    script.statements,
+        if let Value::ScriptBlock(source) = &value {
+            return Ok(block(parse(&source.to_string_lossy())?.statements));
+        }
+        let name = match hidden_type(&value).as_deref() {
+            Some(super::native::APPLICATION_TYPE | EXTERNAL_SCRIPT) => {
+                member(&value, "Path")?.to_string()
+            }
+            Some(super::functions::CMDLET) => {
+                return Ok(CallTarget::Cmdlet(member(&value, "Name")?.to_string()));
+            }
+            Some(super::functions::FUNCTION) => {
+                let function = self.function(&member(&value, "Name")?.to_string())?;
+                return Ok(CallTarget::Block(Box::new(ScriptCall::new(
+                    function, operator,
                 ))));
             }
-            _ => match hidden_type(&value).as_deref() {
-                Some(super::native::APPLICATION_TYPE) => member(&value, "Path")?.to_string(),
-                Some(super::functions::CMDLET) => {
-                    return Ok(CallTarget::Cmdlet(member(&value, "Name")?.to_string()));
+            Some(super::aliases::TYPE_NAME) => {
+                let definition = member(&value, "Definition")?;
+                if definition.is_null_like() {
+                    value.to_string()
+                } else {
+                    definition.to_string()
                 }
-                Some(super::functions::FUNCTION) => {
-                    return Ok(CallTarget::Block(Box::new(
-                        self.function(&member(&value, "Name")?.to_string())?,
-                    )));
-                }
-                Some(super::aliases::TYPE_NAME) => {
-                    let definition = member(&value, "Definition")?;
-                    if definition.is_null_like() {
-                        value.to_string()
-                    } else {
-                        definition.to_string()
-                    }
-                }
-                _ => value.to_ps_string().to_string_lossy(),
-            },
+            }
+            _ => value.to_ps_string().to_string_lossy(),
         };
         if name.is_empty() {
             return Err(RuntimeError::Script {
                 id: "BadExpression",
                 category: "InvalidOperation: (:) [], RuntimeException".into(),
                 exception_type: "System.Management.Automation.RuntimeException",
-                message: rpsh_messages::format("ParserStrings/BadExpression", &["&"]),
+                message: rpsh_messages::format("ParserStrings/BadExpression", &[operator.symbol()]),
             }
             .into());
         }
-        Ok(CallTarget::Name(name.into()))
+        self.named_target(name.into(), operator)
     }
 
     pub(super) fn pipeline_stage<'a>(
@@ -111,11 +328,15 @@ impl Engine {
         let command = match command {
             PipelineCommand::Expression(expr) => StageCommand::Expression(expr),
             PipelineCommand::Command { name, arguments } => StageCommand::Call(
-                CallTarget::Name(name.as_str().into()),
+                self.named_target(name.as_str().into(), InvocationOperator::Ampersand)?,
                 self.prepare_arguments(arguments)?,
             ),
-            PipelineCommand::Call { target, arguments } => StageCommand::Call(
-                self.call_target(target)?,
+            PipelineCommand::Call {
+                operator,
+                target,
+                arguments,
+            } => StageCommand::Call(
+                self.call_target(target, *operator)?,
                 self.prepare_arguments(arguments)?,
             ),
             PipelineCommand::Redirected { .. } => {

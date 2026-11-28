@@ -38,7 +38,7 @@ use command_arguments::{CallArgument, PreparedArguments};
 use encoding::Encoding;
 pub use errors::ScriptException;
 use errors::error_record;
-use invocation::{CallTarget, PipelineStage, StageCommand};
+use invocation::{CallTarget, PipelineStage, ScriptCall, StageCommand};
 use method_error::{ambiguous_overload, overload_error};
 use native::NativeOutput;
 use redirection::{OutputTarget, record_prefix};
@@ -52,9 +52,9 @@ use rpsh_commands::{BuiltinModule, MODULES};
 use rpsh_format::{CommandTableItem, command_table};
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
-    AssignmentValue, BinaryOp, ChainOperator, CommandArgument, Expr, ExprKind, MethodDef,
-    NumberLiteral, Parameter, ParseError, PipelineChain, PipelineCommand, ScriptBlockAst,
-    Statement, SwitchClause, UnaryOp, parse,
+    AssignmentValue, BinaryOp, ChainOperator, CommandArgument, Expr, ExprKind, InvocationOperator,
+    MethodDef, NumberLiteral, Parameter, ParseError, PipelineChain, PipelineCommand,
+    ScriptBlockAst, Statement, SwitchClause, UnaryOp, parse,
 };
 
 /// Runs scripts.
@@ -85,8 +85,6 @@ pub struct Engine {
     host_encoding: Option<Encoding>,
     /// The generator Get-Random draws from; -SetSeed replaces it.
     random: Option<RandomGenerator>,
-    /// `$global:`/`$script:` variables, kept across function calls.
-    globals: HashMap<String, Value>,
     /// User-defined PowerShell classes.
     classes: HashMap<String, ClassDef>,
     /// Session aliases shared by command discovery, dispatch, and the provider.
@@ -395,16 +393,7 @@ impl Engine {
         );
         if let Some(path) = script_path {
             let full = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-            self.variables.insert(
-                "PSCommandPath".to_owned(),
-                Value::String(full.to_string_lossy().to_string().into()),
-            );
-            if let Some(parent) = full.parent() {
-                self.variables.insert(
-                    "PSScriptRoot".to_owned(),
-                    Value::String(parent.to_string_lossy().to_string().into()),
-                );
-            }
+            self.variables.set_script_path(&full);
         }
         self.run_ast(&script, out)
     }
@@ -618,9 +607,6 @@ impl Engine {
     fn restore_variables(&mut self, mut saved: Variables) {
         saved.restore_session(&mut self.variables);
         self.variables = saved;
-        for (key, value) in &self.globals {
-            self.variables.insert(key.clone(), value.clone());
-        }
     }
 
     fn exec_block(
@@ -1009,18 +995,6 @@ impl Engine {
                 }
                 Ok(Flow::Normal)
             }
-            Statement::DotSource { path, .. } => {
-                let source = std::fs::read_to_string(path).map_err(|_| {
-                    RuntimeError::Script {
-                        id: "CommandNotFoundException",
-                        category: format!("ObjectNotFound: ({path}:String) [], CommandNotFoundException"),
-                        exception_type: "System.Management.Automation.CommandNotFoundException",
-                        message: format!("The term '{path}' is not recognized as a name of a cmdlet, function, script file, or executable program."),
-                    }
-                })?;
-                let script = parse(&source)?;
-                self.exec_block(&script.statements, out)
-            }
             Statement::Param { parameters, .. } => {
                 let positional = match self.variables.get("args") {
                     Some(Value::Array(items) | Value::StringArray(items)) => items.as_ref().clone(),
@@ -1123,10 +1097,7 @@ impl Engine {
             }
             canonical
         } else { key }.to_owned();
-        if is_global_scope(name) {
-            self.globals.insert(key.clone(), value.clone());
-        }
-        self.variables.insert(key, value);
+        self.variables.insert_scoped(name, key, value);
         Ok(())
     }
 
@@ -1262,6 +1233,12 @@ impl Engine {
             out.flush()?;
         }
         if !self.functions.contains_key(&name.to_ascii_lowercase()) {
+            if invocation::script_name(name)
+                && let CallTarget::Block(call) =
+                    self.named_target(name.into(), InvocationOperator::Ampersand)?
+            {
+                return self.call_definition(&call, arguments, None, out);
+            }
             if let Some(outputs) = self.invoke_builtin(name, arguments, &[])? {
                 for value in outputs {
                     self.write_value(value, out)?;
@@ -1280,43 +1257,8 @@ impl Engine {
             return Ok(Flow::Normal);
         }
         let function = self.function(name)?;
-        self.call_definition(&function, arguments, out)
-    }
-
-    fn call_definition(
-        &mut self,
-        function: &FunctionDef,
-        arguments: &PreparedArguments<'_>,
-        out: &mut dyn Write,
-    ) -> Result<Flow, EngineError> {
-        let (positional, named) = self.function_arguments(arguments, function)?;
-        let mut local = self.variables.child();
-        self.bind_parameters(function, &positional, &named, &mut local)?;
-        if function.filter {
-            local.entry("_".to_owned()).or_insert(Value::Null);
-        }
-        let saved_trap = self.trap.take();
-        let saved = std::mem::replace(&mut self.variables, local);
-        let flow = if function.has_blocks() {
-            self.exec_named_blocks(function, None, out)
-        } else {
-            self.exec_block(&function.body, out)
-        };
-        self.restore_variables(saved);
-        self.trap = saved_trap;
-        if matches!(flow, Ok(Flow::Normal | Flow::Return(_))) {
-            self.last_failed = false;
-        }
-        Ok(match flow? {
-            Flow::Return(value) => {
-                if let Some(value) = value {
-                    self.write_value(value, out)?;
-                }
-                Flow::Normal
-            }
-            Flow::Break(_) | Flow::Continue(_) => Flow::Normal,
-            flow => flow,
-        })
+        let call = ScriptCall::new(function, InvocationOperator::Ampersand);
+        self.call_definition(&call, arguments, None, out)
     }
 
     /// Runs a function's `begin` / `process` / `end` blocks over `input`.
@@ -1481,12 +1423,19 @@ impl Engine {
         commands: &[PipelineCommand],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
-        if let [PipelineCommand::Call { target, arguments }] = commands {
-            let target = self.call_target(target)?;
+        if let [
+            PipelineCommand::Call {
+                operator,
+                target,
+                arguments,
+            },
+        ] = commands
+        {
+            let target = self.call_target(target, *operator)?;
             let args = self.prepare_arguments(arguments)?;
             return match target {
                 CallTarget::Name(name) => self.call_function(&name, &args, out),
-                CallTarget::Block(function) => self.call_definition(&function, &args, out),
+                CallTarget::Block(call) => self.call_definition(&call, &args, None, out),
                 CallTarget::Cmdlet(name) => {
                     if name.eq_ignore_ascii_case("Switch-Process") {
                         self.flush_host(out)?;
@@ -1616,6 +1565,12 @@ impl Engine {
         let resolved = self.discover_alias(name);
         let name = resolved.as_deref().unwrap_or(name);
         if !self.functions.contains_key(&name.to_ascii_lowercase()) {
+            if invocation::script_name(name)
+                && let CallTarget::Block(call) =
+                    self.named_target(name.into(), InvocationOperator::Ampersand)?
+            {
+                return self.function_output(&call, arguments, input);
+            }
             if let Some(outputs) = self.invoke_builtin(name, arguments, &input)? {
                 return Ok(outputs);
             }
@@ -1623,88 +1578,8 @@ impl Engine {
             return self.run_native(name, arguments, Some(&input), destination);
         }
         let function = self.function(name)?;
-        self.function_output(&function, arguments, input)
-    }
-
-    fn function_output(
-        &mut self,
-        function: &FunctionDef,
-        arguments: &PreparedArguments<'_>,
-        input: Vec<Value>,
-    ) -> Result<Vec<Value>, EngineError> {
-        let (positional, named) = self.function_arguments(arguments, function)?;
-        let saved_trap = self.trap.take();
-        let saved_capture = self.capture.take();
-        let result = self.pipeline_function_output(function, &positional, &named, input);
-        self.capture = saved_capture;
-        self.trap = saved_trap;
-        if result.is_ok() {
-            self.last_failed = false;
-        }
-        result
-    }
-
-    fn pipeline_function_output(
-        &mut self,
-        function: &FunctionDef,
-        positional: &[Value],
-        named: &[(String, Value)],
-        input: Vec<Value>,
-    ) -> Result<Vec<Value>, EngineError> {
-        let mut outputs = Vec::new();
-        if function.filter {
-            for item in input {
-                let mut local = self.variables.child();
-                self.bind_parameters(function, positional, named, &mut local)?;
-                local.insert("_".to_owned(), item);
-                let saved = std::mem::replace(&mut self.variables, local);
-                self.capture = Some(Vec::new());
-                let flow = self.exec_block(&function.body, &mut capture_sink());
-                let captured = self.capture.take().unwrap_or_default();
-                self.restore_variables(saved);
-                outputs.extend(captured);
-                match flow? {
-                    Flow::Return(Some(value)) => outputs.extend(flatten_value(value)),
-                    Flow::Return(None) | Flow::Normal => {}
-                    Flow::Break(_) | Flow::Continue(_) => {}
-                    _ => {
-                        return Err(RuntimeError::NotImplemented {
-                            feature: "exit or throw inside a pipeline filter",
-                        }
-                        .into());
-                    }
-                }
-            }
-        } else {
-            let has_blocks = function.has_blocks();
-            let mut local = self.variables.child();
-            self.bind_parameters(function, positional, named, &mut local)?;
-            if !has_blocks {
-                local.insert("input".to_owned(), Value::array(input.clone()));
-            }
-            let saved = std::mem::replace(&mut self.variables, local);
-            self.capture = Some(Vec::new());
-            let flow = if has_blocks {
-                self.exec_named_blocks(function, Some(input), &mut capture_sink())
-            } else {
-                self.exec_block(&function.body, &mut capture_sink())
-            };
-            let captured = self.capture.take().unwrap_or_default();
-            self.restore_variables(saved);
-            outputs.extend(captured);
-            match flow? {
-                Flow::Return(Some(value)) => outputs.extend(flatten_value(value)),
-                Flow::Return(None) | Flow::Normal => {}
-                Flow::Break(_) | Flow::Continue(_) => {}
-                _ => {
-                    return Err(RuntimeError::NotImplemented {
-                        feature: "exit or throw inside a pipeline function",
-                    }
-                    .into());
-                }
-            }
-        }
-        Ok(outputs)
+        let call = ScriptCall::new(function, InvocationOperator::Ampersand);
+        self.function_output(&call, arguments, input)
     }
 
     fn invoke_builtin(
@@ -2418,10 +2293,7 @@ impl Engine {
                     "variable" => {
                         let key = strip_scope(name);
                         let key = encoding::variable_name(key).unwrap_or(key).to_owned();
-                        if is_global_scope(name) {
-                            self.globals.insert(key.clone(), value.clone());
-                        }
-                        self.variables.insert(key, value);
+                        self.variables.insert_scoped(name, key, value);
                     }
                     _ => {
                         return Err(RuntimeError::NotImplemented {
@@ -2857,12 +2729,10 @@ impl Engine {
                                         .collect();
                                     for key in keys {
                                         self.variables.remove(&key);
-                                        self.globals.remove(&key);
                                     }
                                 } else {
                                     let key = strip_scope(name);
-                                    self.variables.remove(key);
-                                    self.globals.remove(key);
+                                    self.variables.remove_scoped(name, key);
                                 }
                                 continue;
                             }
@@ -3801,7 +3671,13 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "split-path" => {
-                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let (positional, named) = self.evaluate_arguments_matching(arguments, |name| {
+                    match name.to_ascii_lowercase().as_str() {
+                        "leaf" | "leafbase" | "parent" | "qualifier" | "noqualifier"
+                        | "extension" | "isabsolute" | "resolve" => ArgumentBinding::Switch,
+                        _ => ArgumentBinding::Named,
+                    }
+                })?;
                 let path = named
                     .iter()
                     .find(|(name, _)| {
@@ -4286,12 +4162,10 @@ impl Engine {
                             .collect();
                         for key in keys {
                             self.variables.remove(&key);
-                            self.globals.remove(&key);
                         }
                     } else {
                         let key = strip_scope(&name);
-                        self.variables.remove(key);
-                        self.globals.remove(key);
+                        self.variables.remove_scoped(&name, key);
                     }
                 }
                 Ok(Some(Vec::new()))
@@ -5203,9 +5077,10 @@ impl Engine {
                 if !requested_names.is_empty()
                     && verb.is_empty()
                     && noun.is_empty()
-                    && command_type
-                        .as_deref()
-                        .is_none_or(|kind| kind.eq_ignore_ascii_case("Application"))
+                    && command_type.as_deref().is_none_or(|kind| {
+                        kind.eq_ignore_ascii_case("Application")
+                            || kind.eq_ignore_ascii_case("ExternalScript")
+                    })
                 {
                     let all = command_type.is_some()
                         || named.iter().any(|(key, value)| {
@@ -5225,16 +5100,31 @@ impl Engine {
                         {
                             continue;
                         }
-                        outputs.extend(
-                            self.application_paths(&name, all)
-                                .into_iter()
-                                .filter(|path| {
-                                    !path
-                                        .extension()
-                                        .is_some_and(|ext| ext.eq_ignore_ascii_case("ps1"))
-                                })
-                                .map(native::application_info),
-                        );
+                        let script = invocation::script_name(&name);
+                        let kind = if script {
+                            "ExternalScript"
+                        } else {
+                            "Application"
+                        };
+                        if command_type
+                            .as_deref()
+                            .is_some_and(|wanted| !wanted.eq_ignore_ascii_case(kind))
+                        {
+                            continue;
+                        }
+                        if script {
+                            outputs.extend(
+                                self.script_paths(&name, all)
+                                    .into_iter()
+                                    .map(invocation::script_info),
+                            );
+                        } else {
+                            outputs.extend(
+                                self.application_paths(&name, all)
+                                    .into_iter()
+                                    .map(native::application_info),
+                            );
+                        }
                     }
                 }
                 Ok(Some(outputs))
@@ -5937,8 +5827,7 @@ impl Engine {
                 }
                 let key = strip_scope(name);
                 Some(
-                    self.variables.contains_key(key)
-                        || self.globals.contains_key(key)
+                    self.variables.get_scoped(name, key).is_some()
                         || automatic_variable(key).is_some(),
                 )
             }
@@ -6212,6 +6101,20 @@ impl Engine {
             };
             local.insert(parameter.name.clone(), value);
         }
+        let mut bound: Vec<_> = named
+            .iter()
+            .map(|(name, _)| {
+                (
+                    name.clone(),
+                    local.get(name).expect("installed parameter").clone(),
+                )
+            })
+            .collect();
+        bound.push((
+            "__TypeName".into(),
+            Value::String("System.Management.Automation.PSBoundParametersDictionary".into()),
+        ));
+        local.insert("PSBoundParameters".into(), Value::object(bound));
         local.insert("args".to_owned(), Value::array(unbound.to_vec()));
         Ok(())
     }
@@ -7248,7 +7151,11 @@ fn is_command_info(value: &Value) -> bool {
     matches!(
         hidden_type(value).as_deref(),
         Some(
-            aliases::TYPE_NAME | native::APPLICATION_TYPE | functions::FUNCTION | functions::CMDLET
+            aliases::TYPE_NAME
+                | native::APPLICATION_TYPE
+                | invocation::EXTERNAL_SCRIPT
+                | functions::FUNCTION
+                | functions::CMDLET
         )
     )
 }
@@ -8245,14 +8152,18 @@ fn assignment_key(target: &Expr) -> Result<&str, RuntimeError> {
 }
 
 fn is_global_scope(name: &str) -> bool {
-    name.starts_with("global:") || name.starts_with("script:")
+    name.split_once(':').is_some_and(|(scope, _)| {
+        scope.eq_ignore_ascii_case("global") || scope.eq_ignore_ascii_case("script")
+    })
 }
 
 fn strip_scope(name: &str) -> &str {
-    for scope in ["global:", "script:", "local:", "private:", "using:"] {
-        if let Some(rest) = name.strip_prefix(scope) {
-            return rest;
-        }
+    if let Some((scope, key)) = name.split_once(':')
+        && ["global", "script", "local", "private", "using"]
+            .iter()
+            .any(|s| scope.eq_ignore_ascii_case(s))
+    {
+        return key;
     }
     name
 }
@@ -8276,7 +8187,7 @@ fn lookup(name: &str, variables: &Variables, last_success: bool) -> Option<Value
     }
     let key = preferences::variable_name(key).unwrap_or(key);
     let key = encoding::variable_name(key).unwrap_or(key);
-    if let Some(value) = variables.get(key) {
+    if let Some(value) = variables.get_scoped(name, key) {
         return Some(value.clone());
     }
     automatic_variable(key)

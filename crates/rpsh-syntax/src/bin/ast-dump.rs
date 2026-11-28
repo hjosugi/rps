@@ -93,9 +93,11 @@ fn format_stage(command: &PipelineCommand) -> String {
             format!("(command-expression {})", format_expr(expr))
         }
         PipelineCommand::Command { name, arguments } => format_command(name, arguments),
-        PipelineCommand::Call { target, arguments } => {
-            format_command_elements(format!("Ampersand {}", format_expr(target)), arguments)
-        }
+        PipelineCommand::Call {
+            operator,
+            target,
+            arguments,
+        } => format_command_elements(format!("{operator:?} {}", format_expr(target)), arguments),
     }
 }
 

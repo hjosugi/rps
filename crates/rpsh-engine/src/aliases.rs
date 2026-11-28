@@ -89,13 +89,13 @@ fn alias_info(
     ])
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(super) struct Aliases {
     // Keys are case-insensitive. A removed default must stay hidden.
     changes: HashMap<String, Option<StoredAlias>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct StoredAlias {
     name: String,
     definition: String,

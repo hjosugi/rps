@@ -69,6 +69,7 @@ lang/double-format
 lang/dsc-boundary
 lang/enum
 lang/error-history
+lang/fixtures/invocation-file with spaces
 lang/format-operator
 lang/function
 lang/function-basic
@@ -77,6 +78,8 @@ lang/get-date
 lang/hashtable
 lang/if-else
 lang/int-overflow
+lang/invocation-files
+lang/invocation-scope
 lang/invoke-expression
 lang/loops
 lang/matches-variable

@@ -180,11 +180,6 @@ pub enum Statement {
         members: Vec<(String, Option<i64>)>,
         span: Span,
     },
-    /// `. path`: run a script in the current scope.
-    DotSource {
-        path: String,
-        span: Span,
-    },
     /// A script-level `param(...)` declaration.
     Param {
         parameters: Vec<Parameter>,
@@ -249,7 +244,6 @@ impl Statement {
             | Self::Try { span, .. }
             | Self::Class { span, .. }
             | Self::Enum { span, .. }
-            | Self::DotSource { span, .. }
             | Self::Param { span, .. }
             | Self::Trap { span, .. }
             | Self::Throw { span, .. }
@@ -279,8 +273,9 @@ pub enum PipelineCommand {
         name: String,
         arguments: Vec<CommandArgument>,
     },
-    /// The call operator evaluates the command target separately from its arguments.
+    /// Both invocation operators evaluate a target before binding arguments.
     Call {
+        operator: InvocationOperator,
         target: Expr,
         arguments: Vec<CommandArgument>,
     },
@@ -288,6 +283,21 @@ pub enum PipelineCommand {
         command: Box<PipelineCommand>,
         redirections: Vec<Redirection>,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InvocationOperator {
+    Ampersand,
+    Dot,
+}
+
+impl InvocationOperator {
+    pub fn symbol(self) -> &'static str {
+        match self {
+            Self::Ampersand => "&",
+            Self::Dot => ".",
+        }
+    }
 }
 
 /// Stream slots in the order exposed by PowerShell's CommandBaseAst.

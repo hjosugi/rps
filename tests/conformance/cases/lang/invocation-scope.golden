@@ -1,0 +1,17 @@
+rpsh-golden-v2
+exit=0
+start=arg|original|original
+private|child|child
+after-call=original|arg||False|False
+same|extra|child
+after-dot=same|arg|child|here|yes|original
+inner=fn|extra
+after-function=fn|function
+cmdlet
+BadExpression
+The expression after '.' in a pipeline element produced an object that was not valid. It must result in a command name, a script block, or a CommandInfo object.
+dotted warning
+outside=False|False
+1/1
+2/2
+3/3

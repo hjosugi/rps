@@ -55,5 +55,10 @@
   {"name":"call-parenthesized-command","source":"& (Get-Command Write-Output) -InputObject (1 + 2)"},
   {"name":"call-block","source":"$value = & {param($x) $x} -x:4"},
   {"name":"call-native-chain","source":"& \"program\" @items 2>&1 && & other --% -literal $x"},
-  {"name":"call-target-expression","source":"& ('Write-' + 'Output') ( & $name )"}
+  {"name":"call-target-expression","source":"& ('Write-' + 'Output') ( & $name )"},
+  {"name":"dot-variable","source":". $file -Name:foo @options"},
+  {"name":"dot-script-block","source":". {param($x) $x} 'arg'"},
+  {"name":"dot-command-info","source":"$r = . (Get-Command Test-F) -n: 2"},
+  {"name":"dot-pipeline","source":"'hi' | . $stage 3>&1 && . ./second.ps1"},
+  {"name":"dot-relative-script","source":". ./script.ps1 -Param hello"}
 ]

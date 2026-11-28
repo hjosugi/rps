@@ -102,7 +102,8 @@ impl Engine {
             .definition(name)
             .map_or(Cow::Borrowed(name.as_ref()), Cow::Owned);
         let lower = super::command_name(&resolved).to_ascii_lowercase();
-        if self.functions.contains_key(&lower)
+        if super::invocation::script_name(&resolved)
+            || self.functions.contains_key(&lower)
             || CORE_CMDLETS.binary_search(&lower.as_str()).is_ok()
             || MODULES.iter().any(|module| {
                 (module.exports_cmdlet(&lower) || module.exports_alias(&resolved))

@@ -28,6 +28,7 @@ pub struct FullToken {
     pub flags: TokenFlags,
     /// The same token kind can represent an operator or command argument.
     pub(crate) in_command_arguments: bool,
+    invocation_operator: bool,
 }
 
 /// Tokenizes `source` into the full token surface.
@@ -389,7 +390,10 @@ impl Tokenizer<'_> {
                 && !self.statement_start
                 && self.tokens.last().is_some_and(|token| {
                     token.span.end < start as u32
-                        || matches!(token.kind, FullTokenKind::Comma | FullTokenKind::Ampersand)
+                        || matches!(
+                            token.kind,
+                            FullTokenKind::Comma | FullTokenKind::Ampersand | FullTokenKind::Dot
+                        )
                         || self.after_member()
                         || (token.kind == FullTokenKind::Parameter
                             && token.span.text(self.source).ends_with(':'))
@@ -397,11 +401,11 @@ impl Tokenizer<'_> {
             self.command_after_paren.push(argument);
         }
         if matches!(kind, FullTokenKind::LCurly | FullTokenKind::AtCurly) {
-            self.command_after_brace.push(
-                self.tokens.last().is_some_and(|token| {
-                    token.kind == FullTokenKind::Ampersand && self.command_seen
-                }),
-            );
+            self.command_after_brace
+                .push(self.tokens.last().is_some_and(|token| {
+                    matches!(token.kind, FullTokenKind::Ampersand | FullTokenKind::Dot)
+                        && self.command_seen
+                }));
         }
         if matches!(
             kind,
@@ -910,6 +914,7 @@ impl Tokenizer<'_> {
         tokens.len() >= 2
             && tokens[tokens.len() - 1].kind == FullTokenKind::Identifier
             && tokens[tokens.len() - 2].kind == FullTokenKind::Dot
+            && !tokens[tokens.len() - 2].invocation_operator
     }
 
     /// `-ieq`, `-ine`, ... are explicit case-insensitive spellings of `-eq`,
@@ -1050,7 +1055,7 @@ impl Tokenizer<'_> {
                     return true;
                 }
                 match kind {
-                    FullTokenKind::Ampersand if self.statement_start => {
+                    FullTokenKind::Ampersand | FullTokenKind::Dot if self.statement_start => {
                         self.mode = Mode::Command;
                         self.command_seen = true;
                         self.statement_start = false;
@@ -1248,6 +1253,7 @@ impl Tokenizer<'_> {
 
     fn follows_member_operator(&self) -> bool {
         self.tokens.len() >= 2
+            && !self.tokens[self.tokens.len() - 1].invocation_operator
             && matches!(
                 self.tokens[self.tokens.len() - 1].kind,
                 FullTokenKind::Dot | FullTokenKind::ColonColon
@@ -1353,6 +1359,8 @@ impl Tokenizer<'_> {
             end_column: 0,
             flags: kind.flags(),
             in_command_arguments: self.mode == Mode::Command && self.command_seen,
+            invocation_operator: self.statement_start
+                && matches!(kind, FullTokenKind::Dot | FullTokenKind::Ampersand),
         });
     }
 }

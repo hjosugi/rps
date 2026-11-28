@@ -2,43 +2,81 @@ use super::{ArgumentBinding, FunctionDef};
 use rpsh_runtime::Value;
 use std::cell::LazyCell;
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 #[derive(Debug)]
-pub(super) struct Functions(LazyCell<HashMap<String, FunctionDef>>);
+pub(super) struct Functions {
+    entries: LazyCell<HashMap<String, FunctionDef>>,
+    scopes: Vec<HashMap<String, Option<FunctionDef>>>,
+}
 
 impl Default for Functions {
     fn default() -> Self {
-        Self(LazyCell::new(|| {
-            if cfg!(unix) {
-                let function = FunctionDef {
-                    name: "exec".into(),
-                    definition: Some("\nSwitch-Process -WithCommand $args\n"),
-                    parameters: Vec::new(),
-                    begin: Vec::new(),
-                    process: Vec::new(),
-                    end: Vec::new(),
-                    body: Vec::new(),
-                    filter: false,
-                };
-                HashMap::from([("exec".into(), function)])
-            } else {
-                HashMap::new()
-            }
-        }))
+        Self {
+            entries: LazyCell::new(|| {
+                if cfg!(unix) {
+                    let function = FunctionDef {
+                        name: "exec".into(),
+                        definition: Some("\nSwitch-Process -WithCommand $args\n"),
+                        parameters: Vec::new(),
+                        begin: Vec::new(),
+                        process: Vec::new(),
+                        end: Vec::new(),
+                        body: Vec::new(),
+                        filter: false,
+                    };
+                    HashMap::from([("exec".into(), function)])
+                } else {
+                    HashMap::new()
+                }
+            }),
+            scopes: Vec::new(),
+        }
     }
 }
 
 impl Deref for Functions {
     type Target = HashMap<String, FunctionDef>;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.entries
     }
 }
 
-impl DerefMut for Functions {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        LazyCell::force_mut(&mut self.0)
+impl Functions {
+    pub(super) fn enter_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    pub(super) fn leave_scope(&mut self) {
+        for (name, original) in self.scopes.pop().expect("function scope") {
+            let entries = LazyCell::force_mut(&mut self.entries);
+            match original {
+                Some(old) => {
+                    entries.insert(name, old);
+                }
+                None => {
+                    entries.remove(&name);
+                }
+            }
+        }
+    }
+
+    fn remember(&mut self, name: &str) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope
+                .entry(name.to_owned())
+                .or_insert_with(|| self.entries.get(name).cloned());
+        }
+    }
+
+    pub(super) fn insert(&mut self, name: String, function: FunctionDef) {
+        self.remember(&name);
+        LazyCell::force_mut(&mut self.entries).insert(name, function);
+    }
+
+    pub(super) fn remove(&mut self, name: &str) {
+        self.remember(name);
+        LazyCell::force_mut(&mut self.entries).remove(name);
     }
 }
 

@@ -166,6 +166,7 @@ impl Engine {
         });
         let mut args = args.into_iter().peekable();
         let mut bound = vec![None; function.parameters.len()];
+        let mut order = Vec::new();
         let mut rest = Vec::new();
         while let Some(arg) = args.next() {
             let (name, text, mut value, separator, from_hashtable) = match arg {
@@ -213,6 +214,7 @@ impl Engine {
                     value = Some(next);
                 }
                 bound[index] = Some((value.unwrap_or(Value::Bool(true)), !from_hashtable));
+                order.push(index);
                 continue;
             }
             rest.push((
@@ -231,19 +233,26 @@ impl Engine {
             }
         }
         let mut unbound = Vec::new();
-        let mut slots = bound.iter_mut().filter(|slot| slot.is_none());
+        let mut slots = bound
+            .iter_mut()
+            .enumerate()
+            .filter(|(_, slot)| slot.is_none());
         for (positional, value) in rest {
-            if positional && let Some(slot) = slots.next() {
+            if positional && let Some((index, slot)) = slots.next() {
                 *slot = Some((value, true));
+                order.push(index);
             } else {
                 unbound.push(value);
             }
         }
-        let named = function
-            .parameters
-            .iter()
-            .zip(bound)
-            .filter_map(|(p, value)| value.map(|(value, _)| (p.name.clone(), value)))
+        let named = order
+            .into_iter()
+            .map(|index| {
+                (
+                    function.parameters[index].name.clone(),
+                    bound[index].take().expect("bound parameter").0,
+                )
+            })
             .collect();
         Ok((unbound, named))
     }

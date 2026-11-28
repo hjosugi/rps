@@ -2,13 +2,13 @@
 //! environment within a shell. Deletions mask inherited values in child scopes.
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use rpsh_runtime::{RuntimeError, Value};
 
-type Variables = HashMap<String, Value>;
+use crate::variables::Variables;
 
 pub(super) fn drive_name(path: &str) -> Option<&str> {
     let (prefix, name) = path.split_once(':')?;
@@ -93,7 +93,7 @@ pub(super) fn set(variables: &mut Variables, name: &str, value: &Value) {
         let text = value.to_string();
         Value::String(text.split('\0').next().unwrap_or("").into())
     };
-    variables.insert(format!("env:{name}"), value);
+    variables.insert_scoped("env:", format!("env:{name}"), value);
 }
 
 pub(super) fn entries(variables: &Variables) -> BTreeMap<String, Value> {
@@ -108,7 +108,7 @@ pub(super) fn entries(variables: &Variables) -> BTreeMap<String, Value> {
     for (name, value) in startup() {
         entries.insert(name.clone(), Value::String(value.as_str().into()));
     }
-    for (key, value) in variables {
+    for (key, value) in variables.iter() {
         if let Some(name) = key.strip_prefix("env:") {
             if value.is_null_like() {
                 entries.remove(name);

@@ -1,0 +1,4 @@
+rpsh-golden-v2
+exit=0
+file=default|1||invocation-file with spaces.ps1|fixtures
+returned
