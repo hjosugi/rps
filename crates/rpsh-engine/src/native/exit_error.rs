@@ -1,4 +1,4 @@
-use super::{Engine, EngineError, native_exit_code};
+use super::{Engine, EngineError, ErrorFiles, OutputTarget, native_exit_code};
 use crate::{ScriptException, errors::record_with_exception, preferences::Action};
 use rpsh_native::{FailedStage, PipelineStatus};
 use rpsh_runtime::{RuntimeError, Value};
@@ -40,6 +40,7 @@ impl Engine {
         &mut self,
         status: PipelineStatus,
         policy: Option<(Action, Vec<PathBuf>)>,
+        error_files: &ErrorFiles,
     ) -> Result<(), EngineError> {
         self.last_failed = !status.all_succeeded;
         if let Some((action, paths)) = policy {
@@ -60,7 +61,15 @@ impl Engine {
                 }
                 self.remember_error(&error);
                 if action != Action::Silent {
-                    writeln!(io::stderr().lock(), "NativeCommandExitException: {error}")?;
+                    match error_files.target(stage.index) {
+                        Some(OutputTarget::Discard) => {}
+                        Some(OutputTarget::File(file)) => {
+                            writeln!(&*file, "NativeCommandExitException: {error}")?
+                        }
+                        None => {
+                            writeln!(io::stderr().lock(), "NativeCommandExitException: {error}")?
+                        }
+                    }
                 }
             }
         }

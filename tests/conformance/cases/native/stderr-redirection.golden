@@ -1,0 +1,24 @@
+rpsh-golden-v2
+exit=0
+00ff4f
+00efbfbd450a5a0a
+False|1|0
+00efbfbd450a5a0a0a410a0a420a
+stdout
+object|line
+616e6f746865720a
+6f6e650a
+74776f0a
+ff00
+efbbbf410a420a
+done
+327681
+Continue|False|7|1
+err|two|NativeCommandExitException: Program "sh" ended with non-zero exit code: 7 (0x07).
+SilentlyContinue|False|7|1
+err|two
+Ignore|False|7|0
+err|two
+catch|Stop|False|7|1|ProgramExitedWithNonZeroCode
+err|two
+False|7|1

@@ -213,6 +213,26 @@ impl Encoding {
         }
     }
 
+    pub(super) fn unit_width(self) -> usize {
+        match self.kind {
+            Kind::Utf16Le | Kind::Utf16Be => 2,
+            Kind::Utf32Le | Kind::Utf32Be => 4,
+            _ => 1,
+        }
+    }
+
+    pub(super) fn newline(self, unit: &[u8]) -> Option<u8> {
+        let byte = match (self.kind, unit) {
+            (_, [delimiter])
+            | (Kind::Utf16Le, [delimiter, 0])
+            | (Kind::Utf16Be, [0, delimiter])
+            | (Kind::Utf32Le, [delimiter, 0, 0, 0])
+            | (Kind::Utf32Be, [0, 0, 0, delimiter]) => *delimiter,
+            _ => return None,
+        };
+        matches!(byte, b'\r' | b'\n').then_some(byte)
+    }
+
     pub(super) fn decode(self, bytes: &[u8]) -> std::borrow::Cow<'_, str> {
         use std::borrow::Cow;
         match self.kind {

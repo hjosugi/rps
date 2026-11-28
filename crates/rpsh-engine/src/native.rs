@@ -1,3 +1,4 @@
+mod error_files;
 mod exit_error;
 mod glob;
 mod path;
@@ -5,6 +6,7 @@ pub(super) use path::LookupPaths;
 
 use super::encoding::Encoding;
 use super::{encoding, format_out_string, redirection::text_output_width};
+use error_files::ErrorFiles;
 use std::borrow::Cow;
 use std::io::{self, Write};
 use std::path::Path;
@@ -29,6 +31,7 @@ pub(super) struct NativeStage<'a> {
     name: Cow<'a, str>,
     arguments: &'a [CommandArgument],
     pub(super) file: Option<(&'a Expr, bool)>,
+    error_file: Option<(&'a Expr, bool)>,
 }
 
 pub(super) const APPLICATION_TYPE: &str = "System.Management.Automation.ApplicationInfo";
@@ -64,24 +67,31 @@ impl Engine {
     }
 
     pub(super) fn native_stage<'a>(&self, stage: &'a PipelineCommand) -> Option<NativeStage<'a>> {
-        let (stage, file) = match stage {
-            PipelineCommand::Redirected {
-                command,
-                redirections,
-            } => {
-                let [
+        let mut file = None;
+        let mut error_file = None;
+        let stage = if let PipelineCommand::Redirected {
+            command,
+            redirections,
+        } = stage
+        {
+            for redirect in redirections {
+                match redirect {
                     Redirection::File {
                         from: Stream::Output,
                         append,
                         path,
-                    },
-                ] = redirections.as_slice()
-                else {
-                    return None;
-                };
-                (command.as_ref(), Some((path, *append)))
+                    } => file = Some((path, *append)),
+                    Redirection::File {
+                        from: Stream::Error,
+                        append,
+                        path,
+                    } => error_file = Some((path, *append)),
+                    _ => return None,
+                }
             }
-            stage => (stage, None),
+            command.as_ref()
+        } else {
+            stage
         };
         let PipelineCommand::Command { name, arguments } = stage else {
             return None;
@@ -104,6 +114,7 @@ impl Engine {
             name: resolved,
             arguments,
             file,
+            error_file,
         })
     }
 
@@ -118,6 +129,7 @@ impl Engine {
             name: Cow::Borrowed(name),
             arguments,
             file: None,
+            error_file: None,
         };
         self.run_native_stages(&[stage], input, destination)
     }
@@ -129,19 +141,24 @@ impl Engine {
         destination: NativeOutput<'_>,
     ) -> Result<Vec<Value>, EngineError> {
         let mut commands = Vec::with_capacity(stages.len());
-        for stage in stages {
+        let mut error_files = ErrorFiles::default();
+        for (index, stage) in stages.iter().enumerate() {
             let path = self
                 .application_paths(&stage.name, false)
                 .into_iter()
                 .next()
                 .ok_or_else(|| command_not_found(&stage.name))?;
             let args = self.native_arguments(stage.arguments)?;
-            let command = application_command(
+            let mut command = application_command(
                 &path,
                 &args,
                 super::environment::child_overrides(&self.variables),
             )
             .map_err(|err| spawn_failure(&path, err))?;
+            if let Some((expr, append)) = stage.error_file {
+                let target = OutputTarget::open(self.eval_expression(expr)?, append)?;
+                error_files.attach(&mut command, index, target)?;
+            }
             commands.push(command);
         }
         let mut bytes = Vec::new();
@@ -176,23 +193,29 @@ impl Engine {
                         .collect(),
                 )
             });
-        let status =
+        let run = || {
             run_pipeline_with_input(commands, stdin, output).map_err(|error| match error {
                 PipelineError::Spawn { program, error } => {
                     spawn_failure(Path::new(&program), error)
                 }
                 PipelineError::Io(error) => EngineError::Io(error),
-            })?;
-        self.native_exit_status(status, policy)?;
+            })
+        };
+        let status = error_files.run(run, || self.native_output_encoding())?;
+        self.native_exit_status(status, policy, &error_files)?;
         if captured.is_empty() {
             return Ok(Vec::new());
         }
-        let encoding = self
-            .variables
+        Ok(native_lines(
+            &self.native_output_encoding().decode(&captured),
+        ))
+    }
+
+    fn native_output_encoding(&self) -> Encoding {
+        self.variables
             .get("PSApplicationOutputEncoding")
             .and_then(Encoding::from_value)
-            .unwrap_or_else(encoding::console);
-        Ok(native_lines(&encoding.decode(&captured)))
+            .unwrap_or_else(encoding::console)
     }
 
     fn native_arguments(

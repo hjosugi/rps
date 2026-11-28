@@ -123,6 +123,7 @@ native/pipe
 native/pipe-encoding
 native/pipeline-chain
 native/pipeline-status
+native/stderr-redirection
 native/unix-command-names
 ops/comparison
 ops/string-collation
