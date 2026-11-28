@@ -1,4 +1,4 @@
-//! PowerShell's adapter for System.Collections.ArrayList.
+//! The mutable IList adapters for ArrayList and List[object].
 use rpsh_runtime::{ArrayList, RuntimeError, Value};
 use std::rc::Rc;
 
@@ -7,8 +7,44 @@ use super::{ambiguous_overload, convert_int32, member_enumeration, method_error,
 const INDEX: &str = "Index was out of range. Must be non-negative and less than the size of the collection. (Parameter 'index')";
 const INSERT_INDEX: &str = "Index was out of range. Must be non-negative and less than or equal to the size of the collection. (Parameter 'index')";
 
-fn value_list(values: Vec<Value>) -> Value {
-    Value::ArrayList(ArrayList::from_values(values))
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum Kind {
+    ArrayList,
+    ObjectList,
+}
+
+impl Kind {
+    fn wrap(self, list: ArrayList) -> Value {
+        match self {
+            Self::ArrayList => Value::ArrayList(list),
+            Self::ObjectList => Value::ObjectList(list),
+        }
+    }
+
+    fn make(self, values: Vec<Value>) -> Value {
+        self.wrap(ArrayList::from_values(values))
+    }
+}
+
+pub(super) fn is_object_list_type(lower: &str) -> bool {
+    matches!(
+        lower.strip_prefix("system.").unwrap_or(lower),
+        "collections.generic.list[object]" | "collections.generic.list[system.object]"
+    )
+}
+
+pub(super) fn cast_object_list(value: Value) -> Value {
+    if value.is_null_like() {
+        return Value::Null;
+    }
+    if matches!(value, Value::ObjectList(_)) {
+        return value;
+    }
+    let items = match value {
+        Value::Array(items) | Value::StringArray(items) => items.to_vec(),
+        other => vec![other],
+    };
+    Kind::ObjectList.make(items)
 }
 
 fn cast_detail(value: &Value, target: &str) -> String {
@@ -27,7 +63,10 @@ pub(super) fn cast(value: Value) -> Result<Value, RuntimeError> {
     match value {
         Value::ArrayList(_) | Value::Null => Ok(value),
         Value::AutomationNull => Ok(Value::Null),
-        Value::Array(values) | Value::StringArray(values) => Ok(value_list(values.to_vec())),
+        Value::Array(values) | Value::StringArray(values) => {
+            Ok(Kind::ArrayList.make(values.to_vec()))
+        }
+        Value::ObjectList(list) => Ok(Kind::ArrayList.make(list.items().to_vec())),
         other => Err(RuntimeError::Script {
             id: if matches!(other, Value::Bool(_)) {
                 "InvalidCastIConvertible"
@@ -50,31 +89,67 @@ fn allocation_error(method: &str, arity: usize) -> RuntimeError {
     )
 }
 
-fn collection(value: &Value, method: &str, arity: usize) -> Result<Vec<Value>, RuntimeError> {
+fn collection(
+    kind: Kind,
+    value: &Value,
+    method: &str,
+    arity: usize,
+) -> Result<Vec<Value>, RuntimeError> {
+    let (parameter, ty) = match kind {
+        Kind::ArrayList => ("c", "System.Collections.ICollection"),
+        Kind::ObjectList => (
+            "collection",
+            "System.Collections.Generic.IEnumerable`1[System.Object]",
+        ),
+    };
     if value.is_null_like() {
         return Err(method_error::invocation(
             "ArgumentNullException",
             method,
             arity,
-            "Value cannot be null. (Parameter 'c')",
+            &format!("Value cannot be null. (Parameter '{parameter}')"),
         ));
     }
-    value.sequence().map(|items| items.to_vec()).ok_or_else(|| {
-        let ty = "System.Collections.ICollection";
-        method_error::argument_error(method, "c", ty, &value.to_string(), &cast_detail(value, ty))
-    })
+    if !(kind == Kind::ObjectList && matches!(value, Value::ArrayList(_)))
+        && let Some(items) = value.sequence()
+    {
+        return Ok(items.to_vec());
+    }
+    let text = if matches!(value, Value::ArrayList(_)) {
+        ArrayList::TYPE.to_owned()
+    } else {
+        value.to_string()
+    };
+    let detail = match value {
+        Value::ArrayList(_) => {
+            format!("Cannot convert the \"{text}\" value of type \"{text}\" to type \"{ty}\".")
+        }
+        Value::Bool(_) if kind == Kind::ObjectList => {
+            let full =
+                ArrayList::OBJECT_LIST_TYPE.replacen("Generic.List", "Generic.IEnumerable", 1);
+            format!(
+                "Cannot convert value \"{value}\" to type \"{ty}\". Error: \"Invalid cast from 'System.Boolean' to '{full}'.\""
+            )
+        }
+        _ => cast_detail(value, ty),
+    };
+    Err(method_error::argument_error(
+        method, parameter, ty, &text, &detail,
+    ))
 }
 
-pub(super) fn construct(arguments: &[Value]) -> Result<Value, RuntimeError> {
+pub(super) fn construct(kind: Kind, arguments: &[Value]) -> Result<Value, RuntimeError> {
     match arguments {
-        [] => Ok(value_list(Vec::new())),
+        [] => Ok(kind.make(Vec::new())),
+        [Value::ArrayList(_)] if kind == Kind::ObjectList => Err(overload_error("new", 1)),
         [
             value @ (Value::Array(_)
             | Value::StringArray(_)
             | Value::ArrayList(_)
+            | Value::ObjectList(_)
             | Value::Null
             | Value::AutomationNull),
-        ] => Ok(value_list(collection(value, ".ctor", 1)?)),
+        ] => Ok(kind.make(collection(kind, value, ".ctor", 1)?)),
         [Value::Bool(_)] => Err(ambiguous_overload("new", 1)),
         [Value::Object(_)] => Err(overload_error("new", 1)),
         [capacity] => {
@@ -84,25 +159,29 @@ pub(super) fn construct(arguments: &[Value]) -> Result<Value, RuntimeError> {
                     "ArgumentOutOfRangeException",
                     ".ctor",
                     1,
-                    "'capacity' must be non-negative. (Parameter 'capacity')",
+                    if kind == Kind::ArrayList {
+                        "'capacity' must be non-negative. (Parameter 'capacity')"
+                    } else {
+                        "Non-negative number required. (Parameter 'capacity')"
+                    },
                 )
             })?;
             let mut items = Vec::new();
             items
                 .try_reserve_exact(capacity)
                 .map_err(|_| allocation_error(".ctor", 1))?;
-            Ok(value_list(items))
+            Ok(kind.make(items))
         }
         _ => Err(overload_error("new", arguments.len())),
     }
 }
 
-pub(super) fn property(list: &ArrayList, name: &str) -> Result<Value, RuntimeError> {
+pub(super) fn property(kind: Kind, list: &ArrayList, name: &str) -> Result<Value, RuntimeError> {
     match name.to_ascii_lowercase().as_str() {
         "count" => Ok(Value::Int32(list.items().len() as i32)),
         "capacity" => Ok(Value::Int32(list.items().capacity() as i32)),
         "isreadonly" | "isfixedsize" | "issynchronized" => Ok(Value::Bool(false)),
-        "syncroot" => Ok(Value::ArrayList(list.clone())),
+        "syncroot" => Ok(kind.wrap(list.clone())),
         _ => member_enumeration(&list.items(), name),
     }
 }
@@ -150,7 +229,11 @@ pub(super) fn set_index(list: &ArrayList, index: &Value, value: Value) -> Result
     Ok(())
 }
 
-pub(super) fn set_capacity(list: &ArrayList, value: &Value) -> Result<(), RuntimeError> {
+pub(super) fn set_capacity(
+    kind: Kind,
+    list: &ArrayList,
+    value: &Value,
+) -> Result<(), RuntimeError> {
     let capacity = convert_int32(value)?;
     let mut items = list.items_mut();
     let requested = usize::try_from(capacity).ok().filter(|n| *n >= items.len()).ok_or_else(|| RuntimeError::Script {
@@ -162,7 +245,11 @@ pub(super) fn set_capacity(list: &ArrayList, value: &Value) -> Result<(), Runtim
     if requested != items.capacity() {
         let mut resized = Vec::new();
         resized
-            .try_reserve_exact(if requested == 0 { 4 } else { requested })
+            .try_reserve_exact(if requested == 0 && kind == Kind::ArrayList {
+                4
+            } else {
+                requested
+            })
             .map_err(|_| allocation_error("Capacity", 1))?;
         resized.append(&mut items);
         *items = resized;
@@ -184,6 +271,7 @@ fn equal(a: &Value, b: &Value) -> bool {
 }
 
 pub(super) fn method(
+    kind: Kind,
     list: &ArrayList,
     name: &str,
     arguments: &[Value],
@@ -199,7 +287,11 @@ pub(super) fn method(
             let mut items = list.items_mut();
             let index = items.len();
             items.push(value.clone());
-            return Ok(Value::Int32(index as i32));
+            return Ok(if kind == Kind::ArrayList {
+                Value::Int32(index as i32)
+            } else {
+                Value::AutomationNull
+            });
         }
         ("addrange", [value]) | ("insertrange", [_, value]) => {
             let (at, method) = if arguments.len() == 2 {
@@ -210,12 +302,12 @@ pub(super) fn method(
             } else {
                 (list.items().len(), "AddRange")
             };
-            let values = collection(value, method, arguments.len())?;
+            let values = collection(kind, value, method, arguments.len())?;
             reserve(values.len())?;
             list.items_mut().splice(at..at, values);
         }
         ("clear", []) => list.items_mut().clear(),
-        ("clone", []) => return Ok(value_list(list.items().to_vec())),
+        ("clone", []) if kind == Kind::ArrayList => return Ok(kind.make(list.items().to_vec())),
         ("contains" | "indexof" | "remove", [value]) => {
             let index = list.items().iter().position(|item| equal(item, value));
             match method.as_str() {
@@ -225,13 +317,14 @@ pub(super) fn method(
                     if let Some(at) = index {
                         list.items_mut().remove(at);
                     }
+                    if kind == Kind::ObjectList {
+                        return Ok(Value::Bool(index.is_some()));
+                    }
                 }
             }
         }
         ("equals", [value]) => {
-            return Ok(Value::Bool(
-                matches!(value, Value::ArrayList(other) if list == other),
-            ));
+            return Ok(Value::Bool(kind.wrap(list.clone()) == *value));
         }
         ("insert", [at, value]) => {
             let at = checked_index(list, at, "Insert", 2, true)?;
@@ -247,16 +340,33 @@ pub(super) fn method(
             list.items_mut()[at] = value.clone();
         }
         ("reverse", []) => list.items_mut().reverse(),
-        ("trimtosize", []) => {
+        ("trimtosize", []) if kind == Kind::ArrayList => {
             let count = Value::Int32(list.items().len() as i32);
-            set_capacity(list, &count)?;
+            set_capacity(kind, list, &count)?;
         }
         ("removeat", [at]) => {
             let at = checked_index(list, at, "RemoveAt", 1, false)?;
             list.items_mut().remove(at);
         }
+        ("trimexcess", []) if kind == Kind::ObjectList => {
+            let items = list.items();
+            let len = items.len();
+            let threshold = (items.capacity() as f64 * 0.9) as usize;
+            drop(items);
+            if len < threshold {
+                set_capacity(kind, list, &Value::Int32(len as i32))?;
+            }
+        }
         ("toarray", []) => return Ok(Value::array(list.items().to_vec())),
-        ("tostring", []) => return Ok(Value::String(ArrayList::TYPE.into())),
+        ("tostring", []) => {
+            return Ok(Value::String(
+                match kind {
+                    Kind::ArrayList => ArrayList::TYPE,
+                    Kind::ObjectList => ArrayList::OBJECT_LIST_DISPLAY,
+                }
+                .into(),
+            ));
+        }
         (
             "binarysearch" | "copyto" | "getenumerator" | "getrange" | "lastindexof"
             | "removerange" | "repeat" | "setrange" | "sort" | "synchronized" | "fixedsize"

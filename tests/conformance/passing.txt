@@ -92,6 +92,7 @@ lang/loops
 lang/matches-variable
 lang/numeric-literals
 lang/numeric-promotion
+lang/object-list
 lang/operators
 lang/pipeline-basic
 lang/psobject

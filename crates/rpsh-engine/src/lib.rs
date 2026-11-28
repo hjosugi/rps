@@ -755,7 +755,9 @@ impl Engine {
                 let value = self.eval_expression(value)?;
                 let index = self.eval_expression(index)?;
                 let key = assignment_key(target)?;
-                if let Some(Value::ArrayList(list)) = self.variables.get(key) {
+                if let Some(Value::ArrayList(list) | Value::ObjectList(list)) =
+                    self.variables.get(key)
+                {
                     array_list::set_index(list, &index, value)?;
                 } else {
                     self.assign_property(
@@ -1122,10 +1124,24 @@ impl Engine {
         unsupported: &'static str,
     ) -> Result<(), EngineError> {
         let key = assignment_key(target)?;
-        if let Some(Value::ArrayList(list)) = self.variables.get(key)
-            && name.eq_ignore_ascii_case("Capacity")
-        {
-            return Ok(array_list::set_capacity(list, &value)?);
+        if name.eq_ignore_ascii_case("Capacity") {
+            match self.variables.get(key) {
+                Some(Value::ArrayList(list)) => {
+                    return Ok(array_list::set_capacity(
+                        array_list::Kind::ArrayList,
+                        list,
+                        &value,
+                    )?);
+                }
+                Some(Value::ObjectList(list)) => {
+                    return Ok(array_list::set_capacity(
+                        array_list::Kind::ObjectList,
+                        list,
+                        &value,
+                    )?);
+                }
+                _ => (),
+            }
         }
         let Some(Value::Object(entries)) = self.variables.get(key) else {
             return Err(RuntimeError::NotImplemented {
@@ -5999,7 +6015,7 @@ impl Engine {
             input::check(&input)?;
             return self.write_value(Value::array(input.take_remaining().to_vec()), out);
         }
-        if let Value::ArrayList(list) = value {
+        if let Value::ArrayList(list) | Value::ObjectList(list) = value {
             return self.write_value(Value::array(list.items().to_vec()), out);
         }
         if let Some(capture) = &mut self.capture {
@@ -7986,7 +8002,7 @@ fn flatten_value(value: Value) -> Vec<Value> {
     match value {
         Value::InputEnumerator(input) => input.take_remaining().to_vec(),
         Value::Array(items) | Value::StringArray(items) => items.as_ref().clone(),
-        Value::ArrayList(list) => list.items().to_vec(),
+        Value::ArrayList(list) | Value::ObjectList(list) => list.items().to_vec(),
         Value::Null | Value::AutomationNull => Vec::new(),
         value => vec![value],
     }
@@ -8217,6 +8233,9 @@ fn type_full_name(name: &str) -> String {
         "biginteger" => "System.Numerics.BigInteger".to_owned(),
         "collections.arraylist" | "system.collections.arraylist" => {
             rpsh_runtime::ArrayList::TYPE.into()
+        }
+        name if array_list::is_object_list_type(name) => {
+            rpsh_runtime::ArrayList::OBJECT_LIST_TYPE.into()
         }
         "collections.ilist" | "system.collections.ilist" => "System.Collections.IList".into(),
         "collections.icollection" | "system.collections.icollection" => {
@@ -8825,7 +8844,12 @@ fn invoke_static(
         {
             Ok(Value::Bool(a == b))
         }
-        ("collections.arraylist", "new") => array_list::construct(arguments),
+        ("collections.arraylist", "new") => {
+            array_list::construct(array_list::Kind::ArrayList, arguments)
+        }
+        (kind, "new") if array_list::is_object_list_type(kind) => {
+            array_list::construct(array_list::Kind::ObjectList, arguments)
+        }
         ("cultureinfo" | "globalization.cultureinfo", method @ ("new" | "getcultureinfo")) => {
             globalization::culture_method(method, arguments)
         }
@@ -9465,7 +9489,7 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
     if type_name.ends_with("[]") {
         return Ok(match value {
             Value::Array(_) | Value::StringArray(_) => value,
-            Value::ArrayList(list) => Value::array(list.items().to_vec()),
+            Value::ArrayList(list) | Value::ObjectList(list) => Value::array(list.items().to_vec()),
             other => Value::array(vec![other]),
         });
     }
@@ -9477,6 +9501,7 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
             preferences::argument_cast(&value)
         }
         "collections.arraylist" | "system.collections.arraylist" => array_list::cast(value),
+        kind if array_list::is_object_list_type(kind) => Ok(array_list::cast_object_list(value)),
         "cultureinfo" | "globalization.cultureinfo" | "system.globalization.cultureinfo" => {
             globalization::cast_culture(&value)
         }
@@ -9671,7 +9696,9 @@ fn convert_bool(value: &Value) -> bool {
         Value::SByte(value) => *value != 0,
         Value::Double(value) => *value != 0.0,
         Value::String(text) => !text.is_empty(),
-        Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) => ops::is_true(value),
+        Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) | Value::ObjectList(_) => {
+            ops::is_true(value)
+        }
         Value::Decimal(_)
         | Value::BigInteger(_)
         | Value::ScriptBlock(_)
@@ -9757,7 +9784,10 @@ fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeEr
                         | "System.Collections.IEnumerable"
                 ) && matches!(
                     left,
-                    Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_)
+                    Value::Array(_)
+                        | Value::StringArray(_)
+                        | Value::ArrayList(_)
+                        | Value::ObjectList(_)
                 )
         });
     if !same
@@ -9894,7 +9924,10 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
         return result;
     }
     if let Value::ArrayList(list) = target {
-        return array_list::method(list, name, arguments);
+        return array_list::method(array_list::Kind::ArrayList, list, name, arguments);
+    }
+    if let Value::ObjectList(list) = target {
+        return array_list::method(array_list::Kind::ObjectList, list, name, arguments);
     }
     if name.eq_ignore_ascii_case("ToString")
         && !matches!(target, Value::String(_) | Value::Object(_))
@@ -10404,20 +10437,29 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
         Value::Type(full) if name.eq_ignore_ascii_case("FullName") => {
             Ok(Value::String(full.clone()))
         }
-        Value::Type(full) if name.eq_ignore_ascii_case("Name") => {
+        Value::Type(full)
+            if name.eq_ignore_ascii_case("Name") || name.eq_ignore_ascii_case("Namespace") =>
+        {
             let text = full.to_string_lossy();
+            let definition = text
+                .split_once("[[")
+                .map_or(text.as_str(), |(outer, _)| outer);
+            let (namespace, base) = definition.rsplit_once('.').unwrap_or(("", definition));
+            if name.eq_ignore_ascii_case("Namespace") {
+                return Ok(Value::String(namespace.into()));
+            }
             Ok(Value::String(
-                text.rsplit(['.', '+'])
-                    .next()
-                    .unwrap_or(&text)
-                    .to_owned()
-                    .into(),
+                base.rsplit('+').next().unwrap_or(base).into(),
             ))
+        }
+        Value::Type(full) if name.eq_ignore_ascii_case("IsGenericType") => {
+            Ok(Value::Bool(full.to_string_lossy().contains('`')))
         }
         Value::String(text) if name.eq_ignore_ascii_case("Length") => {
             Ok(Value::Int32(text.len() as i32))
         }
-        Value::ArrayList(list) => array_list::property(list, name),
+        Value::ArrayList(list) => array_list::property(array_list::Kind::ArrayList, list, name),
+        Value::ObjectList(list) => array_list::property(array_list::Kind::ObjectList, list, name),
         Value::InputEnumerator(input) if name.eq_ignore_ascii_case("Current") => {
             Ok(input.current().cloned().unwrap_or(Value::Null))
         }

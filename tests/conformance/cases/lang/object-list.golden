@@ -1,0 +1,39 @@
+rpsh-golden-v2
+exit=0
+System.Collections.Generic.List`1[[System.Object, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]
+List`1
+System.Collections.Generic.List`1[System.Object]
+True
+True
+False
+False
+0
+2/4/7,abc
+13,12,hello,second,7/3/True
+True
+False
+1,1,5,1
+55
+System.Object[]
+4,3,4
+1,1,x
+7
+13,55,hello,7
+0
+0
+System.Collections.Generic
+True
+False
+1:ArrayList
+a,bb,a,bb
+4
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "collection", with value: "System.Collections.ArrayList", for "AddRange" to type "System.Collections.Generic.IEnumerable`1[System.Object]": "Cannot convert the "System.Collections.ArrayList" value of type "System.Collections.ArrayList" to type "System.Collections.Generic.IEnumerable`1[System.Object]"."
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "collection", with value: "True", for "AddRange" to type "System.Collections.Generic.IEnumerable`1[System.Object]": "Cannot convert value "True" to type "System.Collections.Generic.IEnumerable`1[System.Object]". Error: "Invalid cast from 'System.Boolean' to 'System.Collections.Generic.IEnumerable`1[[System.Object, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]'.""
+ArgumentNullException
+Exception calling "InsertRange" with "2" argument(s): "Value cannot be null. (Parameter 'collection')"
+ArgumentOutOfRangeException
+Exception calling ".ctor" with "1" argument(s): "Non-negative number required. (Parameter 'capacity')"
+MethodCountCouldNotFindBest
+Cannot find an overload for "new" and the argument count: "1".

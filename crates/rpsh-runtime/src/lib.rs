@@ -74,6 +74,8 @@ pub enum Value {
     /// A covariant System.String[] containing strings and null references.
     StringArray(Rc<Vec<Value>>),
     ArrayList(ArrayList),
+    /// A System.Collections.Generic.List[object] with mutable, shared storage.
+    ObjectList(ArrayList),
     InputEnumerator(InputEnumerator),
     /// A PowerShell object/hashtable with ordered keys. The `Rc` is the
     /// object's identity, so `$o -eq $o` compares the same object, not its
@@ -131,6 +133,7 @@ impl Value {
             Value::Array(_) => "System.Object[]",
             Value::StringArray(_) => "System.String[]",
             Value::ArrayList(_) => ArrayList::TYPE,
+            Value::ObjectList(_) => ArrayList::OBJECT_LIST_TYPE,
             Value::InputEnumerator(_) => InputEnumerator::TYPE,
             Value::Object(_) => "System.Management.Automation.PSCustomObject",
             Value::Type(_) => "System.RuntimeType",
@@ -157,7 +160,7 @@ impl Value {
     pub fn sequence(&self) -> Option<Sequence<'_>> {
         match self {
             Self::Array(items) | Self::StringArray(items) => Some(Sequence::Array(items)),
-            Self::ArrayList(list) => Some(Sequence::List(list.items())),
+            Self::ArrayList(list) | Self::ObjectList(list) => Some(Sequence::List(list.items())),
             _ => None,
         }
     }
@@ -181,6 +184,7 @@ impl Value {
             Self::Array(_)
             | Self::StringArray(_)
             | Self::ArrayList(_)
+            | Self::ObjectList(_)
             | Self::InputEnumerator(_) => self.to_ps_string_with_separator(&" ".into()),
             _ => PsString::from(self.to_string()),
         }
@@ -191,7 +195,9 @@ impl Value {
             Self::Array(items) | Self::StringArray(items) => {
                 collection::sequence_text(items, separator)
             }
-            Self::ArrayList(list) => collection::sequence_text(&list.items(), separator),
+            Self::ArrayList(list) | Self::ObjectList(list) => {
+                collection::sequence_text(&list.items(), separator)
+            }
             Self::InputEnumerator(input) if input.valid() => {
                 collection::sequence_text(input.take_remaining(), separator)
             }
@@ -227,9 +233,10 @@ impl fmt::Display for Value {
             Value::Double(value) => f.write_str(&format_double(*value)),
             Value::ScriptBlock(text) => fmt::Display::fmt(text, f),
             Value::InputEnumerator(_) => f.write_str(InputEnumerator::TYPE),
-            Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) => {
-                fmt::Display::fmt(&self.to_ps_string(), f)
-            }
+            Value::Array(_)
+            | Value::StringArray(_)
+            | Value::ArrayList(_)
+            | Value::ObjectList(_) => fmt::Display::fmt(&self.to_ps_string(), f),
             Value::Object(entries) => {
                 if let Some((_, Value::String(text))) =
                     entries.iter().find(|(key, _)| key == "__Text")

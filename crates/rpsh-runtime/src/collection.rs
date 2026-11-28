@@ -12,6 +12,9 @@ pub struct ArrayList(Rc<RefCell<Vec<Value>>>);
 impl ArrayList {
     pub const TYPE: &str = "System.Collections.ArrayList";
 
+    pub const OBJECT_LIST_DISPLAY: &str = "System.Collections.Generic.List`1[System.Object]";
+    pub const OBJECT_LIST_TYPE: &str = "System.Collections.Generic.List`1[[System.Object, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]";
+
     pub fn from_values(values: Vec<Value>) -> Self {
         Self(Rc::new(RefCell::new(values)))
     }
@@ -144,6 +147,7 @@ pub(crate) fn sequence_text(items: &[Value], separator: &PsString) -> PsString {
             units.extend(separator.units());
         }
         match item {
+            Value::ObjectList(_) => units.extend(ArrayList::OBJECT_LIST_DISPLAY.encode_utf16()),
             Value::Array(_)
             | Value::StringArray(_)
             | Value::ArrayList(_)
