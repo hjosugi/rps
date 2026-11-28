@@ -53,6 +53,8 @@ type Strength = unsafe extern "C" fn(*const c_void) -> i32;
 type SortKey = unsafe extern "C" fn(*const c_void, *const u16, i32, *mut u8, i32) -> i32;
 type DefaultLocale = unsafe extern "C" fn() -> *const c_char;
 
+type LocaleForLcid = unsafe extern "C" fn(u32, *mut c_char, i32, *mut i32) -> i32;
+
 struct Api {
     open: Open,
     close: Close,
@@ -66,6 +68,7 @@ struct Api {
     strength: Strength,
     sort_key: SortKey,
     default_locale: DefaultLocale,
+    locale_for_lcid: LocaleForLcid,
     _library: Library,
 }
 
@@ -109,6 +112,7 @@ impl Api {
             strength: bind!("ucol_getStrength", Strength),
             sort_key: bind!("ucol_getSortKey", SortKey),
             default_locale: bind!("uloc_getDefault", DefaultLocale),
+            locale_for_lcid: bind!("uloc_getLocaleForLCID", LocaleForLcid),
             _library: library,
         })
     }
@@ -316,6 +320,29 @@ pub(super) fn default_locale() -> Option<String> {
         } else {
             name.to_owned()
         })
+    })
+}
+
+pub(super) fn locale_for_lcid(id: u32) -> Option<String> {
+    CACHE.with_borrow(|cache| {
+        let api = cache.api.as_ref()?;
+        let mut bytes = [0u8; 157]; // ULOC_FULLNAME_CAPACITY
+        let mut status = 0;
+        // SAFETY: ICU writes at most the supplied capacity; we use the returned length.
+        let len = unsafe {
+            (api.locale_for_lcid)(
+                id,
+                bytes.as_mut_ptr().cast(),
+                bytes.len() as i32,
+                &mut status,
+            )
+        };
+        if status > 0 || len <= 0 {
+            return None;
+        }
+        std::str::from_utf8(bytes.get(..len as usize)?)
+            .ok()
+            .map(str::to_owned)
     })
 }
 

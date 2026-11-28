@@ -28,6 +28,18 @@ pub fn current_locale() -> String {
     }
 }
 
+/// Windows locale identifiers are accepted by the Culture cmdlet parameter.
+pub fn locale_for_lcid(id: u32) -> Option<String> {
+    if id == 0x7f {
+        return Some(String::new());
+    }
+    #[cfg(unix)]
+    if !invariant_mode() {
+        return icu::locale_for_lcid(id);
+    }
+    None
+}
+
 fn invariant_mode() -> bool {
     use std::sync::OnceLock;
     static ENABLED: OnceLock<bool> = OnceLock::new();

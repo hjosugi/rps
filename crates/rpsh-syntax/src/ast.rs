@@ -314,9 +314,22 @@ pub enum CommandArgument {
     /// An expression, `Add (1 + 2)` or `Add $x`.
     Value(Expr),
     /// `-Name value`, or `-Switch` with no value.
-    Parameter { name: String, value: Option<Expr> },
+    Parameter {
+        name: String,
+        value: Option<Expr>,
+        separator: ArgumentSeparator,
+    },
     /// A bare word such as `Add hello`.
     Bareword(String),
+}
+
+/// In native argv, a colon can attach a value to the parameter spelling,
+/// or precede a separate argument if whitespace follows it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArgumentSeparator {
+    Space,
+    Colon,
+    ColonSpace,
 }
 
 /// A constructor or method of a PowerShell class.
@@ -377,7 +390,10 @@ pub enum ExprKind {
     /// Upstream: `ArrayLiteralAst`.
     Array(Vec<Expr>),
     /// Upstream: `ScriptBlockExpressionAst`.
-    ScriptBlock(Vec<Statement>),
+    ScriptBlock {
+        statements: Vec<Statement>,
+        source: String,
+    },
     /// Upstream: `IndexExpressionAst`.
     Index { target: Box<Expr>, index: Box<Expr> },
     /// Upstream: `TernaryExpressionAst`.

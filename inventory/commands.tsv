@@ -232,7 +232,7 @@ Microsoft.PowerShell.Utility	Set-PSBreakpoint	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Set-TraceSource	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Set-Variable	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Show-Markdown	Cmdlet	linux-x64	todo
-Microsoft.PowerShell.Utility	Sort-Object	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Sort-Object	Cmdlet	linux-x64	partial
 Microsoft.PowerShell.Utility	Start-Sleep	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Tee-Object	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Test-Json	Cmdlet	linux-x64	todo

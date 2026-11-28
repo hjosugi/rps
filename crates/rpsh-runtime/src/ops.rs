@@ -69,6 +69,69 @@ fn float_value(value: &Value) -> Option<f64> {
     }
 }
 
+/// Compare CLR numeric values as numbers, including the full precision of
+/// integer and decimal keys. Double.CompareTo puts NaN before other values.
+pub fn number_order(left: &Value, right: &Value) -> Option<std::cmp::Ordering> {
+    use std::cmp::Ordering;
+    if let (Some(a), Some(b)) = (int_value(left), int_value(right)) {
+        return Some(a.cmp(&b));
+    }
+    let numeric = |v| {
+        int_kind(v).is_some()
+            || matches!(
+                v,
+                Value::Double(_) | Value::BigInteger(_) | Value::Decimal(_)
+            )
+    };
+    if !numeric(left) || !numeric(right) {
+        return None;
+    }
+    if matches!(left, Value::Double(_)) || matches!(right, Value::Double(_)) {
+        let double = |v: &Value| float_value(v).or_else(|| v.to_string().parse::<f64>().ok());
+        let (a, b) = (double(left)?, double(right)?);
+        return Some(
+            a.partial_cmp(&b)
+                .unwrap_or_else(|| b.is_nan().cmp(&a.is_nan())),
+        );
+    }
+    // Decimal and BigInteger store their text losslessly. The point position
+    // and significant digits order magnitudes without scaling into an i128.
+    fn parts(text: &str) -> Option<(i8, i32, String)> {
+        let unsigned = text.trim_start_matches(['-', '+']);
+        let (body, exp) = unsigned
+            .split_once(['e', 'E'])
+            .map_or(Some((unsigned, 0)), |(digits, e)| {
+                Some((digits, e.parse::<i32>().ok()?))
+            })?;
+        let before = body.find('.').unwrap_or(body.len()) as i32;
+        let digits = body.replace('.', "");
+        let trimmed = digits.trim_start_matches('0');
+        if trimmed.is_empty() {
+            return Some((0, 0, String::new()));
+        }
+        let power = before
+            .checked_add(exp)?
+            .checked_sub((digits.len() - trimmed.len()) as i32)?;
+        Some((
+            if text.starts_with('-') { -1 } else { 1 },
+            power,
+            trimmed.trim_end_matches('0').to_owned(),
+        ))
+    }
+    let (a_sign, a_power, a_digits) = parts(&left.to_string())?;
+    let (b_sign, b_power, b_digits) = parts(&right.to_string())?;
+    let order = a_sign.cmp(&b_sign);
+    if order != Ordering::Equal {
+        return Some(order);
+    }
+    let magnitude = a_power.cmp(&b_power).then_with(|| a_digits.cmp(&b_digits));
+    Some(if a_sign < 0 {
+        magnitude.reverse()
+    } else {
+        magnitude
+    })
+}
+
 /// The result kind of a binary arithmetic operator. A negative value mixed
 /// with an unsigned 64-bit operand is `Decimal` upstream; that is refused
 /// until `Decimal` arithmetic is implemented.

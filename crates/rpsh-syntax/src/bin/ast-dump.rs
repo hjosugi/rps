@@ -92,7 +92,7 @@ fn format_stage(command: &PipelineCommand) -> String {
                 match arg {
                     CommandArgument::Value(expr) => elements.push(format_expr(expr)),
                     CommandArgument::Bareword(word) => elements.push(format!("(str {word:?})")),
-                    CommandArgument::Parameter { name, value } => {
+                    CommandArgument::Parameter { name, value, .. } => {
                         elements.push(format!("(parameter {name})"));
                         if let Some(expr) = value {
                             elements.push(format_expr(expr));
@@ -175,7 +175,7 @@ fn format_expr(expr: &Expr) -> String {
                 .collect::<Vec<_>>()
                 .join(" ")
         ),
-        ExprKind::ScriptBlock(_) => "(scriptblock)".to_owned(),
+        ExprKind::ScriptBlock { .. } => "(scriptblock)".to_owned(),
         ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) => format!(
             "(expand {})",
             parts

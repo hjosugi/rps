@@ -154,5 +154,9 @@
   {
     "name": "keyword-member",
     "source": "[EnvironmentVariableTarget]::Process"
+  },
+  {
+    "name": "command-parameter-colon",
+    "source": "1, 2 | Sort-Object -Descending:$false -Top: 2"
   }
 ]

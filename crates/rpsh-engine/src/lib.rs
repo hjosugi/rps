@@ -16,6 +16,7 @@ mod encoding;
 mod environment;
 mod native;
 mod redirection;
+mod sorting;
 mod wildcards;
 
 use aliases::Aliases;
@@ -1363,7 +1364,7 @@ impl Engine {
                         regex_match(&item, &pattern, case_sensitive, false, &mut self.variables)?,
                         Value::Bool(true)
                     )
-                } else if matches!(label.kind, ExprKind::ScriptBlock(_)) {
+                } else if matches!(label.kind, ExprKind::ScriptBlock { .. }) {
                     self.scriptblock_truth(label)?
                 } else {
                     let expected = evaluate(label, &mut self.variables, !self.last_failed)?;
@@ -1415,7 +1416,7 @@ impl Engine {
     }
 
     fn scriptblock_truth(&mut self, expr: &Expr) -> Result<bool, EngineError> {
-        let ExprKind::ScriptBlock(statements) = &expr.kind else {
+        let ExprKind::ScriptBlock { statements, .. } = &expr.kind else {
             return Ok(ops::is_true(&self.eval_expression(expr)?));
         };
         let saved = self.capture.take();
@@ -1753,7 +1754,7 @@ impl Engine {
             "foreach-object" => {
                 let mut member_name_named = None;
                 for argument in arguments {
-                    if let CommandArgument::Parameter { name, value } = argument
+                    if let CommandArgument::Parameter { name, value, .. } = argument
                         && name.eq_ignore_ascii_case("membername")
                         && let Some(expr) = value
                     {
@@ -1762,11 +1763,13 @@ impl Engine {
                 }
                 let block_for = |wanted: &str| -> Option<Vec<Statement>> {
                     arguments.iter().find_map(|argument| match argument {
-                        CommandArgument::Parameter { name, value }
+                        CommandArgument::Parameter { name, value, .. }
                             if name.eq_ignore_ascii_case(wanted) =>
                         {
                             value.as_ref().and_then(|expr| match &expr.kind {
-                                ExprKind::ScriptBlock(statements) => Some(statements.clone()),
+                                ExprKind::ScriptBlock { statements, .. } => {
+                                    Some(statements.clone())
+                                }
                                 _ => None,
                             })
                         }
@@ -2126,86 +2129,7 @@ impl Engine {
                 }
                 Ok(Some(vec![Value::object(entries)]))
             }
-            "sort-object" => {
-                let (_, named) = self.evaluate_arguments(arguments)?;
-                let descending = named.iter().any(|(name, value)| {
-                    name.eq_ignore_ascii_case("descending") && ops::is_true(value)
-                });
-                let case_sensitive = named.iter().any(|(name, value)| {
-                    name.eq_ignore_ascii_case("casesensitive") && ops::is_true(value)
-                });
-                let mut property = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("property"))
-                    .map(|(_, value)| value.clone());
-                if let Some(property_names) = &property {
-                    let names = flatten_value(property_names.clone());
-                    if names
-                        .iter()
-                        .any(|name| name.to_string().contains(['*', '?']))
-                        && let Some(Value::Object(entries)) = input.first()
-                    {
-                        let visible = visible_entries(entries);
-                        let mut expanded = Vec::new();
-                        for name in &names {
-                            let text = name.to_string();
-                            if text.contains(['*', '?']) {
-                                for (candidate, _) in &visible {
-                                    if ops::wildcard_match(candidate, &text, false) {
-                                        expanded.push(Value::String((*candidate).clone().into()));
-                                    }
-                                }
-                            } else {
-                                expanded.push(name.clone());
-                            }
-                        }
-                        if !expanded.is_empty() {
-                            property = Some(Value::array(expanded));
-                        }
-                    }
-                }
-                let mut items = input.to_vec();
-                items.sort_by(|a, b| {
-                    let left = match &property {
-                        Some(property) => sort_key(a, property),
-                        None => a.to_string(),
-                    };
-                    let right = match &property {
-                        Some(property) => sort_key(b, property),
-                        None => b.to_string(),
-                    };
-                    culture_rank(&left)
-                        .cmp(&culture_rank(&right))
-                        .then_with(|| left.to_lowercase().cmp(&right.to_lowercase()))
-                        .then_with(|| {
-                            if case_sensitive {
-                                culture_case(&left).cmp(&culture_case(&right))
-                            } else {
-                                std::cmp::Ordering::Equal
-                            }
-                        })
-                });
-                if descending {
-                    items.reverse();
-                }
-                let unique = named.iter().any(|(name, value)| {
-                    name.eq_ignore_ascii_case("unique") && ops::is_true(value)
-                });
-                if unique {
-                    items.dedup_by(|a, b| {
-                        let left = match &property {
-                            Some(property) => sort_key(a, property),
-                            None => a.to_string(),
-                        };
-                        let right = match &property {
-                            Some(property) => sort_key(b, property),
-                            None => b.to_string(),
-                        };
-                        left.eq_ignore_ascii_case(&right)
-                    });
-                }
-                Ok(Some(items))
-            }
+            "sort-object" => self.sort_objects(arguments, input).map(Some),
             "group-object" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
                 let property = named
@@ -6261,7 +6185,7 @@ impl Engine {
                 CommandArgument::Bareword(word) => {
                     positional.push(Value::String(word.clone().into()));
                 }
-                CommandArgument::Parameter { name, value } => {
+                CommandArgument::Parameter { name, value, .. } => {
                     let value = match value {
                         Some(expr) => self.eval_expression(expr)?,
                         None => Value::Bool(true),
@@ -6514,9 +6438,7 @@ fn evaluate(
                 Ok(value)
             }
         }
-        ExprKind::ScriptBlock(statements) => Ok(Value::ScriptBlock(
-            format!("{{ {} }}", statements.len()).into(),
-        )),
+        ExprKind::ScriptBlock { source, .. } => Ok(Value::ScriptBlock(source.as_str().into())),
         ExprKind::Array(items) => {
             let mut values = Vec::with_capacity(items.len());
             for item in items {
@@ -6758,7 +6680,7 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
 fn script_block_argument(arguments: &[CommandArgument]) -> Option<&Vec<Statement>> {
     arguments.iter().find_map(|argument| match argument {
         CommandArgument::Value(Expr {
-            kind: ExprKind::ScriptBlock(statements),
+            kind: ExprKind::ScriptBlock { statements, .. },
             ..
         }) => Some(statements),
         _ => None,
@@ -8009,27 +7931,6 @@ fn collect_children(
     }
 }
 
-fn sort_key(value: &Value, property: &Value) -> String {
-    if let Some(fields) = datetime_fields(value) {
-        return format!("{:020}", datetime_ticks(fields));
-    }
-    if let Some(ticks) = timespan_ticks(value) {
-        return format!("{:020}", ticks);
-    }
-    if let Value::Array(properties) = property {
-        return properties
-            .iter()
-            .map(|property| sort_key(value, property))
-            .collect::<Vec<_>>()
-            .join("\u{0}");
-    }
-    let name = property.to_string();
-    match member(value, &name) {
-        Ok(value) => value.to_string(),
-        Err(_) => String::new(),
-    }
-}
-
 const BUILTIN_COMMANDS: &[&str] = &[
     "Add-Content",
     "ConvertFrom-Json",
@@ -8289,23 +8190,6 @@ fn parse_csv_line_with(line: &str, delimiter: char) -> Vec<String> {
 
 fn flatten_values(values: Vec<Value>) -> Vec<Value> {
     values.into_iter().flat_map(flatten_value).collect()
-}
-
-fn culture_rank(text: &str) -> u8 {
-    match text.chars().next() {
-        Some(ch) if !ch.is_alphanumeric() => 0,
-        Some(ch) if ch.is_ascii_digit() => 1,
-        Some(_) => 2,
-        None => 0,
-    }
-}
-
-fn culture_case(text: &str) -> u8 {
-    match text.chars().next() {
-        Some(ch) if ch.is_lowercase() => 0,
-        Some(ch) if ch.is_uppercase() => 1,
-        _ => 0,
-    }
 }
 
 fn contains_group(expr: &Expr) -> bool {

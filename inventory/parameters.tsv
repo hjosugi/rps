@@ -1701,15 +1701,15 @@ Show-Markdown	InputObject	System.Management.Automation.PSObject	InputObject		lin
 Show-Markdown	LiteralPath	System.String[]	LiteralPath	PSPath,LP	linux-x64	todo
 Show-Markdown	Path	System.String[]	Path		linux-x64	todo
 Show-Markdown	UseBrowser	System.Management.Automation.SwitchParameter	*		linux-x64	todo
-Sort-Object	Bottom	System.Int32	Bottom		linux-x64	todo
-Sort-Object	CaseSensitive	System.Management.Automation.SwitchParameter	*		linux-x64	todo
-Sort-Object	Culture	System.String	*		linux-x64	todo
-Sort-Object	Descending	System.Management.Automation.SwitchParameter	*		linux-x64	todo
-Sort-Object	InputObject	System.Management.Automation.PSObject	*		linux-x64	todo
-Sort-Object	Property	System.Object[]	*		linux-x64	todo
-Sort-Object	Stable	System.Management.Automation.SwitchParameter	Default		linux-x64	todo
-Sort-Object	Top	System.Int32	Top		linux-x64	todo
-Sort-Object	Unique	System.Management.Automation.SwitchParameter	*		linux-x64	todo
+Sort-Object	Bottom	System.Int32	Bottom		linux-x64	partial
+Sort-Object	CaseSensitive	System.Management.Automation.SwitchParameter	*		linux-x64	partial
+Sort-Object	Culture	System.String	*		linux-x64	partial
+Sort-Object	Descending	System.Management.Automation.SwitchParameter	*		linux-x64	partial
+Sort-Object	InputObject	System.Management.Automation.PSObject	*		linux-x64	partial
+Sort-Object	Property	System.Object[]	*		linux-x64	partial
+Sort-Object	Stable	System.Management.Automation.SwitchParameter	Default		linux-x64	partial
+Sort-Object	Top	System.Int32	Top		linux-x64	partial
+Sort-Object	Unique	System.Management.Automation.SwitchParameter	*		linux-x64	partial
 Start-Sleep	Duration	System.TimeSpan	FromTimeSpan	ts	linux-x64	todo
 Start-Sleep	Milliseconds	System.Int32	Milliseconds	ms	linux-x64	todo
 Start-Sleep	Seconds	System.Double	Seconds		linux-x64	todo

@@ -378,10 +378,11 @@ impl Tokenizer<'_> {
             let argument = self.mode == Mode::Command
                 && self.command_seen
                 && !self.statement_start
-                && self
-                    .tokens
-                    .last()
-                    .is_some_and(|token| token.span.end < start as u32);
+                && self.tokens.last().is_some_and(|token| {
+                    token.span.end < start as u32
+                        || (token.kind == FullTokenKind::Parameter
+                            && token.span.text(self.source).ends_with(':'))
+                });
             self.command_after_paren.push(argument);
         }
         self.pos += len;
@@ -489,6 +490,7 @@ impl Tokenizer<'_> {
 
     fn variable(&mut self) {
         let start = self.pos;
+        let command_argument = self.mode == Mode::Command && self.command_seen;
         self.pos += 1;
         if self.bytes.get(self.pos) == Some(&b'{') {
             while self.pos < self.bytes.len() && self.bytes[self.pos] != b'}' {
@@ -497,27 +499,26 @@ impl Tokenizer<'_> {
             if self.pos < self.bytes.len() {
                 self.pos += 1;
             }
-            self.push(FullTokenKind::Variable, start, self.pos);
-            self.mode = Mode::Expression;
-            self.statement_start = false;
-            return;
-        }
-        let mut name = self.pos;
-        while let Some(ch) = self.source[self.pos..].chars().next() {
-            if ch.is_alphanumeric() || ch == '_' || ch == ':' || ch == '?' || ch == '$' || ch == '^'
-            {
-                self.pos += ch.len_utf8();
-            } else {
-                break;
+        } else {
+            let name = self.pos;
+            while let Some(ch) = self.source[self.pos..].chars().next() {
+                if ch.is_alphanumeric() || matches!(ch, '_' | ':' | '?' | '$' | '^') {
+                    self.pos += ch.len_utf8();
+                } else {
+                    break;
+                }
+            }
+            if self.pos == name && self.pos < self.bytes.len() {
+                self.pos += self.char().map_or(1, char::len_utf8);
             }
         }
-        if self.pos == name && self.pos < self.bytes.len() {
-            self.pos += 1;
-        }
-        name = start;
-        let _ = name;
         self.push(FullTokenKind::Variable, start, self.pos);
-        self.mode = Mode::Expression;
+        self.mode =
+            if command_argument && !matches!(self.bytes.get(self.pos), Some(b'.' | b'[' | b'?')) {
+                Mode::Command
+            } else {
+                Mode::Expression
+            };
         self.statement_start = false;
     }
 
@@ -718,6 +719,9 @@ impl Tokenizer<'_> {
                         break;
                     }
                 }
+                if self.bytes.get(at) == Some(&b':') {
+                    at += 1;
+                }
                 self.pos = at;
                 self.push(FullTokenKind::Parameter, start, at);
                 return true;
@@ -790,6 +794,9 @@ impl Tokenizer<'_> {
         if is_unary_dash_operator(&self.source[start..at]) {
             self.pos = start;
             return false;
+        }
+        if self.bytes.get(at) == Some(&b':') {
+            at += 1;
         }
         self.pos = at;
         self.push(FullTokenKind::Parameter, start, at);

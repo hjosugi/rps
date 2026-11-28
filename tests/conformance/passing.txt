@@ -102,6 +102,7 @@ native/exit-code
 native/glob
 native/glob-arguments
 native/output-redirection
+native/parameter-colon
 native/pipe
 native/pipe-encoding
 native/pipeline-chain
@@ -127,6 +128,7 @@ pipeline/random-pipeline
 pipeline/select-sort
 pipeline/select-string
 pipeline/sort-multi-property
+pipeline/sort-typed-keys
 pipeline/tee-sort
 pipeline/where-foreach
 pipeline/where-property

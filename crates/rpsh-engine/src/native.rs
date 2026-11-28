@@ -9,7 +9,9 @@ use std::process::Command;
 use rpsh_commands::{CORE_CMDLETS, MODULES};
 use rpsh_native::{Destination, PipelineError, run_pipeline};
 use rpsh_runtime::{RuntimeError, Value};
-use rpsh_syntax::{CommandArgument, Expr, ExprKind, PipelineCommand, Redirection, Stream};
+use rpsh_syntax::{
+    ArgumentSeparator, CommandArgument, Expr, ExprKind, PipelineCommand, Redirection, Stream,
+};
 
 use super::{Engine, EngineError, OutputTarget, command_not_found, native_exit_code};
 
@@ -146,10 +148,29 @@ impl Engine {
             match argument {
                 CommandArgument::Bareword(word) => glob::append(&mut out, word.clone(), false),
                 CommandArgument::Value(expr) => self.native_argument_value(expr, &mut out)?,
-                CommandArgument::Parameter { name, value } => {
-                    glob::append(&mut out, format!("-{name}"), false);
-                    if let Some(expr) = value {
-                        self.native_argument_value(expr, &mut out)?;
+                CommandArgument::Parameter {
+                    name,
+                    value,
+                    separator,
+                } => {
+                    if *separator == ArgumentSeparator::Space {
+                        out.push(format!("-{name}"));
+                        if let Some(expr) = value {
+                            self.native_argument_value(expr, &mut out)?;
+                        }
+                    } else if let Some(expr) = value {
+                        let mut values = Vec::new();
+                        self.native_argument_value(expr, &mut values)?;
+                        for value in values {
+                            if *separator == ArgumentSeparator::Colon {
+                                out.push(format!("-{name}:{value}"));
+                            } else {
+                                out.push(format!("-{name}:"));
+                                out.push(value);
+                            }
+                        }
+                    } else {
+                        out.push(format!("-{name}:"));
                     }
                 }
             }

@@ -26,6 +26,7 @@ fn assignment_target(expr: &Expr) -> bool {
 pub fn parse(source: &str) -> Result<ScriptBlockAst, ParseError> {
     let tokens = tokenize(source)?;
     let mut parser = Parser {
+        source,
         tokens,
         pos: 0,
         nodes: 0,
@@ -38,7 +39,8 @@ pub fn parse(source: &str) -> Result<ScriptBlockAst, ParseError> {
     })
 }
 
-struct Parser {
+struct Parser<'a> {
+    source: &'a str,
     tokens: Vec<Token>,
     pos: usize,
     /// Expression nodes created for the statement being parsed.
@@ -48,7 +50,7 @@ struct Parser {
     stop_comma: bool,
 }
 
-impl Parser {
+impl Parser<'_> {
     /// The token at the cursor. The cursor never moves past `EndOfInput`.
     fn peek(&self) -> &Token {
         &self.tokens[self.pos]
@@ -648,6 +650,16 @@ impl Parser {
                 _ => None,
             };
             if let Some(parameter) = parameter {
+                let (parameter, separator) = if let Some(name) = parameter.strip_suffix(':') {
+                    let separator = if self.previous_span().end == self.peek().span.start {
+                        crate::ArgumentSeparator::Colon
+                    } else {
+                        crate::ArgumentSeparator::ColonSpace
+                    };
+                    (name.to_owned(), separator)
+                } else {
+                    (parameter, crate::ArgumentSeparator::Space)
+                };
                 let value = match &self.peek().kind {
                     TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
                         let word = word.clone();
@@ -689,6 +701,7 @@ impl Parser {
                 arguments.push(CommandArgument::Parameter {
                     name: parameter,
                     value,
+                    separator,
                 });
                 continue;
             }
@@ -1933,7 +1946,10 @@ impl Parser {
                     if self.peek().kind == TokenKind::RCurly {
                         let close = self.peek().span;
                         self.pos += 1;
-                        return self.expr(ExprKind::ScriptBlock(statements), span.to(close));
+                        let source =
+                            self.source[span.end as usize..close.start as usize].to_owned();
+                        return self
+                            .expr(ExprKind::ScriptBlock { statements, source }, span.to(close));
                     }
                     statements.push(self.statement()?);
                 }
@@ -2452,7 +2468,7 @@ mod tests {
                 name,
                 arguments.iter().map(show).collect::<Vec<_>>().join(",")
             ),
-            ExprKind::ScriptBlock(_) => "{...}".to_owned(),
+            ExprKind::ScriptBlock { .. } => "{...}".to_owned(),
         }
     }
 
@@ -2492,7 +2508,7 @@ mod tests {
                     text.push(' ');
                     text.push_str(word);
                 }
-                CommandArgument::Parameter { name, value } => {
+                CommandArgument::Parameter { name, value, .. } => {
                     text.push_str(&format!(" -{name}"));
                     if let Some(value) = value {
                         text.push(' ');
