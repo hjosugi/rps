@@ -329,6 +329,34 @@ pub fn compare(
     op: Comparison,
     case_sensitive: bool,
 ) -> Result<Value, RuntimeError> {
+    if matches!(op, Comparison::Like | Comparison::NotLike) {
+        if matches!(left, Value::Array(items) if items.is_empty()) {
+            return Ok(left.clone());
+        }
+        let (pattern, options) = match right {
+            Value::Object(entries)
+                if let Some((pattern, bits)) = crate::wildcard::stored(entries) =>
+            {
+                (pattern.clone(), bits)
+            }
+            other => (other.to_ps_string(), if case_sensitive { 0 } else { 2 }),
+        };
+        let matcher = crate::wildcard::operator_pattern(&pattern, options)?;
+        let negate = matches!(op, Comparison::NotLike);
+        if let Value::Array(items) = left {
+            let mut kept = Vec::new();
+            for item in items.iter() {
+                let text = item.to_ps_string();
+                if matcher.is_match(Some(&text))? != negate {
+                    kept.push(Value::String(text));
+                }
+            }
+            return Ok(Value::array(kept));
+        }
+        return Ok(Value::Bool(
+            matcher.is_match(Some(&left.to_ps_string()))? != negate,
+        ));
+    }
     if let Value::Array(items) = left {
         let mut kept = Vec::new();
         for item in items.iter() {
@@ -352,112 +380,89 @@ fn compare_scalar(
     op: Comparison,
     case_sensitive: bool,
 ) -> Result<bool, RuntimeError> {
-    match op {
-        Comparison::Like | Comparison::NotLike => {
-            let text = left.to_string();
-            let pattern = right.to_string();
-            let matched = wildcard(&text, &pattern, case_sensitive);
-            Ok(if matches!(op, Comparison::NotLike) {
-                !matched
-            } else {
-                matched
-            })
-        }
-        _ => {
-            if let (Some(left), Some(right)) = (typed_text(left), typed_text(right)) {
-                return compare_scalar(
-                    &Value::String(left.into()),
-                    &Value::String(right.into()),
-                    op,
-                    case_sensitive,
-                );
-            }
-            if let (Value::Object(a), Value::Object(b)) = (left, right) {
-                return match op {
-                    Comparison::Eq => Ok(Rc::ptr_eq(a, b)),
-                    Comparison::Ne => Ok(!Rc::ptr_eq(a, b)),
-                    _ => refuse("ordering comparison on objects"),
-                };
-            }
-            if let Value::Char(unit) = left {
-                let left = Value::String(PsString::from_units(vec![*unit]));
-                return compare_scalar(&left, right, op, case_sensitive);
-            }
-            if let Value::Char(unit) = right {
-                let right = Value::String(PsString::from_units(vec![*unit]));
-                return compare_scalar(left, &right, op, case_sensitive);
-            }
-            let ordering =
-                match (left, right) {
-                    (Value::Null | Value::AutomationNull, Value::Null | Value::AutomationNull) => 0,
-                    (Value::Null | Value::AutomationNull, _) => -1,
-                    (_, Value::Null | Value::AutomationNull) => 1,
-                    (Value::Int32(a), Value::Int32(b)) => a.cmp(b) as i8,
-                    (Value::String(a), b) => {
-                        let b = b.to_ps_string();
-                        crate::culture::compare(a, &b, "", case_sensitive)? as i8
-                    }
-                    (a, b) => {
-                        if let (Some(a), Some(b)) = (int_value(a), int_value(b)) {
-                            return Ok(match op {
-                                Comparison::Eq => a == b,
-                                Comparison::Ne => a != b,
-                                Comparison::Ge => a >= b,
-                                Comparison::Gt => a > b,
-                                Comparison::Lt => a < b,
-                                Comparison::Le => a <= b,
-                                Comparison::Like | Comparison::NotLike => unreachable!(),
-                            });
-                        }
-                        let a = a.to_string().parse::<f64>().map_err(|_| {
-                            RuntimeError::NotImplemented {
-                                feature: "comparison on these operand types",
-                            }
-                        })?;
-                        let b = b.to_string().parse::<f64>().map_err(|_| {
-                            RuntimeError::NotImplemented {
-                                feature: "comparison on these operand types",
-                            }
-                        })?;
-                        a.partial_cmp(&b)
-                            .map(|ordering| match ordering {
-                                std::cmp::Ordering::Less => -1,
-                                std::cmp::Ordering::Equal => 0,
-                                std::cmp::Ordering::Greater => 1,
-                            })
-                            .ok_or(RuntimeError::NotImplemented {
-                                feature: "comparison on NaN",
-                            })?
-                    }
-                };
-            Ok(match op {
-                Comparison::Eq => ordering == 0,
-                Comparison::Ne => ordering != 0,
-                Comparison::Ge => ordering >= 0,
-                Comparison::Gt => ordering > 0,
-                Comparison::Lt => ordering < 0,
-                Comparison::Le => ordering <= 0,
-                Comparison::Like | Comparison::NotLike => unreachable!(),
-            })
-        }
+    if let (Some(left), Some(right)) = (typed_text(left), typed_text(right)) {
+        return compare_scalar(
+            &Value::String(left.into()),
+            &Value::String(right.into()),
+            op,
+            case_sensitive,
+        );
     }
+    if let (Value::Object(a), Value::Object(b)) = (left, right) {
+        return match op {
+            Comparison::Eq => Ok(Rc::ptr_eq(a, b)),
+            Comparison::Ne => Ok(!Rc::ptr_eq(a, b)),
+            _ => refuse("ordering comparison on objects"),
+        };
+    }
+    if let Value::Char(unit) = left {
+        let left = Value::String(PsString::from_units(vec![*unit]));
+        return compare_scalar(&left, right, op, case_sensitive);
+    }
+    if let Value::Char(unit) = right {
+        let right = Value::String(PsString::from_units(vec![*unit]));
+        return compare_scalar(left, &right, op, case_sensitive);
+    }
+    let ordering = match (left, right) {
+        (Value::Null | Value::AutomationNull, Value::Null | Value::AutomationNull) => 0,
+        (Value::Null | Value::AutomationNull, _) => -1,
+        (_, Value::Null | Value::AutomationNull) => 1,
+        (Value::Int32(a), Value::Int32(b)) => a.cmp(b) as i8,
+        (Value::String(a), b) => {
+            let b = b.to_ps_string();
+            crate::culture::compare(a, &b, "", case_sensitive)? as i8
+        }
+        (a, b) => {
+            if let (Some(a), Some(b)) = (int_value(a), int_value(b)) {
+                return Ok(match op {
+                    Comparison::Eq => a == b,
+                    Comparison::Ne => a != b,
+                    Comparison::Ge => a >= b,
+                    Comparison::Gt => a > b,
+                    Comparison::Lt => a < b,
+                    Comparison::Le => a <= b,
+                    Comparison::Like | Comparison::NotLike => unreachable!(),
+                });
+            }
+            let a = a
+                .to_string()
+                .parse::<f64>()
+                .map_err(|_| RuntimeError::NotImplemented {
+                    feature: "comparison on these operand types",
+                })?;
+            let b = b
+                .to_string()
+                .parse::<f64>()
+                .map_err(|_| RuntimeError::NotImplemented {
+                    feature: "comparison on these operand types",
+                })?;
+            a.partial_cmp(&b)
+                .map(|ordering| match ordering {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Equal => 0,
+                    std::cmp::Ordering::Greater => 1,
+                })
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "comparison on NaN",
+                })?
+        }
+    };
+    Ok(match op {
+        Comparison::Eq => ordering == 0,
+        Comparison::Ne => ordering != 0,
+        Comparison::Ge => ordering >= 0,
+        Comparison::Gt => ordering > 0,
+        Comparison::Lt => ordering < 0,
+        Comparison::Le => ordering <= 0,
+        Comparison::Like | Comparison::NotLike => unreachable!(),
+    })
 }
 
-#[derive(Debug, Clone)]
-enum WildcardAtom {
-    Star,
-    Any,
-    Char(char),
-    Class(Vec<(char, char)>),
-}
-
-/// Public `-like` match, used by `switch -Wildcard` too.
+/// Infallible filter predicate for callers which handle pattern errors separately.
 pub fn wildcard_match(text: &str, pattern: &str, case_sensitive: bool) -> bool {
-    wildcard(text, pattern, case_sensitive)
+    crate::wildcard::operator_match(&text.into(), &pattern.into(), case_sensitive).unwrap_or(false)
 }
 
-/// `.NET`'s wildcard matching: `*`, `?`, `[abc]`, `[a-z]` and a backtick that
-/// escapes the next character. A malformed class (`[` with no `]`) is literal.
 fn typed_text(value: &Value) -> Option<String> {
     let Value::Object(entries) = value else {
         return None;
@@ -472,107 +477,6 @@ fn typed_text(value: &Value) -> Option<String> {
             None
         }
     })
-}
-
-fn wildcard(text: &str, pattern: &str, case_sensitive: bool) -> bool {
-    let text: Vec<char> = if case_sensitive {
-        text.chars().collect()
-    } else {
-        text.to_lowercase().chars().collect()
-    };
-    let pattern: Vec<char> = if case_sensitive {
-        pattern.chars().collect()
-    } else {
-        pattern.to_lowercase().chars().collect()
-    };
-    let atoms = wildcard_atoms(&pattern);
-    let mut ti = 0;
-    let mut pi = 0;
-    let mut star = None;
-    let mut match_at = 0;
-    while ti < text.len() {
-        let matches = pi < atoms.len()
-            && match &atoms[pi] {
-                WildcardAtom::Star => false,
-                WildcardAtom::Any => true,
-                WildcardAtom::Char(ch) => *ch == text[ti],
-                WildcardAtom::Class(ranges) => ranges
-                    .iter()
-                    .any(|(low, high)| (*low..=*high).contains(&text[ti])),
-            };
-        if matches {
-            ti += 1;
-            pi += 1;
-        } else if pi < atoms.len() && matches!(&atoms[pi], WildcardAtom::Star) {
-            star = Some(pi);
-            match_at = ti;
-            pi += 1;
-        } else if let Some(star) = star {
-            pi = star + 1;
-            match_at += 1;
-            ti = match_at;
-        } else {
-            return false;
-        }
-    }
-    while pi < atoms.len() && matches!(&atoms[pi], WildcardAtom::Star) {
-        pi += 1;
-    }
-    pi == atoms.len()
-}
-
-fn wildcard_atoms(pattern: &[char]) -> Vec<WildcardAtom> {
-    let mut atoms = Vec::new();
-    let mut at = 0;
-    while at < pattern.len() {
-        match pattern[at] {
-            '*' => {
-                atoms.push(WildcardAtom::Star);
-                at += 1;
-            }
-            '?' => {
-                atoms.push(WildcardAtom::Any);
-                at += 1;
-            }
-            '`' => {
-                if let Some(ch) = pattern.get(at + 1) {
-                    atoms.push(WildcardAtom::Char(*ch));
-                    at += 2;
-                } else {
-                    atoms.push(WildcardAtom::Char('`'));
-                    at += 1;
-                }
-            }
-            '[' => {
-                let Some(end) = pattern[at + 1..].iter().position(|ch| *ch == ']') else {
-                    atoms.push(WildcardAtom::Char('['));
-                    at += 1;
-                    continue;
-                };
-                let inner = &pattern[at + 1..at + 1 + end];
-                let mut ranges = Vec::new();
-                let mut index = 0;
-                while index < inner.len() {
-                    if inner.get(index + 1) == Some(&'-')
-                        && let Some(high) = inner.get(index + 2)
-                    {
-                        ranges.push((inner[index], *high));
-                        index += 3;
-                    } else {
-                        ranges.push((inner[index], inner[index]));
-                        index += 1;
-                    }
-                }
-                atoms.push(WildcardAtom::Class(ranges));
-                at = at + 1 + end + 1;
-            }
-            ch => {
-                atoms.push(WildcardAtom::Char(ch));
-                at += 1;
-            }
-        }
-    }
-    atoms
 }
 
 /// `-contains` / `-in`.
@@ -1046,14 +950,14 @@ mod tests {
 
     #[test]
     fn wildcards_match_classes_and_escapes() {
-        assert!(wildcard("abc", "a?c", true));
-        assert!(wildcard("abc", "a[bx]c", true));
-        assert!(wildcard("abc", "a[a-c]c", true));
-        assert!(!wildcard("abc", "a[d]c", true));
-        assert!(wildcard("ABC", "a*", false));
-        assert!(!wildcard("ABC", "a*", true));
-        assert!(wildcard("a*c", "a`*c", true));
-        assert!(wildcard("a[bc]", "a`[bc`]", true));
+        assert!(wildcard_match("abc", "a?c", true));
+        assert!(wildcard_match("abc", "a[bx]c", true));
+        assert!(wildcard_match("abc", "a[a-c]c", true));
+        assert!(!wildcard_match("abc", "a[d]c", true));
+        assert!(wildcard_match("ABC", "a*", false));
+        assert!(!wildcard_match("ABC", "a*", true));
+        assert!(wildcard_match("a*c", "a`*c", true));
+        assert!(wildcard_match("a[bc]", "a`[bc`]", true));
     }
 
     #[test]

@@ -12,6 +12,62 @@ const FLAGS: &[(&str, i32)] = &[
     ("CultureInvariant", 4),
 ];
 
+#[derive(Clone, Copy)]
+pub(super) enum Command {
+    GetAlias,
+    GetCommand,
+}
+
+impl Command {
+    pub(super) fn patterns(
+        self,
+        patterns: &[String],
+    ) -> Result<Vec<wildcard::Matcher>, RuntimeError> {
+        let (name, id) = match self {
+            Self::GetAlias => (
+                "Get-Alias",
+                "RuntimeException,Microsoft.PowerShell.Commands.GetAliasCommand",
+            ),
+            Self::GetCommand => (
+                "Get-Command",
+                "RuntimeException,Microsoft.PowerShell.Commands.GetCommandCommand",
+            ),
+        };
+        patterns
+            .iter()
+            .map(|pattern| {
+                wildcard::Matcher::new(&pattern.as_str().into(), 2).map_err(|error| match error {
+                    RuntimeError::Script {
+                        id: "WildcardPatternException",
+                        exception_type,
+                        message,
+                        ..
+                    } => RuntimeError::Script {
+                        id,
+                        category: format!("NotSpecified: (:) [{name}], WildcardPatternException"),
+                        exception_type,
+                        message,
+                    },
+                    other => other,
+                })
+            })
+            .collect()
+    }
+}
+
+pub(super) fn matches_any(
+    patterns: &[wildcard::Matcher],
+    text: &str,
+) -> Result<bool, RuntimeError> {
+    let text = PsString::from(text);
+    for pattern in patterns {
+        if pattern.is_match(Some(&text))? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 fn as_string(value: &Value) -> Option<PsString> {
     match value {
         Value::String(text) => Some(text.clone()),
@@ -21,7 +77,7 @@ fn as_string(value: &Value) -> Option<PsString> {
         {
             None
         }
-        value => Some(PsString::from(value.to_string())),
+        value => Some(value.to_ps_string()),
     }
 }
 
@@ -184,11 +240,18 @@ pub(super) fn pattern_method(
     name: &str,
     arguments: &[Value],
 ) -> Option<Result<Value, RuntimeError>> {
-    let pattern = entries.iter().find_map(|(key, value)| match value {
-        Value::String(pattern) if key == "__WildcardPattern" => Some(pattern),
-        _ => None,
-    })?;
+    let (pattern, bits) = wildcard::stored(entries)?;
     match (name.to_ascii_lowercase().as_str(), arguments) {
+        ("ismatch", [input]) => {
+            let input = as_string(input);
+            Some(
+                wildcard::Matcher::new(pattern, bits)
+                    .and_then(|matcher| matcher.is_match(input.as_ref()))
+                    .map(Value::Bool)
+                    .map_err(|err| invocation_error("IsMatch", 1, err)),
+            )
+        }
+        ("ismatch", _) => Some(Err(overload_error("IsMatch", arguments.len()))),
         ("towql", []) => Some(
             wildcard::to_wql(pattern)
                 .map(Value::String)

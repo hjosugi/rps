@@ -109,6 +109,7 @@ ops/comparison
 ops/string-collation
 ops/ternary-coalesce
 ops/wildcard-escape
+ops/wildcard-matching
 ops/wildcard-wql
 pipeline/command-aliases
 pipeline/compare-object

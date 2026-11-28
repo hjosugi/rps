@@ -1322,9 +1322,20 @@ impl Engine {
             for clause in clauses.iter().filter(|clause| clause.label.is_some()) {
                 let label = clause.label.as_ref().unwrap();
                 let is_match = if wildcard {
-                    let pattern =
-                        evaluate(label, &mut self.variables, !self.last_failed)?.to_string();
-                    ops::wildcard_match(&item.to_string(), &pattern, case_sensitive)
+                    let value = evaluate(label, &mut self.variables, !self.last_failed)?;
+                    let pattern = match &value {
+                        Value::Object(entries)
+                            if let Some((pattern, _)) = rpsh_runtime::wildcard::stored(entries) =>
+                        {
+                            pattern.clone()
+                        }
+                        other => other.to_ps_string(),
+                    };
+                    rpsh_runtime::wildcard::operator_match(
+                        &item.to_ps_string(),
+                        &pattern,
+                        case_sensitive,
+                    )?
                 } else if regex {
                     let pattern = evaluate(label, &mut self.variables, !self.last_failed)?;
                     matches!(
@@ -5241,12 +5252,10 @@ impl Engine {
                         .iter()
                         .map(ToString::to_string)
                         .collect();
+                    let modules = wildcards::Command::GetCommand.patterns(&modules)?;
                     let mut outputs = Vec::new();
                     for (name, functions) in &self.module_functions {
-                        if !modules
-                            .iter()
-                            .any(|module| ops::wildcard_match(name, module, false))
-                        {
+                        if !wildcards::matches_any(&modules, name)? {
                             continue;
                         }
                         for function in functions {
@@ -5288,14 +5297,22 @@ impl Engine {
                         }
                     }
                 }
-                let verb = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("verb"))
-                    .map(|(_, value)| value.to_string());
-                let noun = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("noun"))
-                    .map(|(_, value)| value.to_string());
+                let wanted = wildcards::Command::GetCommand.patterns(&wanted)?;
+                let word_patterns = |field: &str| {
+                    let patterns = named
+                        .iter()
+                        .find(|(name, _)| name.eq_ignore_ascii_case(field))
+                        .map(|(_, values)| {
+                            flatten_value(values.clone())
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    wildcards::Command::GetCommand.patterns(&patterns)
+                };
+                let verb = word_patterns("verb")?;
+                let noun = word_patterns("noun")?;
                 let mut names: Vec<(String, &'static str)> = self
                     .functions
                     .values()
@@ -5324,10 +5341,7 @@ impl Engine {
                 names.sort_by(|left, right| left.0.cmp(&right.0));
                 let mut outputs = Vec::new();
                 for (name, kind) in names {
-                    let matches = wanted.is_empty()
-                        || wanted
-                            .iter()
-                            .any(|wanted| ops::wildcard_match(&name, wanted, false));
+                    let matches = wanted.is_empty() || wildcards::matches_any(&wanted, &name)?;
                     let type_matches = command_type
                         .as_deref()
                         .is_none_or(|wanted| wanted.eq_ignore_ascii_case(kind));
@@ -5335,12 +5349,8 @@ impl Engine {
                         Some((verb, noun)) => (verb, noun),
                         None => ("", name.as_str()),
                     };
-                    let verb_matches = verb
-                        .as_deref()
-                        .is_none_or(|wanted| ops::wildcard_match(name_verb, wanted, false));
-                    let noun_matches = noun
-                        .as_deref()
-                        .is_none_or(|wanted| ops::wildcard_match(name_noun, wanted, false));
+                    let verb_matches = verb.is_empty() || wildcards::matches_any(&verb, name_verb)?;
+                    let noun_matches = noun.is_empty() || wildcards::matches_any(&noun, name_noun)?;
                     if matches && type_matches && verb_matches && noun_matches {
                         if kind == "Alias" {
                             if let Some(alias) = self.aliases.get(&name) {
@@ -8038,6 +8048,7 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "ConvertTo-Json",
     "Copy-Item",
     "ForEach-Object",
+    "Get-Alias",
     "Get-ChildItem",
     "Get-Command",
     "Get-ItemProperty",
@@ -8066,6 +8077,7 @@ const BUILTIN_COMMANDS: &[&str] = &[
     "Remove-Item",
     "Remove-Variable",
     "Select-Object",
+    "Set-Alias",
     "Set-Content",
     "Set-Location",
     "Set-Variable",
@@ -10126,6 +10138,9 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
             Ok(Value::array(parts.into_iter().map(Value::String).collect()))
         }
         "startswith" | "endswith" => {
+            if let [Value::String(pattern)] = arguments {
+                return rpsh_runtime::culture::has_affix(text, pattern, &rpsh_runtime::culture::current_locale(), true, name.eq_ignore_ascii_case("startswith")).map(Value::Bool);
+            }
             let needle = needle_units(arguments.first())?;
             let found = if name.eq_ignore_ascii_case("startswith") {
                 units.starts_with(&needle)

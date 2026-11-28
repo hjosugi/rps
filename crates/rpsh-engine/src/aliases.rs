@@ -4,9 +4,9 @@
 use std::collections::HashMap;
 
 use rpsh_commands::BuiltinModule;
-use rpsh_runtime::{RuntimeError, Value, ops};
+use rpsh_runtime::{RuntimeError, Value};
 
-use super::{flatten_value, flatten_values, version_value};
+use super::{flatten_value, flatten_values, version_value, wildcards};
 
 pub(super) const TYPE_NAME: &str = "System.Management.Automation.AliasInfo";
 
@@ -173,6 +173,8 @@ impl Aliases {
         let excluded = parameter("Exclude")
             .map(|value| strings(flatten_value(value.clone())))
             .unwrap_or_default();
+        let patterns = wildcards::Command::GetAlias.patterns(&patterns)?;
+        let excluded = wildcards::Command::GetAlias.patterns(&excluded)?;
         let mut candidates = Vec::new();
         for alias in self.iter() {
             let text = if definition.is_some() {
@@ -180,10 +182,7 @@ impl Aliases {
             } else {
                 alias.name
             };
-            if !excluded
-                .iter()
-                .any(|pattern| ops::wildcard_match(text, pattern, false))
-            {
+            if !wildcards::matches_any(&excluded, text)? {
                 candidates.push((alias, text));
             }
         }
@@ -191,7 +190,7 @@ impl Aliases {
         let mut outputs = Vec::new();
         for pattern in patterns {
             for (alias, text) in &candidates {
-                if pattern == "*" || ops::wildcard_match(text, &pattern, false) {
+                if pattern.is_match(Some(&(*text).into()))? {
                     outputs.push(alias.value());
                 }
             }

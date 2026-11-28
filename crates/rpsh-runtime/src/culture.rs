@@ -8,6 +8,13 @@ mod icu;
 
 /// ICU uses the empty locale name for the invariant (root) culture.
 pub fn current_locale() -> String {
+    if invariant_mode() {
+        return String::new();
+    }
+    #[cfg(unix)]
+    if let Some(locale) = icu::default_locale() {
+        return locale;
+    }
     let value = ["LC_ALL", "LC_MESSAGES", "LANG"]
         .iter()
         .filter_map(std::env::var_os)
@@ -57,6 +64,82 @@ pub fn ordinal_compare(left: &[u16], right: &[u16], case_sensitive: bool) -> Ord
         left.cmp(right)
     } else {
         ordinal_upper(left).cmp(&ordinal_upper(right))
+    }
+}
+
+pub fn ordinal_has_affix(
+    text: &[u16],
+    pattern: &[u16],
+    case_sensitive: bool,
+    prefix: bool,
+) -> bool {
+    if text.len() < pattern.len() {
+        return false;
+    }
+    let start = if prefix {
+        0
+    } else {
+        text.len() - pattern.len()
+    };
+    ordinal_compare(&text[start..start + pattern.len()], pattern, case_sensitive).is_eq()
+}
+
+pub fn has_affix(
+    text: &PsString,
+    pattern: &PsString,
+    locale: &str,
+    case_sensitive: bool,
+    prefix: bool,
+) -> Result<bool, RuntimeError> {
+    if pattern.is_empty() {
+        return Ok(true);
+    }
+    let text = text.as_utf16();
+    let pattern = pattern.as_utf16();
+    if invariant_mode() {
+        return Ok(ordinal_has_affix(&text, &pattern, case_sensitive, prefix));
+    }
+    #[cfg(unix)]
+    if let Some(matched) = icu::has_affix(&text, &pattern, locale, case_sensitive, prefix) {
+        return Ok(matched);
+    }
+    Err(RuntimeError::NotImplemented {
+        feature: "system ICU string collation",
+    })
+}
+
+/// TextInfo.ToLower(char) maps one code unit. Surrogates remain intact and
+/// dotted/dotless I depend on whether the culture is invariant or Turkic.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Casing {
+    Invariant,
+    Turkic,
+    Other,
+}
+
+impl Casing {
+    pub(crate) fn for_locale(locale: &str) -> Self {
+        let language = locale.split(['_', '-']).next().unwrap_or("");
+        if language.is_empty() || language.eq_ignore_ascii_case("root") {
+            Self::Invariant
+        } else if language.eq_ignore_ascii_case("tr") || language.eq_ignore_ascii_case("az") {
+            Self::Turkic
+        } else {
+            Self::Other
+        }
+    }
+
+    pub(crate) fn lower(self, unit: u16) -> u16 {
+        match unit {
+            0x49 if self == Self::Turkic => 0x131,
+            0x130 if self == Self::Invariant => unit,
+            0x130 => 0x69,
+            0..=0x7f => (unit as u8).to_ascii_lowercase().into(),
+            _ => char::from_u32(u32::from(unit))
+                .and_then(|ch| ch.to_lowercase().next())
+                .and_then(|lower| u16::try_from(u32::from(lower)).ok())
+                .unwrap_or(unit),
+        }
     }
 }
 

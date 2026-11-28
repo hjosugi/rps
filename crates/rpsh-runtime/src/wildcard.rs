@@ -1,5 +1,5 @@
 //! PowerShell wildcard strings are sequences of UTF-16 code units.
-use crate::{PsString, RuntimeError};
+use crate::{PsString, RuntimeError, Value, culture};
 
 const ESCAPE: u16 = b'`' as u16;
 
@@ -144,6 +144,207 @@ fn parse_atoms(pattern: &PsString) -> Result<Vec<Atom>, RuntimeError> {
     Ok(atoms)
 }
 
+#[derive(Debug)]
+enum Strategy {
+    All,
+    Literal(PsString),
+    Prefix(PsString),
+    Pattern(Vec<Atom>),
+}
+
+/// A parsed PowerShell wildcard can be reused across an input collection.
+#[derive(Debug)]
+pub struct Matcher {
+    strategy: Strategy,
+    locale: String,
+    casing: Option<culture::Casing>,
+    ordinal_ignore_case: bool,
+}
+
+impl Matcher {
+    pub fn new(pattern: &PsString, options: i32) -> Result<Self, RuntimeError> {
+        let locale = if options & 4 != 0 || pattern.as_ascii() == Some("*") {
+            String::new()
+        } else {
+            culture::current_locale()
+        };
+        Self::for_locale(pattern, options & 2 != 0, locale)
+    }
+
+    fn for_locale(
+        pattern: &PsString,
+        ignore_case: bool,
+        locale: String,
+    ) -> Result<Self, RuntimeError> {
+        let special = pattern
+            .units()
+            .position(|unit| wildcard_character(unit) || unit == ESCAPE);
+        let casing = ignore_case.then(|| culture::Casing::for_locale(&locale));
+        let strategy = match special {
+            None => Strategy::Literal(pattern.clone()),
+            Some(0) if pattern.len() == 1 && pattern.unit(0) == Some(0x2a) => Strategy::All,
+            Some(last) if last + 1 == pattern.len() && pattern.unit(last) == Some(0x2a) => {
+                Strategy::Prefix(PsString::from_units(pattern.units().take(last).collect()))
+            }
+            _ => {
+                let mut atoms = parse_atoms(pattern)?;
+                if let Some(casing) = casing {
+                    for atom in &mut atoms {
+                        match atom {
+                            Atom::Literal(unit) => *unit = casing.lower(*unit),
+                            Atom::Class(members) => *members = fold_class(members, casing),
+                            _ => {}
+                        }
+                    }
+                }
+                Strategy::Pattern(atoms)
+            }
+        };
+        let ordinal_ignore_case =
+            ignore_case && locale.replace('-', "_").eq_ignore_ascii_case("en_US_POSIX");
+        Ok(Self {
+            strategy,
+            locale,
+            casing,
+            ordinal_ignore_case,
+        })
+    }
+
+    pub fn is_match(&self, input: Option<&PsString>) -> Result<bool, RuntimeError> {
+        let Some(input) = input else { return Ok(false) };
+        let sensitive = self.casing.is_none();
+        match &self.strategy {
+            Strategy::All => Ok(true),
+            Strategy::Literal(pattern) if self.ordinal_ignore_case => {
+                Ok(culture::ordinal_compare(&input.as_utf16(), &pattern.as_utf16(), false).is_eq())
+            }
+            Strategy::Literal(pattern) => {
+                Ok(culture::compare(input, pattern, &self.locale, sensitive)?.is_eq())
+            }
+            Strategy::Prefix(prefix) if self.ordinal_ignore_case => Ok(culture::ordinal_has_affix(
+                &input.as_utf16(),
+                &prefix.as_utf16(),
+                false,
+                true,
+            )),
+            Strategy::Prefix(prefix) => {
+                culture::has_affix(input, prefix, &self.locale, sensitive, true)
+            }
+            Strategy::Pattern(atoms) => Ok(match_units(atoms, &input.as_utf16(), self.casing)),
+        }
+    }
+}
+
+impl ClassMember {
+    fn limits(self) -> (u16, u16) {
+        match self {
+            Self::Literal(unit) => (unit, unit),
+            Self::Range(low, high) => (low, high),
+        }
+    }
+}
+
+// Map the whole range before matching: transforming just its endpoints would
+// drop punctuation in [A-z] and miss case equivalents outside the range.
+fn fold_class(members: &[ClassMember], casing: culture::Casing) -> Vec<ClassMember> {
+    let mut units = Vec::new();
+    for member in members {
+        let (low, high) = member.limits();
+        units.extend((low..=high).map(|unit| casing.lower(unit)));
+    }
+    units.sort_unstable();
+    units.dedup();
+    let mut ranges = Vec::new();
+    let mut rest = units.as_slice();
+    while let Some((&low, tail)) = rest.split_first() {
+        let mut high = low;
+        rest = tail;
+        while let Some((&next, tail)) = rest.split_first() {
+            if high.checked_add(1) != Some(next) {
+                break;
+            }
+            high = next;
+            rest = tail;
+        }
+        ranges.push(ClassMember::Range(low, high));
+    }
+    ranges
+}
+
+fn match_units(atoms: &[Atom], text: &[u16], casing: Option<culture::Casing>) -> bool {
+    let (mut pattern_at, mut text_at) = (0, 0);
+    let mut star_retry = None;
+    while text_at < text.len() {
+        let unit = casing.map_or(text[text_at], |case| case.lower(text[text_at]));
+        let matched = match atoms.get(pattern_at) {
+            Some(Atom::Any) => true,
+            Some(Atom::Literal(expected)) => *expected == unit,
+            Some(Atom::Class(members)) => members.iter().any(|member| {
+                let (low, high) = member.limits();
+                (low..=high).contains(&unit)
+            }),
+            Some(Atom::Star) => {
+                pattern_at += 1;
+                star_retry = Some((pattern_at, text_at));
+                continue;
+            }
+            None => false,
+        };
+        if matched {
+            pattern_at += 1;
+            text_at += 1;
+        } else if let Some((after_star, consumed)) = &mut star_retry {
+            *consumed += 1;
+            text_at = *consumed;
+            pattern_at = *after_star;
+        } else {
+            return false;
+        }
+    }
+    atoms[pattern_at..]
+        .iter()
+        .all(|atom| matches!(atom, Atom::Star))
+}
+
+/// Read the pattern and options kept by the engine's WildcardPattern object.
+pub fn stored(entries: &[(String, Value)]) -> Option<(&PsString, i32)> {
+    let pattern = entries.iter().find_map(|(key, value)| match value {
+        Value::String(pattern) if key == "__WildcardPattern" => Some(pattern),
+        _ => None,
+    })?;
+    let options = entries.iter().find_map(|(key, value)| match value {
+        Value::Int32(bits) if key == "__WildcardOptions" => Some(*bits),
+        _ => None,
+    })?;
+    Some((pattern, options))
+}
+
+/// Operators surface the original WildcardPatternException as a RuntimeException.
+pub fn operator_pattern(pattern: &PsString, options: i32) -> Result<Matcher, RuntimeError> {
+    Matcher::new(pattern, options).map_err(|error| match error {
+        RuntimeError::Script {
+            id: "WildcardPatternException",
+            exception_type,
+            message,
+            ..
+        } => RuntimeError::Script {
+            id: "RuntimeException",
+            category: "NotSpecified: (:) [], WildcardPatternException".into(),
+            exception_type,
+            message,
+        },
+        other => other,
+    })
+}
+
+pub fn operator_match(
+    text: &PsString,
+    pattern: &PsString,
+    case_sensitive: bool,
+) -> Result<bool, RuntimeError> {
+    operator_pattern(pattern, if case_sensitive { 0 } else { 2 })?.is_match(Some(text))
+}
+
 /// Translate PowerShell wildcard tokens to the operand of WQL LIKE.
 /// A class whose exact bounds WQL cannot represent requires client-side filtering.
 pub fn to_wql(pattern: &PsString) -> Result<PsString, RuntimeError> {
@@ -189,6 +390,32 @@ pub fn to_wql(pattern: &PsString) -> Result<PsString, RuntimeError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn turkish_i_depends_on_culture_for_each_pattern_strategy() {
+        for (locale, target, yes, no) in [
+            ("tr_TR", "ı", "I", "i"),
+            ("tr_TR", "İ", "i", "I"),
+            ("", "I", "i", "ı"),
+        ] {
+            for (pattern, input) in [
+                (yes.to_owned(), target.to_owned()),
+                (format!("{yes}*"), format!("{target}more")),
+                (format!("{yes}?"), format!("{target}x")),
+                (format!("[{yes}]"), target.to_owned()),
+            ] {
+                let matcher =
+                    Matcher::for_locale(&pattern.as_str().into(), true, locale.into()).unwrap();
+                assert!(
+                    matcher.is_match(Some(&input.as_str().into())).unwrap(),
+                    "{locale} {pattern} {input}"
+                );
+            }
+            let matcher =
+                Matcher::for_locale(&format!("[{no}]").into(), true, locale.into()).unwrap();
+            assert!(!matcher.is_match(Some(&target.into())).unwrap());
+        }
+    }
 
     #[test]
     fn null_pattern_raises_argument_null() {

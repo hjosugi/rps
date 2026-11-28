@@ -7,7 +7,7 @@
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::ffi::{CString, c_char, c_int, c_void};
+use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::ptr::{self, NonNull};
 use std::rc::Rc;
 
@@ -47,6 +47,10 @@ type Compare = unsafe extern "C" fn(*const c_void, *const u16, i32, *const u16, 
 type Rules = unsafe extern "C" fn(*const c_void, *mut i32) -> *const u16;
 type OpenRules =
     unsafe extern "C" fn(*const u16, i32, i32, i32, *mut c_void, *mut i32) -> *mut c_void;
+type OpenElements = unsafe extern "C" fn(*const c_void, *const u16, i32, *mut i32) -> *mut c_void;
+type Next = unsafe extern "C" fn(*mut c_void, *mut i32) -> i32;
+type Strength = unsafe extern "C" fn(*const c_void) -> i32;
+type DefaultLocale = unsafe extern "C" fn() -> *const c_char;
 
 struct Api {
     open: Open,
@@ -54,6 +58,12 @@ struct Api {
     compare: Compare,
     rules: Rules,
     open_rules: OpenRules,
+    open_elements: OpenElements,
+    close_elements: Close,
+    next: Next,
+    previous: Next,
+    strength: Strength,
+    default_locale: DefaultLocale,
     _library: Library,
 }
 
@@ -90,6 +100,12 @@ impl Api {
             compare: bind!("ucol_strcoll", Compare),
             rules: bind!("ucol_getRules", Rules),
             open_rules: bind!("ucol_openRules", OpenRules),
+            open_elements: bind!("ucol_openElements", OpenElements),
+            close_elements: bind!("ucol_closeElements", Close),
+            next: bind!("ucol_next", Next),
+            previous: bind!("ucol_previous", Next),
+            strength: bind!("ucol_getStrength", Strength),
+            default_locale: bind!("uloc_getDefault", DefaultLocale),
             _library: library,
         })
     }
@@ -98,6 +114,54 @@ impl Api {
 struct Collator {
     handle: NonNull<c_void>,
     api: Rc<Api>,
+}
+
+/// An ICU iterator borrows both its collator and the UTF-16 text.
+struct Elements<'a> {
+    handle: NonNull<c_void>,
+    collator: &'a Collator,
+    _text: &'a [u16],
+}
+
+impl<'a> Elements<'a> {
+    fn new(collator: &'a Collator, text: &'a [u16]) -> Option<Self> {
+        let length = i32::try_from(text.len()).ok()?;
+        let mut status = 0;
+        // SAFETY: both inputs stay alive and immutable until this iterator drops.
+        let handle = unsafe {
+            (collator.api.open_elements)(
+                collator.handle.as_ptr(),
+                text.as_ptr(),
+                length,
+                &mut status,
+            )
+        };
+        let elements = Self {
+            handle: NonNull::new(handle)?,
+            collator,
+            _text: text,
+        };
+        (status <= 0).then_some(elements)
+    }
+
+    fn advance(&mut self, forward: bool) -> Option<i32> {
+        let step = if forward {
+            self.collator.api.next
+        } else {
+            self.collator.api.previous
+        };
+        let mut status = 0;
+        // SAFETY: step advances this live iterator in its selected direction.
+        let value = unsafe { step(self.handle.as_ptr(), &mut status) };
+        (status <= 0).then_some(value)
+    }
+}
+
+impl Drop for Elements<'_> {
+    fn drop(&mut self) {
+        // SAFETY: the iterator is owned and its collator is still live.
+        unsafe { (self.collator.api.close_elements)(self.handle.as_ptr()) };
+    }
 }
 
 impl Drop for Collator {
@@ -165,6 +229,38 @@ impl Collator {
         };
         Some(order.cmp(&0))
     }
+
+    fn has_affix(&self, text: &[u16], pattern: &[u16], prefix: bool) -> Option<bool> {
+        let mut pattern = Elements::new(self, pattern)?;
+        let mut text = Elements::new(self, text)?;
+        // SAFETY: this asks for an attribute of the live collator.
+        let strength = unsafe { (self.api.strength)(self.handle.as_ptr()) };
+        let mask = match strength {
+            0 => !0xffff,
+            1 => !0xff,
+            _ => -1,
+        };
+        let mut want = pattern.advance(prefix)?;
+        let mut have = text.advance(prefix)?;
+        loop {
+            if want == -1 {
+                // A combining accent immediately following a prefix belongs to
+                // its preceding base. An ignorable element can end the match.
+                let combining = have & !0xffff == 0 && have & 0xff00 != 0;
+                return Some(!prefix || !combining);
+            }
+            if want == 0 {
+                want = pattern.advance(prefix)?;
+            } else if have == 0 {
+                have = text.advance(prefix)?;
+            } else if have == -1 || (want ^ have) & mask != 0 {
+                return Some(false);
+            } else {
+                want = pattern.advance(prefix)?;
+                have = text.advance(prefix)?;
+            }
+        }
+    }
 }
 
 struct Cache {
@@ -179,22 +275,37 @@ thread_local! {
     });
 }
 
-pub(super) fn compare(
-    left: &[u16],
-    right: &[u16],
+pub(super) fn default_locale() -> Option<String> {
+    CACHE.with_borrow(|cache| {
+        let api = cache.api.as_ref()?;
+        // SAFETY: ICU owns a NUL-terminated locale ID. We copy it immediately
+        // and never call uloc_setDefault.
+        let locale = NonNull::new(unsafe { (api.default_locale)() }.cast_mut())?;
+        let name = unsafe { CStr::from_ptr(locale.as_ptr()) }.to_str().ok()?;
+        // .NET maps ICU's default en_US_POSIX locale to the invariant culture.
+        Some(if name == "en_US_POSIX" {
+            String::new()
+        } else {
+            name.to_owned()
+        })
+    })
+}
+
+fn with_collator<T>(
     locale: &str,
     case_sensitive: bool,
-) -> Option<Ordering> {
+    operation: impl FnOnce(&Collator) -> Option<T>,
+) -> Option<T> {
     CACHE.with_borrow_mut(|cache| {
         if let Some((_, _, collator)) = cache
             .entries
             .iter()
             .find(|(name, case, _)| name == locale && *case == case_sensitive)
         {
-            return collator.compare(left, right);
+            return operation(collator);
         }
         let collator = Collator::new(cache.api.as_ref()?, locale, case_sensitive)?;
-        let result = collator.compare(left, right);
+        let result = operation(&collator);
         if cache.entries.len() == 8 {
             cache.entries.remove(0);
         }
@@ -202,5 +313,28 @@ pub(super) fn compare(
             .entries
             .push((locale.to_owned(), case_sensitive, collator));
         result
+    })
+}
+
+pub(super) fn compare(
+    left: &[u16],
+    right: &[u16],
+    locale: &str,
+    case_sensitive: bool,
+) -> Option<Ordering> {
+    with_collator(locale, case_sensitive, |collator| {
+        collator.compare(left, right)
+    })
+}
+
+pub(super) fn has_affix(
+    text: &[u16],
+    pattern: &[u16],
+    locale: &str,
+    case_sensitive: bool,
+    prefix: bool,
+) -> Option<bool> {
+    with_collator(locale, case_sensitive, |collator| {
+        collator.has_affix(text, pattern, prefix)
     })
 }
