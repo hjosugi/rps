@@ -12,6 +12,7 @@
 //! value. `Int32` overflow, for instance, promotes to `Double` upstream, so
 //! here it is refused until `Double` exists.
 
+pub mod culture;
 pub mod ops;
 pub mod regex;
 mod string;
@@ -120,6 +121,25 @@ impl Value {
     /// `$null` and the empty-pipeline value both compare as null.
     pub fn is_null_like(&self) -> bool {
         matches!(self, Value::Null | Value::AutomationNull)
+    }
+
+    /// PowerShell string conversion preserves UTF-16 until the host writes output.
+    pub fn to_ps_string(&self) -> PsString {
+        match self {
+            Self::String(text) | Self::ScriptBlock(text) => text.clone(),
+            Self::Char(unit) => PsString::from_units(vec![*unit]),
+            Self::Array(items) => {
+                let mut units = Vec::new();
+                for (index, item) in items.iter().enumerate() {
+                    if index != 0 {
+                        units.push(b' ' as u16);
+                    }
+                    units.extend(item.to_ps_string().units());
+                }
+                PsString::from_units(units)
+            }
+            _ => PsString::from(self.to_string()),
+        }
     }
 }
 

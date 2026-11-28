@@ -10,6 +10,7 @@
 //! handle and the payload into one allocation is tracked in #35; the
 //! observable string behaviour is the same.
 
+use std::borrow::Cow;
 use std::fmt;
 use std::rc::Rc;
 
@@ -69,6 +70,14 @@ impl PsString {
         match &*self.0 {
             Repr::Ascii(bytes) => Box::new(bytes.iter().map(|&byte| u16::from(byte))),
             Repr::Wide(units) => Box::new(units.iter().copied()),
+        }
+    }
+
+    /// A contiguous UTF-16 view for APIs that take a pointer and unit count.
+    pub fn as_utf16(&self) -> Cow<'_, [u16]> {
+        match &*self.0 {
+            Repr::Ascii(bytes) => Cow::Owned(bytes.iter().copied().map(u16::from).collect()),
+            Repr::Wide(units) => Cow::Borrowed(units),
         }
     }
 

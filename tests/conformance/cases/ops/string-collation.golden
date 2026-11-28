@@ -1,0 +1,24 @@
+rpsh-golden-v2
+exit=0
+True
+True
+False
+True
+False
+True
+False
+False
+True
+True
+True
+False
+False
+True
+True
+0
+-1
+1
+1
+1
+ArgumentException
+Exception calling "CompareTo" with "1" argument(s): "Object must be of type String."

@@ -37,13 +37,12 @@ whether or not the script uses it.
 
 ## Candidate areas
 
-These are the crates the milestones are expected to need. None is admitted
-yet; each gets its own issue and spike, and this table records the decision.
+Each candidate has an issue for its evaluation and the resulting decision.
 
 | Area | Candidates | Where it sits | What decides it |
 |---|---|---|---|
 | regex | `regex`, `regex-automata` | `rpsh-runtime` default | #41: startup cost, binary size, and whether the .NET regex dialect needs a custom front-end |
-| Unicode / culture | `icu` crates, system ICU via `libicu` | `rpsh-runtime` feature | #36: data size (ICU data is large), startup cost, whether the system ICU the PINNED pwsh already uses is enough |
+| Unicode / culture | system ICU | `rpsh-runtime` | #36: string collation opens the installed ICU on first use. The default binary has no ICU load-time dependency or bundled locale data. |
 | line editor | `reedline`, a custom editor | `rpsh-host` feature | #111: interactive-only, so it must not be on the startup path; pull in the history/completion stack by measurement |
 | OS interfaces | `libc`, `rustix`, `nix` | `rpsh-native` default | #73, #76: syscall coverage, unsafe surface, pipes and process control |
 | HTTP | `reqwest`/`hyper`, `ureq` | `rpsh-commands` feature | #97: TLS stack (rustls or native), binary size, and whether web cmdlets stay a feature |
@@ -55,6 +54,14 @@ The rule for the two big data crates (ICU and the CLR bridge) is the same:
 **do not put their data in the binary by default.** ICU is loaded from the
 system or the reference pwsh; the CLR is found at run time; both fail with a
 precise refusal when absent, never with an approximation.
+
+The unsafe boundary for string collation (#36) lives in
+`crates/rpsh-runtime/src/culture/icu.rs`. It opens and closes the library and
+collators, resolves the ICU C functions by name, and passes UTF-16 slices
+with their lengths. A thread owns its collators and keeps the library alive
+until it closes them. The case-insensitive collator uses the locale's rules
+and .NET's width and kana tailoring. The `ops/string-collation` conformance
+case exercises both collators through PowerShell operators and `.CompareTo()`.
 
 ## Adding a dependency
 

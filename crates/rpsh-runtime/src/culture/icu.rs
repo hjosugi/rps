@@ -1,0 +1,206 @@
+//! First-use binding to the system ICU collation API. All handles are owned
+//! by one thread. A collator keeps its library alive until after ucol_close.
+#![allow(
+    unsafe_code,
+    reason = "Issue #36 owns the small POSIX and ICU C ABI boundary"
+)]
+
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::ffi::{CString, c_char, c_int, c_void};
+use std::ptr::{self, NonNull};
+use std::rc::Rc;
+
+#[cfg_attr(target_os = "linux", link(name = "dl"))]
+unsafe extern "C" {
+    fn dlopen(name: *const c_char, mode: c_int) -> *mut c_void;
+    fn dlsym(handle: *mut c_void, name: *const c_char) -> *mut c_void;
+    fn dlclose(handle: *mut c_void) -> c_int;
+}
+
+struct Library(NonNull<c_void>);
+
+impl Library {
+    fn open(name: &str) -> Option<Self> {
+        let name = CString::new(name).ok()?;
+        // SAFETY: name is NUL-terminated. RTLD_LAZY is 1 on our Unix targets.
+        NonNull::new(unsafe { dlopen(name.as_ptr(), 1) }).map(Self)
+    }
+
+    fn symbol(&self, name: &str) -> Option<NonNull<c_void>> {
+        let name = CString::new(name).ok()?;
+        // SAFETY: self owns the live handle and name is NUL-terminated.
+        NonNull::new(unsafe { dlsym(self.0.as_ptr(), name.as_ptr()) })
+    }
+}
+
+impl Drop for Library {
+    fn drop(&mut self) {
+        // SAFETY: each successful dlopen creates exactly one Library.
+        unsafe { dlclose(self.0.as_ptr()) };
+    }
+}
+
+type Open = unsafe extern "C" fn(*const c_char, *mut i32) -> *mut c_void;
+type Close = unsafe extern "C" fn(*mut c_void);
+type Compare = unsafe extern "C" fn(*const c_void, *const u16, i32, *const u16, i32) -> i32;
+type Rules = unsafe extern "C" fn(*const c_void, *mut i32) -> *const u16;
+type OpenRules =
+    unsafe extern "C" fn(*const u16, i32, i32, i32, *mut c_void, *mut i32) -> *mut c_void;
+
+struct Api {
+    open: Open,
+    close: Close,
+    compare: Compare,
+    rules: Rules,
+    open_rules: OpenRules,
+    _library: Library,
+}
+
+impl Api {
+    fn load() -> Option<Self> {
+        #[cfg(target_os = "macos")]
+        let library = Library::open("/usr/lib/libicucore.A.dylib")?;
+        #[cfg(not(target_os = "macos"))]
+        let library = Library::open("libicui18n.so").or_else(|| {
+            (50..=150)
+                .rev()
+                .find_map(|major| Library::open(&format!("libicui18n.so.{major}")))
+        })?;
+        let suffix = if library.symbol("ucol_open").is_some() {
+            String::new()
+        } else {
+            (50..=150).rev().find_map(|major| {
+                library
+                    .symbol(&format!("ucol_open_{major}"))
+                    .map(|_| format!("_{major}"))
+            })?
+        };
+        macro_rules! bind {
+            ($name:literal, $signature:ty) => {{
+                let address = library.symbol(&format!("{}{suffix}", $name))?;
+                // SAFETY: these names and signatures are paired below exactly as
+                // declared by unicode/ucol.h. The owned library outlives all calls.
+                unsafe { std::mem::transmute::<*mut c_void, $signature>(address.as_ptr()) }
+            }};
+        }
+        Some(Self {
+            open: bind!("ucol_open", Open),
+            close: bind!("ucol_close", Close),
+            compare: bind!("ucol_strcoll", Compare),
+            rules: bind!("ucol_getRules", Rules),
+            open_rules: bind!("ucol_openRules", OpenRules),
+            _library: library,
+        })
+    }
+}
+
+struct Collator {
+    handle: NonNull<c_void>,
+    api: Rc<Api>,
+}
+
+impl Drop for Collator {
+    fn drop(&mut self) {
+        // SAFETY: the handle came from ucol_open or ucol_openRules and is owned.
+        unsafe { (self.api.close)(self.handle.as_ptr()) };
+    }
+}
+
+impl Collator {
+    fn new(api: &Rc<Api>, locale: &str, case_sensitive: bool) -> Option<Self> {
+        let name = CString::new(locale).ok()?;
+        let mut status = 0;
+        // SAFETY: name and status live for the call, and ICU copies the locale.
+        let base = Self {
+            handle: NonNull::new(unsafe { (api.open)(name.as_ptr(), &mut status) })?,
+            api: Rc::clone(api),
+        };
+        if status > 0 {
+            return None;
+        }
+        if case_sensitive {
+            return Some(base);
+        }
+        // IgnoreCase on .NET still distinguishes kana type and character
+        // width. Append the same tailoring to the locale's own collation rules
+        // before opening a secondary-strength collator.
+        let mut length = 0;
+        // SAFETY: ICU owns this view until base is closed. Copy it before then.
+        let source = unsafe { (api.rules)(base.handle.as_ptr(), &mut length) };
+        let mut rules = if length > 0 {
+            let source = NonNull::new(source.cast_mut())?;
+            // SAFETY: ucol_getRules returned this many valid UTF-16 units.
+            unsafe { std::slice::from_raw_parts(source.as_ptr(), length as usize) }.to_vec()
+        } else {
+            Vec::new()
+        };
+        rules.extend(include_str!("ignore_case.rules").encode_utf16());
+        let length = i32::try_from(rules.len()).ok()?;
+        status = 0;
+        // SAFETY: the rules slice contains length units. ICU copies it,
+        // UCOL_DEFAULT = -1, UCOL_SECONDARY = 1 and parseError is optional.
+        let handle = unsafe {
+            (api.open_rules)(rules.as_ptr(), length, -1, 1, ptr::null_mut(), &mut status)
+        };
+        let tailored = Self {
+            handle: NonNull::new(handle)?,
+            api: Rc::clone(api),
+        };
+        (status <= 0).then_some(tailored)
+    }
+
+    fn compare(&self, left: &[u16], right: &[u16]) -> Option<Ordering> {
+        let left_len = i32::try_from(left.len()).ok()?;
+        let right_len = i32::try_from(right.len()).ok()?;
+        // SAFETY: both pointers refer to initialized slices of the stated lengths.
+        let order = unsafe {
+            (self.api.compare)(
+                self.handle.as_ptr(),
+                left.as_ptr(),
+                left_len,
+                right.as_ptr(),
+                right_len,
+            )
+        };
+        Some(order.cmp(&0))
+    }
+}
+
+struct Cache {
+    api: Option<Rc<Api>>,
+    entries: Vec<(String, bool, Collator)>,
+}
+
+thread_local! {
+    static CACHE: RefCell<Cache> = RefCell::new(Cache {
+        api: Api::load().map(Rc::new),
+        entries: Vec::new(),
+    });
+}
+
+pub(super) fn compare(
+    left: &[u16],
+    right: &[u16],
+    locale: &str,
+    case_sensitive: bool,
+) -> Option<Ordering> {
+    CACHE.with_borrow_mut(|cache| {
+        if let Some((_, _, collator)) = cache
+            .entries
+            .iter()
+            .find(|(name, case, _)| name == locale && *case == case_sensitive)
+        {
+            return collator.compare(left, right);
+        }
+        let collator = Collator::new(cache.api.as_ref()?, locale, case_sensitive)?;
+        let result = collator.compare(left, right);
+        if cache.entries.len() == 8 {
+            cache.entries.remove(0);
+        }
+        cache
+            .entries
+            .push((locale.to_owned(), case_sensitive, collator));
+        result
+    })
+}

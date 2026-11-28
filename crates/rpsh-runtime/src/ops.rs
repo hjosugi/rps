@@ -211,11 +211,10 @@ pub fn add(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
         }
         return Ok(Value::array(result));
     }
-    if matches!(left, Value::Char(_)) || matches!(right, Value::Char(_)) {
-        return Ok(Value::String(PsString::from(format!("{left}{right}"))));
-    }
-    if let Value::String(text) = left {
-        return Ok(Value::String(PsString::from(format!("{text}{right}"))));
+    if matches!(left, Value::String(_) | Value::Char(_)) || matches!(right, Value::Char(_)) {
+        return Ok(Value::String(
+            left.to_ps_string().concat(&right.to_ps_string()),
+        ));
     }
     let (left, right) = numeric_pair(left, right)?;
     match numeric_kind(&left, &right)? {
@@ -395,11 +394,8 @@ fn compare_scalar(
                     (_, Value::Null | Value::AutomationNull) => 1,
                     (Value::Int32(a), Value::Int32(b)) => a.cmp(b) as i8,
                     (Value::String(a), b) => {
-                        let b = match b {
-                            Value::String(b) => b.clone(),
-                            other => PsString::from(other.to_string()),
-                        };
-                        compare_strings(a, &b, case_sensitive)?
+                        let b = b.to_ps_string();
+                        crate::culture::compare(a, &b, "", case_sensitive)? as i8
                     }
                     (a, b) => {
                         if let (Some(a), Some(b)) = (int_value(a), int_value(b)) {
@@ -444,26 +440,6 @@ fn compare_scalar(
                 Comparison::Like | Comparison::NotLike => unreachable!(),
             })
         }
-    }
-}
-
-/// Ordinal comparison for `-ceq` and friends. Case-insensitive comparison is
-/// ASCII for now: culture-aware folding (`'ﬀ' -eq 'ff'`) needs ICU, which is
-/// its own dependency decision, so anything else is refused rather than
-/// approximated.
-fn compare_strings(
-    left: &PsString,
-    right: &PsString,
-    case_sensitive: bool,
-) -> Result<i8, RuntimeError> {
-    if case_sensitive {
-        return Ok(left.units().cmp(right.units()) as i8);
-    }
-    match (left.as_ascii(), right.as_ascii()) {
-        (Some(left), Some(right)) => {
-            Ok(left.to_ascii_lowercase().cmp(&right.to_ascii_lowercase()) as i8)
-        }
-        _ => refuse("culture-aware string comparison (ICU)"),
     }
 }
 
@@ -943,13 +919,24 @@ mod tests {
     }
 
     #[test]
-    fn culture_aware_comparison_is_refused_until_icu() {
-        let result = compare(&string("é"), &string("É"), Comparison::Eq, false);
+    fn invariant_culture_compares_accents_width_and_kana() {
+        for (left, right, equal) in [
+            ("é", "É", true),
+            ("ﬀ", "ff", true),
+            ("Ｐ", "ｐ", true),
+            ("Ｐ", "P", false),
+            ("カ", "か", false),
+            ("e", "é", false),
+        ] {
+            assert_eq!(
+                compare(&string(left), &string(right), Comparison::Eq, false),
+                Ok(Value::Bool(equal))
+            );
+        }
         assert_eq!(
-            result.unwrap_err().feature(),
-            "culture-aware string comparison (ICU)"
+            compare(&string("é"), &string("e\u{301}"), Comparison::Eq, true),
+            Ok(Value::Bool(true))
         );
-        // Case-sensitive comparison is ordinal and exact in both forms.
         assert_eq!(
             compare(&string("é"), &string("É"), Comparison::Eq, true),
             Ok(Value::Bool(false))

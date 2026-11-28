@@ -107,8 +107,10 @@ pub fn parse_number_literal(text: &str, span: Span) -> Option<Result<NumberLiter
     for candidate in [
         "ul", "lu", "uy", "yu", "us", "su", "l", "d", "u", "y", "s", "n",
     ] {
-        if body.len() > candidate.len()
-            && body[body.len() - candidate.len()..].eq_ignore_ascii_case(candidate)
+        if !(candidate == "d" && lower.starts_with("0x"))
+            && body.len() > candidate.len()
+            && body.as_bytes()[body.len() - candidate.len()..]
+                .eq_ignore_ascii_case(candidate.as_bytes())
         {
             suffix = candidate;
             body = &body[..body.len() - candidate.len()];
@@ -309,6 +311,9 @@ mod tests {
         assert_eq!(literal("0xFFFFFFFF").to_string(), "-1");
         assert_eq!(literal("0xFFFFFFFFFFFFFFFF").to_string(), "-1");
         assert_eq!(literal("0b101").to_string(), "5");
+        assert_eq!(literal("0xD83D"), NumberLiteral::Int32(0xD83D));
+        assert_eq!(literal("0x1dkb"), NumberLiteral::Int32(29 * 1024));
+        assert_eq!(literal("0b11D"), NumberLiteral::Decimal("3".into()));
         assert_eq!(literal("1kb").to_string(), "1024");
         assert_eq!(literal("1tb").type_name(), "System.Int64");
         assert_eq!(literal("10l").type_name(), "System.Int64");

@@ -9686,7 +9686,7 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
                 feature: "integer conversion overflow",
             }),
         "double" | "system.double" => Ok(Value::Double(convert_double(&value)?)),
-        "string" | "system.string" => Ok(Value::String(value.to_string().into())),
+        "string" | "system.string" => Ok(Value::String(value.to_ps_string())),
         "bool" | "boolean" | "system.boolean" => Ok(Value::Bool(convert_bool(&value))),
         "char" | "system.char" => convert_char(&value),
         "datetime" | "system.datetime" => {
@@ -10046,6 +10046,20 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
 fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
     let units: Vec<u16> = text.units().collect();
     match name.to_ascii_lowercase().as_str() {
+        "compareto" if arguments.len() == 1 => {
+            match &arguments[0] {
+                Value::String(right) => {
+                rpsh_runtime::culture::compare_to(text, right).map(Value::Int32)
+                }
+                value if value.is_null_like() || hidden_type(value).as_deref() == Some("System.Management.Automation.Language.NullString") => Ok(Value::Int32(1)),
+                _ => Err(RuntimeError::Script {
+                    id: "ArgumentException",
+                    category: "NotSpecified: (:) [], MethodInvocationException".into(),
+                    exception_type: "System.Management.Automation.MethodInvocationException",
+                    message: "Exception calling \"CompareTo\" with \"1\" argument(s): \"Object must be of type String.\"".into(),
+                }),
+            }
+        }
         "substring" => {
             let out_of_range = || RuntimeError::Script {
                 id: "ArgumentOutOfRangeException",

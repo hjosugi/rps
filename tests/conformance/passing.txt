@@ -106,6 +106,7 @@ native/pipeline-chain
 native/pipeline-status
 native/unix-command-names
 ops/comparison
+ops/string-collation
 ops/ternary-coalesce
 ops/wildcard-escape
 ops/wildcard-wql

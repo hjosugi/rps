@@ -12,6 +12,13 @@ installed by scripts/fetch-pwsh.sh. The exact version is recorded in the
 generated header or in tests/conformance/reference.txt.
 bench/assets/compiler.test.ps1 is copied from the upstream test suite.
 
+The ICU tailoring in crates/rpsh-runtime/src/culture/ignore_case.rules is
+derived from the width and kana tables in .NET 11.0.0's pal_collation.c:
+
+  .NET Runtime — https://github.com/dotnet/runtime
+  Copyright (c) .NET Foundation and Contributors.
+  Licensed under the MIT License.
+
 The architecture borrows from Nushell:
 
   Nushell — https://github.com/nushell/nushell
