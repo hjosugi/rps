@@ -20,6 +20,7 @@ mod encoding;
 mod enum_table;
 mod environment;
 mod errors;
+mod expression;
 mod function_drive;
 mod functions;
 mod get_command;
@@ -1016,12 +1017,7 @@ impl Engine {
                         bound += 1;
                         value.clone()
                     } else if let Some(default) = &parameter.default {
-                        evaluate(
-                            default,
-                            &mut self.variables,
-                            !self.last_failed,
-                            &self.functions,
-                        )?
+                        self.eval_expression(default)?
                     } else {
                         Value::Null
                     };
@@ -1348,12 +1344,7 @@ impl Engine {
             for clause in clauses.iter().filter(|clause| clause.label.is_some()) {
                 let label = clause.label.as_ref().unwrap();
                 let is_match = if wildcard {
-                    let value = evaluate(
-                        label,
-                        &mut self.variables,
-                        !self.last_failed,
-                        &self.functions,
-                    )?;
+                    let value = self.eval_expression(label)?;
                     let pattern = match &value {
                         Value::Object(entries)
                             if let Some((pattern, _)) = rpsh_runtime::wildcard::stored(entries) =>
@@ -1368,12 +1359,7 @@ impl Engine {
                         case_sensitive,
                     )?
                 } else if regex {
-                    let pattern = evaluate(
-                        label,
-                        &mut self.variables,
-                        !self.last_failed,
-                        &self.functions,
-                    )?;
+                    let pattern = self.eval_expression(label)?;
                     matches!(
                         regex_match(&item, &pattern, case_sensitive, false, &mut self.variables)?,
                         Value::Bool(true)
@@ -1381,12 +1367,7 @@ impl Engine {
                 } else if matches!(label.kind, ExprKind::ScriptBlock { .. }) {
                     self.scriptblock_truth(label)?
                 } else {
-                    let expected = evaluate(
-                        label,
-                        &mut self.variables,
-                        !self.last_failed,
-                        &self.functions,
-                    )?;
+                    let expected = self.eval_expression(label)?;
                     matches!(
                         compare_values(&item, &expected, ops::Comparison::Eq, case_sensitive)?,
                         Value::Bool(true)
@@ -5693,161 +5674,6 @@ impl Engine {
         Ok(value)
     }
 
-    fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
-        if let ExprKind::Cast { type_name, value } = &expr.kind
-            && contains_group(value)
-        {
-            let value = self.eval_expression(value)?;
-            return Ok(cast_in_scope(type_name, value, &self.variables)?);
-        }
-        if let ExprKind::ArrayExpression(statements) = &expr.kind {
-            return Ok(Value::array(self.collect_statements(statements)?));
-        }
-        if let ExprKind::Array(elements) | ExprKind::CommandArray { elements, .. } = &expr.kind {
-            let values = elements
-                .iter()
-                .map(|item| self.eval_expression(item))
-                .collect::<Result<_, _>>()?;
-            return Ok(Value::array(values));
-        }
-        if let ExprKind::TypeLiteral(name) = &expr.kind
-            && self.classes.contains_key(&name.to_ascii_lowercase())
-        {
-            return Ok(Value::Type(name.clone().into()));
-        }
-        if let ExprKind::InvokeStatic {
-            type_name,
-            name,
-            arguments,
-        } = &expr.kind
-        {
-            let values = arguments
-                .iter()
-                .map(|a| self.eval_expression(a))
-                .collect::<Result<Vec<_>, _>>()?;
-            if name.eq_ignore_ascii_case("new")
-                && self.classes.contains_key(&type_name.to_ascii_lowercase())
-            {
-                return self.construct_class(type_name, &values);
-            }
-            return Ok(invoke_static(
-                type_name,
-                name,
-                &values,
-                &mut self.variables,
-            )?);
-        }
-        if let ExprKind::InvokeMember {
-            target,
-            name,
-            arguments,
-        } = &expr.kind
-        {
-            let target = self.eval_expression(target)?;
-            let mut values = Vec::with_capacity(arguments.len());
-            for argument in arguments {
-                values.push(self.eval_expression(argument)?);
-            }
-            if name.eq_ignore_ascii_case("GetType") && values.is_empty() {
-                return Ok(get_type(&target));
-            }
-            if let Value::Object(entries) = &target
-                && let Some(class) = object_class(entries)
-                && self.classes.contains_key(&class.to_ascii_lowercase())
-            {
-                return self.call_method(&class, name, &target, &values);
-            }
-            return Ok(invoke_member(&target, name, &values)?);
-        }
-        if let ExprKind::Paren(inner) | ExprKind::Subexpression(inner) = &expr.kind {
-            return self.eval_expression(inner);
-        }
-        if let ExprKind::Group(statements) = &expr.kind {
-            return self.eval_group(statements);
-        }
-        if let ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) = &expr.kind
-        {
-            let mut text = Vec::new();
-            for part in parts {
-                match part {
-                    rpsh_syntax::StringPart::Literal(value) => text.extend(value.encode_utf16()),
-                    rpsh_syntax::StringPart::Variable(name) => {
-                        if let Some(value) =
-                            lookup(name, &self.variables, !self.last_failed, &self.functions)
-                        {
-                            text.extend(expansion_text(&value, &self.variables).units());
-                        }
-                    }
-                    rpsh_syntax::StringPart::Subexpression(expr) => {
-                        let value = self.eval_expression(expr)?;
-                        text.extend(expansion_text(&value, &self.variables).units());
-                    }
-                }
-            }
-            return Ok(Value::String(PsString::from_units(text)));
-        }
-        if let ExprKind::Member { target, name } = &expr.kind {
-            let target = self.eval_expression(target)?;
-            return Ok(member(&target, name)?);
-        }
-        if let ExprKind::Index { target, index } = &expr.kind {
-            let target = self.eval_expression(target)?;
-            let index = self.eval_expression(index)?;
-            return Ok(index_value(&target, &index)?);
-        }
-        if let ExprKind::Binary { op, left, right } = &expr.kind
-            && (contains_group(left) || contains_group(right))
-        {
-            let left = self.eval_expression(left)?;
-            let right = self.eval_expression(right)?;
-            let result = match op {
-                BinaryOp::Join => join_values(&left, &right, &self.variables)?,
-                BinaryOp::Add => add_values(&left, &right)?,
-                BinaryOp::Subtract => subtract_values(&left, &right)?,
-                BinaryOp::Multiply => ops::multiply(&left, &right)?,
-                BinaryOp::Divide => ops::divide(&left, &right)?,
-                BinaryOp::Remainder => ops::remainder(&left, &right)?,
-                BinaryOp::Eq => compare_values(&left, &right, ops::Comparison::Eq, false)?,
-                BinaryOp::Ne => compare_values(&left, &right, ops::Comparison::Ne, false)?,
-                BinaryOp::Gt => compare_values(&left, &right, ops::Comparison::Gt, false)?,
-                BinaryOp::Ge => compare_values(&left, &right, ops::Comparison::Ge, false)?,
-                BinaryOp::Lt => compare_values(&left, &right, ops::Comparison::Lt, false)?,
-                BinaryOp::Le => compare_values(&left, &right, ops::Comparison::Le, false)?,
-                BinaryOp::CEq => compare_values(&left, &right, ops::Comparison::Eq, true)?,
-                BinaryOp::CNe => compare_values(&left, &right, ops::Comparison::Ne, true)?,
-                BinaryOp::CGt => compare_values(&left, &right, ops::Comparison::Gt, true)?,
-                BinaryOp::CGe => compare_values(&left, &right, ops::Comparison::Ge, true)?,
-                BinaryOp::CLt => compare_values(&left, &right, ops::Comparison::Lt, true)?,
-                BinaryOp::CLe => compare_values(&left, &right, ops::Comparison::Le, true)?,
-                BinaryOp::Like => compare_values(&left, &right, ops::Comparison::Like, false)?,
-                BinaryOp::NotLike => {
-                    compare_values(&left, &right, ops::Comparison::NotLike, false)?
-                }
-                BinaryOp::Contains => ops::contains(&left, &right, false)?,
-                BinaryOp::NotContains => ops::contains(&left, &right, false)
-                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true))))?,
-                BinaryOp::CContains => ops::contains(&left, &right, true)?,
-                BinaryOp::In => ops::contains(&right, &left, false)?,
-                BinaryOp::NotIn => ops::contains(&right, &left, false)
-                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true))))?,
-                BinaryOp::CIn => ops::contains(&right, &left, true)?,
-                _ => {
-                    return Err(RuntimeError::NotImplemented {
-                        feature: "this operator on a group expression",
-                    }
-                    .into());
-                }
-            };
-            return Ok(result);
-        }
-        Ok(evaluate(
-            expr,
-            &mut self.variables,
-            !self.last_failed,
-            &self.functions,
-        )?)
-    }
-
     fn eval_group(&mut self, statements: &[Statement]) -> Result<Value, EngineError> {
         let mut outputs = self.collect_statements(statements)?;
         Ok(match outputs.len() {
@@ -5929,7 +5755,6 @@ impl Engine {
         function: &FunctionDef,
         unbound: &[Value],
         named: &[(String, Value)],
-        local: &mut Variables,
     ) -> Result<(), EngineError> {
         for parameter in &function.parameters {
             let value = if let Some((_, value)) = named
@@ -5938,7 +5763,7 @@ impl Engine {
             {
                 value.clone()
             } else if let Some(default) = &parameter.default {
-                evaluate(default, local, !self.last_failed, &self.functions)?
+                self.eval_expression(default)?
             } else {
                 Value::Null
             };
@@ -5946,14 +5771,17 @@ impl Engine {
                 Some(type_name) => cast_to(type_name, value)?,
                 None => value,
             };
-            local.insert(parameter.name.clone(), value);
+            self.variables.insert(parameter.name.clone(), value);
         }
         let mut bound: Vec<_> = named
             .iter()
             .map(|(name, _)| {
                 (
                     name.clone(),
-                    local.get(name).expect("installed parameter").clone(),
+                    self.variables
+                        .get(name)
+                        .expect("installed parameter")
+                        .clone(),
                 )
             })
             .collect();
@@ -5961,8 +5789,10 @@ impl Engine {
             "__TypeName".into(),
             Value::String("System.Management.Automation.PSBoundParametersDictionary".into()),
         ));
-        local.insert("PSBoundParameters".into(), Value::object(bound));
-        local.insert("args".to_owned(), Value::array(unbound.to_vec()));
+        self.variables
+            .insert("PSBoundParameters".into(), Value::object(bound));
+        self.variables
+            .insert("args".to_owned(), Value::array(unbound.to_vec()));
         Ok(())
     }
 
@@ -6182,245 +6012,6 @@ enum Flow {
     Exit(i32),
 }
 
-fn evaluate(
-    expr: &Expr,
-    variables: &mut Variables,
-    last_success: bool,
-    functions: &functions::Functions,
-) -> Result<Value, RuntimeError> {
-    match &expr.kind {
-        ExprKind::Int32(value) => Ok(Value::Int32(*value)),
-        ExprKind::Number(value) => Ok(number_value(value)),
-        ExprKind::CommandNumber { value, text } => {
-            Ok(Value::command_number(number_value(value), text))
-        }
-        ExprKind::String(value) | ExprKind::Bareword(value) => {
-            Ok(Value::String(value.clone().into()))
-        }
-        ExprKind::Paren(inner) => evaluate(inner, variables, last_success, functions),
-        // An undefined variable reads as `$null` outside strict mode.
-        ExprKind::Variable(name) => {
-            Ok(lookup(name, variables, last_success, functions).unwrap_or(Value::Null))
-        }
-        ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) => {
-            let mut text = Vec::new();
-            for part in parts {
-                match part {
-                    rpsh_syntax::StringPart::Literal(value) => text.extend(value.encode_utf16()),
-                    rpsh_syntax::StringPart::Variable(name) => {
-                        if let Some(value) = lookup(name, variables, last_success, functions) {
-                            text.extend(expansion_text(&value, variables).units());
-                        }
-                    }
-                    rpsh_syntax::StringPart::Subexpression(expr) => {
-                        let value = evaluate(expr, variables, last_success, functions)?;
-                        text.extend(expansion_text(&value, variables).units());
-                    }
-                }
-            }
-            Ok(Value::String(PsString::from_units(text)))
-        }
-        ExprKind::Subexpression(expr) => evaluate(expr, variables, last_success, functions),
-        ExprKind::Group(_) => Err(RuntimeError::NotImplemented {
-            feature: "a parenthesized command in this expression",
-        }),
-        ExprKind::Ternary {
-            condition,
-            when_true,
-            when_false,
-        } => {
-            if ops::is_true(&evaluate(condition, variables, last_success, functions)?) {
-                evaluate(when_true, variables, last_success, functions)
-            } else {
-                evaluate(when_false, variables, last_success, functions)
-            }
-        }
-        ExprKind::TypeLiteral(name) => Ok(Value::Type(type_full_name(name).into())),
-        ExprKind::Coalesce { left, right } => {
-            let value = evaluate(left, variables, last_success, functions)?;
-            if matches!(value, Value::Null) {
-                evaluate(right, variables, last_success, functions)
-            } else {
-                Ok(value)
-            }
-        }
-        ExprKind::ScriptBlock { source, .. } => Ok(Value::ScriptBlock(source.as_str().into())),
-        ExprKind::ArrayExpression(statements) => {
-            let mut values = Vec::new();
-            for statement in statements {
-                let Statement::Expression(expr) = statement else {
-                    return Err(RuntimeError::NotImplemented {
-                        feature: "a statement in an array expression in this context",
-                    });
-                };
-                match evaluate(expr, variables, last_success, functions)? {
-                    Value::Null => values.push(Value::Null),
-                    Value::InputEnumerator(input) => {
-                        input::check(&input)?;
-                        values.extend_from_slice(input.take_remaining());
-                    }
-                    other => values.extend(flatten_value(other)),
-                }
-            }
-            Ok(Value::array(values))
-        }
-        ExprKind::Array(items)
-        | ExprKind::CommandArray {
-            elements: items, ..
-        } => {
-            let mut values = Vec::with_capacity(items.len());
-            for item in items {
-                values.push(evaluate(item, variables, last_success, functions)?);
-            }
-            Ok(Value::array(values))
-        }
-        ExprKind::Index { target, index } => {
-            let target = evaluate(target, variables, last_success, functions)?;
-            let index = evaluate(index, variables, last_success, functions)?;
-            index_value(&target, &index)
-        }
-        ExprKind::Object(entries) => {
-            evaluate_hashtable(entries, "hashtable", variables, last_success, functions)
-        }
-        ExprKind::Cast { type_name, value } => {
-            if let ExprKind::Object(entries) = &value.kind {
-                let ty = type_name.to_ascii_lowercase();
-                if matches!(
-                    ty.as_str(),
-                    "ordered" | "pscustomobject" | "system.management.automation.pscustomobject"
-                ) {
-                    return evaluate_hashtable(entries, &ty, variables, last_success, functions);
-                }
-            }
-            let value = evaluate(value, variables, last_success, functions)?;
-            cast_in_scope(type_name, value, variables)
-        }
-        ExprKind::StaticMember { type_name, name } => static_member(type_name, name, variables),
-        ExprKind::InvokeStatic {
-            type_name,
-            name,
-            arguments,
-        } => {
-            let mut values = Vec::with_capacity(arguments.len());
-            for argument in arguments {
-                values.push(evaluate(argument, variables, last_success, functions)?);
-            }
-            invoke_static(type_name, name, &values, variables)
-        }
-        ExprKind::Member { target, name } => {
-            member(&evaluate(target, variables, last_success, functions)?, name)
-        }
-        ExprKind::InvokeMember {
-            target,
-            name,
-            arguments,
-        } => {
-            let target = evaluate(target, variables, last_success, functions)?;
-            let mut values = Vec::with_capacity(arguments.len());
-            for argument in arguments {
-                values.push(evaluate(argument, variables, last_success, functions)?);
-            }
-            invoke_member(&target, name, &values)
-        }
-        ExprKind::Unary {
-            op:
-                op @ (UnaryOp::Increment
-                | UnaryOp::Decrement
-                | UnaryOp::PostIncrement
-                | UnaryOp::PostDecrement),
-            operand,
-        } => increment(operand, variables, last_success, *op, functions),
-        ExprKind::Unary {
-            op: UnaryOp::Negate,
-            operand,
-        } => negate_value(&evaluate(operand, variables, last_success, functions)?),
-        ExprKind::Unary {
-            op: UnaryOp::Join,
-            operand,
-        } => join_values(
-            &evaluate(operand, variables, last_success, functions)?,
-            &Value::String(Default::default()),
-            variables,
-        ),
-        ExprKind::Unary {
-            op: UnaryOp::Not,
-            operand,
-        } => Ok(ops::not(&evaluate(
-            operand,
-            variables,
-            last_success,
-            functions,
-        )?)),
-        ExprKind::Unary {
-            op: UnaryOp::Bnot,
-            operand,
-        } => ops::bnot(&evaluate(operand, variables, last_success, functions)?),
-        ExprKind::Binary { op, left, right } => {
-            let left = evaluate(left, variables, last_success, functions)?;
-            let right = evaluate(right, variables, last_success, functions)?;
-            match op {
-                BinaryOp::Add => add_values(&left, &right),
-                BinaryOp::Subtract => subtract_values(&left, &right),
-                BinaryOp::Multiply => ops::multiply(&left, &right),
-                BinaryOp::Divide => ops::divide(&left, &right),
-                BinaryOp::Remainder => ops::remainder(&left, &right),
-                BinaryOp::Range => ops::range(&left, &right),
-                BinaryOp::Join => join_values(&left, &right, variables),
-                BinaryOp::Format => ops::format(&left, &right),
-                BinaryOp::Eq => compare_values(&left, &right, ops::Comparison::Eq, false),
-                BinaryOp::Ne => compare_values(&left, &right, ops::Comparison::Ne, false),
-                BinaryOp::Ge => compare_values(&left, &right, ops::Comparison::Ge, false),
-                BinaryOp::Gt => compare_values(&left, &right, ops::Comparison::Gt, false),
-                BinaryOp::Lt => compare_values(&left, &right, ops::Comparison::Lt, false),
-                BinaryOp::Le => compare_values(&left, &right, ops::Comparison::Le, false),
-                BinaryOp::CEq => compare_values(&left, &right, ops::Comparison::Eq, true),
-                BinaryOp::CNe => compare_values(&left, &right, ops::Comparison::Ne, true),
-                BinaryOp::CGe => compare_values(&left, &right, ops::Comparison::Ge, true),
-                BinaryOp::CGt => compare_values(&left, &right, ops::Comparison::Gt, true),
-                BinaryOp::CLt => compare_values(&left, &right, ops::Comparison::Lt, true),
-                BinaryOp::CLe => compare_values(&left, &right, ops::Comparison::Le, true),
-                BinaryOp::Like => compare_values(&left, &right, ops::Comparison::Like, false),
-                BinaryOp::NotLike => compare_values(&left, &right, ops::Comparison::NotLike, false),
-                BinaryOp::CLike => compare_values(&left, &right, ops::Comparison::Like, true),
-                BinaryOp::CNotLike => compare_values(&left, &right, ops::Comparison::NotLike, true),
-                BinaryOp::Contains => ops::contains(&left, &right, false),
-                BinaryOp::NotContains => ops::contains(&left, &right, false)
-                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
-                BinaryOp::CContains => ops::contains(&left, &right, true),
-                BinaryOp::CNotContains => ops::contains(&left, &right, true)
-                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
-                BinaryOp::In => ops::contains(&right, &left, false),
-                BinaryOp::NotIn => ops::contains(&right, &left, false)
-                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
-                BinaryOp::CIn => ops::contains(&right, &left, true),
-                BinaryOp::CNotIn => ops::contains(&right, &left, true)
-                    .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
-                BinaryOp::Shl => ops::shift(&left, &right, true),
-                BinaryOp::Shr => ops::shift(&left, &right, false),
-                BinaryOp::Band => bitwise_values(&left, &right, "band"),
-                BinaryOp::Bor => bitwise_values(&left, &right, "bor"),
-                BinaryOp::Bxor => bitwise_values(&left, &right, "bxor"),
-                BinaryOp::And => ops::logical(&left, &right, "and"),
-                BinaryOp::Or => ops::logical(&left, &right, "or"),
-                BinaryOp::Xor => ops::logical(&left, &right, "xor"),
-                BinaryOp::Is => type_is(&left, &right, false),
-                BinaryOp::IsNot => type_is(&left, &right, true),
-                BinaryOp::As => as_operator(&left, &right),
-                BinaryOp::Match => regex_match(&left, &right, false, false, variables),
-                BinaryOp::NotMatch => regex_match(&left, &right, false, true, variables),
-                BinaryOp::CMatch => regex_match(&left, &right, true, false, variables),
-                BinaryOp::CNotMatch => regex_match(&left, &right, true, true, variables),
-                BinaryOp::Replace => regex_replace(&left, &right, false),
-                BinaryOp::CReplace => regex_replace(&left, &right, true),
-                BinaryOp::Split => regex_split(&left, &right, false),
-                BinaryOp::CSplit => regex_split(&left, &right, true),
-            }
-        }
-    }
-}
-
-/// `++$x` / `$x++` / `--$x` / `$x--`: a postfix form yields the value before
-/// the update, a prefix form the value after it.
 fn increment(
     operand: &Expr,
     variables: &mut Variables,
@@ -8070,28 +7661,6 @@ fn flatten_values(values: Vec<Value>) -> Vec<Value> {
     values.into_iter().flat_map(flatten_value).collect()
 }
 
-fn contains_group(expr: &Expr) -> bool {
-    match &expr.kind {
-        ExprKind::Group(_) | ExprKind::ArrayExpression(_) => true,
-        ExprKind::InvokeStatic { arguments, .. } => arguments.iter().any(contains_group),
-        ExprKind::InvokeMember {
-            target, arguments, ..
-        } => contains_group(target) || arguments.iter().any(contains_group),
-        ExprKind::Cast { value, .. } => contains_group(value),
-        ExprKind::Member { target, .. } => contains_group(target),
-        ExprKind::Index { target, index } => contains_group(target) || contains_group(index),
-        ExprKind::Binary { left, right, .. } => contains_group(left) || contains_group(right),
-        ExprKind::Unary { operand, .. } => contains_group(operand),
-        ExprKind::Paren(inner) | ExprKind::Subexpression(inner) => contains_group(inner),
-        ExprKind::Ternary {
-            condition,
-            when_true,
-            when_false,
-        } => contains_group(condition) || contains_group(when_true) || contains_group(when_false),
-        _ => false,
-    }
-}
-
 fn expansion_text(value: &Value, variables: &Variables) -> PsString {
     let value = value.base_value();
     if let Some(ofs) = variables.get("OFS").filter(|ofs| !ofs.is_null_like()) {
@@ -9497,38 +9066,6 @@ fn invoke_static(
         _ => Err(RuntimeError::NotImplemented {
             feature: "this static method",
         }),
-    }
-}
-
-fn evaluate_hashtable(
-    entries: &[(String, Expr)],
-    target: &str,
-    variables: &mut Variables,
-    last_success: bool,
-    functions: &functions::Functions,
-) -> Result<Value, RuntimeError> {
-    let mut object = Vec::with_capacity(entries.len());
-    for (key, expr) in entries {
-        object.push((
-            key.clone(),
-            evaluate(expr, variables, last_success, functions)?,
-        ));
-    }
-    match target {
-        "hashtable" => {
-            if !object.is_empty() && object.iter().all(|(key, _)| key.parse::<i64>().is_ok()) {
-                object = order_hashtable(object);
-            }
-            Ok(mark_hashtable(
-                Value::object(object),
-                "System.Collections.Hashtable",
-            ))
-        }
-        "ordered" => Ok(mark_hashtable(
-            Value::object(object),
-            "System.Collections.Specialized.OrderedDictionary",
-        )),
-        _ => Ok(Value::object(object)),
     }
 }
 

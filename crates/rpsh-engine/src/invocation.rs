@@ -164,14 +164,15 @@ impl Engine {
             }
             local.set_script_path(path);
         }
-        self.bind_parameters(function, &positional, &named, &mut local)?;
         let caller = std::mem::replace(&mut self.variables, local);
         let caller_trap = self.trap.take();
         let aliases = child.then(|| {
             self.functions.enter_scope(call.path.is_some());
             self.aliases.clone()
         });
-        let flow = self.execute_definition_body(function, input, out);
+        let flow = self
+            .bind_parameters(function, &positional, &named)
+            .and_then(|()| self.execute_definition_body(function, input, out));
         if let Some(aliases) = aliases {
             self.aliases = aliases;
             self.functions.leave_scope();

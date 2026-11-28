@@ -96,6 +96,7 @@ lang/invocation-scope
 lang/invoke-expression
 lang/loops
 lang/matches-variable
+lang/nested-expressions
 lang/numeric-literals
 lang/numeric-promotion
 lang/object-list

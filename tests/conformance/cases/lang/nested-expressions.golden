@@ -1,0 +1,17 @@
+rpsh-golden-v2
+exit=0
+9|21
+7|4
+a|7
+False
+True
+True
+True
+yes
+fallback
+present
+True
+ab
+5/12
+3/10
+log 2,4,a,and,or,yes,fallback,present,0,b,5
