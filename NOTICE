@@ -16,7 +16,8 @@ The ICU tailoring in crates/rpsh-runtime/src/culture/ignore_case.rules and
 the collation-element prefix and suffix matches in that directory follow the
 width and kana tables and affix comparisons in .NET 11.0.0's pal_collation.c.
 The search-new.rules and search-old.rules files reproduce its grapheme
-boundaries for culture-sensitive string searches.
+boundaries for culture-sensitive string searches. Ordinal comparisons and
+range validation follow String.Comparison.cs and OrdinalCasing.Icu.cs.
 The full ordering of equal Sort-Object keys follows the same release's
 ArraySortHelper. Unicode casing, normalization validation and ICU time
 patterns follow pal_casing.c, Normalization.Icu.cs and CultureData.Icu.cs.

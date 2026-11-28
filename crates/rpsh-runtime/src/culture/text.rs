@@ -54,6 +54,26 @@ fn simple_case(ch: char, upper: bool) -> char {
     }
 }
 
+fn map_case(
+    ch: char,
+    casing: Casing,
+    upper: bool,
+    ordinal: bool,
+    map: impl Fn(char, bool) -> char,
+) -> char {
+    match (ch, upper, casing) {
+        ('\u{131}', true, Casing::Invariant) | ('\u{130}', false, Casing::Invariant) => ch,
+        ('\u{17f}', true, _) if ordinal => ch,
+        ('i', true, Casing::Turkic) => '\u{130}',
+        ('I', false, Casing::Turkic) => '\u{131}',
+        _ => map(ch, upper),
+    }
+}
+
+pub(super) fn ordinal_upper_char(ch: char) -> char {
+    map_case(ch, Casing::Invariant, true, true, simple_case)
+}
+
 pub(super) fn ordinal_upper(units: &[u16]) -> Vec<u16> {
     map_units(
         units.iter().copied(),
@@ -80,13 +100,7 @@ pub(super) fn map_units(
                 continue;
             }
         };
-        let mapped = match (ch, upper, casing) {
-            ('\u{131}', true, Casing::Invariant) | ('\u{130}', false, Casing::Invariant) => ch,
-            ('\u{17f}', true, _) if ordinal => ch,
-            ('i', true, Casing::Turkic) => '\u{130}',
-            ('I', false, Casing::Turkic) => '\u{131}',
-            _ => map(ch, upper),
-        };
+        let mapped = map_case(ch, casing, upper, ordinal, &map);
         result.extend_from_slice(mapped.encode_utf16(&mut [0; 2]));
     }
     result

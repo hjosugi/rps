@@ -18,6 +18,7 @@ mod globalization;
 mod native;
 mod redirection;
 mod sorting;
+mod string_compare;
 mod string_search;
 mod wildcards;
 
@@ -8967,6 +8968,29 @@ fn to_radix(value: i64, base: i32) -> String {
     digits.iter().rev().collect()
 }
 
+fn is_null_string(value: &Value) -> bool {
+    hidden_type(value).as_deref() == Some("System.Management.Automation.Language.NullString")
+}
+
+fn dotnet_string_argument(value: &Value) -> Option<PsString> {
+    if is_null_string(value) {
+        None
+    } else {
+        Some(value.to_ps_string())
+    }
+}
+
+fn ambiguous_overload(method: &str, arity: usize) -> RuntimeError {
+    RuntimeError::Script {
+        id: "MethodCountCouldNotFindBest",
+        category: "NotSpecified: (:) [], MethodException".into(),
+        exception_type: "System.Management.Automation.MethodException",
+        message: format!(
+            "Multiple ambiguous overloads found for \"{method}\" and the argument count: \"{arity}\"."
+        ),
+    }
+}
+
 fn overload_error(method: &str, arity: usize) -> RuntimeError {
     RuntimeError::Script {
         id: "MethodCountCouldNotFindBest",
@@ -9401,6 +9425,9 @@ fn invoke_static(
         ("math", "truncate") => Ok(Value::Double(
             convert_double(arguments.first().unwrap_or(&Value::Null))?.trunc(),
         )),
+        ("string", "compare") => string_compare::compare(arguments, false),
+        ("string", "compareordinal") => string_compare::compare(arguments, true),
+        ("string", "equals") => string_compare::static_equals(arguments),
         ("string", "format") => {
             let Some(template) = arguments.first() else {
                 return Err(RuntimeError::NotImplemented {
@@ -9971,30 +9998,18 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
 fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
     let units: Vec<u16> = text.units().collect();
     match name.to_ascii_lowercase().as_str() {
-        "compareto" if arguments.len() == 1 => {
-            match &arguments[0] {
-                Value::String(right) => {
-                rpsh_runtime::culture::compare_to(text, right).map(Value::Int32)
-                }
-                value if value.is_null_like() || hidden_type(value).as_deref() == Some("System.Management.Automation.Language.NullString") => Ok(Value::Int32(1)),
-                _ => Err(RuntimeError::Script {
-                    id: "ArgumentException",
-                    category: "NotSpecified: (:) [], MethodInvocationException".into(),
-                    exception_type: "System.Management.Automation.MethodInvocationException",
-                    message: "Exception calling \"CompareTo\" with \"1\" argument(s): \"Object must be of type String.\"".into(),
-                }),
-            }
-        }
-        "substring" => string_search::substring(text,arguments),
-        "indexof" => string_search::index(text,arguments,false),
-        "lastindexof" => string_search::index(text,arguments,true),
-        "contains" => string_search::contains(text,arguments),
-        "toupper" => globalization::case_method(text,"ToUpper",arguments),
-        "toupperinvariant" => globalization::case_method(text,"ToUpperInvariant",arguments),
-        "tolower" => globalization::case_method(text,"ToLower",arguments),
-        "tolowerinvariant" => globalization::case_method(text,"ToLowerInvariant",arguments),
-        "normalize" => globalization::normalization(text,"Normalize",arguments),
-        "isnormalized" => globalization::normalization(text,"IsNormalized",arguments),
+        "equals" => string_compare::instance_equals(text, arguments),
+        "compareto" => string_compare::compare_to(text, arguments),
+        "substring" => string_search::substring(text, arguments),
+        "indexof" => string_search::index(text, arguments, false),
+        "lastindexof" => string_search::index(text, arguments, true),
+        "contains" => string_search::contains(text, arguments),
+        "toupper" => globalization::case_method(text, "ToUpper", arguments),
+        "toupperinvariant" => globalization::case_method(text, "ToUpperInvariant", arguments),
+        "tolower" => globalization::case_method(text, "ToLower", arguments),
+        "tolowerinvariant" => globalization::case_method(text, "ToLowerInvariant", arguments),
+        "normalize" => globalization::normalization(text, "Normalize", arguments),
+        "isnormalized" => globalization::normalization(text, "IsNormalized", arguments),
         "split" => {
             let needle = needle_units(arguments.first())?;
             let mut parts = Vec::new();
@@ -10010,8 +10025,8 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
             }
             Ok(Value::array(parts.into_iter().map(Value::String).collect()))
         }
-        "startswith" => string_search::affix(text,arguments,true),
-        "endswith" => string_search::affix(text,arguments,false),
+        "startswith" => string_search::affix(text, arguments, true),
+        "endswith" => string_search::affix(text, arguments, false),
         "trim" | "trimstart" | "trimend" => {
             let mut start = 0;
             let mut end = units.len();

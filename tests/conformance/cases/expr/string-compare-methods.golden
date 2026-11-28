@@ -1,0 +1,68 @@
+rpsh-golden-v2
+exit=0
+1
+0
+-1
+1
+False
+True
+0
+0
+-1
+1
+False
+True
+-1
+0
+-1
+1
+False
+True
+-1
+0
+-1
+1
+True
+True
+-232
+132
+60
+60
+False
+False
+-232
+132
+61952
+60
+True
+False
+-1
+0
+1
+-1
+0
+-120
+-122
+-1
+0
+0
+-1
+-1
+True
+False
+False
+True
+True
+False
+False
+True
+ArgumentOutOfRangeException
+Exception calling "Compare" with "5" argument(s): "length1 ('-1') must be a non-negative value. (Parameter 'length1')
+Actual value was -1."
+ArgumentOutOfRangeException
+Exception calling "Compare" with "6" argument(s): "Index was out of range. Must be non-negative and less than or equal to the size of the collection. (Parameter 'indexA')"
+MethodCountCouldNotFindBest
+Multiple ambiguous overloads found for "Compare" and the argument count: "3".
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "comparisonType", with value: "unknown", for "Equals" to type "System.StringComparison": "Cannot convert value "unknown" to type "System.StringComparison". Error: "Unable to match the identifier name unknown to a valid enumerator name. Specify one of the following enumerator names and try again:
+CurrentCulture, CurrentCultureIgnoreCase, InvariantCulture, InvariantCultureIgnoreCase, Ordinal, OrdinalIgnoreCase""

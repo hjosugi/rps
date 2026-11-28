@@ -190,7 +190,7 @@ pub(super) fn method_locale(method: &str, value: &Value) -> Result<String, Runti
     if value.is_null_like() {
         return Ok(culture::current_locale());
     }
-    if hidden_type(value).as_deref() == Some("System.Management.Automation.Language.NullString") {
+    if super::is_null_string(value) {
         let detail = format!(
             "Cannot convert the \"\" value of type \"System.Management.Automation.Language.NullString\" to type \"{CULTURE_TYPE}\"."
         );

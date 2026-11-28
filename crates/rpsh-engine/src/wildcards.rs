@@ -1,7 +1,7 @@
 //! Binding of the public System.Management.Automation wildcard types.
 use rpsh_runtime::{PsString, RuntimeError, Value, wildcard};
 
-use super::{hidden_type, overload_error};
+use super::{dotnet_string_argument, hidden_type, overload_error};
 
 const PATTERN_TYPE: &str = "System.Management.Automation.WildcardPattern";
 const OPTIONS_TYPE: &str = "System.Management.Automation.WildcardOptions";
@@ -66,19 +66,6 @@ pub(super) fn matches_any(
         }
     }
     Ok(false)
-}
-
-fn as_string(value: &Value) -> Option<PsString> {
-    match value {
-        Value::String(text) => Some(text.clone()),
-        value
-            if hidden_type(value).as_deref()
-                == Some("System.Management.Automation.Language.NullString") =>
-        {
-            None
-        }
-        value => Some(value.to_ps_string()),
-    }
 }
 
 fn invocation_error(method: &str, arity: usize, error: RuntimeError) -> RuntimeError {
@@ -186,7 +173,7 @@ fn parse_options(value: &Value, method: &str) -> Result<i32, RuntimeError> {
 pub(super) fn static_method(name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
     match (name, arguments) {
         ("escape" | "unescape", [value]) => {
-            let pattern = as_string(value);
+            let pattern = dotnet_string_argument(value);
             let (method, result) = if name == "escape" {
                 ("Escape", wildcard::escape(pattern.as_ref(), &[]))
             } else {
@@ -196,14 +183,13 @@ pub(super) fn static_method(name: &str, arguments: &[Value]) -> Result<Value, Ru
                 .map(Value::String)
                 .map_err(|err| invocation_error(method, 1, err))
         }
-        ("containswildcardcharacters", [value]) => {
-            Ok(Value::Bool(as_string(value).is_some_and(|pattern| {
-                wildcard::contains_wildcard_characters(pattern.units())
-            })))
-        }
+        ("containswildcardcharacters", [value]) => Ok(Value::Bool(
+            dotnet_string_argument(value)
+                .is_some_and(|pattern| wildcard::contains_wildcard_characters(pattern.units())),
+        )),
         ("new", [first] | [first, _]) | ("get", [first, _]) => {
             let method = if name == "new" { ".ctor" } else { "Get" };
-            let pattern = as_string(first);
+            let pattern = dotnet_string_argument(first);
             let options = match arguments.get(1) {
                 Some(value) if name == "new" && value.is_null_like() => {
                     return Err(overload_error(name, arguments.len()));
@@ -232,7 +218,7 @@ pub(super) fn pattern_method(
     let (pattern, bits) = wildcard::stored(entries)?;
     match (name.to_ascii_lowercase().as_str(), arguments) {
         ("ismatch", [input]) => {
-            let input = as_string(input);
+            let input = dotnet_string_argument(input);
             Some(
                 wildcard::Matcher::new(pattern, bits)
                     .and_then(|matcher| matcher.is_match(input.as_ref()))

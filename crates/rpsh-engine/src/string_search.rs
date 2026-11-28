@@ -19,8 +19,7 @@ impl Term {
         arity: usize,
         allow_char: bool,
     ) -> Result<Self, RuntimeError> {
-        if hidden_type(value).as_deref() == Some("System.Management.Automation.Language.NullString")
-        {
+        if super::is_null_string(value) {
             return Err(globalization::invocation(
                 "ArgumentNullException",
                 method,
@@ -47,14 +46,7 @@ impl Term {
                     Some(unit)
                 }
                 Value::Bool(_) => {
-                    return Err(RuntimeError::Script {
-                        id: "MethodCountCouldNotFindBest",
-                        category: "NotSpecified: (:) [], MethodException".into(),
-                        exception_type: "System.Management.Automation.MethodException",
-                        message: format!(
-                            "Multiple ambiguous overloads found for \"{method}\" and the argument count: \"{arity}\"."
-                        ),
-                    });
+                    return Err(super::ambiguous_overload(method, arity));
                 }
                 _ => None,
             }
@@ -72,7 +64,7 @@ impl Term {
     }
 }
 
-fn integer(method: &str, name: &str, value: &Value) -> Result<i32, RuntimeError> {
+pub(super) fn integer(method: &str, name: &str, value: &Value) -> Result<i32, RuntimeError> {
     if matches!(value,Value::String(text) if text.is_empty()) {
         return Ok(0);
     }
@@ -82,7 +74,7 @@ fn integer(method: &str, name: &str, value: &Value) -> Result<i32, RuntimeError>
     })
 }
 
-fn nonnegative(name: &str, value: i64) -> String {
+pub(super) fn nonnegative(name: &str, value: i64) -> String {
     format!(
         "{name} ('{value}') must be a non-negative value. (Parameter '{name}')\nActual value was {value}."
     )

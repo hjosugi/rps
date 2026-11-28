@@ -3,6 +3,8 @@
 use crate::{PsString, RuntimeError};
 use std::cmp::Ordering;
 
+mod compare;
+pub use compare::compare_locale;
 mod search;
 pub use search::StringComparison;
 mod text;
@@ -111,11 +113,7 @@ fn invariant_mode() -> bool {
 }
 
 pub fn ordinal_compare(left: &[u16], right: &[u16], case_sensitive: bool) -> Ordering {
-    if case_sensitive {
-        left.cmp(right)
-    } else {
-        ordinal_upper(left).cmp(&ordinal_upper(right))
-    }
+    compare::ordinal(left, right, case_sensitive).cmp(&0)
 }
 
 pub fn ordinal_has_affix(
@@ -196,15 +194,7 @@ impl Casing {
 
 /// String.CompareTo exposes the raw difference in globalization-invariant mode.
 pub fn compare_to(left: &PsString, right: &PsString) -> Result<i32, RuntimeError> {
-    if invariant_mode() {
-        for (a, b) in left.units().zip(right.units()) {
-            if a != b {
-                return Ok(i32::from(a) - i32::from(b));
-            }
-        }
-        return Ok(left.len() as i32 - right.len() as i32);
-    }
-    Ok(compare(left, right, &current_locale(), true)? as i32)
+    StringComparison::CurrentCulture.compare(&left.as_utf16(), &right.as_utf16(), true)
 }
 
 /// A key for repeated comparisons with the same locale and case option.
@@ -215,12 +205,11 @@ pub fn sort_key(
 ) -> Result<Vec<u8>, RuntimeError> {
     let units = text.as_utf16();
     if invariant_mode() {
-        let units = if case_sensitive {
-            units
+        return Ok(if case_sensitive {
+            units.iter().flat_map(|unit| unit.to_be_bytes()).collect()
         } else {
-            ordinal_upper(&units).into()
-        };
-        return Ok(units.iter().flat_map(|unit| unit.to_be_bytes()).collect());
+            compare::ignore_case_key(&units)
+        });
     }
     #[cfg(unix)]
     if let Some(key) = icu::sort_key(&units, locale, case_sensitive) {
@@ -242,16 +231,5 @@ pub fn compare(
     if left == right {
         return Ok(Ordering::Equal);
     }
-    let left = left.as_utf16();
-    let right = right.as_utf16();
-    if invariant_mode() {
-        return Ok(ordinal_compare(&left, &right, case_sensitive));
-    }
-    #[cfg(unix)]
-    if let Some(order) = icu::compare(&left, &right, locale, case_sensitive) {
-        return Ok(order);
-    }
-    Err(RuntimeError::NotImplemented {
-        feature: "system ICU string collation",
-    })
+    compare_locale(&left.as_utf16(), &right.as_utf16(), locale, case_sensitive).map(|n| n.cmp(&0))
 }
