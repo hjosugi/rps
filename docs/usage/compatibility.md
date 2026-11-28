@@ -10,6 +10,43 @@ The short version:
 3. **Unsupported means refused.** `rpsh` exits `99` with
    `rpsh: not implemented: ...`. It never substitutes a similar result.
 
+## Desired State Configuration on Linux
+
+The Linux compatibility target leaves legacy DSC configuration compilation
+to installations that provide the OMI schema store and DSC resources. When
+`rpsh` encounters a `configuration` declaration, it refuses the script
+during parsing with exit code 99. The word can still be passed as a command
+argument or used to name a function after a pipe. The Linux acceptance
+case covers those contexts and command discovery. [Issue #134](https://github.com/hjosugi/rpsh/issues/134)
+
+In the clean PowerShell 7.7.0 Linux x64 reference environment,
+`Get-Module -ListAvailable PSDesiredStateConfiguration` returned no modules.
+Command discovery found none of `Get-DscResource`, `Invoke-DscResource` or
+`Start-DscConfiguration`. Parsing the following declaration reported
+`ParserError` at `Example` because the schema store at
+`/etc/opt/omi/conf/dsc/configuration` was absent. Recovery also reported
+`UnexpectedToken` at the closing brace. The parser can reproduce these
+observations without applying a configuration.
+
+```powershell
+$tokens = $null
+$errors = $null
+$null = [System.Management.Automation.Language.Parser]::ParseInput(
+    'configuration Example { }', [ref]$tokens, [ref]$errors)
+$errors | Select-Object ErrorId, Extent
+```
+
+DSC v3 has a separate command-line application. When installed, `dsc`
+uses the ordinary native-command path. The PowerShell 7.7.0 bundle includes
+the `Microsoft.PowerShell/Profile` resource, whose manifest invokes `pwsh`
+for `get`, `set` and `export`. The reference machine had no `dsc` on
+`PATH`. Calling the bundled resource's read-only `get` operation directly
+with `{"profileType":"CurrentUserCurrentHost","_exist":false}` on stdin
+returned the profile path, null content and `_exist: false` in an empty
+test home. End-to-end DSC v3 orchestration requires a separate DSC installation.
+[DSC v3 overview](https://learn.microsoft.com/en-us/powershell/dsc/overview?view=dsc-3.0)
+and [PowerShell 7.7.0 resource manifest](https://github.com/PowerShell/PowerShell/blob/v7.7.0/dsc/pwsh.profile.dsc.resource.json).
+
 ## Running the suite
 
 ```console

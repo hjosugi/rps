@@ -8,7 +8,7 @@ catch	Catch	Keyword	linux-x64	todo
 class	Class	Keyword	linux-x64	todo
 clean	Clean	Keyword,ScriptBlockBlockName	linux-x64	todo
 command	Command	Keyword	linux-x64	todo
-configuration	Configuration	Keyword	linux-x64	todo
+configuration	Configuration	Keyword	linux-x64	partial
 continue	Continue	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
 data	Data	Keyword,StatementDoesntSupportAttributes	linux-x64	todo
 default	Default	Keyword	linux-x64	todo

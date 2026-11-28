@@ -55,6 +55,16 @@ impl Parser {
         }
     }
 
+    /// At the start of a statement or assignment RHS, configuration introduces
+    /// a legacy DSC declaration. After a pipe it can still name a command.
+    fn statement_command_name(&self) -> Result<Option<&str>, ParseError> {
+        let name = self.command_name();
+        if name.is_some_and(|name| name.eq_ignore_ascii_case("configuration")) {
+            return self.refuse("DSC configuration declarations");
+        }
+        Ok(name)
+    }
+
     fn at_statement_end(&self) -> bool {
         matches!(
             self.peek().kind,
@@ -123,7 +133,11 @@ impl Parser {
             let name = name.clone();
             let start = self.peek().span;
             self.pos += 2;
-            if !append && !coalesce && compound.is_none() && self.command_name().is_some() {
+            if !append
+                && !coalesce
+                && compound.is_none()
+                && self.statement_command_name()?.is_some()
+            {
                 let mut commands = vec![self.pipeline_element()?];
                 while self.peek().kind == TokenKind::Pipe {
                     self.pos += 1;
@@ -184,7 +198,7 @@ impl Parser {
             let span = start.to(self.previous_span());
             return Ok(Statement::DotSource { path, span });
         }
-        if let Some(name) = self.command_name() {
+        if let Some(name) = self.statement_command_name()? {
             let statement = self.command_statement(name.to_owned())?;
             return self.pipeline_after(statement);
         }
@@ -2622,6 +2636,24 @@ mod tests {
         assert_eq!(refused("+1"), "unary plus");
         assert_eq!(refused("(1\n)"), "newlines inside parentheses");
         assert_eq!(refused("1 2"), "syntax error reporting");
+    }
+
+    #[test]
+    fn configuration_declarations_are_refused_during_parsing() {
+        for source in [
+            "Write-Output before; CONFIGURATION Demo { }",
+            "if (1) { configuration Nested { } }",
+            "$value = configuration Assigned { }",
+        ] {
+            let error = parse(source).unwrap_err();
+            assert_eq!(error.feature(), "DSC configuration declarations");
+            assert!(
+                error
+                    .span()
+                    .text(source)
+                    .eq_ignore_ascii_case("configuration")
+            );
+        }
     }
 
     #[test]
