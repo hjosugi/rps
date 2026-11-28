@@ -23,5 +23,5 @@
 mod command;
 mod flow;
 
-pub use command::{CommandTableItem, command_table};
+pub use command::{CommandTableItem, command_table, help_table};
 pub use flow::{wraps_words, write_field};

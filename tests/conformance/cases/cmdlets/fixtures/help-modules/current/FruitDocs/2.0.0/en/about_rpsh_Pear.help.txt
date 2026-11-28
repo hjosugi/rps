@@ -1,0 +1,8 @@
+TOPIC
+    about_rpsh_Pear
+
+SHORT DESCRIPTION
+    Pears in the orchard.
+
+LONG DESCRIPTION
+    A second tree grown as an espalier.

@@ -1,0 +1,8 @@
+SUJET
+    about_rpsh_Apple
+
+DESCRIPTION COURTE
+    Pommes du verger.
+
+DESCRIPTION LONGUE
+    Deuxième édition, avec le mot espalier.

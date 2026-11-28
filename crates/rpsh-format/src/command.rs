@@ -17,9 +17,38 @@ pub fn command_table(
     auto_size: bool,
     hide_headers: bool,
 ) -> String {
-    let mut widths = [15, 50, 10, width];
+    fixed_table(
+        items,
+        width,
+        HEADERS,
+        [15, 50, 10, width],
+        auto_size,
+        hide_headers,
+    )
+}
+
+/// HelpInfoShort's built-in four-column view. Synopsis uses the remaining columns.
+pub fn help_table(items: &[CommandTableItem], width: usize) -> String {
+    fixed_table(
+        items,
+        width,
+        ["Name", "Category", "Module", "Synopsis"],
+        [33, 9, 25, width],
+        false,
+        false,
+    )
+}
+
+fn fixed_table(
+    items: &[CommandTableItem],
+    width: usize,
+    headers: [&str; 4],
+    mut widths: [usize; 4],
+    auto_size: bool,
+    hide_headers: bool,
+) -> String {
     if auto_size {
-        widths = HEADERS.map(str::len);
+        widths = headers.map(str::len);
         for item in items {
             if let CommandTableItem::Command(fields) = item {
                 for (width, field) in widths.iter_mut().zip(fields) {
@@ -38,7 +67,7 @@ pub fn command_table(
     let mut out = String::from("\n");
     if width >= 5 && !hide_headers {
         // Header labels wrap. Their last visible column has no right padding.
-        let lines = HEADERS
+        let lines = headers
             .iter()
             .zip(widths)
             .filter(|(_, width)| *width != 0)
@@ -47,7 +76,7 @@ pub fn command_table(
             .unwrap_or(0);
         for line in 0..lines {
             let mut header = String::new();
-            for (index, (&label, &width)) in HEADERS.iter().zip(&widths).enumerate() {
+            for (index, (&label, &width)) in headers.iter().zip(&widths).enumerate() {
                 if width == 0 {
                     break;
                 }
@@ -65,7 +94,7 @@ pub fn command_table(
             out.push_str(header.trim_end());
             out.push('\n');
         }
-        let rules = std::array::from_fn(|i| "-".repeat(widths[i].min(HEADERS[i].len())));
+        let rules = std::array::from_fn(|i| "-".repeat(widths[i].min(headers[i].len())));
         write_row(&mut out, &rules, &widths);
     }
     for item in items {

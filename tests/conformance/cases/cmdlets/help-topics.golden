@@ -1,0 +1,34 @@
+rpsh-golden-v2
+exit=0
+default|HelpFile|System.String|SHORT DESCRIPTION|3312
+True
+about_rpsh_Apple|System.String,System.Object|T|TOPIC
+TOPIC
+    about_rpsh_Apple
+
+SHORT DESCRIPTION
+    Apples in the orchard.
+
+LONG DESCRIPTION
+    The second edition uses the word espalier.
+
+about_rpsh_Apple|HelpFile|Apples in the orchard.|HelpInfoShort
+about_rpsh_Pear|HelpFile|Pears in the orchard.|HelpInfoShort
+
+Name                              Category  Module                    Synopsis
+----                              --------  ------                    --------
+about_rpsh_Apple                  HelpFile                            Apples in the orchard.
+about_rpsh_Pear                   HelpFile                            Pears in the orchard.
+
+
+HelpInfoShort#FullView,HelpInfoShort
+about_rpsh_Pear|System.String,System.Object|True
+about_rpsh_Apple,about_rpsh_Pear
+0
+HelpNotFound,Microsoft.PowerShell.Commands.GetHelpCommand
+NoParmsFound,Microsoft.PowerShell.Commands.GetHelpCommand
+No parameter matches criteria *.
+Argument,Microsoft.PowerShell.Commands.GetHelpCommand
+InvalidOperation,Microsoft.PowerShell.Commands.GetHelpCommand
+The online version of this Help topic cannot be displayed because the Internet address (URI) of the Help topic is not specified in the command code or in the help file for the command.
+Old edition.

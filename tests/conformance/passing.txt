@@ -18,6 +18,8 @@ cmdlets/format-list-table
 cmdlets/format-mixed-stream
 cmdlets/format-table
 cmdlets/get-help
+cmdlets/help-topics
+cmdlets/help-topics-fr
 cmdlets/hidden
 cmdlets/item-props
 cmdlets/json

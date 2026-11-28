@@ -43,6 +43,10 @@ impl BuiltinModule {
         self.cmdlets.binary_search(&lowercase).is_ok()
     }
 
+    pub fn cmdlet_names(&self) -> &'static [&'static str] {
+        self.cmdlets
+    }
+
     pub fn exports_alias(&self, name: &str) -> bool {
         self.aliases
             .iter()

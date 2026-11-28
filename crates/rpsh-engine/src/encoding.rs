@@ -89,6 +89,22 @@ static CONSOLE: Mutex<Encoding> = Mutex::new(Encoding {
     ..UTF8
 });
 
+/// Reader detection order matters: UTF-32LE shares the two-byte UTF-16LE prefix.
+pub(super) fn decode_with_bom(bytes: &[u8]) -> std::borrow::Cow<'_, str> {
+    for (prefix, kind) in [
+        (&b"\x00\x00\xfe\xff"[..], Kind::Utf32Be),
+        (&b"\xff\xfe\x00\x00"[..], Kind::Utf32Le),
+        (&b"\xff\xfe"[..], Kind::Utf16Le),
+        (&b"\xfe\xff"[..], Kind::Utf16Be),
+        (&b"\xef\xbb\xbf"[..], Kind::Utf8),
+    ] {
+        if let Some(data) = bytes.strip_prefix(prefix) {
+            return Encoding::marked(kind).decode(data);
+        }
+    }
+    UTF8.decode(bytes)
+}
+
 impl Encoding {
     fn marked(kind: Kind) -> Self {
         Self {

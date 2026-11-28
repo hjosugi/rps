@@ -11,6 +11,7 @@ tests/conformance/ are generated from the latest stable PowerShell release
 installed by scripts/fetch-pwsh.sh. The exact version is recorded in the
 generated header or in tests/conformance/reference.txt.
 bench/assets/compiler.test.ps1 is copied from the upstream test suite.
+crates/rpsh-engine/assets/en-US/default.help.txt is the upstream default help topic.
 The emitted proxy script text in crates/rpsh-engine/src/proxy_command.rs
 follows CommandMetadata.cs and TypeMetadata.cs from the same release.
 

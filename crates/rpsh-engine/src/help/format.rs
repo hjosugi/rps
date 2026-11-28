@@ -2,7 +2,7 @@
 //! formatting field wraps independently, including existing spaces and newlines.
 use super::{EXTENDED, Value};
 
-fn field<'a>(o: &'a Value, key: &str) -> Option<&'a Value> {
+pub(super) fn field<'a>(o: &'a Value, key: &str) -> Option<&'a Value> {
     let Value::Object(fields) = o else {
         return None;
     };
@@ -12,7 +12,7 @@ fn field<'a>(o: &'a Value, key: &str) -> Option<&'a Value> {
         .map(|(_, v)| v)
 }
 
-fn text(o: &Value, name: &str) -> String {
+pub(super) fn text(o: &Value, name: &str) -> String {
     field(o, name).map(ToString::to_string).unwrap_or_default()
 }
 
@@ -33,7 +33,7 @@ pub(in crate::help) fn comments(o: &Value) -> Option<String> {
 }
 
 pub(crate) fn supported(o: &Value) -> bool {
-    field(o, "__Format").is_none() && (root(o) || parameter(o))
+    field(o, "__Format").is_none() && (root(o) || parameter(o) || super::topics::is_topic(o))
 }
 
 struct Output {
@@ -161,7 +161,14 @@ fn syntax_parameter(p: &Value) -> String {
 }
 
 pub(crate) fn group(items: &[Value], width: usize) -> Option<String> {
-    if items.is_empty() || !items.iter().all(supported) {
+    if let Some(text) = super::topics::format(items, width) {
+        return Some(text);
+    }
+    if items.is_empty()
+        || !items
+            .iter()
+            .all(|o| supported(o) && !super::topics::is_topic(o))
+    {
         return None;
     }
     let mut out = Output {

@@ -72,6 +72,7 @@ use rpsh_syntax::{
 #[derive(Debug, Default)]
 pub struct Engine {
     variables: Variables,
+    help_topics: Option<Box<help::topics::Cache>>,
     functions: functions::Functions,
     last_failed: bool,
     /// Whether the active cmdlet wrote a non-terminating error.
@@ -1185,7 +1186,12 @@ impl Engine {
         for target in rest {
             self.assign_element(target, values.next().unwrap_or(Value::Null))?;
         }
-        self.assign_element(last, scalar_or_array(values))
+        let last_value = if values.len() == 0 {
+            Value::Null
+        } else {
+            scalar_or_array(values)
+        };
+        self.assign_element(last, last_value)
     }
 
     fn assign_element(&mut self, target: &Expr, value: Value) -> Result<(), EngineError> {
@@ -6086,7 +6092,11 @@ impl Engine {
             }
             return Ok(());
         }
-        if self.host_objects.first().is_some_and(uses_command_table) {
+        if self
+            .host_objects
+            .first()
+            .is_some_and(|first| uses_command_table(first) || help::topics::short(first))
+        {
             self.host_objects.extend(flatten_value(value));
             return Ok(());
         }
@@ -6094,6 +6104,10 @@ impl Engine {
             if let Some(prefix) = record_prefix(&value) {
                 self.flush_host(out)?;
                 self.write_host(out, format_args!("{prefix}{value}\n"))?;
+                return Ok(());
+            }
+            if help::topics::short(&value) {
+                self.host_objects.push(value);
                 return Ok(());
             }
             let host_text = entries
@@ -6439,6 +6453,9 @@ fn increment(
 }
 
 fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
+    if let Some(text) = extended_string(target) {
+        return index_value(&Value::String(text.clone()), index);
+    }
     if let Value::Collection(c) = target
         && c.sync_root.is_some()
     {
@@ -6529,14 +6546,29 @@ fn script_block_argument(arguments: &[CommandArgument]) -> Option<&ScriptBlockAs
     })
 }
 
-fn extended_string(value: &Value) -> Option<String> {
-    (matches!(value, Value::Object(_)) && hidden_type(value).as_deref() == Some("System.String"))
-        .then(|| value.to_string())
+fn extended_string(value: &Value) -> Option<&PsString> {
+    let Value::Object(entries) = value else {
+        return None;
+    };
+    if !entries.iter().any(|(key, v)| {
+        key == "__TypeName" && matches!(v,Value::String(s) if s.as_ascii()==Some("System.String"))
+    }) {
+        return None;
+    }
+    entries.iter().find_map(|(key, v)| {
+        if key == "__Text"
+            && let Value::String(text) = v
+        {
+            Some(text)
+        } else {
+            None
+        }
+    })
 }
 
 fn json_stringify(value: &Value) -> Result<String, RuntimeError> {
     if let Some(text) = extended_string(value) {
-        return Ok(json_quote(&text));
+        return Ok(json_quote(&text.to_string_lossy()));
     }
     let value = value.base_value();
     match value {
@@ -6581,7 +6613,7 @@ fn json_stringify(value: &Value) -> Result<String, RuntimeError> {
 
 fn json_stringify_pretty(value: &Value, indent: usize) -> Result<String, RuntimeError> {
     if let Some(text) = extended_string(value) {
-        return Ok(json_quote(&text));
+        return Ok(json_quote(&text.to_string_lossy()));
     }
     let pad = " ".repeat(indent);
     let inner = " ".repeat(indent + 2);
@@ -8089,7 +8121,7 @@ fn flatten_value(value: Value) -> Vec<Value> {
 
 fn scalar_or_array(mut values: std::vec::IntoIter<Value>) -> Value {
     match values.len() {
-        0 | 1 => values.next().unwrap_or(Value::Null),
+        0 | 1 => values.next().unwrap_or(Value::AutomationNull),
         _ => Value::array(values.collect()),
     }
 }
@@ -9982,6 +10014,9 @@ fn pstypenames(fields: &[(String, Value)]) -> Value {
     if let Some((_, names)) = fields.iter().find(|(key, _)| key == "__PSTypeNames") {
         return names.clone();
     }
+    if let Some(slot) = help::topics::names_slot(fields) {
+        return help::topics::base_names(slot);
+    }
     Value::array(vec![
         Value::String("System.Management.Automation.PSCustomObject".into()),
         Value::String("System.Object".into()),
@@ -10000,15 +10035,24 @@ fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
             ])
         })
         .collect();
-    Value::object(vec![
-        ("TypeNames".to_owned(), pstypenames(entries)),
+    let deferred = help::topics::names_slot(entries)
+        .filter(|_| !entries.iter().any(|(k, _)| k == "__PSTypeNames"));
+    let mut view = vec![
+        (
+            "TypeNames".to_owned(),
+            deferred.map_or_else(|| pstypenames(entries), |_| Value::Null),
+        ),
         ("BaseObject".to_owned(), value.clone()),
         ("Properties".to_owned(), Value::array(properties)),
         ("Members".to_owned(), Value::array(Vec::new())),
         ("Methods".to_owned(), Value::array(Vec::new())),
         ("ExtendedMembers".to_owned(), Value::array(Vec::new())),
         ("AdaptedMembers".to_owned(), Value::array(Vec::new())),
-    ])
+    ];
+    if let Some(slot) = deferred {
+        view.push(("__DeferredTypeNames".into(), Value::ArrayList(slot.clone())));
+    }
+    Value::object(view)
 }
 
 fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
@@ -10058,6 +10102,7 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
     }
     match target {
         Value::String(text) => string_method(text, name, arguments),
+        value if let Some(text) = extended_string(value) => string_method(text, name, arguments),
         Value::Object(entries) => object_method(entries, name, arguments),
         _ => Err(RuntimeError::NotImplemented {
             feature: "method invocation on this type",
@@ -10066,6 +10111,9 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
 }
 
 fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
+    if name.eq_ignore_ascii_case("ToString") && arguments.is_empty() {
+        return Ok(Value::String(text.clone()));
+    }
     let units: Vec<u16> = text.units().collect();
     match name.to_ascii_lowercase().as_str() {
         "equals" => string_compare::instance_equals(text, arguments),
@@ -10605,6 +10653,12 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
             }
             if name.eq_ignore_ascii_case("pstypenames") {
                 return Ok(pstypenames(entries));
+            }
+            if name.eq_ignore_ascii_case("TypeNames")
+                && let Some((_, Value::ArrayList(slot))) =
+                    entries.iter().find(|(k, _)| k == "__DeferredTypeNames")
+            {
+                return Ok(help::topics::base_names(slot));
             }
             if let Some((_, value)) = entries
                 .iter()

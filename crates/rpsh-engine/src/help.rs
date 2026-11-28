@@ -1,5 +1,6 @@
 //! Default cmdlet help synthesized from registered PowerShell parameter declarations.
 pub(super) mod format;
+pub(super) mod topics;
 
 use super::{
     CallArgument, Engine, EngineError, PreparedArguments, ScriptException, cmdlet, command_name,
@@ -435,11 +436,43 @@ impl Engine {
         } else {
             View::Default
         };
-        if enabled("Online") {
-            return Err(RuntimeError::NotImplemented {
-                feature: "Get-Help -Online",
-            }
-            .into());
+        let categories = call.bound.get("Category").map(strings).unwrap_or_default();
+        let category_is = |category: &str| {
+            categories
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case(category))
+        };
+        let files_allowed = categories.is_empty() || category_is("All") || category_is("HelpFile");
+        let files_only = !categories.is_empty()
+            && categories.iter().all(|s| {
+                s.eq_ignore_ascii_case("HelpFile") || s.eq_ignore_ascii_case("DefaultHelp")
+            });
+        let filters = ["Component", "Role", "Functionality"];
+        if !categories.is_empty()
+            && ![
+                "All",
+                "Alias",
+                "Cmdlet",
+                "ExternalScript",
+                "Filter",
+                "Function",
+                "ScriptCommand",
+            ]
+            .iter()
+            .any(|c| category_is(c))
+            && let Some(key) = ["Parameter", "Component", "Role", "Functionality"]
+                .iter()
+                .find(|name| call.bound.get(name).is_some())
+        {
+            let reason =
+                rpsh_messages::format("HelpErrors/ParamNotSupported", &[&format!("-{key}")]);
+            return Err(EngineError::Script(ScriptException::new(error_record(
+                "Argument,Microsoft.PowerShell.Commands.GetHelpCommand",
+                "InvalidArgument: (:) [Get-Help], PSArgumentException",
+                "System.Management.Automation.PSArgumentException",
+                &reason,
+                &reason,
+            ))));
         }
         let bound = call.bound.get("Name");
         let mut names = Vec::new();
@@ -458,17 +491,36 @@ impl Engine {
                 }
             }
             None => {
-                let Some(name) = bound else {
-                    return Err(RuntimeError::NotImplemented {
-                        feature: "default Get-Help topic",
-                    }
-                    .into());
-                };
-                names.push(name.to_string());
+                names.push(bound.map_or_else(
+                    || {
+                        if categories.is_empty() {
+                            "default".into()
+                        } else {
+                            "*".into()
+                        }
+                    },
+                    ToString::to_string,
+                ));
             }
         }
         let mut result = Vec::new();
         for name in names {
+            let wildcard = name.contains(['*', '?', '[']);
+            if wildcard && files_allowed && !files_only {
+                let matches = |s: &str| ops::wildcard_match(s, &name, false);
+                if rpsh_commands::CORE_CMDLETS.iter().any(|s| matches(s))
+                    || rpsh_commands::MODULES
+                        .iter()
+                        .any(|m| m.cmdlet_names().iter().any(|s| matches(s)))
+                    || self.functions.keys().any(|s| matches(s))
+                    || self.aliases.iter().any(|a| matches(a.name))
+                {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "combined command and file help search",
+                    }
+                    .into());
+                }
+            }
             let alias = self.resolve_alias(&name)?;
             let allowed = allows_topic(&call.bound, alias.is_some());
             let target = alias.unwrap_or_else(|| name.to_owned());
@@ -477,8 +529,50 @@ impl Engine {
                 .map_or((None, target.as_str()), |(m, n)| (Some(m), n));
             let sig = signature::lookup(target)
                 .filter(|s| module.is_none_or(|m| s.module.eq_ignore_ascii_case(m)));
-            let Some(sig) = sig.filter(|_| allowed) else {
-                if allowed
+            let sig = sig.filter(|_| allowed);
+            if sig.is_none() && files_allowed && filters.iter().all(|k| call.bound.get(k).is_none())
+            {
+                let cache = self.help_topics.get_or_insert_with(Default::default);
+                let found = cache.search(&name, &self.variables, view);
+                if !found.is_empty() {
+                    if enabled("Online") {
+                        if found.len() > 1 {
+                            return Err(RuntimeError::NotImplemented {
+                                feature: "streaming help matches before an online-help error",
+                            }
+                            .into());
+                        }
+                        let message = rpsh_messages::text("HelpErrors/NoURIFound");
+                        return Err(EngineError::Script(ScriptException::new(error_record(
+                            "InvalidOperation,Microsoft.PowerShell.Commands.GetHelpCommand",
+                            "InvalidOperation: (:) [Get-Help], PSInvalidOperationException",
+                            "System.Management.Automation.PSInvalidOperationException",
+                            message,
+                            message,
+                        ))));
+                    }
+                    if let Some(patterns) = call.bound.get("Parameter") {
+                        if found.len() == 1
+                            && let Some(first) = strings(patterns).first()
+                        {
+                            let reason = rpsh_messages::format("HelpErrors/NoParmsFound", &[first]);
+                            self.help_error("NoParmsFound","InvalidArgument: (System.Management.A…on.HelpFileHelpInfo:HelpFileHelpInfo) [Get-Help], PSArgumentException",
+                                "System.Management.Automation.PSArgumentException",&reason,&call.common)?;
+                        }
+                    } else {
+                        result.extend(found);
+                    }
+                    continue;
+                }
+            }
+            let about = name.to_ascii_lowercase().starts_with("about_");
+            if wildcard && (files_only || about) {
+                continue;
+            }
+            let Some(sig) = sig else {
+                if !about
+                    && !files_only
+                    && allowed
                     && (super::BUILTIN_COMMANDS
                         .iter()
                         .any(|n| n.eq_ignore_ascii_case(command_name(&name)))
@@ -486,8 +580,7 @@ impl Engine {
                             .iter()
                             .any(|m| m.exports_cmdlet(&target.to_ascii_lowercase()))
                         || self.functions.contains_key(&name.to_ascii_lowercase())
-                        || name.contains(['*', '?', '['])
-                        || name.to_ascii_lowercase().starts_with("about_"))
+                        || name.contains(['*', '?', '[']))
                 {
                     return Err(RuntimeError::NotImplemented {
                         feature: "help for this topic or search",
@@ -503,6 +596,12 @@ impl Engine {
                 )?;
                 continue;
             };
+            if enabled("Online") {
+                return Err(RuntimeError::NotImplemented {
+                    feature: "Get-Help -Online for a web topic",
+                }
+                .into());
+            }
             let info = self.cmdlet_help(sig, view);
             if let Some(patterns) = call.bound.get("Parameter") {
                 let patterns = strings(patterns);
