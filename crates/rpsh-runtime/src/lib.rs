@@ -15,6 +15,7 @@
 pub mod ops;
 pub mod regex;
 mod string;
+pub mod wildcard;
 
 use std::fmt;
 use std::rc::Rc;

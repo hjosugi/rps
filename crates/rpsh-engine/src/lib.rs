@@ -9014,6 +9014,10 @@ fn static_member(
         ("datetimekind", "unspecified") => Ok(Value::Int32(0)),
         ("console", "isoutputredirected") => Ok(Value::Bool(true)),
         ("console", "windowwidth") => Ok(Value::Int32(0)),
+        ("nullstring" | "management.automation.language.nullstring", "value") => Ok(typed_scalar(
+            "System.Management.Automation.Language.NullString",
+            "",
+        )),
         ("console", "outputencoding") => Ok(encoding::console().value()),
         ("text.encoding", name) => {
             Encoding::property(name)
@@ -9057,6 +9061,50 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        (
+            "wildcardpattern" | "management.automation.wildcardpattern",
+            method @ ("escape" | "unescape" | "containswildcardcharacters"),
+        ) if arguments.len() == 1 => {
+            let converted = match &arguments[0] {
+                Value::String(text) => Some(text.clone()),
+                value
+                    if hidden_type(value).as_deref()
+                        == Some("System.Management.Automation.Language.NullString") =>
+                {
+                    None
+                }
+                value => Some(PsString::from(value.to_string())),
+            };
+            let pattern = converted.as_ref();
+            let result = match method {
+                "escape" => rpsh_runtime::wildcard::escape(pattern, &[]),
+                "unescape" => rpsh_runtime::wildcard::unescape(pattern),
+                _ => {
+                    return Ok(Value::Bool(pattern.is_some_and(|pattern| {
+                        rpsh_runtime::wildcard::contains_wildcard_characters(pattern.units())
+                    })));
+                }
+            };
+            result.map(Value::String).map_err(|err| {
+                let Some(source) = err.script() else {
+                    return err;
+                };
+                let name = if method == "escape" {
+                    "Escape"
+                } else {
+                    "Unescape"
+                };
+                RuntimeError::Script {
+                    id: "PSArgumentNullException",
+                    category: "NotSpecified: (:) [], MethodInvocationException".into(),
+                    exception_type: "System.Management.Automation.MethodInvocationException",
+                    message: format!(
+                        "Exception calling \"{name}\" with \"1\" argument(s): \"{}\"",
+                        source.message
+                    ),
+                }
+            })
+        }
         ("text.encoding", "getencoding") if arguments.len() == 1 => {
             Encoding::by_name(&arguments[0]).map(Encoding::value).ok_or(
                 RuntimeError::NotImplemented {

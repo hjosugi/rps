@@ -107,6 +107,7 @@ native/pipeline-status
 native/unix-command-names
 ops/comparison
 ops/ternary-coalesce
+ops/wildcard-escape
 pipeline/command-aliases
 pipeline/compare-object
 pipeline/csv

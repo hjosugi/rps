@@ -39,7 +39,7 @@ IPEndpoint	System.Net.IPEndPoint	linux-x64	todo
 long	System.Int64	linux-x64	todo
 mailaddress	System.Net.Mail.MailAddress	linux-x64	todo
 NoRunspaceAffinity	System.Management.Automation.Language.NoRunspaceAffinityAttribute	linux-x64	todo
-NullString	System.Management.Automation.Language.NullString	linux-x64	todo
+NullString	System.Management.Automation.Language.NullString	linux-x64	partial
 ObjectSecurity	System.Security.AccessControl.ObjectSecurity	linux-x64	todo
 ordered	System.Collections.Specialized.OrderedDictionary	linux-x64	todo
 OutputType	System.Management.Automation.OutputTypeAttribute	linux-x64	todo
@@ -97,7 +97,7 @@ ValidateTrustedData	System.Management.Automation.ValidateTrustedDataAttribute	li
 ValidateUserDrive	System.Management.Automation.ValidateUserDriveAttribute	linux-x64	todo
 version	System.Version	linux-x64	todo
 void	System.Void	linux-x64	todo
-WildcardPattern	System.Management.Automation.WildcardPattern	linux-x64	todo
+WildcardPattern	System.Management.Automation.WildcardPattern	linux-x64	partial
 X500DistinguishedName	System.Security.Cryptography.X509Certificates.X500DistinguishedName	linux-x64	todo
 X509Certificate	System.Security.Cryptography.X509Certificates.X509Certificate	linux-x64	todo
 xml	System.Xml.XmlDocument	linux-x64	todo
