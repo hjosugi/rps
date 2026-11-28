@@ -44,6 +44,7 @@ expr/string-literals
 expr/string-methods
 expr/timespan
 expr/version-type
+lang/alias-filters
 lang/aliases
 lang/array
 lang/class

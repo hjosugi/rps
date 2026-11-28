@@ -3,7 +3,9 @@
 
 use std::collections::HashMap;
 
-use rpsh_runtime::Value;
+use rpsh_runtime::{RuntimeError, Value, ops};
+
+use super::{flatten_value, flatten_values};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Alias<'a> {
@@ -79,6 +81,67 @@ impl Aliases {
             .copied()
             .map(default_alias);
         defaults.chain(self.changes.values().flatten().map(custom_alias))
+    }
+
+    /// Get-Alias writes a sorted group for each input pattern, including
+    /// repeated matches. Exclude applies to the field being searched.
+    pub fn query(
+        &self,
+        positional: Vec<Value>,
+        named: &[(String, Value)],
+    ) -> Result<Vec<Value>, RuntimeError> {
+        let parameter = |name: &str| {
+            named
+                .iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                .map(|(_, value)| value)
+        };
+        let strings =
+            |values: Vec<Value>| values.iter().map(ToString::to_string).collect::<Vec<_>>();
+        let name = parameter("Name");
+        let definition = parameter("Definition");
+        if definition.is_some() && (name.is_some() || !positional.is_empty()) {
+            return Err(RuntimeError::NotImplemented {
+                feature: "Get-Alias with both Name and Definition",
+            });
+        }
+        if parameter("Scope").is_some() {
+            return Err(RuntimeError::NotImplemented {
+                feature: "Get-Alias with an explicit scope",
+            });
+        }
+        let patterns = match definition.or(name) {
+            Some(value) => strings(flatten_value(value.clone())),
+            None if positional.is_empty() => vec!["*".to_owned()],
+            None => strings(flatten_values(positional)),
+        };
+        let excluded = parameter("Exclude")
+            .map(|value| strings(flatten_value(value.clone())))
+            .unwrap_or_default();
+        let mut candidates = Vec::new();
+        for alias in self.iter() {
+            let text = if definition.is_some() {
+                alias.definition
+            } else {
+                alias.name
+            };
+            if !excluded
+                .iter()
+                .any(|pattern| ops::wildcard_match(text, pattern, false))
+            {
+                candidates.push((alias, text));
+            }
+        }
+        candidates.sort_by_cached_key(|(alias, _)| name_sort_key(alias));
+        let mut outputs = Vec::new();
+        for pattern in patterns {
+            for (alias, text) in &candidates {
+                if pattern == "*" || ops::wildcard_match(text, &pattern, false) {
+                    outputs.push(alias.value());
+                }
+            }
+        }
+        Ok(outputs)
     }
 
     pub fn set(&mut self, name: String, definition: String) -> Alias<'_> {

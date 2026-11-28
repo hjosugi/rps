@@ -1,0 +1,11 @@
+rpsh-golden-v2
+exit=0
+sampleC,sampleA,sampleB,sampleA
+sampleC,sampleA,sampleB,sampleA
+sampleA,sampleC
+sampleB
+echo,sampleA,sampleC
+echo,sampleA,sampleC
+gc,sampleB,type,echo,sampleA,sampleC,gc,sampleB,type
+False
+True

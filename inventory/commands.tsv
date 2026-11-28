@@ -166,7 +166,7 @@ Microsoft.PowerShell.Utility	Format-Hex	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Format-List	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Format-Table	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Format-Wide	Cmdlet	linux-x64	todo
-Microsoft.PowerShell.Utility	Get-Alias	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Get-Alias	Cmdlet	linux-x64	partial
 Microsoft.PowerShell.Utility	Get-Culture	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Get-Date	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Get-Error	Cmdlet	linux-x64	todo
@@ -225,7 +225,7 @@ Microsoft.PowerShell.Utility	Select-Object	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Select-String	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Select-Xml	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Send-MailMessage	Cmdlet	linux-x64	todo
-Microsoft.PowerShell.Utility	Set-Alias	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Set-Alias	Cmdlet	linux-x64	partial
 Microsoft.PowerShell.Utility	Set-Date	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Set-MarkdownOption	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Set-PSBreakpoint	Cmdlet	linux-x64	todo

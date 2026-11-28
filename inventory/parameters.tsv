@@ -1280,9 +1280,9 @@ Format-Wide	InputObject	System.Management.Automation.PSObject	*		linux-x64	todo
 Format-Wide	Property	System.Object	*		linux-x64	todo
 Format-Wide	ShowError	System.Management.Automation.SwitchParameter	*		linux-x64	todo
 Format-Wide	View	System.String	*		linux-x64	todo
-Get-Alias	Definition	System.String[]	Definition		linux-x64	todo
-Get-Alias	Exclude	System.String[]	*		linux-x64	todo
-Get-Alias	Name	System.String[]	Default		linux-x64	todo
+Get-Alias	Definition	System.String[]	Definition		linux-x64	partial
+Get-Alias	Exclude	System.String[]	*		linux-x64	done
+Get-Alias	Name	System.String[]	Default		linux-x64	partial
 Get-Alias	Scope	System.String	*		linux-x64	todo
 Get-Culture	ListAvailable	System.Management.Automation.SwitchParameter	ListAvailable		linux-x64	todo
 Get-Culture	Name	System.String[]	Name		linux-x64	todo

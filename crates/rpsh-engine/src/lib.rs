@@ -13,7 +13,7 @@
 
 mod aliases;
 
-use aliases::{Alias, Aliases};
+use aliases::Aliases;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
@@ -4809,42 +4809,7 @@ impl Engine {
             }
             "get-alias" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let wanted: Vec<String> = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
-                let definitions: Vec<String> = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("definition"))
-                    .map(|(_, value)| {
-                        flatten_value(value.clone())
-                            .iter()
-                            .map(ToString::to_string)
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let mut entries: Vec<_> = self
-                    .aliases
-                    .iter()
-                    .filter(|alias| {
-                        (wanted.is_empty()
-                            || wanted
-                                .iter()
-                                .any(|pattern| ops::wildcard_match(alias.name, pattern, false)))
-                            && (definitions.is_empty()
-                                || definitions.iter().any(|pattern| {
-                                    ops::wildcard_match(alias.definition, pattern, false)
-                                }))
-                    })
-                    .collect();
-                entries.sort_by_cached_key(aliases::name_sort_key);
-                Ok(Some(entries.into_iter().map(Alias::value).collect()))
+                Ok(Some(self.aliases.query(positional, &named)?))
             }
             "set-alias" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
