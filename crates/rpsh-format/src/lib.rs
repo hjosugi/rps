@@ -16,6 +16,10 @@
 //!
 //! # Status
 //!
-//! Empty. The host writes values with `Display`.
+//! Renders the built-in CommandInfo table used by session aliases.
 
 #![forbid(unsafe_code)]
+
+mod command;
+
+pub use command::{CommandTableItem, command_table};

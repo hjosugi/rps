@@ -7,6 +7,8 @@ use rpsh_runtime::{RuntimeError, Value, ops};
 
 use super::{flatten_value, flatten_values};
 
+pub(super) const TYPE_NAME: &str = "System.Management.Automation.AliasInfo";
+
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Alias<'a> {
     pub name: &'a str,
@@ -45,6 +47,15 @@ impl Alias<'_> {
     pub fn value(self) -> Value {
         Value::object(vec![
             ("Name".into(), Value::String(self.name.into())),
+            ("__TypeName".into(), Value::String(TYPE_NAME.into())),
+            ("__Text".into(), Value::String(self.name.into())),
+            ("CommandType".into(), Value::String("Alias".into())),
+            (
+                "DisplayName".into(),
+                Value::String(format!("{} -> {}", self.name, self.definition).into()),
+            ),
+            ("Source".into(), Value::String("".into())),
+            ("Version".into(), Value::Null),
             ("Definition".into(), Value::String(self.definition.into())),
             ("Options".into(), Value::String(self.options.label().into())),
             ("ModuleName".into(), Value::String("".into())),

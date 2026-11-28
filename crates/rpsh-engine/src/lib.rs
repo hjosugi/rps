@@ -20,6 +20,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::Stdio;
 
+use rpsh_format::{CommandTableItem, command_table};
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
     BinaryOp, CommandArgument, Expr, ExprKind, MethodDef, NumberLiteral, Parameter, ParseError,
@@ -4404,7 +4405,16 @@ impl Engine {
                 let hide_headers = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("hidetableheaders") && ops::is_true(value)
                 });
-                Ok(Some(mark_format(input, "Table", property, hide_headers)))
+                let auto_size = named.iter().any(|(name, value)| {
+                    name.eq_ignore_ascii_case("autosize") && ops::is_true(value)
+                });
+                Ok(Some(mark_format(
+                    input,
+                    "Table",
+                    property,
+                    hide_headers,
+                    auto_size,
+                )))
             }
             "format-list" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
@@ -4415,7 +4425,7 @@ impl Engine {
                         .find(|(name, _)| name.eq_ignore_ascii_case("property"))
                         .map(|(_, value)| value.clone()),
                 );
-                Ok(Some(mark_format(input, "List", property, false)))
+                Ok(Some(mark_format(input, "List", property, false, false)))
             }
             "compare-object" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -4916,6 +4926,7 @@ impl Engine {
                         .iter()
                         .map(|alias| (alias.name.to_owned(), "Alias")),
                 );
+                names.sort_by(|left, right| left.0.cmp(&right.0));
                 let mut outputs = Vec::new();
                 for (name, kind) in names {
                     let matches = wanted.is_empty()
@@ -4936,13 +4947,18 @@ impl Engine {
                         .as_deref()
                         .is_none_or(|wanted| ops::wildcard_match(name_noun, wanted, false));
                     if matches && type_matches && verb_matches && noun_matches {
-                        outputs.push(Value::object(vec![
-                            ("Name".to_owned(), Value::String(name.into())),
-                            ("CommandType".to_owned(), Value::String(kind.into())),
-                        ]));
+                        if kind == "Alias" {
+                            if let Some(alias) = self.aliases.get(&name) {
+                                outputs.push(alias.value());
+                            }
+                        } else {
+                            outputs.push(Value::object(vec![
+                                ("Name".to_owned(), Value::String(name.into())),
+                                ("CommandType".to_owned(), Value::String(kind.into())),
+                            ]));
+                        }
                     }
                 }
-                outputs.sort_by_key(|value| value.to_string());
                 Ok(Some(outputs))
             }
             "get-unique" => {
@@ -5235,7 +5251,17 @@ impl Engine {
             }
             "out-string" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
-                let text = format_out_string(input);
+                let width = named
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case("width"))
+                    .map_or(Ok(i32::MAX), |(_, value)| convert_int32(value))?;
+                if width < 2 {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Out-String Width below two columns",
+                    }
+                    .into());
+                }
+                let text = format_out_string(input, width as usize);
                 let stream = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("stream") && ops::is_true(value)
                 });
@@ -6032,6 +6058,10 @@ impl Engine {
             }
             return Ok(());
         }
+        if self.host_objects.first().is_some_and(uses_command_table) {
+            self.host_objects.extend(flatten_value(value));
+            return Ok(());
+        }
         if let Value::Object(entries) = &value {
             let host_text = entries
                 .iter()
@@ -6046,7 +6076,9 @@ impl Engine {
                 self.host_text = true;
                 return Ok(());
             }
-            if datetime_fields(&value).is_some() {
+            if datetime_fields(&value).is_some()
+                || hidden_type(&value).as_deref() == Some(aliases::TYPE_NAME)
+            {
                 self.host_objects.push(value);
                 return Ok(());
             }
@@ -6941,6 +6973,7 @@ fn mark_format(
     kind: &str,
     properties: Option<Value>,
     hide_headers: bool,
+    auto_size: bool,
 ) -> Vec<Value> {
     input
         .iter()
@@ -6950,6 +6983,9 @@ fn mark_format(
                 entries.push(("__Format".to_owned(), Value::String(kind.into())));
                 if let Some(properties) = &properties {
                     entries.push(("__TableProperty".to_owned(), properties.clone()));
+                }
+                if auto_size {
+                    entries.push(("__AutoSize".to_owned(), Value::Bool(true)));
                 }
                 if hide_headers {
                     entries.push(("__HideHeaders".to_owned(), Value::Bool(true)));
@@ -7023,10 +7059,47 @@ fn format_marker(value: &Value) -> Option<String> {
     })
 }
 
-fn format_out_string(input: &[Value]) -> String {
+fn uses_command_table(first: &Value) -> bool {
+    hidden_type(first).as_deref() == Some(aliases::TYPE_NAME)
+        && format_marker(first).as_deref() != Some("List")
+        && format_table_properties(first).is_empty()
+}
+
+fn format_command_table(first: &Value, input: &[Value], width: usize) -> String {
+    let flag = |name| matches!(first, Value::Object(entries) if entries.iter().any(|(key, value)| key == name && ops::is_true(value)));
+    let items: Vec<_> = input
+        .iter()
+        .filter(|value| !value.is_null_like())
+        .map(|value| {
+            let Value::Object(entries) = value else {
+                return CommandTableItem::Text(value.to_string());
+            };
+            let property = |name: &str| {
+                entries
+                    .iter()
+                    .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                    .map(|(_, value)| value.to_string())
+                    .unwrap_or_default()
+            };
+            let kind = property("CommandType");
+            let name = if kind == "Alias" {
+                property("DisplayName")
+            } else {
+                property("Name")
+            };
+            CommandTableItem::Command([kind, name, property("Version"), property("Source")])
+        })
+        .collect();
+    command_table(&items, width, flag("__AutoSize"), flag("__HideHeaders"))
+}
+
+fn format_out_string(input: &[Value], width: usize) -> String {
     let Some(first) = input.first() else {
         return String::new();
     };
+    if uses_command_table(first) {
+        return format_command_table(first, input, width);
+    }
     let Value::Object(entries) = first else {
         let mut text = String::new();
         for value in input {
@@ -7283,6 +7356,14 @@ fn format_host_stream(objects: &[Value]) -> String {
     let Some(first) = objects.first() else {
         return String::new();
     };
+    // ConsoleHost reserves the last column of the reference 80-column
+    // buffer when emitting newlines.
+    if uses_command_table(first) {
+        return format_command_table(first, objects, 79);
+    }
+    if format_marker(first).is_some() {
+        return format_out_string(objects, 79);
+    }
     if datetime_fields(first).is_some() {
         let mut text = String::from("\n");
         for object in objects {

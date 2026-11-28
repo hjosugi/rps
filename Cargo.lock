@@ -28,6 +28,7 @@ version = "0.0.299"
 name = "rpsh-engine"
 version = "0.0.299"
 dependencies = [
+ "rpsh-format",
  "rpsh-runtime",
  "rpsh-syntax",
 ]

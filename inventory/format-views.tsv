@@ -144,7 +144,7 @@ System.IO.FileInfo	children	Wide	linux-x64	todo
 System.IO.FileInfo	childrenWithHardlink	Table	linux-x64	todo
 System.IO.FileInfo	childrenWithUnixStat	Table	linux-x64	todo
 System.Management.Automation.AliasInfo	AliasInfo	Table	linux-x64	todo
-System.Management.Automation.AliasInfo	CommandInfo	Table	linux-x64	todo
+System.Management.Automation.AliasInfo	CommandInfo	Table	linux-x64	partial
 System.Management.Automation.AliasInfo	System.Management.Automation.AliasInfo	List	linux-x64	todo
 System.Management.Automation.ApplicationInfo	ApplicationInfo	Table	linux-x64	todo
 System.Management.Automation.ApplicationInfo	CommandInfo	Table	linux-x64	todo
