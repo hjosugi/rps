@@ -653,7 +653,8 @@ pub fn is_true(value: &Value) -> bool {
                 _ => true,
             }
         }
-        Value::Object(_)
+        Value::InputEnumerator(_)
+        | Value::Object(_)
         | Value::Type(_)
         | Value::Decimal(_)
         | Value::BigInteger(_)

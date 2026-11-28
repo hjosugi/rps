@@ -20,7 +20,7 @@ impl Default for Functions {
                         definition: Some("\nSwitch-Process -WithCommand $args\n"),
                         parameters: Vec::new(),
                         begin: Vec::new(),
-                        process: Vec::new(),
+                        process: None,
                         end: Vec::new(),
                         body: Vec::new(),
                         filter: false,

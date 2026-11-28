@@ -50,6 +50,7 @@ function Format-Expr($e) {
             return "(member $(Format-Expr $e.Expression) $($e.Member.Value))"
         }
         'InvokeMemberExpressionAst' { return "(invoke $(Format-Expr $e.Expression) $($e.Member.Value))" }
+        'ArrayExpressionAst' { return "(array-expr " + (($e.SubExpression.Statements | ForEach-Object { Format-Statement $_ }) -join ' ') + ")" }
         'ArrayLiteralAst' { return "(array " + (($e.Elements | ForEach-Object { Format-Expr $_ }) -join ' ') + ")" }
         'IndexExpressionAst' { return "(index $(Format-Expr $e.Target) $(Format-Expr $e.Index))" }
         'TernaryExpressionAst' { return "(ternary $(Format-Expr $e.Condition) $(Format-Expr $e.IfTrue) $(Format-Expr $e.IfFalse))" }
@@ -103,21 +104,24 @@ function Format-Pipeline($pipeline) {
     "(pipeline $($stages -join ' '))"
 }
 
-$statement = $ast.EndBlock.Statements[0]
-if ($statement -is [System.Management.Automation.Language.PipelineChainAst]) {
-    Format-Pipeline $statement
-} elseif ($statement -is [System.Management.Automation.Language.PipelineAst] -and
-    ($statement.PipelineElements.Count -gt 1 -or $statement.PipelineElements[0].Redirections.Count -or
-        $statement.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst])) {
-    Format-Pipeline $statement
-} elseif ($statement -is [System.Management.Automation.Language.AssignmentStatementAst]) {
-    $right = $statement.Right
-    if ($right -is [System.Management.Automation.Language.CommandExpressionAst]) {
-        $rhs = "(command-expression $(Format-Expr $right.Expression))"
+function Format-Statement($statement) {
+    if ($statement -is [System.Management.Automation.Language.PipelineChainAst]) {
+        Format-Pipeline $statement
+    } elseif ($statement -is [System.Management.Automation.Language.PipelineAst] -and
+        ($statement.PipelineElements.Count -gt 1 -or $statement.PipelineElements[0].Redirections.Count -or
+            $statement.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst])) {
+        Format-Pipeline $statement
+    } elseif ($statement -is [System.Management.Automation.Language.AssignmentStatementAst]) {
+        $right = $statement.Right
+        if ($right -is [System.Management.Automation.Language.CommandExpressionAst]) {
+            $rhs = "(command-expression $(Format-Expr $right.Expression))"
+        } else {
+            $rhs = Format-Pipeline $right
+        }
+        "(assign $($statement.Operator) $(Format-Expr $statement.Left) $rhs)"
     } else {
-        $rhs = Format-Pipeline $right
+        Format-Expr $statement.PipelineElements[0].Expression
     }
-    "(assign $($statement.Operator) $(Format-Expr $statement.Left) $rhs)"
-} else {
-    Format-Expr $statement.PipelineElements[0].Expression
 }
+
+Format-Statement $ast.EndBlock.Statements[0]

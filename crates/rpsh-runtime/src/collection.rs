@@ -1,5 +1,5 @@
 use crate::{PsString, Value};
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::fmt;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -56,6 +56,68 @@ impl PartialEq for ArrayList {
     }
 }
 
+/// The ArrayList enumerator bound to a function's automatic `$input` variable.
+/// Assignments share the same position. Each process clause clears the backing
+/// list after it runs, invalidating enumerators retained by the script.
+#[derive(Clone, Debug)]
+pub struct InputEnumerator(Rc<InputCursor>);
+
+#[derive(Debug)]
+struct InputCursor {
+    items: Vec<Value>,
+    position: Cell<usize>,
+    valid: Cell<bool>,
+}
+
+impl InputEnumerator {
+    pub const TYPE: &str = "System.Collections.ArrayList+ArrayListEnumeratorSimple";
+
+    pub fn new(items: Vec<Value>) -> Self {
+        Self(Rc::new(InputCursor {
+            items,
+            position: Cell::new(0),
+            valid: Cell::new(true),
+        }))
+    }
+
+    pub fn invalidate(&self) {
+        self.0.valid.set(false);
+    }
+
+    pub fn valid(&self) -> bool {
+        self.0.valid.get()
+    }
+
+    pub fn current(&self) -> Option<&Value> {
+        self.0
+            .position
+            .get()
+            .checked_sub(1)
+            .and_then(|i| self.0.items.get(i))
+    }
+
+    pub fn advance(&self) -> bool {
+        let position = self.0.position.get().min(self.0.items.len());
+        self.0.position.set(position + 1);
+        position < self.0.items.len()
+    }
+
+    pub fn reset(&self) {
+        self.0.position.set(0);
+    }
+
+    pub fn take_remaining(&self) -> &[Value] {
+        let start = self.0.position.replace(self.0.items.len() + 1);
+        &self.0.items[start.min(self.0.items.len())..]
+    }
+}
+
+impl PartialEq for InputEnumerator {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
 #[derive(Debug)]
 pub enum Sequence<'a> {
     Array(&'a [Value]),
@@ -82,9 +144,10 @@ pub(crate) fn sequence_text(items: &[Value], separator: &PsString) -> PsString {
             units.extend(separator.units());
         }
         match item {
-            Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) => {
-                units.extend(item.type_name().encode_utf16())
-            }
+            Value::Array(_)
+            | Value::StringArray(_)
+            | Value::ArrayList(_)
+            | Value::InputEnumerator(_) => units.extend(item.type_name().encode_utf16()),
             other => units.extend(other.to_ps_string().units()),
         }
     }

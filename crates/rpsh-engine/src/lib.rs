@@ -20,6 +20,7 @@ mod environment;
 mod errors;
 mod functions;
 mod globalization;
+mod input;
 mod invocation;
 mod method_error;
 mod native;
@@ -256,7 +257,7 @@ struct FunctionDef {
     definition: Option<&'static str>,
     parameters: Vec<Parameter>,
     begin: Vec<Statement>,
-    process: Vec<Statement>,
+    process: Option<Vec<Statement>>,
     end: Vec<Statement>,
     body: Vec<Statement>,
     filter: bool,
@@ -264,7 +265,7 @@ struct FunctionDef {
 
 impl FunctionDef {
     fn has_blocks(&self) -> bool {
-        !self.begin.is_empty() || !self.process.is_empty() || !self.end.is_empty()
+        !self.begin.is_empty() || self.process.is_some() || !self.end.is_empty()
     }
 }
 
@@ -889,9 +890,9 @@ impl Engine {
                 ..
             } => {
                 let value = self.eval_expression(collection)?;
-                let items = flatten_value(value);
+                let mut items = input::Iteration::new(value);
                 let key = strip_scope(name).to_owned();
-                for item in items {
+                while let Some(item) = items.next_value()? {
                     self.variables.insert(key.clone(), item);
                     match self.exec_block(body, out)? {
                         Flow::Normal => {}
@@ -1073,7 +1074,7 @@ impl Engine {
             environment::set(&mut self.variables, name, &value);
             return Ok(());
         }
-        let key = strip_scope(name);
+        let key = automatic_spelling(strip_scope(name));
         if key.eq_ignore_ascii_case("Error") {
             if !self.variables.nested || is_global_scope(name) {
                 return Err(errors::constant_error(false).into());
@@ -1259,47 +1260,6 @@ impl Engine {
         let function = self.function(name)?;
         let call = ScriptCall::new(function, InvocationOperator::Ampersand);
         self.call_definition(&call, arguments, None, out)
-    }
-
-    /// Runs a function's `begin` / `process` / `end` blocks over `input`.
-    /// `None` invokes `process` once with `$_` as null.
-    fn exec_named_blocks(
-        &mut self,
-        function: &FunctionDef,
-        input: Option<Vec<Value>>,
-        out: &mut dyn Write,
-    ) -> Result<Flow, EngineError> {
-        let mut flow = self.exec_block(&function.begin, out)?;
-        if matches!(flow, Flow::Normal) {
-            match input {
-                Some(items) if !function.process.is_empty() => {
-                    for item in items {
-                        self.variables.insert("_".to_owned(), item);
-                        flow = self.exec_block(&function.process, out)?;
-                        if !matches!(flow, Flow::Normal) {
-                            break;
-                        }
-                    }
-                }
-                Some(items) => {
-                    self.variables
-                        .insert("input".to_owned(), Value::array(items));
-                }
-                None => {
-                    self.variables.insert("_".to_owned(), Value::Null);
-                    if !function.process.is_empty() {
-                        flow = self.exec_block(&function.process, out)?;
-                    }
-                }
-            }
-        }
-        if matches!(flow, Flow::Normal | Flow::Return(_)) {
-            let end = self.exec_block(&function.end, out)?;
-            if !matches!(end, Flow::Normal) {
-                flow = end;
-            }
-        }
-        Ok(flow)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1682,6 +1642,8 @@ impl Engine {
                 for value in values {
                     if no_enumerate {
                         outputs.push(value);
+                    } else if lower == "write-output" {
+                        outputs.extend(input::pipeline_values(value)?);
                     } else {
                         outputs.extend(flatten_value(value));
                     }
@@ -5876,7 +5838,10 @@ impl Engine {
     }
 
     fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
-        if let ExprKind::CommandArray { elements, .. } = &expr.kind {
+        if let ExprKind::ArrayExpression(statements) = &expr.kind {
+            return Ok(Value::array(self.collect_statements(statements)?));
+        }
+        if let ExprKind::Array(elements) | ExprKind::CommandArray { elements, .. } = &expr.kind {
             let values = elements
                 .iter()
                 .map(|item| self.eval_expression(item))
@@ -5924,28 +5889,30 @@ impl Engine {
             }
             return Ok(invoke_member(&target, name, &values)?);
         }
+        if let ExprKind::Paren(inner) | ExprKind::Subexpression(inner) = &expr.kind {
+            return self.eval_expression(inner);
+        }
         if let ExprKind::Group(statements) = &expr.kind {
             return self.eval_group(statements);
         }
         if let ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) = &expr.kind
         {
-            let mut text = String::new();
+            let mut text = Vec::new();
             for part in parts {
                 match part {
-                    rpsh_syntax::StringPart::Literal(value) => text.push_str(value),
+                    rpsh_syntax::StringPart::Literal(value) => text.extend(value.encode_utf16()),
                     rpsh_syntax::StringPart::Variable(name) => {
                         if let Some(value) = lookup(name, &self.variables, !self.last_failed) {
-                            use std::fmt::Write as _;
-                            let _ = write!(text, "{}", value.base_value());
+                            text.extend(expansion_text(&value, &self.variables).units());
                         }
                     }
                     rpsh_syntax::StringPart::Subexpression(expr) => {
-                        use std::fmt::Write as _;
-                        let _ = write!(text, "{}", self.eval_expression(expr)?.base_value());
+                        let value = self.eval_expression(expr)?;
+                        text.extend(expansion_text(&value, &self.variables).units());
                     }
                 }
             }
-            return Ok(Value::String(text.into()));
+            return Ok(Value::String(PsString::from_units(text)));
         }
         if let ExprKind::Member { target, name } = &expr.kind {
             let target = self.eval_expression(target)?;
@@ -5962,7 +5929,7 @@ impl Engine {
             let left = self.eval_expression(left)?;
             let right = self.eval_expression(right)?;
             let result = match op {
-                BinaryOp::Join => ops::join(&left, &right)?,
+                BinaryOp::Join => join_values(&left, &right, &self.variables)?,
                 BinaryOp::Add => add_values(&left, &right)?,
                 BinaryOp::Subtract => subtract_values(&left, &right)?,
                 BinaryOp::Multiply => ops::multiply(&left, &right)?,
@@ -6005,17 +5972,20 @@ impl Engine {
     }
 
     fn eval_group(&mut self, statements: &[Statement]) -> Result<Value, EngineError> {
-        let saved = self.capture.take();
-        self.capture = Some(Vec::new());
-        let flow = self.exec_block(statements, &mut capture_sink());
-        let mut outputs = self.capture.take().unwrap_or_default();
-        self.capture = saved;
-        flow?;
+        let mut outputs = self.collect_statements(statements)?;
         Ok(match outputs.len() {
-            0 => Value::Null,
+            0 => Value::AutomationNull,
             1 => outputs.pop().unwrap_or(Value::Null),
             _ => Value::array(outputs),
         })
+    }
+
+    fn collect_statements(&mut self, statements: &[Statement]) -> Result<Vec<Value>, EngineError> {
+        let saved = self.capture.replace(Vec::new());
+        let flow = self.exec_block(statements, &mut capture_sink());
+        let outputs = std::mem::replace(&mut self.capture, saved).unwrap_or_default();
+        flow?;
+        Ok(outputs)
     }
 
     fn evaluate_arguments(
@@ -6180,6 +6150,10 @@ impl Engine {
     }
 
     fn write_value(&mut self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
+        if let Value::InputEnumerator(input) = value {
+            input::check(&input)?;
+            return self.write_value(Value::array(input.take_remaining().to_vec()), out);
+        }
         if let Value::ArrayList(list) = value {
             return self.write_value(Value::array(list.items().to_vec()), out);
         }
@@ -6188,7 +6162,7 @@ impl Engine {
                 Value::Array(items) | Value::StringArray(items) => {
                     capture.extend(items.iter().cloned())
                 }
-                Value::Null | Value::AutomationNull => {}
+                Value::AutomationNull => {}
                 value => capture.push(value),
             }
             return Ok(());
@@ -6312,27 +6286,22 @@ fn evaluate(
             Ok(lookup(name, variables, last_success).unwrap_or(Value::Null))
         }
         ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) => {
-            let mut text = String::new();
+            let mut text = Vec::new();
             for part in parts {
                 match part {
-                    rpsh_syntax::StringPart::Literal(value) => text.push_str(value),
+                    rpsh_syntax::StringPart::Literal(value) => text.extend(value.encode_utf16()),
                     rpsh_syntax::StringPart::Variable(name) => {
                         if let Some(value) = lookup(name, variables, last_success) {
-                            use std::fmt::Write as _;
-                            let _ = write!(text, "{}", value.base_value());
+                            text.extend(expansion_text(&value, variables).units());
                         }
                     }
                     rpsh_syntax::StringPart::Subexpression(expr) => {
-                        use std::fmt::Write as _;
-                        let _ = write!(
-                            text,
-                            "{}",
-                            evaluate(expr, variables, last_success)?.base_value()
-                        );
+                        let value = evaluate(expr, variables, last_success)?;
+                        text.extend(expansion_text(&value, variables).units());
                     }
                 }
             }
-            Ok(Value::String(text.into()))
+            Ok(Value::String(PsString::from_units(text)))
         }
         ExprKind::Subexpression(expr) => evaluate(expr, variables, last_success),
         ExprKind::Group(_) => Err(RuntimeError::NotImplemented {
@@ -6359,6 +6328,25 @@ fn evaluate(
             }
         }
         ExprKind::ScriptBlock { source, .. } => Ok(Value::ScriptBlock(source.as_str().into())),
+        ExprKind::ArrayExpression(statements) => {
+            let mut values = Vec::new();
+            for statement in statements {
+                let Statement::Expression(expr) = statement else {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "a statement in an array expression in this context",
+                    });
+                };
+                match evaluate(expr, variables, last_success)? {
+                    Value::Null => values.push(Value::Null),
+                    Value::InputEnumerator(input) => {
+                        input::check(&input)?;
+                        values.extend_from_slice(input.take_remaining());
+                    }
+                    other => values.extend(flatten_value(other)),
+                }
+            }
+            Ok(Value::array(values))
+        }
         ExprKind::Array(items)
         | ExprKind::CommandArray {
             elements: items, ..
@@ -6388,6 +6376,15 @@ fn evaluate(
                 }
             }
             let value = evaluate(value, variables, last_success)?;
+            if matches!(
+                type_name.to_ascii_lowercase().as_str(),
+                "string" | "system.string"
+            ) && let Some(ofs) = variables.get("OFS").filter(|v| !v.is_null_like())
+            {
+                return Ok(Value::String(
+                    value.to_ps_string_with_separator(&ofs.to_ps_string()),
+                ));
+            }
             cast_to(type_name, value)
         }
         ExprKind::StaticMember { type_name, name } => static_member(type_name, name, variables),
@@ -6432,7 +6429,11 @@ fn evaluate(
         ExprKind::Unary {
             op: UnaryOp::Join,
             operand,
-        } => ops::unary_join(&evaluate(operand, variables, last_success)?),
+        } => join_values(
+            &evaluate(operand, variables, last_success)?,
+            &Value::String(Default::default()),
+            variables,
+        ),
         ExprKind::Unary {
             op: UnaryOp::Not,
             operand,
@@ -6451,7 +6452,7 @@ fn evaluate(
                 BinaryOp::Divide => ops::divide(&left, &right),
                 BinaryOp::Remainder => ops::remainder(&left, &right),
                 BinaryOp::Range => ops::range(&left, &right),
-                BinaryOp::Join => ops::join(&left, &right),
+                BinaryOp::Join => join_values(&left, &right, variables),
                 BinaryOp::Format => ops::format(&left, &right),
                 BinaryOp::Eq => compare_values(&left, &right, ops::Comparison::Eq, false),
                 BinaryOp::Ne => compare_values(&left, &right, ops::Comparison::Ne, false),
@@ -6553,6 +6554,11 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
         };
     }
     match (target, index) {
+        (Value::InputEnumerator(_), Value::Int32(i)) => Ok(if matches!(*i, 0 | -1) {
+            target.clone()
+        } else {
+            Value::Null
+        }),
         (Value::String(text), Value::Int32(at)) => {
             let at = if *at < 0 {
                 text.len() as i32 + *at
@@ -8096,7 +8102,7 @@ fn flatten_values(values: Vec<Value>) -> Vec<Value> {
 
 fn contains_group(expr: &Expr) -> bool {
     match &expr.kind {
-        ExprKind::Group(_) => true,
+        ExprKind::Group(_) | ExprKind::ArrayExpression(_) => true,
         ExprKind::Member { target, .. } => contains_group(target),
         ExprKind::Index { target, index } => contains_group(target) || contains_group(index),
         ExprKind::Binary { left, right, .. } => contains_group(left) || contains_group(right),
@@ -8111,8 +8117,25 @@ fn contains_group(expr: &Expr) -> bool {
     }
 }
 
+fn expansion_text(value: &Value, variables: &Variables) -> PsString {
+    let value = value.base_value();
+    if let Some(ofs) = variables.get("OFS").filter(|ofs| !ofs.is_null_like()) {
+        value.to_ps_string_with_separator(&ofs.to_ps_string())
+    } else {
+        value.to_ps_string()
+    }
+}
+
+fn join_values(left: &Value, right: &Value, variables: &Variables) -> Result<Value, RuntimeError> {
+    if matches!(left, Value::InputEnumerator(_)) {
+        return Ok(Value::String(expansion_text(left, variables)));
+    }
+    ops::join(left, right)
+}
+
 fn flatten_value(value: Value) -> Vec<Value> {
     match value {
+        Value::InputEnumerator(input) => input.take_remaining().to_vec(),
         Value::Array(items) | Value::StringArray(items) => items.as_ref().clone(),
         Value::ArrayList(list) => list.items().to_vec(),
         Value::Null | Value::AutomationNull => Vec::new(),
@@ -8168,6 +8191,17 @@ fn strip_scope(name: &str) -> &str {
     name
 }
 
+// These two automatic bindings participate in string conversion and enumeration.
+fn automatic_spelling(key: &str) -> &str {
+    if key.eq_ignore_ascii_case("input") {
+        "input"
+    } else if key.eq_ignore_ascii_case("OFS") {
+        "OFS"
+    } else {
+        key
+    }
+}
+
 fn lookup(name: &str, variables: &Variables, last_success: bool) -> Option<Value> {
     match name {
         "null" => return Some(Value::Null),
@@ -8181,7 +8215,7 @@ fn lookup(name: &str, variables: &Variables, last_success: bool) -> Option<Value
     if let Some(rest) = environment::drive_name(name) {
         return Some(environment::get(variables, rest).unwrap_or(Value::Null));
     }
-    let key = strip_scope(name);
+    let key = automatic_spelling(strip_scope(name));
     if key.eq_ignore_ascii_case("Error") {
         return Some(variables.error_value(is_global_scope(name)));
     }
@@ -8919,6 +8953,13 @@ fn invoke_static(
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        ("object", "referenceequals")
+            if let [a, b] = arguments
+                && (matches!(a, Value::InputEnumerator(_))
+                    || matches!(b, Value::InputEnumerator(_))) =>
+        {
+            Ok(Value::Bool(a == b))
+        }
         ("collections.arraylist", "new") => array_list::construct(arguments),
         ("cultureinfo" | "globalization.cultureinfo", method @ ("new" | "getcultureinfo")) => {
             globalization::culture_method(method, arguments)
@@ -9962,6 +10003,11 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
     if name.eq_ignore_ascii_case("GetType") && arguments.is_empty() {
         return Ok(get_type(target));
     }
+    if let Value::InputEnumerator(input) = target
+        && let Some(result) = input::method(input, name, arguments.len())
+    {
+        return result;
+    }
     if let Value::ArrayList(list) = target {
         return array_list::method(list, name, arguments);
     }
@@ -10463,13 +10509,24 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
         Value::Type(full) if name.eq_ignore_ascii_case("Name") => {
             let text = full.to_string_lossy();
             Ok(Value::String(
-                text.rsplit('.').next().unwrap_or(&text).to_owned().into(),
+                text.rsplit(['.', '+'])
+                    .next()
+                    .unwrap_or(&text)
+                    .to_owned()
+                    .into(),
             ))
         }
         Value::String(text) if name.eq_ignore_ascii_case("Length") => {
             Ok(Value::Int32(text.len() as i32))
         }
         Value::ArrayList(list) => array_list::property(list, name),
+        Value::InputEnumerator(input) if name.eq_ignore_ascii_case("Current") => {
+            Ok(input.current().cloned().unwrap_or(Value::Null))
+        }
+        Value::InputEnumerator(input) => {
+            input::check(input)?;
+            member_enumeration(input.take_remaining(), name)
+        }
         Value::Array(items) | Value::StringArray(items) if name.eq_ignore_ascii_case("Count") => {
             Ok(Value::Int32(items.len() as i32))
         }

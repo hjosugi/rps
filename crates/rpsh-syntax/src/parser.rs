@@ -1080,7 +1080,7 @@ impl Parser<'_> {
         self.pos += 1;
         let mut body = Vec::new();
         let mut begin = Vec::new();
-        let mut process = Vec::new();
+        let mut process = None;
         let mut end = Vec::new();
         loop {
             while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
@@ -1106,7 +1106,7 @@ impl Parser<'_> {
                 }
                 TokenKind::Process => {
                     self.pos += 1;
-                    process = self.block()?.0;
+                    process = Some(self.block()?.0);
                     continue;
                 }
                 TokenKind::End => {
@@ -2034,23 +2034,13 @@ impl Parser<'_> {
             }
             TokenKind::AtParen => {
                 self.pos += 1;
-                if self.peek().kind == TokenKind::RParen {
-                    let close = self.peek().span;
-                    self.pos += 1;
-                    self.expr(ExprKind::Array(Vec::new()), span.to(close))
-                } else {
-                    let inner = self.nested_expression()?;
-                    let close = match self.peek().kind {
-                        TokenKind::RParen => self.peek().span,
-                        _ => return self.refuse(SYNTAX_ERRORS),
-                    };
-                    self.pos += 1;
-                    let items = match inner.kind {
-                        ExprKind::Array(items) => items,
-                        _ => vec![inner],
-                    };
-                    self.expr(ExprKind::Array(items), span.to(close))
-                }
+                let old = std::mem::replace(&mut self.stop_comma, false);
+                let statements = self.paren_statements();
+                self.stop_comma = old;
+                self.expr(
+                    ExprKind::ArrayExpression(statements?),
+                    span.to(self.previous_span()),
+                )
             }
             TokenKind::DollarParen => {
                 self.pos += 1;
@@ -2551,6 +2541,7 @@ mod tests {
             ),
             ExprKind::Subexpression(expr) => format!("$({})", show(expr)),
             ExprKind::Group(_) => "(...)".to_owned(),
+            ExprKind::ArrayExpression(statements) => format!("@({})", show_block(statements)),
             ExprKind::TypeLiteral(name) => format!("[{name}]"),
             ExprKind::Array(items)
             | ExprKind::CommandArray {

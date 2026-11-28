@@ -86,7 +86,7 @@ pub enum Statement {
         name: String,
         parameters: Vec<Parameter>,
         begin: Vec<Statement>,
-        process: Vec<Statement>,
+        process: Option<Vec<Statement>>,
         end: Vec<Statement>,
         body: Vec<Statement>,
         filter: bool,
@@ -445,6 +445,8 @@ pub enum ExprKind {
     Group(Vec<Statement>),
     /// Upstream: `TypeExpressionAst` used as a value.
     TypeLiteral(String),
+    /// Upstream: `ArrayExpressionAst`. Collects the output of a statement list.
+    ArrayExpression(Vec<Statement>),
     /// Upstream: `ArrayLiteralAst`.
     Array(Vec<Expr>),
     /// A comma-separated command argument. Native binders can reconstruct it

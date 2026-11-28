@@ -182,6 +182,14 @@ fn format_expr(expr: &Expr) -> String {
             format_expr(when_false)
         ),
         ExprKind::Subexpression(_) => "(subexpr)".to_owned(),
+        ExprKind::ArrayExpression(statements) => format!(
+            "(array-expr {})",
+            statements
+                .iter()
+                .map(format_statement)
+                .collect::<Vec<_>>()
+                .join(" ")
+        ),
         ExprKind::Group(statements) => format!(
             "(paren {})",
             statements

@@ -1,14 +1,13 @@
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
-use rpsh_runtime::{RuntimeError, Value};
+use rpsh_runtime::{InputEnumerator, RuntimeError, Value};
 use rpsh_syntax::{
     Expr, ExprKind, InvocationOperator, PipelineCommand, Redirection, Statement, parse,
 };
 
 use super::{
-    Engine, EngineError, FunctionDef, OutputTarget, PreparedArguments, flatten_value, hidden_type,
-    member,
+    Engine, EngineError, Flow, FunctionDef, OutputTarget, PreparedArguments, hidden_type, member,
 };
 
 pub(super) enum CallTarget<'a> {
@@ -106,7 +105,7 @@ impl FunctionDef {
             definition: None,
             parameters,
             begin: Vec::new(),
-            process: Vec::new(),
+            process: None,
             end: Vec::new(),
             body,
             filter: false,
@@ -115,6 +114,13 @@ impl FunctionDef {
 }
 
 impl Engine {
+    fn bind_input(&mut self, items: Vec<Value>) -> InputEnumerator {
+        let input = InputEnumerator::new(items);
+        self.variables
+            .insert("input".into(), Value::InputEnumerator(input.clone()));
+        input
+    }
+
     pub(super) fn call_definition(
         &mut self,
         call: &ScriptCall,
@@ -122,7 +128,6 @@ impl Engine {
         input: Option<Vec<Value>>,
         out: &mut dyn std::io::Write,
     ) -> Result<super::Flow, EngineError> {
-        use super::Flow;
         let function = &call.function;
         let (positional, named) = self.function_arguments(arguments, function)?;
         let child = call.operator == InvocationOperator::Ampersand;
@@ -176,27 +181,72 @@ impl Engine {
         function: &FunctionDef,
         input: Option<Vec<Value>>,
         out: &mut dyn std::io::Write,
-    ) -> Result<super::Flow, EngineError> {
-        use super::Flow;
-        if function.has_blocks() {
-            return self.exec_named_blocks(function, input, out);
+    ) -> Result<Flow, EngineError> {
+        if !function.filter && !function.has_blocks() {
+            self.bind_input(input.unwrap_or_default());
+            return self.exec_block(&function.body, out);
         }
-        if function.filter
-            && let Some(items) = input
-        {
-            for item in items {
-                self.variables.insert("_".into(), item);
-                match self.exec_block(&function.body, out)? {
-                    Flow::Return(Some(value)) => self.write_value(value, out)?,
-                    Flow::Normal | Flow::Return(None) | Flow::Continue(_) => {}
-                    flow => return Ok(flow),
+
+        let begin_input = self.bind_input(Vec::new());
+        let flow = self.run_input_clause(&function.begin, out)?;
+        if !matches!(flow, Flow::Normal) {
+            return Ok(flow);
+        }
+
+        let process = function
+            .process
+            .as_deref()
+            .or_else(|| function.filter.then_some(function.body.as_slice()));
+        let mut end_input = Vec::new();
+        match (process, input) {
+            (Some(body), Some(items)) => {
+                for item in items {
+                    begin_input.invalidate();
+                    let cursor = self.bind_input(vec![item.clone()]);
+                    self.variables.insert("_".into(), item);
+                    let flow = self.run_input_clause(body, out);
+                    cursor.invalidate();
+                    let flow = flow?;
+                    if !matches!(flow, Flow::Normal) {
+                        return Ok(flow);
+                    }
                 }
             }
-            return Ok(Flow::Normal);
+            (Some(body), None) => {
+                self.bind_input(Vec::new());
+                self.variables.insert("_".into(), Value::Null);
+                let flow = self.run_input_clause(body, out)?;
+                if !matches!(flow, Flow::Normal) {
+                    return Ok(flow);
+                }
+            }
+            (None, Some(items)) => {
+                if !items.is_empty() {
+                    begin_input.invalidate();
+                }
+                end_input = items;
+            }
+            (None, None) => {}
         }
-        self.variables
-            .insert("input".into(), Value::array(input.unwrap_or_default()));
-        self.exec_block(&function.body, out)
+        self.bind_input(end_input);
+        self.run_input_clause(&function.end, out)
+    }
+
+    // A return completes this clause. A new record or the end clause can still run.
+    fn run_input_clause(
+        &mut self,
+        body: &[Statement],
+        out: &mut dyn std::io::Write,
+    ) -> Result<Flow, EngineError> {
+        match self.exec_block(body, out)? {
+            Flow::Return(value) => {
+                if let Some(value) = value {
+                    self.write_value(value, out)?;
+                }
+                Ok(Flow::Normal)
+            }
+            flow => Ok(flow),
+        }
     }
 
     pub(super) fn function_output(
@@ -359,9 +409,9 @@ impl Engine {
         output: Option<&OutputTarget>,
     ) -> Result<Vec<Value>, EngineError> {
         match command {
-            StageCommand::Expression(expr) => {
-                Ok(flatten_value(self.eval_pipeline_expression(expr)?))
-            }
+            StageCommand::Expression(expr) => Ok(super::input::pipeline_values(
+                self.eval_pipeline_expression(expr)?,
+            )?),
             StageCommand::Call(CallTarget::Name(name), arguments) => {
                 self.run_command(name, arguments, input, output)
             }

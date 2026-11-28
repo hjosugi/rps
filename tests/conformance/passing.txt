@@ -58,6 +58,7 @@ lang/alias-view
 lang/aliases
 lang/array
 lang/array-list
+lang/array-subexpression
 lang/call-operator
 lang/class
 lang/comparison-basic
@@ -73,6 +74,7 @@ lang/fixtures/invocation-file with spaces
 lang/format-operator
 lang/function
 lang/function-basic
+lang/function-input
 lang/get-command
 lang/get-date
 lang/hashtable
