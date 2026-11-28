@@ -7,11 +7,11 @@
 //! the harness's.
 
 use std::ffi::{OsStr, OsString};
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+use std::{fs, io};
 
 /// Resource usage `wait4` reports for one run.
 #[derive(Debug, Clone, Copy)]
@@ -32,9 +32,40 @@ pub(crate) struct Measured {
     pub(crate) metrics: Metrics,
 }
 
+/// An atomically claimed directory on the same filesystem as the cached helper.
+/// Two containers sharing the checkout can have the same process ID.
+struct RunDirectory(PathBuf);
+
+impl RunDirectory {
+    fn create(parent: &Path) -> io::Result<Self> {
+        fs::create_dir_all(parent)?;
+        let mut builder = fs::DirBuilder::new();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(0o700);
+        }
+        for suffix in 0_u64.. {
+            let path = parent.join(format!("run-{}-{suffix}", std::process::id()));
+            match builder.create(&path) {
+                Ok(()) => return Ok(Self(path)),
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(e) => return Err(e),
+            }
+        }
+        Err(io::Error::other("no available benchmark directory"))
+    }
+}
+
+impl Drop for RunDirectory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
 pub(crate) struct Measurer {
     helper: PathBuf,
-    reports: PathBuf,
+    reports: RunDirectory,
     next_report: AtomicU64,
 }
 
@@ -45,6 +76,13 @@ impl Measurer {
         let source = root.join("scripts/spawn-measure.c");
         let tools = root.join(".cache/tools");
         let helper = tools.join("spawn-measure");
+        let parent = tools.join("bench-reports");
+        let reports = RunDirectory::create(&parent).map_err(|error| {
+            format!(
+                "cannot create a run directory in {}: {error}",
+                parent.display()
+            )
+        })?;
         let stale = match (fs::metadata(&helper), fs::metadata(&source)) {
             (Ok(binary), Ok(source)) => match (binary.modified(), source.modified()) {
                 (Ok(binary), Ok(source)) => binary < source,
@@ -53,13 +91,12 @@ impl Measurer {
             _ => true,
         };
         if stale {
-            fs::create_dir_all(&tools)
-                .map_err(|error| format!("cannot create {}: {error}", tools.display()))?;
+            let candidate = reports.0.join("spawn-measure");
             let compiler = std::env::var_os("CC").unwrap_or_else(|| OsString::from("cc"));
             let output = Command::new(&compiler)
                 .arg("-O2")
                 .arg("-o")
-                .arg(&helper)
+                .arg(&candidate)
                 .arg(&source)
                 .output()
                 .map_err(|error| {
@@ -76,10 +113,9 @@ impl Measurer {
                     String::from_utf8_lossy(&output.stderr)
                 ));
             }
+            fs::rename(&candidate, &helper)
+                .map_err(|error| format!("cannot install {}: {error}", helper.display()))?;
         }
-        let reports = tools.join("bench-reports");
-        fs::create_dir_all(&reports)
-            .map_err(|error| format!("cannot create {}: {error}", reports.display()))?;
         Ok(Self {
             helper,
             reports,
@@ -90,9 +126,8 @@ impl Measurer {
     /// Runs `command` as the helper's child and returns what both saw.
     pub(crate) fn run(&self, command: Command) -> Result<Measured, String> {
         let program = resolve_program(command.get_program(), &command)?;
-        let report_path = self.reports.join(format!(
-            "{}-{}.report",
-            std::process::id(),
+        let report_path = self.reports.0.join(format!(
+            "{}.report",
             self.next_report.fetch_add(1, Ordering::Relaxed)
         ));
 
@@ -214,6 +249,23 @@ fn resolve_program(program: &OsStr, command: &Command) -> Result<OsString, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn overlapping_runs_own_their_reports() {
+        let parent = RunDirectory::create(&std::env::temp_dir()).unwrap();
+        let first = RunDirectory::create(&parent.0).unwrap();
+        let second = RunDirectory::create(&parent.0).unwrap();
+        let copy = first.0.clone();
+        fs::write(copy.join("0.report"), "first").unwrap();
+        fs::write(second.0.join("0.report"), "second").unwrap();
+        assert_eq!(fs::read_to_string(copy.join("0.report")).unwrap(), "first");
+        drop(first);
+        assert!(!copy.exists());
+        assert_eq!(
+            fs::read_to_string(second.0.join("0.report")).unwrap(),
+            "second"
+        );
+    }
 
     #[test]
     fn parses_a_report() {

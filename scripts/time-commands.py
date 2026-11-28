@@ -81,7 +81,10 @@ def spawn_measure():
     if not os.path.exists(binary) or os.path.getmtime(binary) < os.path.getmtime(source):
         os.makedirs(os.path.dirname(binary), exist_ok=True)
         compiler = os.environ.get('CC', 'cc')
-        subprocess.run([compiler, '-O2', '-o', binary, source], check=True)
+        with tempfile.TemporaryDirectory(prefix='spawn-measure-', dir=os.path.dirname(binary)) as run:
+            candidate = os.path.join(run, 'spawn-measure')
+            subprocess.run([compiler, '-O2', '-o', candidate, source], check=True)
+            os.replace(candidate, binary)
     return binary
 
 
