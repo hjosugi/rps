@@ -16,11 +16,12 @@ pub(crate) struct Engine {
     /// user's own. pwsh reads modules, `powershell.config.json` and its
     /// startup JIT profile from below `$HOME`.
     home: PathBuf,
+    file_args: &'static [&'static str],
 }
 
 /// `PATH` for every run, so that a case names the same programs on every
 /// machine (docs/01_compat_contract.md, "Reference environment").
-const REFERENCE_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
+pub(crate) const REFERENCE_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
 
 pub(crate) struct Run {
     pub(crate) stdout: Vec<u8>,
@@ -37,7 +38,18 @@ impl Engine {
         let home = root.join(".cache/home");
         fs::create_dir_all(&home)
             .map_err(|error| format!("cannot create {}: {error}", home.display()))?;
-        Ok(Self { program, home })
+        Ok(Self {
+            program,
+            home,
+            file_args: &["-NoProfile", "-NonInteractive", "-File"],
+        })
+    }
+
+    pub(crate) fn bash(root: &Path) -> Result<Self, String> {
+        let program = find_program("bash").ok_or("no bash found for --bash")?;
+        let mut engine = Self::new(root, program)?;
+        engine.file_args = &["--noprofile", "--norc"];
+        Ok(engine)
     }
 
     /// Runs `script` the same way under either engine: no profile, no
@@ -71,7 +83,7 @@ impl Engine {
 
     fn file_command(&self, script: &Path) -> Command {
         let mut command = self.command();
-        command.args(["-NoProfile", "-NonInteractive", "-File"]);
+        command.args(self.file_args);
         command.arg(script);
         if let Some(directory) = script.parent() {
             command.current_dir(directory);
@@ -171,6 +183,16 @@ pub(crate) fn judge(reference: &Reference, run: &Run) -> Verdict {
         return Verdict::Mismatch(format!("stderr differs from pwsh at byte {at}"));
     }
     Verdict::Match
+}
+
+pub(crate) fn find_program(name: &str) -> Option<PathBuf> {
+    let mut search = std::env::var_os("PATH")
+        .map_or_else(Vec::new, |path| std::env::split_paths(&path).collect());
+    search.extend(std::env::split_paths(&std::ffi::OsStr::new(REFERENCE_PATH)));
+    search
+        .into_iter()
+        .map(|directory| directory.join(name))
+        .find(|candidate| candidate.is_file())
 }
 
 /// Finds the upstream pwsh to measure against.

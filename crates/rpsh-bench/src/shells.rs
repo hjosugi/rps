@@ -18,7 +18,7 @@ use crate::json::Json;
 use crate::rusage::Measurer;
 use crate::stats::{self, Sample, Summary};
 
-const REFERENCE_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
+use crate::engines::{REFERENCE_PATH, find_program};
 
 pub(crate) fn run(root: &Path, mut args: Args) -> Result<bool, String> {
     let runs = args.number("--runs")?.unwrap_or(10);
@@ -151,16 +151,6 @@ fn candidates(pwsh: &Path, rpsh: &Path) -> Vec<Candidate> {
         detail: Some("interactive sessions are not implemented"),
     });
     candidates
-}
-
-fn find_program(name: &str) -> Option<PathBuf> {
-    let mut search = std::env::var_os("PATH")
-        .map_or_else(Vec::new, |path| std::env::split_paths(&path).collect());
-    search.extend(std::env::split_paths(&std::ffi::OsStr::new(REFERENCE_PATH)));
-    search
-        .into_iter()
-        .map(|directory| directory.join(name))
-        .find(|candidate| candidate.is_file())
 }
 
 struct ShellResult {

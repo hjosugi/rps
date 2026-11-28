@@ -22,12 +22,13 @@ Usage: cargo harness <command>
   bench [--suite scripts|shells] [--runs N] [--warmup N] [--filter TEXT]
         [--out FILE] [--compare BASELINE.json]
         [--export-hyperfine FILE] [--pwsh PATH] [--rpsh PATH]
-        [--budget-scale N]
+        [--budget-scale N] [--bash]
       suite=scripts times every script in bench/cases under pwsh and rpsh.
       A speedup is reported only for cases where rpsh's stdout and exit code
       equal pwsh's. Peak RSS and CPU time come from wait4
       (scripts/spawn-measure.c). --compare prints a diff against an earlier
       result file, and --export-hyperfine writes hyperfine-compatible JSON.
+      --bash also times matching .bash fixtures after checking their output.
       suite=shells compares bash, dash, zsh, fish, nu, pwsh and rpsh: a
       one-line run and time to the first prompt on a pseudo-terminal.
       suite=profiles times pwsh with the fixture profiles in bench/profiles:

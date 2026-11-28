@@ -32,6 +32,7 @@ struct CaseResult {
     reference_exit: i32,
     pwsh: Summary,
     rpsh: Option<Summary>,
+    bash: Option<Summary>,
     /// rpsh's allowed median, from `# rpsh-bench: budget-ms=N` times
     /// `--budget-scale` (docs/05_startup.md).
     budget_ms: Option<f64>,
@@ -66,6 +67,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
             ));
         }
     }
+    let include_bash = args.flag("--bash");
     let runs = args.number("--runs")?.unwrap_or(10);
     let warmup = args.number("--warmup")?.unwrap_or(2);
     let filter = args.value("--filter")?;
@@ -95,12 +97,18 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
         return Err("no benchmark case matches".to_owned());
     }
 
+    let bash = include_bash.then(|| Engine::bash(root)).transpose()?;
+    let settings = Settings {
+        runs,
+        warmup,
+        budget_scale,
+    };
     let before = load_average();
     let measurer = Measurer::new(root)?;
     let mut results = Vec::new();
     for case in &cases {
         eprint!("{} ... ", case.id);
-        let result = measure(case, &pwsh, &rpsh, &measurer, runs, warmup, budget_scale)?;
+        let result = measure(case, &pwsh, &rpsh, bash.as_ref(), &measurer, &settings)?;
         match &result.status {
             Status::Verified => eprintln!("verified"),
             Status::NotImplemented(feature) => eprintln!("not implemented: {feature}"),
@@ -126,7 +134,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
         eprintln!("warning: {warning}");
     }
 
-    let document = Json::Object(vec![
+    let mut fields = vec![
         ("schema", Json::text("rpsh-bench-v2")),
         ("generated_at_unix_s", Json::Number(unix_seconds())),
         ("rpsh", rpsh_info(root, &rpsh)),
@@ -157,7 +165,23 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
             "cases",
             Json::Array(results.iter().map(case_json).collect()),
         ),
-    ]);
+    ];
+    if let Some(bash) = &bash {
+        let version = command_output(
+            root,
+            bash.program.to_str().ok_or("invalid bash path")?,
+            &["--version"],
+        )
+        .and_then(|text| text.lines().next().map(str::to_owned));
+        fields.push((
+            "bash",
+            Json::Object(vec![
+                ("executable", Json::text(recorded_path(root, &bash.program))),
+                ("version", Json::optional(version, Json::Text)),
+            ]),
+        ));
+    }
+    let document = Json::Object(fields);
     let out = match out {
         Some(path) => Path::new(&path).to_path_buf(),
         None => root.join("bench/results/latest.json"),
@@ -189,21 +213,28 @@ pub(crate) fn write_json(path: &Path, document: &Json) -> Result<(), String> {
         .map_err(|error| format!("cannot write {}: {error}", path.display()))
 }
 
+struct Settings {
+    runs: usize,
+    warmup: usize,
+    budget_scale: f64,
+}
+
 fn measure(
     case: &Case,
     pwsh: &Engine,
     rpsh: &Engine,
+    bash: Option<&Engine>,
     measurer: &Measurer,
-    runs: usize,
-    warmup: usize,
-    budget_scale: f64,
+    settings: &Settings,
 ) -> Result<CaseResult, String> {
     let source = fs::read_to_string(&case.path)
         .map_err(|error| format!("cannot read {}: {error}", case.path.display()))?;
-    let runs = cases::directive(&source, "runs").unwrap_or(runs).max(1);
-    let warmup = cases::directive(&source, "warmup").unwrap_or(warmup);
+    let runs = cases::directive(&source, "runs")
+        .unwrap_or(settings.runs)
+        .max(1);
+    let warmup = cases::directive(&source, "warmup").unwrap_or(settings.warmup);
     let budget_ms =
-        cases::directive(&source, "budget-ms").map(|budget| budget as f64 * budget_scale);
+        cases::directive(&source, "budget-ms").map(|budget| budget as f64 * settings.budget_scale);
 
     // The first run of each engine establishes the answer and is not timed.
     let first = pwsh.run_file_measured(&case.path, measurer)?;
@@ -215,6 +246,17 @@ fn measure(
         stderr: None,
         exit_code,
     };
+    let bash_script = case.path.with_extension("bash");
+    let bash = bash.filter(|_| bash_script.is_file());
+    let run_bash = |engine: &Engine| -> Result<Sample, String> {
+        let run = engine.run_file_measured(&bash_script, measurer)?;
+        match engines::judge(&reference, &run) {
+            Verdict::Match => sample_of(&run),
+            Verdict::Mismatch(why) | Verdict::NotImplemented(why) => {
+                Err(format!("{}: bash {why}", case.id))
+            }
+        }
+    };
     let mut status =
         match engines::judge(&reference, &rpsh.run_file_measured(&case.path, measurer)?) {
             Verdict::Match => Status::Verified,
@@ -222,7 +264,13 @@ fn measure(
             Verdict::Mismatch(why) => Status::Mismatch(why),
         };
 
+    if let Some(bash) = bash {
+        run_bash(bash)?;
+    }
     for _ in 0..warmup {
+        if let Some(bash) = bash {
+            run_bash(bash)?;
+        }
         pwsh.run_file_measured(&case.path, measurer)?;
         if matches!(status, Status::Verified) {
             rpsh.run_file_measured(&case.path, measurer)?;
@@ -232,6 +280,7 @@ fn measure(
     // Alternate the engines so that drift in machine load hits both.
     let mut pwsh_samples = Vec::with_capacity(runs);
     let mut rpsh_samples = Vec::with_capacity(runs);
+    let mut bash_samples = Vec::new();
     for _ in 0..runs {
         let run = pwsh.run_file_measured(&case.path, measurer)?;
         if run.stdout != reference.stdout || run.exit_code != Some(reference.exit_code) {
@@ -252,6 +301,9 @@ fn measure(
                 }
             }
         }
+        if let Some(bash) = bash {
+            bash_samples.push(run_bash(bash)?);
+        }
     }
 
     let rpsh = matches!(status, Status::Verified).then(|| stats::summarize(&rpsh_samples));
@@ -261,6 +313,7 @@ fn measure(
         reference_exit: exit_code,
         pwsh: stats::summarize(&pwsh_samples),
         rpsh,
+        bash: bash.map(|_| stats::summarize(&bash_samples)),
         budget_ms,
     })
 }
@@ -319,6 +372,24 @@ fn markdown(results: &[CaseResult], pwsh_version: &str) -> String {
             result.id,
             millis(result.pwsh.median_ms),
         );
+    }
+
+    if results.iter().any(|row| row.bash.is_some()) {
+        let _ = writeln!(
+            out,
+            "\n| native workload | bash median | rpsh median |\n|---|---:|---:|"
+        );
+        for row in results {
+            if let Some(bash) = &row.bash {
+                let _ = writeln!(
+                    out,
+                    "| {} | {} | {} |",
+                    row.id,
+                    millis(bash.median_ms),
+                    optional_millis(row.rpsh.as_ref().map(|s| s.median_ms))
+                );
+            }
+        }
     }
 
     let speedups: Vec<f64> = results.iter().filter_map(CaseResult::speedup).collect();
@@ -427,7 +498,7 @@ fn case_json(result: &CaseResult) -> Json {
         Status::NotImplemented(feature) => ("not_implemented", Some(feature.clone())),
         Status::Mismatch(why) => ("mismatch", Some(why.clone())),
     };
-    Json::Object(vec![
+    let mut fields = vec![
         ("id", Json::text(result.id.clone())),
         ("status", Json::text(status)),
         ("detail", Json::optional(detail, Json::Text)),
@@ -445,7 +516,11 @@ fn case_json(result: &CaseResult) -> Json {
             "rpsh",
             Json::optional(result.rpsh.as_ref(), summary_to_json),
         ),
-    ])
+    ];
+    if let Some(bash) = &result.bash {
+        fields.push(("bash", summary_to_json(bash)));
+    }
+    Json::Object(fields)
 }
 
 pub(crate) fn summary_to_json(summary: &Summary) -> Json {
@@ -692,6 +767,14 @@ fn hyperfine_json(results: &[CaseResult]) -> Json {
             entries.push(hyperfine_result(
                 &result.id,
                 "rpsh",
+                summary,
+                result.reference_exit,
+            ));
+        }
+        if let Some(summary) = &result.bash {
+            entries.push(hyperfine_result(
+                &result.id,
+                "bash",
                 summary,
                 result.reference_exit,
             ));

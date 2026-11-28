@@ -47,6 +47,7 @@ cargo build --release               # target/release/rpsh
 scripts/fetch-pwsh.sh               # the latest stable pwsh, into .cache/
 cargo harness bench                 # rpsh vs pwsh, per script
 cargo harness bench --compare bench/baselines/2026-11-20-ryzen5-4650u-scaffold.json
+cargo harness bench --filter native/ --bash
 cargo harness bench --suite shells # bash/zsh/fish/nu/pwsh/rpsh startup
 cargo harness bench --suite profiles # pwsh profile cost by fixture
 cargo harness bench --export-hyperfine hyperfine.json
@@ -72,6 +73,12 @@ warning about them. The `rpsh` block also records the binary size.
 `--compare BASELINE.json` prints a before/after table; both the current schema
 and the `rpsh-bench-v1` baselines already in `bench/baselines/` are readable.
 `--export-hyperfine FILE` writes hyperfine-compatible JSON.
+
+`cargo harness bench --filter native/ --bash` times each native workload under
+all three shells. The matching Bash scripts launch external `true` processes,
+count the same lines and lengths, and pass the same byte streams between
+processes. Every timed sample must reproduce pwsh's stdout and exit code.
+The JSON includes the Bash executable, version and per-case samples.
 
 `cargo harness bench --suite shells` compares the installed shells (bash,
 dash, zsh, fish, nu, pwsh and rpsh): a one-line run through `wait4`, and the

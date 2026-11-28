@@ -111,6 +111,7 @@ native/glob
 native/glob-arguments
 native/output-redirection
 native/parameter-colon
+native/path-precedence
 native/pipe
 native/pipe-encoding
 native/pipeline-chain
