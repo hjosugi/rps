@@ -95,15 +95,7 @@ impl Engine {
         for stage in stages {
             let mut command = Command::new(stage.name.as_ref());
             command.args(self.native_arguments(stage.arguments)?);
-            for (key, value) in &self.variables {
-                if let Some(name) = key.strip_prefix("env:") {
-                    if value.is_null_like() {
-                        command.env_remove(name);
-                    } else {
-                        command.env(name, value.to_string());
-                    }
-                }
-            }
+            super::environment::configure_child(&mut command, &self.variables);
             commands.push(command);
         }
         let mut bytes = Vec::new();

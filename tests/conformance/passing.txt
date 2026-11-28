@@ -97,6 +97,7 @@ native/byte-pipe
 native/capture
 native/console-encoding
 native/environment
+native/environment-process
 native/exit-code
 native/glob
 native/glob-arguments

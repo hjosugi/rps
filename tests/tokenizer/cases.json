@@ -150,5 +150,9 @@
   {
     "name": "native-glob-arguments",
     "source": "cmd [aB]*.txt aDir/`*.txt $dir/*.txt ${dir}/sub/?.txt ('*.txt') -flag aDir/*.txt"
+  },
+  {
+    "name": "keyword-member",
+    "source": "[EnvironmentVariableTarget]::Process"
   }
 ]

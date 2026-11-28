@@ -13,6 +13,7 @@
 
 mod aliases;
 mod encoding;
+mod environment;
 mod native;
 mod redirection;
 mod wildcards;
@@ -548,7 +549,12 @@ impl Engine {
         }
     }
 
-    fn restore_variables(&mut self, saved: HashMap<String, Value>) {
+    fn restore_variables(&mut self, mut saved: HashMap<String, Value>) {
+        saved.extend(
+            self.variables
+                .drain()
+                .filter(|(key, _)| key.starts_with("env:")),
+        );
         self.variables = saved;
         for (key, value) in &self.globals {
             self.variables.insert(key.clone(), value.clone());
@@ -1068,6 +1074,10 @@ impl Engine {
     }
 
     fn assign_variable(&mut self, name: &str, value: Value) -> Result<(), EngineError> {
+        if let Some(name) = environment::drive_name(name) {
+            environment::set(&mut self.variables, name, &value);
+            return Ok(());
+        }
         let key = strip_scope(name);
         let key = if let Some(canonical) = encoding::variable_name(key) {
             if !value.is_null_like() && Encoding::from_value(&value).is_none() {
@@ -1101,6 +1111,17 @@ impl Engine {
             }
             .into());
         };
+        if let Some(table) = environment::table_entries(entries) {
+            let mut table = table.to_vec();
+            if let Some((_, slot)) = table.iter_mut().find(|(entry, _)| entry == name) {
+                *slot = value;
+            } else {
+                table.push((name.to_owned(), value));
+            }
+            self.variables
+                .insert(key.to_owned(), environment::table(table));
+            return Ok(());
+        }
         let mut entries = entries.as_ref().clone();
         if let Some(entry) = entries
             .iter_mut()
@@ -2407,7 +2428,7 @@ impl Engine {
                 let name = name.trim_start_matches("\\");
                 match provider.to_ascii_lowercase().as_str() {
                     "env" => {
-                        self.variables.insert(format!("env:{name}"), value);
+                        environment::set(&mut self.variables, name, &value);
                     }
                     "variable" => {
                         let key = strip_scope(name);
@@ -2731,12 +2752,14 @@ impl Engine {
                             .find(|(name, _)| name.eq_ignore_ascii_case("value"))
                             .map(|(_, value)| value.clone())
                             .unwrap_or(Value::Null);
-                        let key = if provider.eq_ignore_ascii_case("env") {
-                            format!("env:{name}")
+                        let value = if provider.eq_ignore_ascii_case("env") {
+                            environment::set(&mut self.variables, name, &value);
+                            environment::get(&self.variables, name).unwrap_or(Value::Null)
                         } else {
-                            strip_scope(name).to_owned()
+                            self.variables
+                                .insert(strip_scope(name).to_owned(), value.clone());
+                            value
                         };
-                        self.variables.insert(key, value.clone());
                         return Ok(Some(vec![Value::object(vec![
                             ("Name".to_owned(), Value::String(name.into())),
                             ("Value".to_owned(), value),
@@ -2856,21 +2879,14 @@ impl Engine {
                         match provider.to_ascii_lowercase().as_str() {
                             "env" => {
                                 if wildcard {
-                                    let keys: Vec<String> = self
-                                        .variables
+                                    for key in environment::entries(&self.variables)
                                         .keys()
-                                        .filter(|key| {
-                                            key.strip_prefix("env:").is_some_and(|candidate| {
-                                                ops::wildcard_match(candidate, name, false)
-                                            })
-                                        })
-                                        .cloned()
-                                        .collect();
-                                    for key in keys {
-                                        self.variables.remove(&key);
+                                        .filter(|key| ops::wildcard_match(key, name, false))
+                                    {
+                                        environment::set(&mut self.variables, key, &Value::Null);
                                     }
                                 } else {
-                                    self.variables.remove(&format!("env:{name}"));
+                                    environment::set(&mut self.variables, name, &Value::Null);
                                 }
                                 continue;
                             }
@@ -3669,14 +3685,7 @@ impl Engine {
                         let name = name.trim_start_matches("\\");
                         if !name.is_empty() {
                             let value = if provider.eq_ignore_ascii_case("env") {
-                                self.variables
-                                    .get(&format!("env:{name}"))
-                                    .cloned()
-                                    .or_else(|| {
-                                        std::env::var(name)
-                                            .ok()
-                                            .map(|value| Value::String(value.into()))
-                                    })
+                                environment::get(&self.variables, name)
                             } else if provider.eq_ignore_ascii_case("variable") {
                                 let key = strip_scope(name);
                                 self.variables
@@ -4038,13 +4047,12 @@ impl Engine {
                             continue;
                         };
                         let name = name.trim_start_matches("\\");
-                        let key = if provider.eq_ignore_ascii_case("env") {
-                            format!("env:{name}")
+                        let value = Value::String(text.as_str().into());
+                        if provider.eq_ignore_ascii_case("env") {
+                            environment::set(&mut self.variables, name, &value);
                         } else {
-                            strip_scope(name).to_owned()
-                        };
-                        self.variables
-                            .insert(key, Value::String(text.clone().into()));
+                            self.variables.insert(strip_scope(name).to_owned(), value);
+                        }
                     }
                     return Ok(Some(Vec::new()));
                 }
@@ -5901,18 +5909,7 @@ impl Engine {
         let mut outputs = Vec::new();
         match provider.to_ascii_lowercase().as_str() {
             "env" => {
-                let mut entries: std::collections::BTreeMap<String, Value> = std::env::vars()
-                    .map(|(name, value)| (name, Value::String(value.into())))
-                    .collect();
-                for (key, value) in &self.variables {
-                    if let Some(env_name) = key.strip_prefix("env:") {
-                        if value.is_null_like() {
-                            entries.remove(env_name);
-                        } else {
-                            entries.insert(env_name.to_owned(), value.clone());
-                        }
-                    }
-                }
+                let entries = environment::entries(&self.variables);
                 for (name, value) in entries {
                     if !matches(&name) {
                         continue;
@@ -5998,18 +5995,12 @@ impl Engine {
             })
         };
         match provider.to_ascii_lowercase().as_str() {
-            "env" => Some(match self.variables.get(&format!("env:{name}")) {
+            "env" => Some(match environment::get(&self.variables, name) {
                 Some(value) => Ok(Value::object(vec![
                     ("Name".to_owned(), Value::String(name.into())),
-                    ("Value".to_owned(), value.clone()),
+                    ("Value".to_owned(), value),
                 ])),
-                None => match std::env::var(name) {
-                    Ok(value) => Ok(Value::object(vec![
-                        ("Name".to_owned(), Value::String(name.into())),
-                        ("Value".to_owned(), Value::String(value.into())),
-                    ])),
-                    Err(_) => missing(path),
-                },
+                None => missing(path),
             }),
             "variable" => {
                 let key = strip_scope(name).to_owned();
@@ -6056,22 +6047,13 @@ impl Engine {
         }
         let wildcard = name.contains(['*', '?']);
         match provider.to_ascii_lowercase().as_str() {
-            "env" => {
-                if wildcard {
-                    return Some(
-                        self.variables
-                            .keys()
-                            .filter_map(|key| key.strip_prefix("env:"))
-                            .any(|candidate| ops::wildcard_match(candidate, name, false))
-                            || std::env::vars()
-                                .any(|(candidate, _)| ops::wildcard_match(&candidate, name, false)),
-                    );
-                }
-                Some(
-                    self.variables.contains_key(&format!("env:{name}"))
-                        || std::env::var(name).is_ok(),
-                )
-            }
+            "env" => Some(if wildcard {
+                environment::entries(&self.variables)
+                    .keys()
+                    .any(|candidate| ops::wildcard_match(candidate, name, false))
+            } else {
+                environment::get(&self.variables, name).is_some()
+            }),
             "variable" => {
                 if wildcard {
                     return Some(
@@ -6571,7 +6553,7 @@ fn evaluate(
             for argument in arguments {
                 values.push(evaluate(argument, variables, last_success)?);
             }
-            invoke_static(type_name, name, &values)
+            invoke_static(type_name, name, &values, variables)
         }
         ExprKind::Member { target, name } => {
             member(&evaluate(target, variables, last_success)?, name)
@@ -6746,6 +6728,12 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
         }
         (Value::Object(entries), Value::String(key)) => {
             let key = key.to_string_lossy();
+            if let Some(table) = environment::table_entries(entries) {
+                return Ok(table
+                    .iter()
+                    .find(|(name, _)| name == &key)
+                    .map_or(Value::Null, |(_, v)| v.clone()));
+            }
             Ok(entries
                 .iter()
                 .find(|(entry, _)| entry.eq_ignore_ascii_case(&key))
@@ -8399,13 +8387,8 @@ fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) ->
         "PSItem" => return variables.get("_").cloned().or(Some(Value::Null)),
         _ => {}
     }
-    if let Some(rest) = name.strip_prefix("env:") {
-        if let Some(value) = variables.get(name) {
-            return Some(value.clone());
-        }
-        return std::env::var(rest)
-            .ok()
-            .map(|value| Value::String(value.into()));
+    if let Some(rest) = environment::drive_name(name) {
+        return Some(environment::get(variables, rest).unwrap_or(Value::Null));
     }
     let key = strip_scope(name);
     let key = encoding::variable_name(key).unwrap_or(key);
@@ -8476,6 +8459,9 @@ fn ps_version_table() -> Value {
 
 fn automatic_variable(name: &str) -> Option<Value> {
     match name {
+        key if key.eq_ignore_ascii_case("PSHOME") => Some(Value::String(
+            environment::ps_home().to_string_lossy().as_ref().into(),
+        )),
         "PSStyle" => Some(Value::object(vec![(
             "OutputRendering".to_owned(),
             Value::String("PlainText".into()),
@@ -8997,6 +8983,11 @@ fn static_member(
         return Ok(value.clone());
     }
     let kind = normalize_type(type_name);
+    if kind == "environmentvariabletarget"
+        && let Some(value) = environment::target_member(name)
+    {
+        return Ok(value);
+    }
     let name = name.to_ascii_lowercase();
     let integer = match &kind[..] {
         "int32" | "int" => Some(("int32", i64::from(i32::MAX), i64::from(i32::MIN))),
@@ -9088,10 +9079,32 @@ fn to_radix(value: i64, base: i32) -> String {
     digits.iter().rev().collect()
 }
 
-fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
+fn overload_error(method: &str, arity: usize) -> RuntimeError {
+    RuntimeError::Script {
+        id: "MethodCountCouldNotFindBest",
+        category: "NotSpecified: (:) [], MethodException".into(),
+        exception_type: "System.Management.Automation.MethodException",
+        message: format!(
+            "Cannot find an overload for \"{method}\" and the argument count: \"{arity}\"."
+        ),
+    }
+}
+
+fn invoke_static(
+    type_name: &str,
+    name: &str,
+    arguments: &[Value],
+    variables: &mut HashMap<String, Value>,
+) -> Result<Value, RuntimeError> {
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        (
+            "environment",
+            method @ ("getenvironmentvariable"
+            | "setenvironmentvariable"
+            | "getenvironmentvariables"),
+        ) => environment::invoke(method, arguments, variables),
         ("wildcardpattern" | "management.automation.wildcardpattern", method) => {
             wildcards::static_method(method, arguments)
         }
@@ -10256,6 +10269,13 @@ fn object_method(
     name: &str,
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
+    if let Some(table) = environment::table_entries(entries)
+        && let [key] = arguments
+        && (name.eq_ignore_ascii_case("ContainsKey") || name.eq_ignore_ascii_case("Contains"))
+    {
+        let key = key.to_string();
+        return Ok(Value::Bool(table.iter().any(|(entry, _)| entry == &key)));
+    }
     if let Some(result) = wildcards::pattern_method(entries, name, arguments) {
         return result;
     }
@@ -10543,6 +10563,26 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
 }
 
 fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
+    if let Value::Object(entries) = value
+        && let Some(table) = environment::table_entries(entries)
+    {
+        if let Some((_, value)) = table.iter().find(|(key, _)| key == name) {
+            return Ok(value.clone());
+        }
+        match name.to_ascii_lowercase().as_str() {
+            "count" => return Ok(Value::Int32(table.len() as i32)),
+            "keys" => {
+                return Ok(Value::array(
+                    table
+                        .iter()
+                        .map(|(key, _)| Value::String(key.as_str().into()))
+                        .collect(),
+                ));
+            }
+            "values" => return Ok(Value::array(table.iter().map(|(_, v)| v.clone()).collect())),
+            _ => {}
+        }
+    }
     if name.eq_ignore_ascii_case("GetType") {
         return Ok(get_type(value));
     }

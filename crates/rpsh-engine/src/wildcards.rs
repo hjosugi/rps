@@ -1,7 +1,7 @@
 //! Binding of the public System.Management.Automation wildcard types.
 use rpsh_runtime::{PsString, RuntimeError, Value, wildcard};
 
-use super::hidden_type;
+use super::{hidden_type, overload_error};
 
 const PATTERN_TYPE: &str = "System.Management.Automation.WildcardPattern";
 const OPTIONS_TYPE: &str = "System.Management.Automation.WildcardOptions";
@@ -92,17 +92,6 @@ fn invocation_error(method: &str, arity: usize, error: RuntimeError) -> RuntimeE
             ),
         },
         other => other,
-    }
-}
-
-fn overload_error(method: &str, arity: usize) -> RuntimeError {
-    RuntimeError::Script {
-        id: "MethodCountCouldNotFindBest",
-        category: "NotSpecified: (:) [], MethodException".into(),
-        exception_type: "System.Management.Automation.MethodException",
-        message: format!(
-            "Cannot find an overload for \"{method}\" and the argument count: \"{arity}\"."
-        ),
     }
 }
 

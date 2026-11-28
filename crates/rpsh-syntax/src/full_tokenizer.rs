@@ -797,7 +797,7 @@ impl Tokenizer<'_> {
     }
 
     fn keyword(&mut self) -> bool {
-        if self.mode == Mode::Command && !self.statement_start {
+        if (self.mode == Mode::Command && !self.statement_start) || self.follows_member_operator() {
             return false;
         }
         let Some((kind, len, end)) = self.word().and_then(|(word, end)| {
@@ -1118,11 +1118,8 @@ impl Tokenizer<'_> {
         true
     }
 
-    fn bareword(&mut self) -> bool {
-        let start = self.pos;
-        let mut at = self.pos;
-        let command_mode = self.mode == Mode::Command;
-        let after_dot = self.tokens.len() >= 2
+    fn follows_member_operator(&self) -> bool {
+        self.tokens.len() >= 2
             && matches!(
                 self.tokens[self.tokens.len() - 1].kind,
                 FullTokenKind::Dot | FullTokenKind::ColonColon
@@ -1130,7 +1127,14 @@ impl Tokenizer<'_> {
             && !matches!(
                 self.tokens[self.tokens.len() - 2].kind,
                 FullTokenKind::NewLine | FullTokenKind::Semi
-            );
+            )
+    }
+
+    fn bareword(&mut self) -> bool {
+        let start = self.pos;
+        let mut at = self.pos;
+        let command_mode = self.mode == Mode::Command;
+        let after_dot = self.follows_member_operator();
         while let Some(ch) = self.source[at..].chars().next() {
             let accepted = if command_mode && !after_dot {
                 ch.is_alphanumeric()
