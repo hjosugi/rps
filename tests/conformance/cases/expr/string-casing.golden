@@ -1,0 +1,35 @@
+rpsh-golden-v2
+exit=0
+IIİISßﬀẞΣΣΣᾈ𐐀
+iiiıſßﬀßσσςᾀ𐐨
+IIİıSßﬀẞΣΣΣᾈ𐐀
+iiİıſßﬀßσσςᾀ𐐨
+iiiıſßﬀßσσςᾀ𐐨
+IIİıSßﬀẞΣΣΣᾈ𐐀
+System.Globalization.CultureInfo
+en-US
+IIİISßﬀẞΣΣΣᾈ𐐀
+iiiıſßﬀßσσςᾀ𐐨
+System.Globalization.CultureInfo
+tr-TR
+İIİISßﬀẞΣΣΣᾈ𐐀
+iıiıſßﬀßσσςᾀ𐐨
+System.Globalization.CultureInfo
+az-Latn-AZ
+İIİISßﬀẞΣΣΣᾈ𐐀
+iıiıſßﬀßσσςᾀ𐐨
+System.Globalization.CultureInfo
+
+IIİıSßﬀẞΣΣΣᾈ𐐀
+iiİıſßﬀßσσςᾀ𐐨
+iıiıſßﬀßσσςᾀ𐐨
+İIİISßﬀẞΣΣΣᾈ𐐀
+IIİıSßﬀẞΣΣΣᾈ𐐀
+iıiıſßﬀßσσςᾀ𐐨
+1
+55296
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "culture", with value: "invalid!", for "ToLower" to type "System.Globalization.CultureInfo": "Cannot convert value "invalid!" to type "System.Globalization.CultureInfo". Error: "Culture is not supported. (Parameter 'name')
+invalid! is an invalid culture identifier.""
+MethodCountCouldNotFindBest
+Cannot find an overload for "ToUpperInvariant" and the argument count: "1".

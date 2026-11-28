@@ -44,8 +44,10 @@ expr/datetime-cast
 expr/int-arithmetic
 expr/math-static
 expr/path-static
+expr/string-casing
 expr/string-literals
 expr/string-methods
+expr/string-normalization
 expr/timespan
 expr/version-type
 lang/alias-filters

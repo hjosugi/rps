@@ -16,7 +16,9 @@ The ICU tailoring in crates/rpsh-runtime/src/culture/ignore_case.rules and
 the collation-element prefix and suffix matches in that directory follow the
 width and kana tables and affix comparisons in .NET 11.0.0's pal_collation.c.
 The full ordering of equal Sort-Object keys follows the same release's
-ArraySortHelper. The bounded heap follows PowerShell's Sort-Object.cs.
+ArraySortHelper. Unicode casing, normalization validation and ICU time
+patterns follow pal_casing.c, Normalization.Icu.cs and CultureData.Icu.cs.
+The bounded heap follows PowerShell's Sort-Object.cs.
 
   .NET Runtime — https://github.com/dotnet/runtime
   Copyright (c) .NET Foundation and Contributors.

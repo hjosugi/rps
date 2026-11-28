@@ -3,3 +3,5 @@
 ('カ','か','ｶ','a','Ａ','A' | Sort-Object -Unique -Stable) -join '|'
 ('カ','か','ｶ','a','Ａ','A' | Sort-Object -CaseSensitive -Stable) -join '|'
 'か' -eq 'カ'
+"$PSCulture|$PSUICulture|$((Get-Culture).LCID)"
+[CultureInfo]::CurrentCulture.DateTimeFormat.ShortTimePattern

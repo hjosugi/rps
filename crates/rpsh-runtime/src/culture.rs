@@ -3,6 +3,10 @@
 use crate::{PsString, RuntimeError};
 use std::cmp::Ordering;
 
+mod text;
+use text::ordinal_upper;
+pub use text::{NormalizationError, NormalizationForm, change_case};
+
 #[cfg(unix)]
 mod icu;
 
@@ -40,6 +44,61 @@ pub fn locale_for_lcid(id: u32) -> Option<String> {
     None
 }
 
+/// Canonical BCP 47 name and Windows LCID for a locale supported on Unix.
+pub fn locale_details(locale: &str) -> Option<(String, u32)> {
+    if locale.is_empty() || locale.eq_ignore_ascii_case("C") {
+        return Some((String::new(), 127));
+    }
+    if locale.eq_ignore_ascii_case("root") {
+        return Some((String::new(), 4096));
+    }
+    if !locale
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_'))
+    {
+        return None;
+    }
+    #[cfg(unix)]
+    if !invariant_mode() {
+        return icu::locale_details(locale);
+    }
+    None
+}
+
+/// Convert ICU's time pattern into DateTimeFormatInfo syntax.
+pub fn time_pattern(locale: &str, short: bool) -> Option<String> {
+    if locale.is_empty() {
+        return Some(if short { "HH:mm" } else { "HH:mm:ss" }.to_owned());
+    }
+    #[cfg(unix)]
+    if let Some(pattern) = icu::time_pattern(locale, short) {
+        let mut result = String::new();
+        let mut quoted = false;
+        let mut period = false;
+        let mut chars = pattern.chars().peekable();
+        while let Some(ch) = chars.next() {
+            match ch {
+                '\\' => result.push_str("\\\\"),
+                '\'' if chars.next_if_eq(&'\'').is_some() => result.push_str("\\\'"),
+                '\'' => {
+                    quoted = !quoted;
+                    result.push(ch);
+                }
+                _ if quoted => result.push(ch),
+                'a' | 'b' | 'B' if !period => {
+                    result.push_str("tt");
+                    period = true;
+                }
+                'H' | 'h' | 'm' | 's' => result.push(ch),
+                other if !other.is_ascii_alphabetic() => result.push(other),
+                _ => {}
+            }
+        }
+        return Some(result);
+    }
+    None
+}
+
 fn invariant_mode() -> bool {
     use std::sync::OnceLock;
     static ENABLED: OnceLock<bool> = OnceLock::new();
@@ -47,28 +106,6 @@ fn invariant_mode() -> bool {
         std::env::var("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT")
             .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
     })
-}
-
-// Ordinal ignore-case uses one-to-one uppercase mappings, retaining unpaired
-// UTF-16 units. It does not expand ligatures or fold a dotless i into ASCII I.
-fn ordinal_upper(units: &[u16]) -> Vec<u16> {
-    let mut folded = Vec::with_capacity(units.len());
-    for item in char::decode_utf16(units.iter().copied()) {
-        match item {
-            Ok(ch) => {
-                let mut mapped = ch.to_uppercase();
-                let first = mapped.next().unwrap_or(ch);
-                let upper = if mapped.next().is_some() || matches!(ch, '\u{131}' | '\u{17f}') {
-                    ch
-                } else {
-                    first
-                };
-                folded.extend_from_slice(upper.encode_utf16(&mut [0; 2]));
-            }
-            Err(error) => folded.push(error.unpaired_surrogate()),
-        }
-    }
-    folded
 }
 
 pub fn ordinal_compare(left: &[u16], right: &[u16], case_sensitive: bool) -> Ordering {

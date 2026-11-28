@@ -5,6 +5,8 @@
     reason = "Issue #36 owns the small POSIX and ICU C ABI boundary"
 )]
 
+use super::{Casing, NormalizationForm, text::map_units};
+use crate::PsString;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
@@ -55,6 +57,26 @@ type DefaultLocale = unsafe extern "C" fn() -> *const c_char;
 
 type LocaleForLcid = unsafe extern "C" fn(u32, *mut c_char, i32, *mut i32) -> i32;
 
+type SimpleCase = unsafe extern "C" fn(i32) -> i32;
+type GetNormalizer = unsafe extern "C" fn(*mut i32) -> *const c_void;
+type Normalize =
+    unsafe extern "C" fn(*const c_void, *const u16, i32, *mut u16, i32, *mut i32) -> i32;
+type IsNormalized = unsafe extern "C" fn(*const c_void, *const u16, i32, *mut i32) -> i8;
+
+type ToLanguageTag = unsafe extern "C" fn(*const c_char, *mut c_char, i32, i8, *mut i32) -> i32;
+type GetLcid = unsafe extern "C" fn(*const c_char) -> u32;
+type OpenDateFormat = unsafe extern "C" fn(
+    i32,
+    i32,
+    *const c_char,
+    *const u16,
+    i32,
+    *const u16,
+    i32,
+    *mut i32,
+) -> *mut c_void;
+type DatePattern = unsafe extern "C" fn(*const c_void, i8, *mut u16, i32, *mut i32) -> i32;
+
 struct Api {
     open: Open,
     close: Close,
@@ -69,6 +91,16 @@ struct Api {
     sort_key: SortKey,
     default_locale: DefaultLocale,
     locale_for_lcid: LocaleForLcid,
+    language_tag: ToLanguageTag,
+    get_lcid: GetLcid,
+    open_date: OpenDateFormat,
+    close_date: Close,
+    date_pattern: DatePattern,
+    upper: SimpleCase,
+    lower: SimpleCase,
+    normalizers: [GetNormalizer; 4],
+    normalize: Normalize,
+    is_normalized: IsNormalized,
     _library: Library,
 }
 
@@ -95,7 +127,7 @@ impl Api {
             ($name:literal, $signature:ty) => {{
                 let address = library.symbol(&format!("{}{suffix}", $name))?;
                 // SAFETY: these names and signatures are paired below exactly as
-                // declared by unicode/ucol.h. The owned library outlives all calls.
+                // declared by ICU’s unicode headers. The library outlives all calls.
                 unsafe { std::mem::transmute::<*mut c_void, $signature>(address.as_ptr()) }
             }};
         }
@@ -113,6 +145,21 @@ impl Api {
             sort_key: bind!("ucol_getSortKey", SortKey),
             default_locale: bind!("uloc_getDefault", DefaultLocale),
             locale_for_lcid: bind!("uloc_getLocaleForLCID", LocaleForLcid),
+            language_tag: bind!("uloc_toLanguageTag", ToLanguageTag),
+            get_lcid: bind!("uloc_getLCID", GetLcid),
+            open_date: bind!("udat_open", OpenDateFormat),
+            close_date: bind!("udat_close", Close),
+            date_pattern: bind!("udat_toPattern", DatePattern),
+            upper: bind!("u_toupper", SimpleCase),
+            lower: bind!("u_tolower", SimpleCase),
+            normalizers: [
+                bind!("unorm2_getNFCInstance", GetNormalizer),
+                bind!("unorm2_getNFDInstance", GetNormalizer),
+                bind!("unorm2_getNFKCInstance", GetNormalizer),
+                bind!("unorm2_getNFKDInstance", GetNormalizer),
+            ],
+            normalize: bind!("unorm2_normalize", Normalize),
+            is_normalized: bind!("unorm2_isNormalized", IsNormalized),
             _library: library,
         })
     }
@@ -395,5 +442,147 @@ pub(super) fn has_affix(
 ) -> Option<bool> {
     with_collator(locale, case_sensitive, |collator| {
         collator.has_affix(text, pattern, prefix)
+    })
+}
+
+pub(super) fn change_case(text: &PsString, casing: Casing, upper: bool) -> Option<PsString> {
+    CACHE.with_borrow(|cache| {
+        let api = cache.api.as_ref()?;
+        let convert = if upper { api.upper } else { api.lower };
+        let units = map_units(text.units(), casing, upper, false, |ch, _| {
+            // SAFETY: the simple Unicode case API takes and returns a single UChar32.
+            char::from_u32(unsafe { convert(ch as i32) } as u32).unwrap_or(ch)
+        });
+        Some(PsString::from_units(units))
+    })
+}
+
+impl Api {
+    fn normalizer(&self, form: NormalizationForm) -> Option<NonNull<c_void>> {
+        let index = match form {
+            NormalizationForm::C => 0,
+            NormalizationForm::D => 1,
+            NormalizationForm::Kc => 2,
+            NormalizationForm::Kd => 3,
+        };
+        let mut status = 0;
+        // SAFETY: ICU owns this immutable singleton for the lifetime of the library.
+        let handle = unsafe { (self.normalizers[index])(&mut status) };
+        if status > 0 {
+            return None;
+        }
+        NonNull::new(handle.cast_mut())
+    }
+}
+
+pub(super) fn normalize(text: &[u16], form: NormalizationForm) -> Option<Vec<u16>> {
+    CACHE.with_borrow(|cache| {
+        let api = cache.api.as_ref()?;
+        let normalizer = api.normalizer(form)?;
+        let length = i32::try_from(text.len()).ok()?;
+        let mut output = vec![0; text.len()];
+        loop {
+            let mut status = 0;
+            let capacity = i32::try_from(output.len()).ok()?;
+            // SAFETY: input and output are distinct buffers with the supplied lengths.
+            let count = unsafe {
+                (api.normalize)(
+                    normalizer.as_ptr(),
+                    text.as_ptr(),
+                    length,
+                    output.as_mut_ptr(),
+                    capacity,
+                    &mut status,
+                )
+            };
+            let needed = usize::try_from(count).ok()?;
+            if status == 15 && needed > output.len() {
+                // U_BUFFER_OVERFLOW_ERROR
+                output.resize(needed, 0);
+                continue;
+            }
+            if status > 0 || needed > output.len() {
+                return None;
+            }
+            output.truncate(needed);
+            return Some(output);
+        }
+    })
+}
+
+pub(super) fn is_normalized(text: &[u16], form: NormalizationForm) -> Option<bool> {
+    CACHE.with_borrow(|cache| {
+        let api = cache.api.as_ref()?;
+        let normalizer = api.normalizer(form)?;
+        let length = i32::try_from(text.len()).ok()?;
+        let mut status = 0;
+        // SAFETY: the singleton and immutable UTF-16 slice live until the call returns.
+        let result =
+            unsafe { (api.is_normalized)(normalizer.as_ptr(), text.as_ptr(), length, &mut status) };
+        (status <= 0).then_some(result != 0)
+    })
+}
+
+pub(super) fn locale_details(name: &str) -> Option<(String, u32)> {
+    let locale = CString::new(name).ok()?;
+    CACHE.with_borrow(|cache| {
+        let api = cache.api.as_ref()?;
+        let mut tag = [0u8; 157]; // ULOC_FULLNAME_CAPACITY
+        let mut status = 0;
+        // SAFETY: locale is NUL-terminated; ICU writes at most the buffer capacity.
+        let len = unsafe {
+            (api.language_tag)(
+                locale.as_ptr(),
+                tag.as_mut_ptr().cast(),
+                tag.len() as i32,
+                0,
+                &mut status,
+            )
+        };
+        if status > 0 || len <= 0 {
+            return None;
+        }
+        let tag = std::str::from_utf8(tag.get(..len as usize)?).ok()?;
+        let lcid = unsafe { (api.get_lcid)(locale.as_ptr()) };
+        Some((tag.to_owned(), if lcid == 0 { 4096 } else { lcid }))
+    })
+}
+
+pub(super) fn time_pattern(locale: &str, short: bool) -> Option<String> {
+    let locale = CString::new(locale).ok()?;
+    CACHE.with_borrow(|cache| {
+        let api = cache.api.as_ref()?;
+        let mut status = 0;
+        // SAFETY: UDAT_SHORT / UDAT_MEDIUM with UDAT_NONE for the date;
+        // no pattern or timezone buffer is supplied.
+        let raw = unsafe {
+            (api.open_date)(
+                if short { 3 } else { 2 },
+                -1,
+                locale.as_ptr(),
+                ptr::null(),
+                0,
+                ptr::null(),
+                0,
+                &mut status,
+            )
+        };
+        let handle = NonNull::new(raw)?;
+        let mut pattern = [0u16; 157];
+        let len = unsafe {
+            (api.date_pattern)(
+                handle.as_ptr(),
+                0,
+                pattern.as_mut_ptr(),
+                pattern.len() as i32,
+                &mut status,
+            )
+        };
+        // SAFETY: every successful udat_open above owns exactly one handle.
+        unsafe { (api.close_date)(handle.as_ptr()) };
+        if status > 0 {
+            return None;
+        }
+        String::from_utf16(pattern.get(..usize::try_from(len).ok()?)?).ok()
     })
 }

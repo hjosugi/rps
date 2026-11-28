@@ -14,6 +14,7 @@
 mod aliases;
 mod encoding;
 mod environment;
+mod globalization;
 mod native;
 mod redirection;
 mod sorting;
@@ -2279,7 +2280,7 @@ impl Engine {
                     .collect();
                 Ok(Some(outputs))
             }
-            "get-culture" | "get-uiculture" => Ok(Some(vec![culture_value()])),
+            "get-culture" | "get-uiculture" => Ok(Some(vec![globalization::current_culture()])),
             "resolve-path" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
@@ -8346,6 +8347,9 @@ fn automatic_variable(name: &str) -> Option<Value> {
         key if key.eq_ignore_ascii_case("PSHOME") => Some(Value::String(
             environment::ps_home().to_string_lossy().as_ref().into(),
         )),
+        key if key.eq_ignore_ascii_case("PSCulture") || key.eq_ignore_ascii_case("PSUICulture") => {
+            Some(Value::String(globalization::current_name().into()))
+        }
         "PSStyle" => Some(Value::object(vec![(
             "OutputRendering".to_owned(),
             Value::String("PlainText".into()),
@@ -8404,6 +8408,8 @@ fn type_full_name(name: &str) -> String {
         "double" => "System.Double".to_owned(),
         "decimal" => "System.Decimal".to_owned(),
         "biginteger" => "System.Numerics.BigInteger".to_owned(),
+        "cultureinfo" | "globalization.cultureinfo" => globalization::CULTURE_TYPE.to_owned(),
+        "text.normalizationform" => globalization::FORM_TYPE.to_owned(),
         "pscustomobject" => "System.Management.Automation.PSCustomObject".to_owned(),
         _ => name.to_owned(),
     }
@@ -8805,19 +8811,6 @@ fn datetime_value(year: i32, month: i32, day: i32, hour: i32, minute: i32, secon
     ])
 }
 
-fn culture_value() -> Value {
-    Value::object(vec![
-        ("Name".to_owned(), Value::String("en-US".into())),
-        (
-            "DateTimeFormat".to_owned(),
-            Value::object(vec![(
-                "LongTimePattern".to_owned(),
-                Value::String("h:mm:ss\u{202F}tt".into()),
-            )]),
-        ),
-    ])
-}
-
 fn parse_timespan_text(text: &str) -> Option<i64> {
     let text = text.trim();
     let negative = text.starts_with('-');
@@ -8911,8 +8904,14 @@ fn static_member(
         };
     }
     match (kind.as_str(), name.as_str()) {
-        ("cultureinfo", "currentculture") | ("cultureinfo", "currentuiculture") => {
-            Ok(culture_value())
+        ("cultureinfo" | "globalization.cultureinfo", "currentculture" | "currentuiculture") => {
+            Ok(globalization::current_culture())
+        }
+        ("cultureinfo" | "globalization.cultureinfo", "invariantculture") => {
+            Ok(globalization::invariant_culture())
+        }
+        ("text.normalizationform", form) => {
+            Ok(globalization::form_member(form).unwrap_or(Value::Null))
         }
         ("datetimekind", "utc") => Ok(Value::Int32(1)),
         ("datetimekind", "local") => Ok(Value::Int32(2)),
@@ -8983,6 +8982,9 @@ fn invoke_static(
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        ("cultureinfo" | "globalization.cultureinfo", method @ ("new" | "getcultureinfo")) => {
+            globalization::culture_method(method, arguments)
+        }
         (
             "environment",
             method @ ("getenvironmentvariable"
@@ -9557,6 +9559,12 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         });
     }
     match type_name.to_ascii_lowercase().as_str() {
+        "cultureinfo" | "globalization.cultureinfo" | "system.globalization.cultureinfo" => {
+            globalization::cast_culture(&value)
+        }
+        "text.normalizationform" | "system.text.normalizationform" => {
+            globalization::cast_form(&value)
+        }
         "pscustomobject" | "system.management.automation.pscustomobject" => Ok(value),
         "ordered" | "ordereddictionary" | "system.collections.specialized.ordereddictionary" => Ok(
             mark_hashtable(value, "System.Collections.Specialized.OrderedDictionary"),
@@ -10008,19 +10016,12 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
             let needle = needle_units(arguments.first())?;
             Ok(Value::Bool(find_units(&units, &needle).is_some()))
         }
-        "toupper" | "toupperinvariant" | "tolower" | "tolowerinvariant" => {
-            let ascii = text.as_ascii().ok_or(RuntimeError::NotImplemented {
-                feature: "culture-aware case conversion (ICU)",
-            })?;
-            let upper = name.eq_ignore_ascii_case("toupper")
-                || name.eq_ignore_ascii_case("toupperinvariant");
-            let result = if upper {
-                ascii.to_ascii_uppercase()
-            } else {
-                ascii.to_ascii_lowercase()
-            };
-            Ok(Value::String(result.into()))
-        }
+        "toupper" => globalization::case_method(text,"ToUpper",arguments),
+        "toupperinvariant" => globalization::case_method(text,"ToUpperInvariant",arguments),
+        "tolower" => globalization::case_method(text,"ToLower",arguments),
+        "tolowerinvariant" => globalization::case_method(text,"ToLowerInvariant",arguments),
+        "normalize" => globalization::normalization(text,"Normalize",arguments),
+        "isnormalized" => globalization::normalization(text,"IsNormalized",arguments),
         "split" => {
             let needle = needle_units(arguments.first())?;
             let mut parts = Vec::new();
@@ -10153,6 +10154,11 @@ fn object_method(
     name: &str,
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
+    if arguments.is_empty() && name.eq_ignore_ascii_case("ToString")
+        && entries.iter().any(|(k, v)| k == "__TypeName" && matches!(v, Value::String(t) if matches!(t.as_ascii(),Some(globalization::CULTURE_TYPE | globalization::FORM_TYPE))))
+        && let Some((_,text))=entries.iter().find(|(key,_)|key=="__Text") {
+        return Ok(text.clone());
+    }
     if let Some(table) = environment::table_entries(entries)
         && let [key] = arguments
         && (name.eq_ignore_ascii_case("ContainsKey") || name.eq_ignore_ascii_case("Contains"))
@@ -10447,6 +10453,9 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
 }
 
 fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
+    if let Some(result) = globalization::culture_property(value, name) {
+        return result;
+    }
     if let Value::Object(entries) = value
         && let Some(table) = environment::table_entries(entries)
     {

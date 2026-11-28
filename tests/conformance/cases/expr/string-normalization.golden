@@ -1,0 +1,45 @@
+rpsh-golden-v2
+exit=0
+False
+True
+Ǻ
+3
+3
+ffA
+ffA
+2
+200
+0
+True
+3
+True
+6
+FormKC
+System.Text.NormalizationForm
+ArgumentException
+Exception calling "Normalize" with "0" argument(s): "String contains invalid Unicode code points. (Parameter 'strInput')"
+ArgumentException
+Exception calling "IsNormalized" with "1" argument(s): "String contains invalid Unicode code points. (Parameter 'source')"
+ArgumentException
+Exception calling "Normalize" with "0" argument(s): "String contains invalid Unicode code points. (Parameter 'strInput')"
+ArgumentException
+Exception calling "IsNormalized" with "1" argument(s): "String contains invalid Unicode code points. (Parameter 'source')"
+ArgumentException
+Exception calling "Normalize" with "0" argument(s): "String contains invalid Unicode code points. (Parameter 'strInput')"
+ArgumentException
+Exception calling "IsNormalized" with "1" argument(s): "String contains invalid Unicode code points. (Parameter 'source')"
+MethodCountCouldNotFindBest
+Cannot find an overload for "Normalize" and the argument count: "1".
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "normalizationForm", with value: "7", for "Normalize" to type "System.Text.NormalizationForm": "Cannot convert value "7" to type "System.Text.NormalizationForm" due to enumeration values that are not valid. Specify one of the following enumeration values and try again. The possible enumeration values are "FormC,FormD,FormKC,FormKD"."
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "normalizationForm", with value: "bogus", for "Normalize" to type "System.Text.NormalizationForm": "Cannot convert value "bogus" to type "System.Text.NormalizationForm". Error: "Unable to match the identifier name bogus to a valid enumerator name. Specify one of the following enumerator names and try again:
+FormC, FormD, FormKC, FormKD""
+2
+1
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "normalizationForm", with value: "0x2", for "Normalize" to type "System.Text.NormalizationForm": "Cannot convert value "0x2" to type "System.Text.NormalizationForm". Error: "Unable to match the identifier name 0x2 to a valid enumerator name. Specify one of the following enumerator names and try again:
+FormC, FormD, FormKC, FormKD""
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "normalizationForm", with value: "FormK", for "Normalize" to type "System.Text.NormalizationForm": "Cannot convert value "FormK" to type "System.Text.NormalizationForm". Error: "The identifier name FormK cannot be processed because it is either too similar or identical to the following enumerator names: FormKC, FormKD. Use a more specific identifier name.""
+UndefinedIntegerToEnum
