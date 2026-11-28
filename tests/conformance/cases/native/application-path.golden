@@ -1,0 +1,30 @@
+rpsh-golden-v2
+exit=0
+a
+rpsh-path-test
+System.Management.Automation.ApplicationInfo
+Application
+0.0.0.0
+True
+True
+temp/a/rpsh-path-test|temp/b/rpsh-path-test
+b
+2
+True
+NativeCommandFailed
+System.Management.Automation.ApplicationFailedException
+True
+a
+b
+absolute
+CommandNotFoundException
+
+CommandType     Name                                               Version    S
+                                                                              o
+                                                                              u
+                                                                              r
+                                                                              c
+                                                                              e
+-----------     ----                                               -------    -
+Application     sh                                                 0.0.0.0    /
+

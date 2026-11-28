@@ -120,6 +120,17 @@ pub(super) fn entries(variables: &Variables) -> BTreeMap<String, Value> {
     entries
 }
 
+pub(super) fn search_path(variables: &Variables) -> std::borrow::Cow<'_, str> {
+    use std::borrow::Cow;
+    match variables.get("env:PATH") {
+        None => Cow::Borrowed(&startup()[0].1),
+        Some(Value::String(s)) => s
+            .as_ascii()
+            .map_or_else(|| Cow::Owned(s.to_string_lossy()), Cow::Borrowed),
+        Some(value) => Cow::Owned(value.to_string()),
+    }
+}
+
 pub(super) fn configure_child(command: &mut Command, variables: &Variables) {
     for (key, value) in startup() {
         command.env(key, value);

@@ -1,9 +1,11 @@
 mod glob;
+mod path;
+pub(super) use path::LookupPaths;
 
 use super::encoding::Encoding;
 use super::{encoding, format_out_string, redirection::text_output_width};
 use std::borrow::Cow;
-use std::io::{self, Write};
+use std::io::Write;
 use std::process::{Command, Stdio};
 
 use rpsh_commands::{CORE_CMDLETS, MODULES};
@@ -27,7 +29,38 @@ pub(super) struct NativeStage<'a> {
     pub(super) file: Option<(&'a Expr, bool)>,
 }
 
+pub(super) const APPLICATION_TYPE: &str = "System.Management.Automation.ApplicationInfo";
+
+pub(super) fn application_info(path: std::path::PathBuf) -> Value {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let extension = path
+        .extension()
+        .map_or_else(String::new, |ext| format!(".{}", ext.to_string_lossy()));
+    let full = Value::String(path.to_string_lossy().as_ref().into());
+    Value::object(vec![
+        ("Name".into(), Value::String(name.as_ref().into())),
+        ("__TypeName".into(), Value::String(APPLICATION_TYPE.into())),
+        ("__Text".into(), Value::String(name.as_ref().into())),
+        ("CommandType".into(), Value::String("Application".into())),
+        ("Path".into(), full.clone()),
+        ("Source".into(), full.clone()),
+        ("Definition".into(), full),
+        ("Extension".into(), Value::String(extension.into())),
+        ("Version".into(), super::version_value("0.0.0.0".into())),
+        ("ModuleName".into(), Value::String("".into())),
+        ("Visibility".into(), Value::String("Public".into())),
+    ])
+}
+
 impl Engine {
+    pub(super) fn application_paths(&mut self, name: &str, all: bool) -> Vec<std::path::PathBuf> {
+        let path = super::environment::search_path(&self.variables);
+        self.command_paths.update(&path, || {
+            super::environment::get(&self.variables, "HOME").map(|v| v.to_string())
+        });
+        self.command_paths.find(name, all)
+    }
+
     pub(super) fn native_stage<'a>(&self, stage: &'a PipelineCommand) -> Option<NativeStage<'a>> {
         let (stage, file) = match stage {
             PipelineCommand::Redirected {
@@ -95,7 +128,12 @@ impl Engine {
     ) -> Result<Vec<Value>, EngineError> {
         let mut commands = Vec::with_capacity(stages.len());
         for stage in stages {
-            let mut command = Command::new(stage.name.as_ref());
+            let path = self
+                .application_paths(&stage.name, false)
+                .into_iter()
+                .next()
+                .ok_or_else(|| command_not_found(&stage.name))?;
+            let mut command = Command::new(path);
             command.args(self.native_arguments(stage.arguments)?);
             super::environment::configure_child(&mut command, &self.variables);
             commands.push(command);
@@ -123,15 +161,19 @@ impl Engine {
         let stdin = (input.is_some() || !self.console_stdio).then_some(bytes.as_slice());
         let status =
             run_pipeline_with_input(commands, stdin, output).map_err(|error| match error {
-                PipelineError::Spawn { program, error }
-                    if error.kind() == io::ErrorKind::NotFound =>
-                {
-                    EngineError::from(command_not_found(&program.to_string_lossy()))
+                PipelineError::Spawn { program, error } => {
+                    let path = std::path::Path::new(&program);
+                    let file = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
+                    let directory = std::env::current_dir().unwrap_or_default();
+                    let reason = error.to_string();
+                    let reason = reason.split(" (os error ").next().unwrap_or(&reason);
+                    RuntimeError::Script {
+                        id: "NativeCommandFailed",
+                        category: "ResourceUnavailable: (:) [], ApplicationFailedException".into(),
+                        exception_type: "System.Management.Automation.ApplicationFailedException",
+                        message: format!("Program '{file}' failed to run: An error occurred trying to start process '{}' with working directory '{}'. {reason}",path.display(),directory.display()),
+                    }.into()
                 }
-                PipelineError::Spawn { .. } => RuntimeError::NotImplemented {
-                    feature: "starting a native command",
-                }
-                .into(),
                 PipelineError::Io(error) => EngineError::Io(error),
             })?;
         self.last_failed = !status.all_succeeded;

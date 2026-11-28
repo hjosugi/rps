@@ -80,6 +80,13 @@ count the same lines and lengths, and pass the same byte streams between
 processes. Every timed sample must reproduce pwsh's stdout and exit code.
 The JSON includes the Bash executable, version and per-case samples.
 
+On Unix, rpsh caches the ordered directories in the shell's `PATH` and checks
+the filesystem on each invocation. A new executable in an earlier directory
+therefore takes precedence immediately. Passing the resolved path to Rust's
+process API allows its Linux `posix_spawn` implementation to handle a
+shell-local `PATH`. Adjacent native commands exchange bytes through OS pipes.
+The engine splits output into lines when it enters a PowerShell object pipeline.
+
 `cargo harness bench --suite shells` compares the installed shells (bash,
 dash, zsh, fish, nu, pwsh and rpsh): a one-line run through `wait4`, and the
 time to the first output on a pseudo-terminal, which is the prompt. A shell

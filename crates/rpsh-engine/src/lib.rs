@@ -49,6 +49,7 @@ pub struct Engine {
     /// The console host can hand its actual descriptors to native children.
     /// Embedded engines continue to use the caller's Write implementation.
     console_stdio: bool,
+    command_paths: native::LookupPaths,
     /// While running a pipeline stage, output is collected here instead of
     /// being written to the host.
     capture: Option<Vec<Value>>,
@@ -5243,7 +5244,8 @@ impl Engine {
                         }
                     }
                 }
-                let wanted = wildcards::Command::GetCommand.patterns(&wanted)?;
+                let requested_names = wanted;
+                let wanted = wildcards::Command::GetCommand.patterns(&requested_names)?;
                 let word_patterns = |field: &str| {
                     let patterns = named
                         .iter()
@@ -5312,6 +5314,43 @@ impl Engine {
                                 ("CommandType".to_owned(), Value::String(kind.into())),
                             ]));
                         }
+                    }
+                }
+                if !requested_names.is_empty()
+                    && verb.is_empty()
+                    && noun.is_empty()
+                    && command_type
+                        .as_deref()
+                        .is_none_or(|kind| kind.eq_ignore_ascii_case("Application"))
+                {
+                    let all = command_type.is_some()
+                        || named.iter().any(|(key, value)| {
+                            key.eq_ignore_ascii_case("All") && ops::is_true(value)
+                        });
+                    for name in requested_names {
+                        let already_found = !all
+                            && outputs.iter().any(|entry| {
+                                member(entry, "Name").is_ok_and(|value| {
+                                    value.to_string().eq_ignore_ascii_case(&name)
+                                })
+                            });
+                        if already_found
+                            || rpsh_runtime::wildcard::contains_wildcard_characters(
+                                name.encode_utf16(),
+                            )
+                        {
+                            continue;
+                        }
+                        outputs.extend(
+                            self.application_paths(&name, all)
+                                .into_iter()
+                                .filter(|path| {
+                                    !path
+                                        .extension()
+                                        .is_some_and(|ext| ext.eq_ignore_ascii_case("ps1"))
+                                })
+                                .map(native::application_info),
+                        );
                     }
                 }
                 Ok(Some(outputs))
@@ -5393,6 +5432,7 @@ impl Engine {
                 ),
             )])])),
             "set-location" => {
+                self.command_paths.remember_process_directory();
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
@@ -5418,6 +5458,7 @@ impl Engine {
                 Ok(Some(Vec::new()))
             }
             "push-location" => {
+                self.command_paths.remember_process_directory();
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
@@ -6324,9 +6365,7 @@ impl Engine {
                 self.host_text = true;
                 return Ok(());
             }
-            if datetime_fields(&value).is_some()
-                || hidden_type(&value).as_deref() == Some(aliases::TYPE_NAME)
-            {
+            if datetime_fields(&value).is_some() || is_command_info(&value) {
                 self.host_objects.push(value);
                 return Ok(());
             }
@@ -7316,8 +7355,15 @@ fn format_marker(value: &Value) -> Option<String> {
     })
 }
 
+fn is_command_info(value: &Value) -> bool {
+    matches!(
+        hidden_type(value).as_deref(),
+        Some(aliases::TYPE_NAME | native::APPLICATION_TYPE)
+    )
+}
+
 fn uses_command_table(first: &Value) -> bool {
-    hidden_type(first).as_deref() == Some(aliases::TYPE_NAME)
+    is_command_info(first)
         && format_marker(first).as_deref() != Some("List")
         && format_table_properties(first).is_empty()
 }

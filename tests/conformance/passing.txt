@@ -101,6 +101,7 @@ lang/wildcard
 modules/import
 modules/import-many
 modules/utility-alias
+native/application-path
 native/byte-pipe
 native/capture
 native/console-encoding
