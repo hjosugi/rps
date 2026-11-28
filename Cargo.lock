@@ -30,6 +30,7 @@ version = "0.0.306"
 dependencies = [
  "rpsh-commands",
  "rpsh-format",
+ "rpsh-native",
  "rpsh-runtime",
  "rpsh-syntax",
 ]

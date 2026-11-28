@@ -9,12 +9,6 @@ use super::{
     Engine, EngineError, error_record, expand_glob, flatten_value, format_out_string, hidden_type,
 };
 
-pub(super) enum NativeOutput<'a> {
-    Objects,
-    Host(&'a mut dyn Write),
-    Redirected(&'a OutputTarget),
-}
-
 /// Native stdout goes directly to the file. PowerShell values use Out-File's
 /// formatting and UTF-8 encoding before they reach the same destination.
 pub(super) enum OutputTarget {
@@ -23,7 +17,7 @@ pub(super) enum OutputTarget {
 }
 
 impl OutputTarget {
-    fn open(path: Value, append: bool) -> Result<Self, EngineError> {
+    pub(super) fn open(path: Value, append: bool) -> Result<Self, EngineError> {
         if path.is_null_like() {
             return Ok(Self::Discard);
         }

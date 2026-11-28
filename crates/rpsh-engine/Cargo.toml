@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 rpsh-commands.workspace = true
 rpsh-format.workspace = true
+rpsh-native.workspace = true
 rpsh-syntax.workspace = true
 rpsh-runtime.workspace = true
 

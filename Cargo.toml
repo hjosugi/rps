@@ -34,6 +34,7 @@ rpsh-syntax = { version = "0.0.306", path = "crates/rpsh-syntax" }
 rpsh-runtime = { version = "0.0.306", path = "crates/rpsh-runtime" }
 rpsh-engine = { version = "0.0.306", path = "crates/rpsh-engine" }
 rpsh-messages = { version = "0.0.306", path = "crates/rpsh-messages" }
+rpsh-native = { version = "0.0.306", path = "crates/rpsh-native" }
 rpsh-host = { version = "0.0.306", path = "crates/rpsh-host" }
 
 [workspace.lints.rust]

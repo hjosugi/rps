@@ -12,15 +12,16 @@
 //! on first use.
 
 mod aliases;
+mod native;
 mod redirection;
 
 use aliases::Aliases;
-use redirection::{NativeOutput, OutputTarget, record_prefix};
+use native::NativeOutput;
+use redirection::{OutputTarget, record_prefix};
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
 use std::path::Path;
-use std::process::Stdio;
 
 use rpsh_commands::{BuiltinModule, MODULES};
 use rpsh_format::{CommandTableItem, command_table};
@@ -1170,13 +1171,10 @@ impl Engine {
                 self.flush_host(out)?;
                 NativeOutput::Host(out)
             };
-            if let Some(outputs) = self.run_native(name, arguments, &[], destination)? {
-                for value in outputs {
-                    self.write_value(value, out)?;
-                }
-                return Ok(Flow::Normal);
+            for value in self.run_native(name, arguments, &[], destination)? {
+                self.write_value(value, out)?;
             }
-            return Err(command_not_found(name).into());
+            return Ok(Flow::Normal);
         }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -1364,7 +1362,11 @@ impl Engine {
         commands: &[PipelineCommand],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
-        let outputs = self.pipeline_output(commands)?;
+        let host = self
+            .capture
+            .is_none()
+            .then_some(&mut *out as &mut dyn Write);
+        let outputs = self.collect_pipeline(commands, host)?;
         for value in outputs {
             self.write_value(value, out)?;
         }
@@ -1413,22 +1415,62 @@ impl Engine {
     }
 
     fn pipeline_output(&mut self, commands: &[PipelineCommand]) -> Result<Vec<Value>, EngineError> {
+        self.collect_pipeline(commands, None)
+    }
+
+    fn collect_pipeline(
+        &mut self,
+        mut commands: &[PipelineCommand],
+        mut host: Option<&mut dyn Write>,
+    ) -> Result<Vec<Value>, EngineError> {
         let mut input = Vec::new();
         let mut failed = false;
-        for command in commands {
-            input = match command {
-                PipelineCommand::Expression(expr) => {
-                    let value = self.eval_pipeline_expression(expr)?;
-                    flatten_value(value)
+        while let Some((command, remaining)) = commands.split_first() {
+            commands = remaining;
+            if let Some(first) = self.native_stage(command) {
+                let mut stages = vec![first];
+                while stages.last().is_some_and(|stage| stage.file.is_none()) {
+                    let Some((next, remaining)) = commands.split_first() else {
+                        break;
+                    };
+                    let Some(next) = self.native_stage(next) else {
+                        break;
+                    };
+                    stages.push(next);
+                    commands = remaining;
                 }
-                PipelineCommand::Command { name, arguments } => {
-                    self.run_command(name, arguments, input, None)?
-                }
-                PipelineCommand::Redirected {
-                    command,
-                    redirections,
-                } => self.run_redirected(command, input, redirections)?,
-            };
+                let file = stages.last().and_then(|stage| stage.file);
+                let target = match file {
+                    Some((path, append)) => {
+                        Some(OutputTarget::open(self.eval_expression(path)?, append)?)
+                    }
+                    None => None,
+                };
+                let destination = if let Some(target) = &target {
+                    NativeOutput::Redirected(target)
+                } else if commands.is_empty()
+                    && let Some(out) = host.take()
+                {
+                    self.flush_host(out)?;
+                    NativeOutput::Host(out)
+                } else {
+                    NativeOutput::Objects
+                };
+                input = self.run_native_stages(&stages, &input, destination)?;
+            } else {
+                input = match command {
+                    PipelineCommand::Expression(expr) => {
+                        flatten_value(self.eval_pipeline_expression(expr)?)
+                    }
+                    PipelineCommand::Command { name, arguments } => {
+                        self.run_command(name, arguments, input, None)?
+                    }
+                    PipelineCommand::Redirected {
+                        command,
+                        redirections,
+                    } => self.run_redirected(command, input, redirections)?,
+                };
+            }
             failed |= self.last_failed;
         }
         self.last_failed = failed;
@@ -1450,10 +1492,7 @@ impl Engine {
                 return Ok(outputs);
             }
             let destination = output.map_or(NativeOutput::Objects, NativeOutput::Redirected);
-            if let Some(outputs) = self.run_native(name, arguments, &input, destination)? {
-                return Ok(outputs);
-            }
-            return Err(command_not_found(name).into());
+            return self.run_native(name, arguments, &input, destination);
         }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -5785,114 +5824,6 @@ impl Engine {
             .into()),
             _ => Ok(None),
         }
-    }
-
-    /// Runs an external program. `Ok(None)` means the executable was not
-    /// found, so the caller reports a command-not-found refusal.
-    fn run_native(
-        &mut self,
-        name: &str,
-        arguments: &[CommandArgument],
-        input: &[Value],
-        destination: NativeOutput<'_>,
-    ) -> Result<Option<Vec<Value>>, EngineError> {
-        let arguments = self.native_arguments(arguments)?;
-        let mut command = std::process::Command::new(name);
-        command
-            .args(&arguments)
-            .stdin(Stdio::piped())
-            .stdout(match &destination {
-                NativeOutput::Redirected(target) => target.stdio()?,
-                NativeOutput::Host(_) | NativeOutput::Objects => Stdio::piped(),
-            })
-            .stderr(Stdio::inherit());
-        for (key, value) in &self.variables {
-            if let Some(env_name) = key.strip_prefix("env:") {
-                match value {
-                    Value::Null | Value::AutomationNull => {
-                        command.env_remove(env_name);
-                    }
-                    value => {
-                        command.env(env_name, value.to_string());
-                    }
-                }
-            }
-        }
-        let mut child = match command.spawn() {
-            Ok(child) => child,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(_) => {
-                return Err(RuntimeError::NotImplemented {
-                    feature: "starting a native command",
-                }
-                .into());
-            }
-        };
-        if let Some(mut stdin) = child.stdin.take() {
-            let mut text = String::new();
-            for (index, item) in input.iter().enumerate() {
-                if index > 0 {
-                    text.push('\n');
-                }
-                text.push_str(&item.to_string());
-            }
-            if !input.is_empty() {
-                text.push('\n');
-            }
-            let _ = stdin.write_all(text.as_bytes());
-        }
-        let output = child
-            .wait_with_output()
-            .map_err(|_| RuntimeError::NotImplemented {
-                feature: "waiting for a native command",
-            })?;
-        let code = native_exit_code(output.status);
-        self.last_failed = !output.status.success();
-        self.assign_variable("global:LASTEXITCODE", Value::Int32(code));
-        if let NativeOutput::Host(writer) = destination {
-            writer.write_all(&output.stdout)?;
-            return Ok(Some(Vec::new()));
-        }
-        let lines = String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .map(|line| Value::String(line.into()))
-            .collect();
-        Ok(Some(lines))
-    }
-
-    fn native_arguments(
-        &mut self,
-        arguments: &[CommandArgument],
-    ) -> Result<Vec<String>, EngineError> {
-        let mut out = Vec::new();
-        for argument in arguments {
-            match argument {
-                CommandArgument::Bareword(word) => {
-                    if word.contains(['*', '?']) {
-                        let matches = expand_glob(word);
-                        if matches.is_empty() {
-                            out.push(word.clone());
-                        } else {
-                            out.extend(matches);
-                        }
-                    } else {
-                        out.push(word.clone());
-                    }
-                }
-                CommandArgument::Value(expr) => {
-                    let value = evaluate(expr, &mut self.variables, !self.last_failed)?;
-                    out.push(value.to_string());
-                }
-                CommandArgument::Parameter { name, value } => {
-                    out.push(format!("-{name}"));
-                    if let Some(expr) = value {
-                        let value = evaluate(expr, &mut self.variables, !self.last_failed)?;
-                        out.push(value.to_string());
-                    }
-                }
-            }
-        }
-        Ok(out)
     }
 
     fn provider_children(

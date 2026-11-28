@@ -21,4 +21,9 @@
 //!
 //! # Status
 //!
-//! Empty.
+//! Connects consecutive native commands with OS pipes. The engine encodes
+//! and decodes values only at the ends of a native pipeline.
+
+mod pipe;
+
+pub use pipe::{Destination, PipelineError, PipelineStatus, run_pipeline};
