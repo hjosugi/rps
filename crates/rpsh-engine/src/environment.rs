@@ -79,7 +79,7 @@ fn startup() -> &'static [(String, String); 2] {
 
 pub(super) fn get(variables: &Variables, name: &str) -> Option<Value> {
     let name = name.split('\0').next().unwrap_or("");
-    if let Some(value) = variables.get(&format!("env:{name}")) {
+    if let Some(value) = variables.environment_value(&format!("env:{name}")) {
         return (!value.is_null_like()).then(|| value.clone());
     }
     if matches!(name, "PATH" | "PSModulePath")
@@ -112,7 +112,7 @@ pub(super) fn entries(variables: &Variables) -> BTreeMap<String, Value> {
     for (name, value) in startup() {
         entries.insert(name.clone(), Value::String(value.as_str().into()));
     }
-    for (key, value) in variables.iter() {
+    for (key, value) in variables.environment() {
         if let Some(name) = key.strip_prefix("env:") {
             if value.is_null_like() {
                 entries.remove(name);
@@ -125,7 +125,7 @@ pub(super) fn entries(variables: &Variables) -> BTreeMap<String, Value> {
 }
 
 pub(super) fn search_path(variables: &Variables) -> Cow<'_, str> {
-    match variables.get("env:PATH") {
+    match variables.environment_value("env:PATH") {
         None => Cow::Borrowed(&startup()[0].1),
         Some(Value::String(s)) => s
             .as_ascii()
@@ -140,7 +140,7 @@ pub(super) fn child_overrides(
     let initial = startup()
         .iter()
         .map(|(key, value)| (key.as_str(), Some(Cow::Borrowed(value.as_str()))));
-    let assigned = variables.iter().filter_map(|(key, value)| {
+    let assigned = variables.environment().filter_map(|(key, value)| {
         Some((
             key.strip_prefix("env:")?,
             (!value.is_null_like()).then(|| Cow::Owned(value.to_string())),

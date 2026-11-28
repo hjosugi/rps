@@ -206,25 +206,42 @@ impl Engine {
 
     fn eval_dictionary(
         &mut self,
-        entries: &[(String, Expr)],
+        entries: &[(rpsh_syntax::HashtableKey, Expr)],
         ty: &str,
     ) -> Result<Value, EngineError> {
         let mut fields = Vec::with_capacity(entries.len());
         for (name, expression) in entries {
-            fields.push((name.clone(), self.eval_expression(expression)?));
+            fields.push((name.text().to_owned(), self.eval_expression(expression)?));
         }
+        let numeric_keys: Vec<_> = entries
+            .iter()
+            .filter_map(|(key, _)| match key {
+                rpsh_syntax::HashtableKey::Number(text) => {
+                    Some(Value::String(text.as_str().into()))
+                }
+                _ => None,
+            })
+            .collect();
         Ok(match ty {
             "hashtable" => {
                 if !fields.is_empty() && fields.iter().all(|(name, _)| name.parse::<i64>().is_ok())
                 {
                     fields = order_hashtable(fields);
                 }
+                if !numeric_keys.is_empty() {
+                    fields.push(("__NumericKeys".into(), Value::array(numeric_keys)));
+                }
                 mark_hashtable(Value::object(fields), "System.Collections.Hashtable")
             }
-            "ordered" => mark_hashtable(
-                Value::object(fields),
-                "System.Collections.Specialized.OrderedDictionary",
-            ),
+            "ordered" => {
+                if !numeric_keys.is_empty() {
+                    fields.push(("__NumericKeys".into(), Value::array(numeric_keys)));
+                }
+                mark_hashtable(
+                    Value::object(fields),
+                    "System.Collections.Specialized.OrderedDictionary",
+                )
+            }
             _ => Value::object(fields),
         })
     }

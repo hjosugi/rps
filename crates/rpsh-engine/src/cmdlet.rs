@@ -644,6 +644,7 @@ impl Engine {
 impl Engine {
     fn error_action(&self, named: &[(String, Value)]) -> String {
         super::function_drive::option(named, &["ErrorAction", "ea"])
+            .cloned()
             .or_else(|| self.variables.get("ErrorActionPreference"))
             .map_or_else(|| "continue".into(), |v| v.to_string().to_ascii_lowercase())
     }

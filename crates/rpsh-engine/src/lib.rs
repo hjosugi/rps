@@ -28,11 +28,13 @@ mod globalization;
 mod help;
 mod input;
 mod invocation;
+mod invoke_context;
 mod metadata;
 mod method_error;
 mod native;
 mod preferences;
 mod proxy_command;
+mod ps_variable;
 mod redirection;
 mod script_methods;
 mod sorting;
@@ -545,9 +547,7 @@ impl Engine {
                 local.insert("this".to_owned(), object.clone());
                 self.variables = local;
                 let flow = self.exec_block(&constructor.body, &mut capture_sink());
-                if let Value::Object(entries) =
-                    self.variables.get("this").cloned().unwrap_or(Value::Null)
-                {
+                if let Value::Object(entries) = self.variables.get("this").unwrap_or(Value::Null) {
                     object = Value::Object(entries);
                 }
                 self.restore_variables(saved);
@@ -572,9 +572,7 @@ impl Engine {
             local.insert("this".to_owned(), object.clone());
             self.variables = local;
             let flow = self.exec_block(&constructor.body, &mut capture_sink());
-            if let Value::Object(entries) =
-                self.variables.get("this").cloned().unwrap_or(Value::Null)
-            {
+            if let Value::Object(entries) = self.variables.get("this").unwrap_or(Value::Null) {
                 object = Value::Object(entries);
             }
             self.restore_variables(saved);
@@ -1143,17 +1141,21 @@ impl Engine {
         value: Value,
         unsupported: &'static str,
     ) -> Result<(), EngineError> {
+        let target_value = self.eval_expression(target)?;
+        if name.eq_ignore_ascii_case("Value") && ps_variable::value(&target_value).is_some() {
+            return Ok(ps_variable::set_value(&target_value, value)?);
+        }
         let key = assignment_key(target)?;
         if name.eq_ignore_ascii_case("Capacity") {
-            match self.variables.get(key) {
-                Some(Value::ArrayList(list)) => {
+            match &target_value {
+                Value::ArrayList(list) => {
                     return Ok(array_list::set_capacity(
                         array_list::Kind::ArrayList,
                         list,
                         &value,
                     )?);
                 }
-                Some(Value::ObjectList(list)) => {
+                Value::ObjectList(list) => {
                     return Ok(array_list::set_capacity(
                         array_list::Kind::ObjectList,
                         list,
@@ -1163,13 +1165,13 @@ impl Engine {
                 _ => (),
             }
         }
-        let Some(Value::Object(entries)) = self.variables.get(key) else {
+        let Value::Object(entries) = target_value else {
             return Err(RuntimeError::NotImplemented {
                 feature: unsupported,
             }
             .into());
         };
-        if let Some(table) = environment::table_entries(entries) {
+        if let Some(table) = environment::table_entries(&entries) {
             let mut table = table.to_vec();
             if let Some((_, slot)) = table.iter_mut().find(|(entry, _)| entry == name) {
                 *slot = value;
@@ -1250,9 +1252,8 @@ impl Engine {
 
     fn autoload_unqualified(&self) -> bool {
         self.variables
-            .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case("PSModuleAutoLoadingPreference"))
-            .is_none_or(|(_, value)| {
+            .get("PSModuleAutoLoadingPreference")
+            .is_none_or(|value| {
                 value.is_null_like()
                     || matches!(value.to_string().to_ascii_lowercase().as_str(), "all" | "2")
             })
@@ -1356,7 +1357,7 @@ impl Engine {
         } else {
             flatten_value(value)
         };
-        let previous = self.variables.get("_").cloned();
+        let previous = self.variables.get("_");
         let mut result = Flow::Normal;
         'items: for item in items {
             self.variables.insert("_".to_owned(), item.clone());
@@ -1705,6 +1706,7 @@ impl Engine {
                                 || key.eq_ignore_ascii_case("ea")
                         })
                         .map(|(_, value)| value)
+                        .cloned()
                         .or_else(|| self.variables.get("ErrorActionPreference"));
                     if action.is_some_and(|value| {
                         matches!(
@@ -3987,7 +3989,30 @@ impl Engine {
                 let value_only = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("valueonly") && ops::is_true(value)
                 });
-                let get = |name: &str| {
+                let mut names = Vec::new();
+                if wanted.is_empty() {
+                    names.extend(
+                        self.variables
+                            .visible_names()
+                            .into_iter()
+                            .map(str::to_owned),
+                    );
+                } else {
+                    for name in wanted {
+                        if name.contains(['*', '?']) {
+                            names.extend(
+                                self.variables
+                                    .visible_names()
+                                    .into_iter()
+                                    .filter(|key| ops::wildcard_match(key, &name, false))
+                                    .map(str::to_owned),
+                            );
+                        } else {
+                            names.push(name)
+                        }
+                    }
+                }
+                let mut get = |name: &str| {
                     let key = strip_scope(name);
                     if key.eq_ignore_ascii_case("Error") {
                         let global = is_global_scope(name);
@@ -4000,19 +4025,20 @@ impl Engine {
                         } else {
                             "None"
                         };
-                        return Value::object(vec![
-                            ("Name".into(), Value::String("Error".into())),
-                            ("Value".into(), value),
-                            (
-                                "Options".into(),
-                                typed_scalar(
-                                    "System.Management.Automation.ScopedItemOptions",
-                                    options,
-                                ),
-                            ),
-                            ("Visibility".into(), Value::String("Public".into())),
-                            ("Description".into(), Value::String("".into())),
-                        ]);
+                        let mut variable = ps_variable::make("Error", value, false);
+                        if options == "Constant"
+                            && let Value::Object(fields) = &mut variable
+                            && let Some((_, slot)) = std::rc::Rc::make_mut(fields)
+                                .iter_mut()
+                                .find(|(k, _)| k == "Options")
+                        {
+                            *slot = errors::enum_number(
+                                "System.Management.Automation.ScopedItemOptions",
+                                "Constant",
+                                2,
+                            );
+                        }
+                        return variable;
                     }
                     let value = lookup(name, &self.variables, !self.last_failed, &self.functions)
                         .unwrap_or(Value::Null);
@@ -4021,34 +4047,14 @@ impl Engine {
                     } else if let Some(canonical) = preferences::variable_name(key) {
                         preferences::variable_info(canonical, value)
                     } else {
-                        Value::object(vec![
-                            ("Name".into(), Value::String(key.into())),
-                            ("Value".into(), value),
-                        ])
+                        self.variables
+                            .expose(name, key)
+                            .unwrap_or_else(|| ps_variable::make(key, value, false))
                     }
                 };
-                if wanted.is_empty() {
-                    return Ok(Some(
-                        self.variables
-                            .visible_names()
-                            .into_iter()
-                            .map(get)
-                            .collect(),
-                    ));
-                }
-                let mut outputs = Vec::new();
-                for name in wanted {
-                    if name.contains(['*', '?']) {
-                        outputs.extend(
-                            self.variables
-                                .visible_names()
-                                .into_iter()
-                                .filter(|key| ops::wildcard_match(key, &name, false))
-                                .map(get),
-                        );
-                    } else {
-                        outputs.push(get(&name));
-                    }
+                let mut outputs = Vec::with_capacity(names.len());
+                for name in names {
+                    outputs.push(get(&name));
                 }
                 Ok(Some(outputs))
             }
@@ -4085,24 +4091,41 @@ impl Engine {
                 for name in names {
                     self.check_error_variable(&lower, &name, &named)?;
 
-                    self.assign_variable(&name, value.clone()).map_err(|err| match err {
-                        EngineError::Runtime(RuntimeError::Script { id: "RuntimeException", category, exception_type, message }) => {
+                    let named_object = self.variables.cmdlet_object(&name, strip_scope(&name));
+                    let assignment = if let Some(object) = &named_object {
+                        ps_variable::set_value(object, value.clone()).map_err(EngineError::from)
+                    } else {
+                        self.assign_variable(&name, value.clone())
+                    };
+                    assignment.map_err(|err| match err {
+                        EngineError::Runtime(RuntimeError::Script {
+                            id: "RuntimeException",
+                            category,
+                            exception_type,
+                            message,
+                        }) => {
                             let id = if lower == "set-variable" {
                                 "RuntimeException,Microsoft.PowerShell.Commands.SetVariableCommand"
                             } else {
                                 "RuntimeException,Microsoft.PowerShell.Commands.NewVariableCommand"
                             };
-                            EngineError::Runtime(RuntimeError::Script { id, category, exception_type, message })
+                            EngineError::Runtime(RuntimeError::Script {
+                                id,
+                                category,
+                                exception_type,
+                                message,
+                            })
                         }
                         other => other,
                     })?;
                     if pass_thru {
                         let key = strip_scope(&name);
                         let key = encoding::variable_name(key).unwrap_or(key);
-                        outputs.push(Value::object(vec![
-                            ("Name".to_owned(), Value::String(key.into())),
-                            ("Value".to_owned(), value.clone()),
-                        ]));
+                        outputs.push(
+                            self.variables
+                                .expose(&name, key)
+                                .unwrap_or_else(|| ps_variable::make(key, value.clone(), false)),
+                        );
                     }
                 }
                 Ok(Some(outputs))
@@ -5579,7 +5602,6 @@ impl Engine {
                     match self
                         .variables
                         .get(&key)
-                        .cloned()
                         .or_else(|| automatic_variable(&key))
                     {
                         Some(value) => Ok(Value::object(vec![
@@ -5860,6 +5882,7 @@ impl Engine {
         let first = &self.host_objects[0];
         let list = matches!(first, Value::Object(entries) if visible_entries(entries).len() > 4)
             && !is_command_info(first)
+            && !ps_variable::is_instance(first)
             && !help::format::supported(first)
             && datetime_fields(first).is_none()
             && format_marker(first).is_none();
@@ -5929,11 +5952,11 @@ impl Engine {
             }
             return Ok(());
         }
-        if self
-            .host_objects
-            .first()
-            .is_some_and(|first| uses_command_table(first) || help::topics::short(first))
-        {
+        if self.host_objects.first().is_some_and(|first| {
+            uses_command_table(first)
+                || help::topics::short(first)
+                || ps_variable::is_instance(first)
+        }) {
             self.host_objects.extend(flatten_value(value));
             return Ok(());
         }
@@ -5943,7 +5966,7 @@ impl Engine {
                 self.write_host(out, format_args!("{prefix}{value}\n"))?;
                 return Ok(());
             }
-            if help::topics::short(&value) {
+            if help::topics::short(&value) || ps_variable::is_instance(&value) {
                 self.host_objects.push(value);
                 return Ok(());
             }
@@ -6630,6 +6653,14 @@ fn mark_format(
         .map(|item| match item {
             Value::Object(entries) => {
                 let mut entries = entries.as_ref().clone();
+                if ps_variable::is_instance(item) {
+                    for (key, slot) in &mut entries {
+                        if matches!(key.as_str(), "Value" | "Attributes") {
+                            let value = member(item, key).unwrap_or(Value::Null);
+                            *slot = Value::String(ps_variable::field_text(&value).into());
+                        }
+                    }
+                }
                 entries.push(("__Format".to_owned(), Value::String(kind.into())));
                 if let Some(properties) = &properties {
                     entries.push(("__TableProperty".to_owned(), properties.clone()));
@@ -6783,6 +6814,9 @@ fn format_value_group(input: &[Value], width: usize) -> String {
         return String::new();
     };
     if let Some(text) = help::format::group(input, width) {
+        return text;
+    }
+    if let Some(text) = ps_variable::table(input, width) {
         return text;
     }
     if uses_command_table(first) {
@@ -7053,6 +7087,9 @@ fn format_host_stream(objects: &[Value]) -> String {
     }
     // ConsoleHost reserves the last column of the reference 80-column
     // buffer when emitting newlines.
+    if let Some(text) = ps_variable::table(objects, 79) {
+        return text;
+    }
     if uses_command_table(first) {
         return format_command_table(first, objects, 79);
     }
@@ -7772,8 +7809,8 @@ fn lookup(
         "true" => return Some(Value::Bool(true)),
         "false" => return Some(Value::Bool(false)),
         "?" => return Some(Value::Bool(last_success)),
-        "_" => return variables.get("_").cloned().or(Some(Value::Null)),
-        "PSItem" => return variables.get("_").cloned().or(Some(Value::Null)),
+        "_" => return variables.get("_").or(Some(Value::Null)),
+        "PSItem" => return variables.get("_").or(Some(Value::Null)),
         _ => {}
     }
     if let Some(rest) = environment::drive_name(name) {
@@ -7786,7 +7823,7 @@ fn lookup(
     let key = preferences::variable_name(key).unwrap_or(key);
     let key = encoding::variable_name(key).unwrap_or(key);
     if let Some(value) = variables.get_scoped(name, key) {
-        return Some(value.clone());
+        return Some(value);
     }
     automatic_variable(key)
 }
@@ -7903,6 +7940,8 @@ fn type_full_name(name: &str) -> String {
         return format!("{}[]", type_full_name(element));
     }
     match name.to_ascii_lowercase().as_str() {
+        name if ps_variable::is_type(name) => ps_variable::TYPE.into(),
+        name if ps_variable::is_list(name) => metadata::VARIABLE_LIST.full_name.into(),
         "object" => "System.Object".to_owned(),
         "scriptblock" | "system.management.automation.scriptblock" => {
             script_methods::TYPE.to_owned()
@@ -8558,6 +8597,8 @@ fn invoke_static(
         ("collections.arraylist", "new") => {
             array_list::construct(array_list::Kind::ArrayList, arguments)
         }
+        (kind, "new") if ps_variable::is_type(kind) => ps_variable::construct(arguments),
+        (kind, "new") if ps_variable::is_list(kind) => ps_variable::list_new(arguments),
         (kind, "new") if array_list::is_object_list_type(kind) => {
             array_list::construct(array_list::Kind::ObjectList, arguments)
         }
@@ -9182,6 +9223,8 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         }
         "collections.arraylist" | "system.collections.arraylist" => array_list::cast(value),
         "scriptblock" | "system.management.automation.scriptblock" => script_methods::cast(value),
+        kind if ps_variable::is_type(kind) => ps_variable::cast(value),
+        kind if ps_variable::is_list(kind) => ps_variable::list_cast(&value),
         kind if array_list::is_object_list_type(kind) => Ok(array_list::cast_object_list(value)),
         "cultureinfo" | "globalization.cultureinfo" | "system.globalization.cultureinfo" => {
             globalization::cast_culture(&value)
@@ -9584,7 +9627,14 @@ fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
         .map(|(name, property)| {
             Value::object(vec![
                 ("Name".to_owned(), Value::String(name.clone().into())),
-                ("Value".to_owned(), property.clone()),
+                (
+                    "Value".to_owned(),
+                    if name == "Value" {
+                        ps_variable::value(value).unwrap_or_else(|| property.clone())
+                    } else {
+                        property.clone()
+                    },
+                ),
             ])
         })
         .collect();
@@ -10101,6 +10151,11 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
 }
 
 fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
+    if name.eq_ignore_ascii_case("Value")
+        && let Some(v) = ps_variable::value(value)
+    {
+        return Ok(v);
+    }
     if name.eq_ignore_ascii_case("Value")
         && hidden_type(value).as_deref()
             == Some("System.Management.Automation.PSParameterizedProperty")

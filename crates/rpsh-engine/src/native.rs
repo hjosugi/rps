@@ -205,6 +205,7 @@ impl Engine {
             let encoding = self
                 .variables
                 .get("OutputEncoding")
+                .as_ref()
                 .and_then(Encoding::from_value)
                 .unwrap_or(encoding::UTF8);
             bytes.extend_from_slice(encoding.preamble());
@@ -275,6 +276,7 @@ impl Engine {
     fn native_output_encoding(&self) -> Encoding {
         self.variables
             .get("PSApplicationOutputEncoding")
+            .as_ref()
             .and_then(Encoding::from_value)
             .unwrap_or_else(encoding::console)
     }

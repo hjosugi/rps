@@ -1,0 +1,34 @@
+rpsh-golden-v2
+exit=0
+Collection`1|2|fn:arg/injected,8/owner/2+3/extra/p|1|v
+fn:default/injected
+////
+outer
+caller=caller; supplied=injected
+injected
+local/injected
+after local=injected
+cmdlet/cmdlet
+after cmdlet=cmdlet
+member
+after member=member
+99/member
+RuntimeException|RuntimeException|Exception calling "InvokeWithContext" with "2" argument(s): "context failure"
+outer
+v
+4
+5
+6
+a=1;args=2,3
+a=;args=
+1
+2
+MethodCountCouldNotFindBest|MethodException||Cannot find an overload for "InvokeWithContext" and the argument count: "0".
+MethodCountCouldNotFindBest|MethodException||Cannot find an overload for "InvokeWithContext" and the argument count: "1".
+MethodCountCouldNotFindBest|MethodException||Cannot find an overload for "InvokeWithContext" and the argument count: "2".
+PSInvalidOperationException|MethodInvocationException|PSInvalidOperationException|Exception calling "InvokeWithContext" with "2" argument(s): "The key property for an entry in the dictionary of functions to define cannot be empty because the key property is used as the function name. Specify a non-empty string as the value of the key property, and then try the operation again."
+PSInvalidOperationException|MethodInvocationException|PSInvalidOperationException|Exception calling "InvokeWithContext" with "2" argument(s): "The key property for an entry in the dictionary of functions to define cannot be empty because the key property is used as the function name. Specify a non-empty string as the value of the key property, and then try the operation again."
+PSInvalidOperationException|MethodInvocationException|PSInvalidOperationException|Exception calling "InvokeWithContext" with "2" argument(s): "The script block that defines function 'fn' cannot be null or empty. Provide a non-empty script block in the function definition dictionary, and then try the operation again."
+NullReferenceException|MethodInvocationException|NullReferenceException|Exception calling "InvokeWithContext" with "2" argument(s): "Object reference not set to an instance of an object."
+ArgumentException|MethodInvocationException|ArgumentException|Exception calling "InvokeWithContext" with "2" argument(s): "An item with the same key has already been added. Key: v"
+MethodArgumentConversionInvalidCastArgument|MethodException|PSInvalidCastException|Cannot convert argument "variablesToDefine", with value: "", for "InvokeWithContext" to type "System.Collections.Generic.List`1[System.Management.Automation.PSVariable]": "Cannot convert value "" to type "System.Management.Automation.PSVariable". Error: "Cannot process argument because the value of argument "name" is not valid. Change the value of the "name" argument and run the operation again.""

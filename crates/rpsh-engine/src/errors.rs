@@ -53,6 +53,29 @@ pub(super) fn record_with_exception(
 }
 
 pub(super) fn catchable(error: &RuntimeError) -> Option<Value> {
+    if let RuntimeError::WithCause { outer, ty, message } = error
+        && let Some(script) = outer.script()
+    {
+        let inner = Value::object(vec![
+            ("__TypeName".into(), Value::String((*ty).into())),
+            ("Message".into(), Value::String(message.as_str().into())),
+        ]);
+        let exception = Value::object(vec![
+            (
+                "__TypeName".into(),
+                Value::String(script.exception_type.into()),
+            ),
+            ("Message".into(), Value::String(script.message.into())),
+            ("InnerException".into(), inner),
+        ]);
+        return Some(record_with_exception(
+            script.id,
+            script.category,
+            exception,
+            script.message,
+            Value::Null,
+        ));
+    }
     if let Some(script) = error.script() {
         return Some(error_record(
             script.id,
@@ -64,7 +87,7 @@ pub(super) fn catchable(error: &RuntimeError) -> Option<Value> {
     }
     let feature = match error {
         RuntimeError::NotImplemented { feature } => feature,
-        RuntimeError::Script { .. } => return None,
+        RuntimeError::Script { .. } | RuntimeError::WithCause { .. } => return None,
     };
     let (id, message) = match *feature {
         "cannot convert a string to a double" => (

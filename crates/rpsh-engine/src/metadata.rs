@@ -28,7 +28,7 @@ macro_rules! collection {
 }
 static STRING_LIST: CollectionType =
     collection!("System.Collections.Generic.List", "System.String", None);
-static ATTRIBUTE_LIST: CollectionType =
+pub(super) static ATTRIBUTE_LIST: CollectionType =
     collection!("System.Collections.Generic.List", "System.Attribute", None);
 static STRINGS: CollectionType = collection!(
     "System.Collections.ObjectModel.Collection",
@@ -41,26 +41,30 @@ static ATTRIBUTES: CollectionType = collection!(
     Some(&ATTRIBUTE_LIST)
 );
 
-macro_rules! psobject_collection {
-    ($class:literal, $backing:expr) => {
+macro_rules! automation_collection {
+    ($class:literal, $element:literal, $backing:expr) => {
         CollectionType {
-            full_name: concat!(
-                $class,
-                "`1[[",
-                sma!("System.Management.Automation.PSObject"),
-                "]]"
-            ),
-            display_name: concat!($class, "`1[System.Management.Automation.PSObject]"),
-            element: "System.Management.Automation.PSObject",
+            full_name: concat!($class, "`1[[", sma!($element), "]]"),
+            display_name: concat!($class, "`1[", $element, "]"),
+            element: $element,
             read_only: false,
             backing: $backing,
         }
     };
 }
-static PSOBJECT_LIST: CollectionType =
-    psobject_collection!("System.Collections.Generic.List", None);
-pub(super) static PSOBJECTS: CollectionType = psobject_collection!(
+static PSOBJECT_LIST: CollectionType = automation_collection!(
+    "System.Collections.Generic.List",
+    "System.Management.Automation.PSObject",
+    None
+);
+pub(super) static VARIABLE_LIST: CollectionType = automation_collection!(
+    "System.Collections.Generic.List",
+    "System.Management.Automation.PSVariable",
+    None
+);
+pub(super) static PSOBJECTS: CollectionType = automation_collection!(
     "System.Collections.ObjectModel.Collection",
+    "System.Management.Automation.PSObject",
     Some(&PSOBJECT_LIST)
 );
 
@@ -634,6 +638,7 @@ pub(super) fn collection_method(
             });
         }
     }
+    let count = args.len();
     let mut args = args.to_vec();
     if let Some(last) = args.last_mut()
         && matches!(
@@ -641,7 +646,9 @@ pub(super) fn collection_method(
             "add" | "remove" | "contains" | "indexof" | "insert" | "set_item"
         )
     {
-        if c.ty.element == "System.String" && !last.is_null_like() {
+        if c.ty.element == super::ps_variable::TYPE {
+            *last = super::ps_variable::argument(last, &lower, count)?;
+        } else if c.ty.element == "System.String" && !last.is_null_like() {
             *last = Value::String(last.to_ps_string());
         } else if c.ty.element == "System.Attribute"
             && !last.is_null_like()

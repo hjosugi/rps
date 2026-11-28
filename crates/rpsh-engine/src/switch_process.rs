@@ -150,6 +150,7 @@ impl Engine {
                     k.eq_ignore_ascii_case("ea") || k.eq_ignore_ascii_case("ErrorAction")
                 })
                 .map(|(_, v)| v)
+                .cloned()
                 .or_else(|| self.variables.get("ErrorActionPreference"))
                 .map_or_else(|| "continue".into(), |v| v.to_string().to_ascii_lowercase());
             self.cmdlet_has_errors = true;

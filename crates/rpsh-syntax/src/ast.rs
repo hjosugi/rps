@@ -508,7 +508,7 @@ pub enum ExprKind {
     /// Upstream: `BinaryExpressionAst` with `??`.
     Coalesce { left: Box<Expr>, right: Box<Expr> },
     /// Upstream: `HashtableAst` (and the value of `[pscustomobject]`).
-    Object(Vec<(String, Expr)>),
+    Object(Vec<(HashtableKey, Expr)>),
     /// Upstream: `ConvertExpressionAst` for the supported `[pscustomobject]`.
     Cast { type_name: String, value: Box<Expr> },
     /// Upstream: `MemberExpressionAst`.
@@ -605,4 +605,23 @@ pub enum BinaryOp {
     CReplace,
     Split,
     CSplit,
+}
+
+/// The string and numeric keys of a hashtable remain distinct at runtime.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HashtableKey {
+    String(String),
+    Number(String),
+}
+impl HashtableKey {
+    pub fn text(&self) -> &str {
+        match self {
+            Self::String(s) | Self::Number(s) => s,
+        }
+    }
+}
+impl std::fmt::Display for HashtableKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.text())
+    }
 }

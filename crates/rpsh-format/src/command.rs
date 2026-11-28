@@ -4,8 +4,8 @@ const HEADERS: [&str; 4] = ["CommandType", "Name", "Version", "Source"];
 
 /// A command row or a value the host displays between rows of an open table.
 #[derive(Debug)]
-pub enum CommandTableItem {
-    Command([String; 4]),
+pub enum CommandTableItem<const N: usize = 4> {
+    Command([String; N]),
     Text(String),
 }
 
@@ -39,11 +39,28 @@ pub fn help_table(items: &[CommandTableItem], width: usize) -> String {
     )
 }
 
-fn fixed_table(
-    items: &[CommandTableItem],
+/// The built-in PSVariable view gives its Name column 30 character cells.
+pub fn variable_table(
+    items: &[CommandTableItem<2>],
     width: usize,
-    headers: [&str; 4],
-    mut widths: [usize; 4],
+    auto_size: bool,
+    hide_headers: bool,
+) -> String {
+    fixed_table(
+        items,
+        width,
+        ["Name", "Value"],
+        [30, width],
+        auto_size,
+        hide_headers,
+    )
+}
+
+fn fixed_table<const N: usize>(
+    items: &[CommandTableItem<N>],
+    width: usize,
+    headers: [&str; N],
+    mut widths: [usize; N],
     auto_size: bool,
     hide_headers: bool,
 ) -> String {
@@ -111,7 +128,7 @@ fn fixed_table(
     out
 }
 
-fn write_row(out: &mut String, fields: &[String; 4], widths: &[usize; 4]) {
+fn write_row<const N: usize>(out: &mut String, fields: &[String; N], widths: &[usize; N]) {
     for (index, (field, &width)) in fields.iter().zip(widths).enumerate() {
         if width == 0 {
             break;

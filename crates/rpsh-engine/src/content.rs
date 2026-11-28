@@ -49,10 +49,7 @@ impl Engine {
                         environment::get(&self.variables, name)
                     } else if provider.eq_ignore_ascii_case("variable") {
                         let key = strip_scope(name);
-                        self.variables
-                            .get(key)
-                            .cloned()
-                            .or_else(|| automatic_variable(key))
+                        self.variables.get(key).or_else(|| automatic_variable(key))
                     } else {
                         None
                     };

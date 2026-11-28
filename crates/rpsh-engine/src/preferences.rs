@@ -26,7 +26,7 @@ const STYLES: EnumTable<ArgumentStyle> = EnumTable {
 pub(super) fn argument_style(variables: &Variables) -> ArgumentStyle {
     variables
         .get(PASSING)
-        .and_then(|value| STYLES.parse(value).ok())
+        .and_then(|value| STYLES.parse(&value).ok())
         .map_or_else(
             || STYLES.entries[if cfg!(windows) { 2 } else { 1 }].2,
             |entry| entry.2,
@@ -96,29 +96,19 @@ pub(super) fn variable_info(name: &str, value: Value) -> Value {
     } else {
         name
     };
-    Value::object(vec![
-        ("Name".into(), Value::String(name.into())),
-        ("Value".into(), value),
-        (
-            "__TypeName".into(),
-            Value::String("System.Management.Automation.PSVariable".into()),
-        ),
-        (
-            "Options".into(),
-            super::errors::enum_value(
-                "System.Management.Automation.ScopedItemOptions",
-                "None",
-                &["None"],
-            ),
-        ),
-        ("Visibility".into(), Value::String("Public".into())),
-        (
-            "Description".into(),
-            Value::String(
-                rpsh_messages::text(&format!("RunspaceInit/{description}Description")).into(),
-            ),
-        ),
-    ])
+    let mut variable = super::ps_variable::make(name, value, false);
+    let Value::Object(fields) = &mut variable else {
+        unreachable!()
+    };
+    if let Some((_, slot)) = std::rc::Rc::make_mut(fields)
+        .iter_mut()
+        .find(|(k, _)| k == "Description")
+    {
+        *slot = Value::String(
+            rpsh_messages::text(&format!("RunspaceInit/{description}Description")).into(),
+        );
+    }
+    variable
 }
 
 pub(super) fn default_value(key: &str) -> Option<Value> {
@@ -198,7 +188,7 @@ pub(super) fn native_action(variables: &Variables) -> Option<Action> {
     Some(
         variables
             .get("ErrorActionPreference")
-            .and_then(|v| TABLE.parse(v).ok())
+            .and_then(|v| TABLE.parse(&v).ok())
             .map_or(Action::Continue, |entry| entry.2),
     )
 }

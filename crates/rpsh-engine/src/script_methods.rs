@@ -38,7 +38,7 @@ fn string(s: impl AsRef<str>) -> Value {
     Value::String(s.as_ref().into())
 }
 
-fn wrapped(method: &str, count: usize, inner: Value) -> EngineError {
+pub(super) fn wrapped(method: &str, count: usize, inner: Value) -> EngineError {
     let ty = hidden_type(&inner)
         .unwrap_or_else(|| "System.Management.Automation.RuntimeException".into());
     let id = ty.rsplit('.').next().unwrap_or(&ty);
@@ -187,6 +187,8 @@ impl Engine {
             "Invoke"
         } else if name.eq_ignore_ascii_case("InvokeReturnAsIs") {
             "InvokeReturnAsIs"
+        } else if name.eq_ignore_ascii_case("InvokeWithContext") {
+            "InvokeWithContext"
         } else if name.eq_ignore_ascii_case("Equals") {
             return Some(match values {
                 [other] => Ok(Value::Bool(
@@ -207,6 +209,11 @@ impl Engine {
         values: &[Value],
         span: Span,
     ) -> Result<Value, EngineError> {
+        let context = if method == "InvokeWithContext" {
+            Some(super::invoke_context::Context::bind(values)?)
+        } else {
+            None
+        };
         let ast = block.syntax()?;
         let Some(mut body) = ast.single_clause() else {
             let inner = Value::object(vec![
@@ -231,18 +238,41 @@ impl Engine {
         } else {
             &[]
         };
-        let positional = params_array(values);
+        let positional = params_array(if context.is_some() {
+            &values[2..]
+        } else {
+            values
+        });
         let supplied: Vec<_> = params
             .iter()
             .zip(positional)
             .map(|(p, v)| (p.name.clone(), v.clone()))
             .collect();
         let mut local = self.variables.child();
-        let path = self
-            .variables
-            .get("PSCommandPath")
-            .cloned()
-            .unwrap_or(Value::Null);
+        let mut definitions = Vec::new();
+        if let Some(context) = context {
+            let dynamic = !context.variables.is_empty() && ast.uses_dynamic_locals();
+            for (name, object) in context.variables {
+                // These automatic slots are set by the invocation itself.
+                if [
+                    "args",
+                    "MyInvocation",
+                    "PSBoundParameters",
+                    "PSScriptRoot",
+                    "PSCommandPath",
+                ]
+                .iter()
+                .all(|reserved| !name.eq_ignore_ascii_case(reserved))
+                {
+                    local.inject(name, object, dynamic);
+                }
+            }
+            for (name, value) in context.automatic {
+                local.insert(name.into(), value);
+            }
+            definitions = context.functions;
+        }
+        let path = self.variables.get("PSCommandPath").unwrap_or(Value::Null);
         local.insert(
             "MyInvocation".into(),
             invocation_info(&path, self.statement_span.unwrap_or(span)),
@@ -262,6 +292,9 @@ impl Engine {
         let caller = std::mem::replace(&mut self.variables, local);
         let caller_file = std::mem::replace(&mut self.source_file, block.file().cloned());
         self.functions.enter_scope(false);
+        for function in definitions {
+            self.functions.insert(function);
+        }
         let aliases = self.aliases.clone();
         let trap = self.trap.take();
         let outer = self.capture.replace(Vec::new());

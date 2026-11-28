@@ -231,7 +231,9 @@ impl Engine {
         named: &[(String, Value)],
     ) -> Result<bool, EngineError> {
         let what_if = option(named, &["WhatIf"])
+            .cloned()
             .or_else(|| self.variables.get("WhatIfPreference"))
+            .as_ref()
             .is_some_and(ops::is_true);
         if !what_if {
             if switch(named, "Confirm") {

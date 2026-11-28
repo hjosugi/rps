@@ -364,12 +364,27 @@ pub enum RuntimeError {
         exception_type: &'static str,
         message: String,
     },
+    /// An adapter exception retaining the CLR exception from its constructor or conversion.
+    WithCause {
+        outer: Box<RuntimeError>,
+        ty: &'static str,
+        message: String,
+    },
 }
 
 impl RuntimeError {
+    pub fn caused_by(self, ty: &'static str, message: impl Into<String>) -> Self {
+        Self::WithCause {
+            outer: Box::new(self),
+            ty,
+            message: message.into(),
+        }
+    }
+
     /// The label of the missing feature.
     pub fn feature(&self) -> &'static str {
         match self {
+            Self::WithCause { outer, .. } => outer.feature(),
             Self::NotImplemented { feature } => feature,
             Self::Script { id, .. } => id,
         }
@@ -388,6 +403,7 @@ impl RuntimeError {
                 exception_type,
                 message,
             }),
+            Self::WithCause { outer, .. } => outer.script(),
             Self::NotImplemented { .. } => None,
         }
     }
@@ -404,6 +420,7 @@ pub struct ScriptErrorRef<'a> {
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::WithCause { outer, .. } => outer.fmt(f),
             Self::NotImplemented { feature } => f.write_str(feature),
             Self::Script { message, .. } => f.write_str(message),
         }

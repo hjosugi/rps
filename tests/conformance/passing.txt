@@ -103,9 +103,11 @@ lang/object-list
 lang/operators
 lang/pipeline-basic
 lang/psobject
+lang/psvariable-objects
 lang/scopes
 lang/scriptblock
 lang/scriptblock-clean-errors
+lang/scriptblock-context
 lang/scriptblock-file-phases
 lang/scriptblock-invoke
 lang/scriptblock-phases

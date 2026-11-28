@@ -233,7 +233,7 @@ impl Engine {
             match cleanup {
                 Err(EngineError::Script(error)) => {
                     use std::io::Write as _;
-                    let path = self.variables.get("PSCommandPath").map(ToString::to_string);
+                    let path = self.variables.get("PSCommandPath").map(|v| v.to_string());
                     let source = path
                         .as_deref()
                         .and_then(|p| std::fs::read_to_string(p).ok())

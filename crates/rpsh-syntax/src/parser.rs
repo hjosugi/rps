@@ -2147,15 +2147,12 @@ impl Parser<'_> {
                         self.pos += 1;
                         break;
                     }
-                    let Token {
-                        kind,
-                        span: key_span,
-                    } = self.peek().clone();
-                    let key = match kind {
-                        TokenKind::Identifier(name) => name,
-                        TokenKind::StringLiteral(value) => value,
-                        TokenKind::Int32(value) => value.to_string(),
-                        TokenKind::Numeric(value) => value.to_string(),
+                    let key = match self.peek().kind.clone() {
+                        TokenKind::Identifier(name) | TokenKind::StringLiteral(name) => {
+                            crate::HashtableKey::String(name)
+                        }
+                        TokenKind::Int32(value) => crate::HashtableKey::Number(value.to_string()),
+                        TokenKind::Numeric(value) => crate::HashtableKey::Number(value.to_string()),
                         _ => return self.refuse("hashtable keys"),
                     };
                     self.pos += 1;
@@ -2164,7 +2161,6 @@ impl Parser<'_> {
                     }
                     self.pos += 1;
                     let value = self.nested_expression()?;
-                    let _ = key_span;
                     entries.push((key, value));
                     while matches!(self.peek().kind, TokenKind::NewLine) {
                         self.pos += 1;
