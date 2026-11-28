@@ -49,6 +49,12 @@ pub enum Statement {
         commands: Vec<PipelineCommand>,
         span: Span,
     },
+    /// An AssignmentStatementAst with an ArrayLiteralAst on the left.
+    MultiAssign {
+        targets: Vec<Expr>,
+        value: AssignmentValue,
+        span: Span,
+    },
     /// `$object.property = expression`.
     MemberAssign {
         target: Expr,
@@ -197,6 +203,14 @@ pub enum PipelineCommand {
         name: String,
         arguments: Vec<CommandArgument>,
     },
+}
+
+/// A simple assignment evaluates an expression directly or collects the
+/// output of a command pipeline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AssignmentValue {
+    Expression(Expr),
+    Pipeline(Vec<PipelineCommand>),
 }
 
 /// A declared parameter. Upstream: `ParameterAst`.

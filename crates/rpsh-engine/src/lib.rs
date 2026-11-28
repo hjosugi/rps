@@ -24,8 +24,9 @@ use rpsh_commands::{BuiltinModule, MODULES};
 use rpsh_format::{CommandTableItem, command_table};
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
-    BinaryOp, CommandArgument, Expr, ExprKind, MethodDef, NumberLiteral, Parameter, ParseError,
-    PipelineCommand, ScriptBlockAst, Statement, SwitchClause, UnaryOp, parse,
+    AssignmentValue, BinaryOp, CommandArgument, Expr, ExprKind, MethodDef, NumberLiteral,
+    Parameter, ParseError, PipelineCommand, ScriptBlockAst, Statement, SwitchClause, UnaryOp,
+    parse,
 };
 
 /// Runs scripts.
@@ -641,12 +642,7 @@ impl Engine {
             }
             Statement::Assign { name, value, .. } => {
                 let value = self.eval_expression(value)?;
-                let global = is_global_scope(name);
-                let key = strip_scope(name).to_owned();
-                if global {
-                    self.globals.insert(key.clone(), value.clone());
-                }
-                self.variables.insert(key, value);
+                self.assign_variable(name, value);
                 self.last_success = true;
                 Ok(Flow::Normal)
             }
@@ -657,26 +653,12 @@ impl Engine {
                 ..
             } => {
                 let value = self.eval_expression(value)?;
-                let key = assignment_key(target)?;
-                let mut entries = match self.variables.get(key) {
-                    Some(Value::Object(entries)) => entries.as_ref().clone(),
-                    _ => {
-                        return Err(RuntimeError::NotImplemented {
-                            feature: "member assignment on a value that is not an object",
-                        }
-                        .into());
-                    }
-                };
-                if let Some(entry) = entries
-                    .iter_mut()
-                    .find(|(entry, _)| entry.eq_ignore_ascii_case(name))
-                {
-                    entry.1 = value;
-                } else {
-                    entries.push((name.clone(), value));
-                }
-                self.variables
-                    .insert(key.to_owned(), Value::object(entries));
+                self.assign_property(
+                    target,
+                    name,
+                    value,
+                    "member assignment on a value that is not an object",
+                )?;
                 self.last_success = true;
                 Ok(Flow::Normal)
             }
@@ -688,27 +670,12 @@ impl Engine {
             } => {
                 let value = self.eval_expression(value)?;
                 let index = self.eval_expression(index)?;
-                let key = assignment_key(target)?;
-                let mut entries = match self.variables.get(key) {
-                    Some(Value::Object(entries)) => entries.as_ref().clone(),
-                    _ => {
-                        return Err(RuntimeError::NotImplemented {
-                            feature: "index assignment on a value that is not an object",
-                        }
-                        .into());
-                    }
-                };
-                let index = index.to_string();
-                if let Some(entry) = entries
-                    .iter_mut()
-                    .find(|(entry, _)| entry.eq_ignore_ascii_case(&index))
-                {
-                    entry.1 = value;
-                } else {
-                    entries.push((index, value));
-                }
-                self.variables
-                    .insert(key.to_owned(), Value::object(entries));
+                self.assign_property(
+                    target,
+                    &index.to_string(),
+                    value,
+                    "index assignment on a value that is not an object",
+                )?;
                 self.last_success = true;
                 Ok(Flow::Normal)
             }
@@ -742,13 +709,20 @@ impl Engine {
             Statement::Pipeline { commands, .. } => self.exec_pipeline(commands, out),
             Statement::AssignPipeline { name, commands, .. } => {
                 let outputs = self.pipeline_output(commands)?;
-                let value = match outputs.len() {
-                    0 => Value::Null,
-                    1 => outputs.into_iter().next().unwrap_or(Value::Null),
-                    _ => Value::array(outputs),
+                self.assign_variable(name, scalar_or_array(outputs.into_iter()));
+                Ok(Flow::Normal)
+            }
+            Statement::MultiAssign { targets, value, .. } => {
+                let result = match value {
+                    AssignmentValue::Expression(expr) => self.eval_expression(expr)?,
+                    AssignmentValue::Pipeline(commands) => {
+                        scalar_or_array(self.pipeline_output(commands)?.into_iter())
+                    }
                 };
-                let key = strip_scope(name);
-                self.variables.insert(key.to_owned(), value);
+                self.assign_multiple(targets, result)?;
+                if matches!(value, AssignmentValue::Expression(_)) {
+                    self.last_success = true;
+                }
                 Ok(Flow::Normal)
             }
             Statement::Switch {
@@ -1030,6 +1004,83 @@ impl Engine {
         self.modules.iter().any(
             |entry| matches!(entry, LoadedModule::Builtin(loaded) if loaded.name == module.name),
         )
+    }
+
+    fn assign_variable(&mut self, name: &str, value: Value) {
+        let key = strip_scope(name).to_owned();
+        if is_global_scope(name) {
+            self.globals.insert(key.clone(), value.clone());
+        }
+        self.variables.insert(key, value);
+    }
+
+    fn assign_property(
+        &mut self,
+        target: &Expr,
+        name: &str,
+        value: Value,
+        unsupported: &'static str,
+    ) -> Result<(), EngineError> {
+        let key = assignment_key(target)?;
+        let Some(Value::Object(entries)) = self.variables.get(key) else {
+            return Err(RuntimeError::NotImplemented {
+                feature: unsupported,
+            }
+            .into());
+        };
+        let mut entries = entries.as_ref().clone();
+        if let Some(entry) = entries
+            .iter_mut()
+            .find(|(entry, _)| entry.eq_ignore_ascii_case(name))
+        {
+            entry.1 = value;
+        } else {
+            entries.push((name.to_owned(), value));
+        }
+        self.variables
+            .insert(key.to_owned(), Value::object(entries));
+        Ok(())
+    }
+
+    fn assign_multiple(&mut self, targets: &[Expr], value: Value) -> Result<(), EngineError> {
+        let Some((last, rest)) = targets.split_last() else {
+            return Ok(());
+        };
+        let mut values = flatten_value(value).into_iter();
+        for target in rest {
+            self.assign_element(target, values.next().unwrap_or(Value::Null))?;
+        }
+        self.assign_element(last, scalar_or_array(values))
+    }
+
+    fn assign_element(&mut self, target: &Expr, value: Value) -> Result<(), EngineError> {
+        match &target.kind {
+            ExprKind::Variable(name) => {
+                self.assign_variable(name, value);
+                Ok(())
+            }
+            ExprKind::Paren(inner) => self.assign_element(inner, value),
+            ExprKind::Array(targets) => self.assign_multiple(targets, value),
+            ExprKind::Member { target, name } => self.assign_property(
+                target,
+                name,
+                value,
+                "member assignment on a value that is not an object",
+            ),
+            ExprKind::Index { target, index } => {
+                let index = self.eval_expression(index)?;
+                self.assign_property(
+                    target,
+                    &index.to_string(),
+                    value,
+                    "index assignment on a value that is not an object",
+                )
+            }
+            _ => Err(RuntimeError::NotImplemented {
+                feature: "this multiple-assignment target",
+            }
+            .into()),
+        }
     }
 
     fn import_builtin(&mut self, module: &'static BuiltinModule) {
@@ -8132,6 +8183,13 @@ fn flatten_value(value: Value) -> Vec<Value> {
         Value::Array(items) => items.as_ref().clone(),
         Value::Null | Value::AutomationNull => Vec::new(),
         value => vec![value],
+    }
+}
+
+fn scalar_or_array(mut values: std::vec::IntoIter<Value>) -> Value {
+    match values.len() {
+        0 | 1 => values.next().unwrap_or(Value::Null),
+        _ => Value::array(values.collect()),
     }
 }
 

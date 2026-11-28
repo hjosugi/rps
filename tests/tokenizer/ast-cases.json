@@ -20,5 +20,11 @@
   {"name":"scriptblock","source":"{ 1 + 1 }"},
   {"name":"hashtable","source":"@{ Name = 1 }"},
   {"name":"variable","source":"$x"},
-  {"name":"string","source":"'a'"}
+  {"name":"string","source":"'a'"},
+  {"name":"assign-variable","source":"$a = 1"},
+  {"name":"assign-pipeline","source":"$a = Write-Output -InputObject 1"},
+  {"name":"assign-multiple","source":"$a, $b = 1, 2, 3"},
+  {"name":"assign-members","source":"$o.Name, $o['Other'] = 'a', 'b'"},
+  {"name":"assign-nested","source":"($a,$b),$c = (1,2),3"},
+  {"name":"assign-multiple-pipeline","source":"$a,$b = 1..3 | Write-Output"}
 ]

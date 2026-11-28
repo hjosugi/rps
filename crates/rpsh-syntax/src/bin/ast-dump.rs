@@ -2,7 +2,10 @@
 
 use std::io::Read;
 
-use rpsh_syntax::{BinaryOp, Expr, ExprKind, Statement, StringPart, UnaryOp, parse};
+use rpsh_syntax::{
+    AssignmentValue, BinaryOp, CommandArgument, Expr, ExprKind, PipelineCommand, Statement,
+    StringPart, UnaryOp, parse,
+};
 
 fn main() {
     let mut source = String::new();
@@ -10,11 +13,61 @@ fn main() {
         .read_to_string(&mut source)
         .expect("ast-dump: stdin is not UTF-8");
     let ast = parse(&source).expect("ast-dump: parse");
-    let expression = match &ast.statements[0] {
-        Statement::Expression(expr) => expr,
-        _ => panic!("ast-dump: expected an expression"),
+    let text = match &ast.statements[0] {
+        Statement::Expression(expr) => format_expr(expr),
+        Statement::MultiAssign { targets, value, .. } => {
+            let targets = targets
+                .iter()
+                .map(format_expr)
+                .collect::<Vec<_>>()
+                .join(" ");
+            let rhs = match value {
+                AssignmentValue::Expression(expr) => {
+                    format!("(command-expression {})", format_expr(expr))
+                }
+                AssignmentValue::Pipeline(commands) => format_pipeline(commands),
+            };
+            format!("(assign Equals (array {targets}) {rhs})")
+        }
+        Statement::Assign { name, value, .. } => format!(
+            "(assign Equals (var {name}) (command-expression {}))",
+            format_expr(value)
+        ),
+        Statement::AssignPipeline { name, commands, .. } => {
+            format!("(assign Equals (var {name}) {})", format_pipeline(commands))
+        }
+        _ => panic!("ast-dump: unsupported statement"),
     };
-    println!("{}", format_expr(expression));
+    println!("{text}");
+}
+
+fn format_pipeline(commands: &[PipelineCommand]) -> String {
+    let stages = commands
+        .iter()
+        .map(|command| match command {
+            PipelineCommand::Expression(expr) => {
+                format!("(command-expression {})", format_expr(expr))
+            }
+            PipelineCommand::Command { name, arguments } => {
+                let mut elements = vec![format!("(str {name:?})")];
+                for arg in arguments {
+                    match arg {
+                        CommandArgument::Value(expr) => elements.push(format_expr(expr)),
+                        CommandArgument::Bareword(word) => elements.push(format!("(str {word:?})")),
+                        CommandArgument::Parameter { name, value } => {
+                            elements.push(format!("(parameter {name})"));
+                            if let Some(expr) = value {
+                                elements.push(format_expr(expr));
+                            }
+                        }
+                    }
+                }
+                format!("(command {})", elements.join(" "))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("(pipeline {stages})")
 }
 
 fn format_expr(expr: &Expr) -> String {

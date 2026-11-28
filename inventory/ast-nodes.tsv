@@ -1,7 +1,7 @@
 node	base	shape	platform	status
 ArrayExpressionAst	ExpressionAst	open	linux-x64	todo
 ArrayLiteralAst	ExpressionAst	open	linux-x64	todo
-AssignmentStatementAst	PipelineBaseAst	open	linux-x64	todo
+AssignmentStatementAst	PipelineBaseAst	open	linux-x64	partial
 AttributeAst	AttributeBaseAst	open	linux-x64	todo
 AttributeBaseAst	Ast	abstract	linux-x64	todo
 AttributedExpressionAst	ExpressionAst	open	linux-x64	todo

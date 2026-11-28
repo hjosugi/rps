@@ -123,4 +123,5 @@ stmt/empty
 stmt/exit-code
 stmt/exit-default
 stmt/exit-negative
+stmt/multiple-assignment
 stmt/separators

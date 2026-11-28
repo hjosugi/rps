@@ -1,0 +1,16 @@
+rpsh-golden-v2
+exit=0
+1|2|Int32
+2|1
+1|2,3,4|Object[]
+scalar|True|True
+True|True
+True|2
+1,2|3,4
+1|2,3|4
+3,4|2
+8|9,10
+3|4|Int32
+True|True
+new|value
+10|20

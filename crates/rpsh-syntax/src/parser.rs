@@ -1,7 +1,7 @@
 use crate::{
-    BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, MethodDef, Parameter, ParseError,
-    PipelineCommand, ScriptBlockAst, Span, Statement, StringPart, SwitchClause, Token, TokenKind,
-    UnaryOp, tokenize,
+    AssignmentValue, BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, MethodDef, Parameter,
+    ParseError, PipelineCommand, ScriptBlockAst, Span, Statement, StringPart, SwitchClause, Token,
+    TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -9,6 +9,15 @@ const SYNTAX_ERRORS: &str = "syntax error reporting";
 /// The evaluator recurses over the tree, so one statement may hold at most
 /// this many expression nodes.
 const MAX_EXPRESSION_NODES: usize = 1000;
+
+fn assignment_target(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::Variable(_) | ExprKind::Member { .. } | ExprKind::Index { .. } => true,
+        ExprKind::Paren(inner) => assignment_target(inner),
+        ExprKind::Array(items) => items.iter().all(assignment_target),
+        _ => false,
+    }
+}
 
 /// Parses a complete script.
 ///
@@ -121,68 +130,43 @@ impl Parser {
                     | TokenKind::CoalesceEquals
             )
         {
-            let compound = match next.kind {
-                TokenKind::MinusEquals => Some(BinaryOp::Subtract),
-                TokenKind::MultiplyEquals => Some(BinaryOp::Multiply),
-                TokenKind::DivideEquals => Some(BinaryOp::Divide),
-                TokenKind::RemainderEquals => Some(BinaryOp::Remainder),
-                _ => None,
-            };
-            let append = next.kind == TokenKind::PlusEquals;
-            let coalesce = next.kind == TokenKind::CoalesceEquals;
+            let operator = next.kind.clone();
             let name = name.clone();
             let start = self.peek().span;
             self.pos += 2;
-            if !append
-                && !coalesce
-                && compound.is_none()
-                && self.statement_command_name()?.is_some()
-            {
-                let mut commands = vec![self.pipeline_element()?];
-                while self.peek().kind == TokenKind::Pipe {
-                    self.pos += 1;
-                    self.skip_newlines();
-                    commands.push(self.pipeline_element()?);
-                }
+            if operator == TokenKind::Equals {
+                let value = self.assignment_value()?;
                 let span = start.to(self.previous_span());
-                return Ok(Statement::AssignPipeline {
-                    name,
-                    commands,
-                    span,
+                return Ok(match value {
+                    AssignmentValue::Expression(value) => Statement::Assign { name, value, span },
+                    AssignmentValue::Pipeline(commands) => Statement::AssignPipeline {
+                        name,
+                        commands,
+                        span,
+                    },
                 });
             }
             let value = self.nested_expression()?;
             let span = start.to(value.span);
-            if self.peek().kind == TokenKind::Pipe && !append && !coalesce && compound.is_none() {
-                let mut commands = vec![PipelineCommand::Expression(value)];
-                while self.peek().kind == TokenKind::Pipe {
-                    self.pos += 1;
-                    self.skip_newlines();
-                    commands.push(self.pipeline_element()?);
-                }
-                let span = start.to(self.previous_span());
-                return Ok(Statement::AssignPipeline {
-                    name,
-                    commands,
-                    span,
-                });
-            }
             if !self.at_statement_end() {
                 return self.refuse(SYNTAX_ERRORS);
             }
-            return Ok(if append {
-                Statement::AppendAssign { name, value, span }
-            } else if coalesce {
-                Statement::CoalesceAssign { name, value, span }
-            } else if let Some(op) = compound {
-                Statement::CompoundAssign {
-                    name,
-                    op,
-                    value,
-                    span,
+            let op = match operator {
+                TokenKind::PlusEquals => return Ok(Statement::AppendAssign { name, value, span }),
+                TokenKind::CoalesceEquals => {
+                    return Ok(Statement::CoalesceAssign { name, value, span });
                 }
-            } else {
-                Statement::Assign { name, value, span }
+                TokenKind::MinusEquals => BinaryOp::Subtract,
+                TokenKind::MultiplyEquals => BinaryOp::Multiply,
+                TokenKind::DivideEquals => BinaryOp::Divide,
+                TokenKind::RemainderEquals => BinaryOp::Remainder,
+                _ => return self.refuse(SYNTAX_ERRORS),
+            };
+            return Ok(Statement::CompoundAssign {
+                name,
+                op,
+                value,
+                span,
             });
         }
         if self.peek().kind == TokenKind::Dot {
@@ -228,6 +212,17 @@ impl Parser {
                 }
                 let span = expression.span;
                 self.pos += 1;
+                if let ExprKind::Array(targets) = expression.kind {
+                    if !targets.iter().all(assignment_target) {
+                        return self.refuse("this multiple-assignment target");
+                    }
+                    let value = self.assignment_value()?;
+                    return Ok(Statement::MultiAssign {
+                        targets,
+                        value,
+                        span: span.to(self.previous_span()),
+                    });
+                }
                 let value = self.nested_expression()?;
                 let span = span.to(value.span);
                 if !self.at_statement_end() {
@@ -250,6 +245,29 @@ impl Parser {
                 }
             }
         }
+    }
+
+    fn assignment_value(&mut self) -> Result<AssignmentValue, ParseError> {
+        self.skip_newlines();
+        let first = if self.statement_command_name()?.is_some() {
+            self.pipeline_element()?
+        } else {
+            let expr = self.nested_expression()?;
+            if self.at_statement_end() {
+                return Ok(AssignmentValue::Expression(expr));
+            }
+            PipelineCommand::Expression(expr)
+        };
+        let mut commands = vec![first];
+        while self.peek().kind == TokenKind::Pipe {
+            self.pos += 1;
+            self.skip_newlines();
+            commands.push(self.pipeline_element()?);
+        }
+        if !self.at_statement_end() {
+            return self.refuse(SYNTAX_ERRORS);
+        }
+        Ok(AssignmentValue::Pipeline(commands))
     }
 
     fn labeled_statement(&mut self, label: String, start: Span) -> Result<Statement, ParseError> {
@@ -2332,6 +2350,21 @@ mod tests {
         match statement {
             Statement::Expression(expr) => show(expr),
             Statement::Assign { name, value, .. } => format!("${name} = {}", show(value)),
+            Statement::MultiAssign { targets, value, .. } => {
+                let targets = targets.iter().map(show).collect::<Vec<_>>().join(", ");
+                let value = match value {
+                    AssignmentValue::Expression(expr) => show(expr),
+                    AssignmentValue::Pipeline(commands) => commands
+                        .iter()
+                        .map(|command| match command {
+                            PipelineCommand::Expression(expr) => show(expr),
+                            PipelineCommand::Command { name, .. } => name.clone(),
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" | "),
+                };
+                format!("{targets} = {value}")
+            }
             Statement::AppendAssign { name, value, .. } => format!("${name} += {}", show(value)),
             Statement::CoalesceAssign { name, value, .. } => {
                 format!("${name} ??= {}", show(value))
