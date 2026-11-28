@@ -792,12 +792,27 @@ impl Tokenizer<'_> {
         {
             return false;
         }
+        let pipeline_foreach = kind == FullTokenKind::Foreach
+            && self
+                .tokens
+                .iter()
+                .rev()
+                .find(|token| {
+                    !matches!(
+                        token.kind,
+                        FullTokenKind::NewLine
+                            | FullTokenKind::Comment
+                            | FullTokenKind::LineContinuation
+                    )
+                })
+                .is_some_and(|token| token.kind == FullTokenKind::Pipe);
         let start = end - len;
         self.pos = end;
         self.push(kind, start, end);
         self.statement_start = false;
         self.command_seen = true;
         self.mode = match kind {
+            FullTokenKind::Foreach if pipeline_foreach => Mode::Command,
             FullTokenKind::Return
             | FullTokenKind::Throw
             | FullTokenKind::If
@@ -873,6 +888,15 @@ impl Tokenizer<'_> {
     }
 
     fn operator(&mut self) -> bool {
+        // In command position, ? and % begin barewords. A standalone %
+        // still has token kind Rem, but its arguments are in command mode.
+        if self.mode == Mode::Command
+            && self.statement_start
+            && matches!(self.bytes[self.pos], b'?' | b'%')
+            && self.peek(1) != Some(b'=')
+        {
+            return false;
+        }
         if self.mode == Mode::Command
             && self.bytes.get(self.pos) == Some(&b'-')
             && let Some(ch) = self.peek_char(1)
@@ -1032,7 +1056,9 @@ impl Tokenizer<'_> {
             && KEYWORDS
                 .iter()
                 .any(|(_, keyword)| word.eq_ignore_ascii_case(keyword));
-        let kind = if has_command_punctuation || contextual_keyword {
+        let kind = if command_mode && self.statement_start && word == "%" {
+            FullTokenKind::Rem
+        } else if has_command_punctuation || contextual_keyword {
             FullTokenKind::Generic
         } else {
             FullTokenKind::Identifier

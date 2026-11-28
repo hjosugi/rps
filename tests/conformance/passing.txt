@@ -97,6 +97,7 @@ native/pipe
 native/unix-command-names
 ops/comparison
 ops/ternary-coalesce
+pipeline/command-aliases
 pipeline/compare-object
 pipeline/csv
 pipeline/foreach-blocks

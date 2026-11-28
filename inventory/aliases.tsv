@@ -1,6 +1,6 @@
 alias	definition	module	platform	status
-?	Where-Object	(session)	linux-x64	partial
-%	ForEach-Object	(session)	linux-x64	partial
+?	Where-Object	(session)	linux-x64	done
+%	ForEach-Object	(session)	linux-x64	done
 cd	Set-Location	(session)	linux-x64	done
 chdir	Set-Location	(session)	linux-x64	done
 clc	Clear-Content	(session)	linux-x64	done
@@ -28,7 +28,7 @@ fdres	Find-PSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
 fhx	Format-Hex	Microsoft.PowerShell.Utility	linux-x64	todo
 fimo	Find-Module	PowerShellGet	linux-x64	todo
 fl	Format-List	(session)	linux-x64	done
-foreach	ForEach-Object	(session)	linux-x64	partial
+foreach	ForEach-Object	(session)	linux-x64	done
 ft	Format-Table	(session)	linux-x64	done
 fw	Format-Wide	(session)	linux-x64	done
 gal	Get-Alias	(session)	linux-x64	done

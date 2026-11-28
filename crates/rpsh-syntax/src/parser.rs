@@ -45,6 +45,16 @@ impl Parser {
         &self.tokens[self.pos]
     }
 
+    /// A percent sign starts a command here and remains an infix operator
+    /// when the expression parser encounters it after an operand.
+    fn command_name(&self) -> Option<&str> {
+        match &self.peek().kind {
+            TokenKind::Identifier(name) | TokenKind::Bareword(name) => Some(name),
+            TokenKind::Remainder => Some("%"),
+            _ => None,
+        }
+    }
+
     fn at_statement_end(&self) -> bool {
         matches!(
             self.peek().kind,
@@ -113,26 +123,8 @@ impl Parser {
             let name = name.clone();
             let start = self.peek().span;
             self.pos += 2;
-            if !append
-                && !coalesce
-                && compound.is_none()
-                && let TokenKind::Identifier(command) | TokenKind::Bareword(command) =
-                    &self.peek().kind
-            {
-                let command = command.clone();
-                let first = self.command_statement(command)?;
-                let Statement::Command {
-                    name: command,
-                    arguments,
-                    ..
-                } = first
-                else {
-                    return self.refuse(SYNTAX_ERRORS);
-                };
-                let mut commands = vec![PipelineCommand::Command {
-                    name: command,
-                    arguments,
-                }];
+            if !append && !coalesce && compound.is_none() && self.command_name().is_some() {
+                let mut commands = vec![self.pipeline_element()?];
                 while self.peek().kind == TokenKind::Pipe {
                     self.pos += 1;
                     self.skip_newlines();
@@ -192,6 +184,10 @@ impl Parser {
             let span = start.to(self.previous_span());
             return Ok(Statement::DotSource { path, span });
         }
+        if let Some(name) = self.command_name() {
+            let statement = self.command_statement(name.to_owned())?;
+            return self.pipeline_after(statement);
+        }
         match &self.peek().kind {
             TokenKind::If => self.if_statement(),
             TokenKind::While => self.while_statement(),
@@ -210,10 +206,6 @@ impl Parser {
             TokenKind::Enum => self.enum_statement(),
             TokenKind::Class => self.class_statement(),
             TokenKind::Filter => self.function_statement(true),
-            TokenKind::Identifier(name) | TokenKind::Bareword(name) => {
-                let statement = self.command_statement(name.clone())?;
-                self.pipeline_after(statement)
-            }
             TokenKind::Exit => self.exit_statement(),
             _ => {
                 let expression = self.expression()?;
@@ -345,11 +337,7 @@ impl Parser {
         }
         self.pos += 1;
         self.skip_newlines();
-        if matches!(
-            self.peek().kind,
-            TokenKind::Identifier(_) | TokenKind::Bareword(_)
-        ) || self.paren_has_pipe()
-        {
+        if self.command_name().is_some() || self.paren_has_pipe() {
             let statements = self.paren_statements()?;
             let span = self.previous_span();
             return self.expr(ExprKind::Group(statements), span);
@@ -520,19 +508,20 @@ impl Parser {
     }
 
     fn pipeline_element(&mut self) -> Result<PipelineCommand, ParseError> {
-        match &self.peek().kind {
-            TokenKind::Identifier(name) | TokenKind::Bareword(name) => {
-                let name = name.clone();
-                let statement = self.command_statement(name)?;
-                let Statement::Command {
-                    name, arguments, ..
-                } = statement
-                else {
-                    return self.refuse(SYNTAX_ERRORS);
-                };
-                Ok(PipelineCommand::Command { name, arguments })
-            }
-            _ => Ok(PipelineCommand::Expression(self.nested_expression()?)),
+        // A keyword can name a command after a pipe, including the
+        // built-in foreach alias. At statement start it introduces a loop.
+        let name = match self.peek().kind {
+            TokenKind::Foreach => Some("foreach"),
+            _ => self.command_name(),
+        };
+        let Some(name) = name else {
+            return Ok(PipelineCommand::Expression(self.nested_expression()?));
+        };
+        match self.command_statement(name.to_owned())? {
+            Statement::Command {
+                name, arguments, ..
+            } => Ok(PipelineCommand::Command { name, arguments }),
+            _ => self.refuse(SYNTAX_ERRORS),
         }
     }
 
@@ -1944,11 +1933,7 @@ impl Parser {
                 if self.peek().kind == TokenKind::NewLine {
                     return self.refuse("newlines inside parentheses");
                 }
-                if matches!(
-                    self.peek().kind,
-                    TokenKind::Identifier(_) | TokenKind::Bareword(_)
-                ) || self.paren_has_pipe()
-                {
+                if self.command_name().is_some() || self.paren_has_pipe() {
                     let statements = self.paren_statements()?;
                     return self.expr(ExprKind::Group(statements), span.to(self.previous_span()));
                 }

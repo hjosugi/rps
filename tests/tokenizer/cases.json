@@ -130,5 +130,13 @@
   {
     "name": "case-insensitive-alias",
     "source": "1 -ieq 1"
+  },
+  {
+    "name": "pipeline-aliases",
+    "source": "1 | ? { $_ % 2 } | % -MemberName Length | foreach -MemberName Length"
+  },
+  {
+    "name": "percent-command",
+    "source": "$value = (% -End { 1 ? 2 : 3 })"
   }
 ]
