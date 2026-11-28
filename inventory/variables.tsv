@@ -36,7 +36,7 @@ PSDefaultParameterValues	System.Management.Automation.DefaultParameterDictionary
 PSEdition	System.String	Constant, AllScope	linux-x64	todo
 PSEmailServer	System.String	None	linux-x64	todo
 PSHOME	System.String	Constant, AllScope	linux-x64	todo
-PSNativeCommandArgumentPassing	System.Management.Automation.NativeArgumentPassingStyle	None	linux-x64	todo
+PSNativeCommandArgumentPassing	System.Management.Automation.NativeArgumentPassingStyle	None	linux-x64	partial
 PSNativeCommandUseErrorActionPreference	System.Boolean	None	linux-x64	todo
 PSScriptRoot	System.String	None	linux-x64	todo
 PSSessionApplicationName	System.String	None	linux-x64	todo

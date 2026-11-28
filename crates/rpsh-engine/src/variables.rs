@@ -39,6 +39,9 @@ impl Variables {
             .filter(|key| *key != "Error")
             .collect();
         names.push("Error");
+        for name in super::preferences::names().filter(|name| !self.contains_key(*name)) {
+            names.push(name);
+        }
         names.sort_unstable();
         names
     }

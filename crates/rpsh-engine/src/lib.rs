@@ -4251,6 +4251,8 @@ impl Engine {
                         lookup(name, &self.variables, !self.last_failed).unwrap_or(Value::Null);
                     if value_only {
                         value
+                    } else if let Some(canonical) = preferences::variable_name(key) {
+                        preferences::variable_info(canonical, value)
                     } else {
                         Value::object(vec![
                             ("Name".into(), Value::String(key.into())),
@@ -8552,6 +8554,10 @@ fn type_full_name(name: &str) -> String {
         "text.normalizationform" => globalization::FORM_TYPE.to_owned(),
         "management.automation.actionpreference"
         | "system.management.automation.actionpreference" => preferences::TYPE.into(),
+        "management.automation.nativeargumentpassingstyle"
+        | "system.management.automation.nativeargumentpassingstyle" => {
+            preferences::ARGUMENT_TYPE.into()
+        }
         "stringcomparison" => globalization::COMPARISON_TYPE.to_owned(),
         "pscustomobject" => "System.Management.Automation.PSCustomObject".to_owned(),
         _ => name.to_owned(),
@@ -9061,6 +9067,9 @@ fn static_member(
         }
         ("management.automation.actionpreference", name) => {
             Ok(preferences::member(name).unwrap_or(Value::Null))
+        }
+        ("management.automation.nativeargumentpassingstyle", name) => {
+            Ok(preferences::argument_member(name).unwrap_or(Value::Null))
         }
         ("datetimekind", "utc") => Ok(Value::Int32(1)),
         ("datetimekind", "local") => Ok(Value::Int32(2)),
@@ -9730,6 +9739,10 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
     match type_name.to_ascii_lowercase().as_str() {
         "management.automation.actionpreference"
         | "system.management.automation.actionpreference" => preferences::cast(&value),
+        "management.automation.nativeargumentpassingstyle"
+        | "system.management.automation.nativeargumentpassingstyle" => {
+            preferences::argument_cast(&value)
+        }
         "collections.arraylist" | "system.collections.arraylist" => array_list::cast(value),
         "cultureinfo" | "globalization.cultureinfo" | "system.globalization.cultureinfo" => {
             globalization::cast_culture(&value)
@@ -10276,7 +10289,7 @@ fn object_method(
     if arguments.is_empty() && name.eq_ignore_ascii_case("ToString") {
         let text_type = entries.iter().any(|(key,value)| key == "__TypeName" && matches!(value, Value::String(ty) if matches!(ty.as_ascii(), Some(
             globalization::CULTURE_TYPE | globalization::FORM_TYPE | globalization::COMPARISON_TYPE
-            | preferences::TYPE | "System.Management.Automation.ErrorRecord" | "System.Management.Automation.ErrorCategoryInfo"
+            | preferences::TYPE | preferences::ARGUMENT_TYPE | "System.Management.Automation.ErrorRecord" | "System.Management.Automation.ErrorCategoryInfo"
             | "System.Management.Automation.ErrorCategory" | "System.Management.Automation.ScopedItemOptions"
         ))));
         if text_type && let Some((_, text)) = entries.iter().find(|(key, _)| key == "__Text") {

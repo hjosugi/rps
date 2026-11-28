@@ -106,6 +106,7 @@ modules/import
 modules/import-many
 modules/utility-alias
 native/application-path
+native/argument-styles
 native/byte-pipe
 native/capture
 native/console-encoding

@@ -1,3 +1,4 @@
+mod arguments;
 mod error_files;
 mod exit_error;
 mod glob;
@@ -17,9 +18,7 @@ use std::process::Stdio;
 use rpsh_commands::{CORE_CMDLETS, MODULES};
 use rpsh_native::{Destination, PipelineError, application_command, run_pipeline_with_input};
 use rpsh_runtime::{RuntimeError, Value};
-use rpsh_syntax::{
-    ArgumentSeparator, CommandArgument, Expr, ExprKind, PipelineCommand, Redirection, Stream,
-};
+use rpsh_syntax::{CommandArgument, PipelineCommand, Redirection, Stream};
 
 use super::{Engine, EngineError, OutputTarget, command_not_found, native_exit_code};
 
@@ -190,7 +189,7 @@ impl Engine {
                 .into_iter()
                 .next()
                 .ok_or_else(|| command_not_found(&stage.name))?;
-            let args = self.native_arguments(stage.arguments)?;
+            let args = self.native_arguments(stage.arguments, &path)?;
             let mut command = application_command(
                 &path,
                 &args,
@@ -283,65 +282,6 @@ impl Engine {
             .get("PSApplicationOutputEncoding")
             .and_then(Encoding::from_value)
             .unwrap_or_else(encoding::console)
-    }
-
-    fn native_arguments(
-        &mut self,
-        arguments: &[CommandArgument],
-    ) -> Result<Vec<String>, EngineError> {
-        let mut out = Vec::new();
-        for argument in arguments {
-            match argument {
-                CommandArgument::Bareword(word) => glob::append(&mut out, word.clone(), false),
-                CommandArgument::Value(expr) => self.native_argument_value(expr, &mut out)?,
-                CommandArgument::Parameter {
-                    name,
-                    value,
-                    separator,
-                } => {
-                    if *separator == ArgumentSeparator::Space {
-                        out.push(format!("-{name}"));
-                        if let Some(expr) = value {
-                            self.native_argument_value(expr, &mut out)?;
-                        }
-                    } else if let Some(expr) = value {
-                        let mut values = Vec::new();
-                        self.native_argument_value(expr, &mut values)?;
-                        for value in values {
-                            if *separator == ArgumentSeparator::Colon {
-                                out.push(format!("-{name}:{value}"));
-                            } else {
-                                out.push(format!("-{name}:"));
-                                out.push(value);
-                            }
-                        }
-                    } else {
-                        out.push(format!("-{name}:"));
-                    }
-                }
-            }
-        }
-        Ok(out)
-    }
-
-    fn native_argument_value(
-        &mut self,
-        expr: &Expr,
-        out: &mut Vec<String>,
-    ) -> Result<(), EngineError> {
-        let quoted = matches!(
-            expr.kind,
-            ExprKind::String(_) | ExprKind::ExpandableString(_)
-        );
-        let value = self.eval_expression(expr)?;
-        let sequence = value.sequence();
-        let items = sequence
-            .as_deref()
-            .unwrap_or_else(|| std::slice::from_ref(&value));
-        for item in items.iter().filter(|item| !item.is_null_like()) {
-            glob::append(out, item.to_string(), quoted);
-        }
-        Ok(())
     }
 }
 

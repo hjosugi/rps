@@ -1064,7 +1064,9 @@ impl Tokenizer<'_> {
             return false;
         }
         let first = self.bytes[start];
-        if matches!(first, b'-' | b'#' | b'@' | b'\'' | b'"') {
+        if matches!(first, b'#' | b'@' | b'\'' | b'"')
+            || first == b'-' && self.bytes.get(start + 1) != Some(&b'-')
+        {
             return false;
         }
         let mut at = start;

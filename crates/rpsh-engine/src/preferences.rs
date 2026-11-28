@@ -4,6 +4,42 @@ use rpsh_runtime::{RuntimeError, Value, ops};
 
 pub(super) const TYPE: &str = "System.Management.Automation.ActionPreference";
 const NATIVE: &str = "PSNativeCommandUseErrorActionPreference";
+const PASSING: &str = "PSNativeCommandArgumentPassing";
+pub(super) const ARGUMENT_TYPE: &str = "System.Management.Automation.NativeArgumentPassingStyle";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ArgumentStyle {
+    Legacy,
+    Standard,
+    Windows,
+}
+
+const STYLES: EnumTable<ArgumentStyle> = EnumTable {
+    ty: ARGUMENT_TYPE,
+    entries: &[
+        ("Legacy", 0, ArgumentStyle::Legacy),
+        ("Standard", 1, ArgumentStyle::Standard),
+        ("Windows", 2, ArgumentStyle::Windows),
+    ],
+};
+
+pub(super) fn argument_style(variables: &Variables) -> ArgumentStyle {
+    variables
+        .get(PASSING)
+        .and_then(|value| STYLES.parse(value).ok())
+        .map_or_else(
+            || STYLES.entries[if cfg!(windows) { 2 } else { 1 }].2,
+            |entry| entry.2,
+        )
+}
+
+pub(super) fn argument_member(name: &str) -> Option<Value> {
+    STYLES.entry(name).map(|entry| STYLES.value(entry))
+}
+
+pub(super) fn argument_cast(value: &Value) -> Result<Value, RuntimeError> {
+    STYLES.cast(value)
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Action {
     Silent,
@@ -39,15 +75,58 @@ pub(super) fn variable_name(key: &str) -> Option<&'static str> {
     if key.eq_ignore_ascii_case(NATIVE) {
         return Some(NATIVE);
     }
+    if key.eq_ignore_ascii_case(PASSING) {
+        return Some(PASSING);
+    }
     VARIABLES
         .iter()
         .find(|(k, _)| key.eq_ignore_ascii_case(k))
         .map(|(k, _)| *k)
 }
 
+pub(super) fn names() -> impl Iterator<Item = &'static str> {
+    [NATIVE, PASSING]
+        .into_iter()
+        .chain(VARIABLES.iter().map(|(name, _)| *name))
+}
+
+pub(super) fn variable_info(name: &str, value: Value) -> Value {
+    let description = if name == PASSING {
+        "NativeCommandArgumentPassing"
+    } else {
+        name
+    };
+    Value::object(vec![
+        ("Name".into(), Value::String(name.into())),
+        ("Value".into(), value),
+        (
+            "__TypeName".into(),
+            Value::String("System.Management.Automation.PSVariable".into()),
+        ),
+        (
+            "Options".into(),
+            super::errors::enum_value(
+                "System.Management.Automation.ScopedItemOptions",
+                "None",
+                &["None"],
+            ),
+        ),
+        ("Visibility".into(), Value::String("Public".into())),
+        (
+            "Description".into(),
+            Value::String(
+                rpsh_messages::text(&format!("RunspaceInit/{description}Description")).into(),
+            ),
+        ),
+    ])
+}
+
 pub(super) fn default_value(key: &str) -> Option<Value> {
     if key == NATIVE {
         return Some(Value::Bool(false));
+    }
+    if key == PASSING {
+        return Some(STYLES.value(&STYLES.entries[if cfg!(windows) { 2 } else { 1 }]));
     }
     VARIABLES
         .iter()
@@ -72,6 +151,12 @@ fn metadata_error(message: String) -> RuntimeError {
 }
 
 pub(super) fn assignment(name: &str, value: &Value) -> Result<Value, RuntimeError> {
+    if name == PASSING {
+        return STYLES
+            .parse(value)
+            .map(|entry| STYLES.value(entry))
+            .map_err(|(_, detail)| metadata_error(detail));
+    }
     if name == NATIVE {
         return match value {
             Value::Bool(_)

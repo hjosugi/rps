@@ -4,23 +4,25 @@ use std::path::{Component, Path, PathBuf};
 
 use rpsh_runtime::{PsString, culture, wildcard};
 
-pub(super) fn append(out: &mut Vec<String>, word: String, quoted: bool) {
+pub(super) fn expand(word: String, quoted: bool, mut emit: impl FnMut(String, bool)) {
     if !cfg!(unix) || quoted || needs_quotes(&word) {
-        out.push(word);
+        emit(word, false);
     } else if wildcard::contains_wildcard_characters(word.encode_utf16()) {
         if let Some(matches) = expand_paths(&word).filter(|paths| !paths.is_empty()) {
-            out.extend(matches);
+            for path in matches {
+                emit(path, true);
+            }
         } else {
-            out.push(word);
+            emit(word, false);
         }
     } else {
-        out.push(crate::expand_home(&word));
+        emit(crate::expand_home(&word), false);
     }
 }
 
 // The native binder quotes a value containing whitespace outside embedded
 // double quotes before it reaches wildcard or tilde expansion.
-fn needs_quotes(word: &str) -> bool {
+pub(super) fn needs_quotes(word: &str) -> bool {
     let mut in_quotes = false;
     let mut after_backslash = false;
     for ch in word.chars() {
