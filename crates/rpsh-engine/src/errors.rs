@@ -26,6 +26,16 @@ pub(super) fn error_record(
             Value::String(message.to_owned().into()),
         ),
     ]);
+    record_with_exception(id, category, exception, text, Value::Null)
+}
+
+pub(super) fn record_with_exception(
+    id: &str,
+    category: &str,
+    exception: Value,
+    text: &str,
+    target: Value,
+) -> Value {
     Value::object(vec![
         ("__Text".to_owned(), Value::String(text.to_owned().into())),
         (
@@ -38,6 +48,7 @@ pub(super) fn error_record(
         ),
         ("CategoryInfo".to_owned(), category_info(category)),
         ("Exception".to_owned(), exception),
+        ("TargetObject".into(), target),
     ])
 }
 
@@ -330,8 +341,12 @@ pub(super) fn thrown(value: Value) -> ScriptException {
         &message,
         &message,
     );
-    if let Value::Object(fields) = &mut record {
-        Rc::make_mut(fields).push(("TargetObject".into(), value));
+    if let Value::Object(fields) = &mut record
+        && let Some((_, target)) = Rc::make_mut(fields)
+            .iter_mut()
+            .find(|(key, _)| key == "TargetObject")
+    {
+        *target = value;
     }
     ScriptException {
         explicit_throw: true,

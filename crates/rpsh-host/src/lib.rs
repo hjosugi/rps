@@ -48,7 +48,7 @@ const ARGUMENT_FILE_DOES_NOT_EXIST: &str =
 /// Runs rpsh with the arguments that follow the program name and returns the
 /// process exit code.
 pub fn run(args: &[String]) -> i32 {
-    let invocation = match parse_args(args) {
+    let (invocation, non_interactive) = match cli::parse_with_mode(args) {
         Ok(invocation) => invocation,
         Err(CliError::NotImplemented(feature)) => return not_implemented(feature),
         Err(CliError::MissingCommand) => {
@@ -72,8 +72,8 @@ pub fn run(args: &[String]) -> i32 {
             println!("{USAGE}");
             0
         }
-        Invocation::Command(source) => run_source(&source),
-        Invocation::File { path, args } => run_file(&path, &args),
+        Invocation::Command(source) => run_source_with(&source, &[], None, non_interactive),
+        Invocation::File { path, args } => run_file(&path, &args, non_interactive),
         Invocation::Interactive => not_implemented("interactive sessions"),
     }
 }
@@ -90,7 +90,7 @@ fn not_implemented(feature: &str) -> i32 {
     EXIT_NOT_IMPLEMENTED
 }
 
-fn run_file(path: &Path, args: &[String]) -> i32 {
+fn run_file(path: &Path, args: &[String], non_interactive: bool) -> i32 {
     let bytes = match fs::read(path) {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -104,18 +104,19 @@ fn run_file(path: &Path, args: &[String]) -> i32 {
     };
     let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes);
     match std::str::from_utf8(bytes) {
-        Ok(source) => run_source_with(source, args, Some(path)),
+        Ok(source) => run_source_with(source, args, Some(path), non_interactive),
         Err(_) => not_implemented("script files that are not UTF-8"),
     }
 }
 
-fn run_source(source: &str) -> i32 {
-    run_source_with(source, &[], None)
-}
-
-fn run_source_with(source: &str, args: &[String], path: Option<&Path>) -> i32 {
+fn run_source_with(
+    source: &str,
+    args: &[String],
+    path: Option<&Path>,
+    non_interactive: bool,
+) -> i32 {
     let mut out = BufWriter::new(io::stdout().lock());
-    let mut engine = Engine::for_console();
+    let mut engine = Engine::for_console_with_mode(non_interactive);
     let result = if let Some(path) = path {
         engine.run_script_with(source, args, Some(path), &mut out)
     } else {

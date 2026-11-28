@@ -1,3 +1,4 @@
+mod exit_error;
 mod glob;
 mod path;
 pub(super) use path::LookupPaths;
@@ -164,6 +165,17 @@ impl Engine {
             NativeOutput::Redirected(target) => Destination::Device(target.stdio()?),
         };
         let stdin = (input.is_some() || !self.console_stdio).then_some(bytes.as_slice());
+        let policy = crate::preferences::native_action(&self.variables)
+            .filter(|action| *action != crate::preferences::Action::Ignore)
+            .map(|action| {
+                (
+                    action,
+                    commands
+                        .iter()
+                        .map(|command| Path::new(command.get_program()).to_owned())
+                        .collect(),
+                )
+            });
         let status =
             run_pipeline_with_input(commands, stdin, output).map_err(|error| match error {
                 PipelineError::Spawn { program, error } => {
@@ -171,11 +183,7 @@ impl Engine {
                 }
                 PipelineError::Io(error) => EngineError::Io(error),
             })?;
-        self.last_failed = !status.all_succeeded;
-        self.assign_variable(
-            "global:LASTEXITCODE",
-            Value::Int32(native_exit_code(status.last)),
-        )?;
+        self.native_exit_status(status, policy)?;
         if captured.is_empty() {
             return Ok(Vec::new());
         }

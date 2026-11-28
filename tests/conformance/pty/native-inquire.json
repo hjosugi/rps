@@ -1,0 +1,8 @@
+{
+  "program": "{engine}",
+  "args": ["-NoLogo", "-NoProfile", "-Command", "$PSNativeCommandUseErrorActionPreference=$true; $ErrorActionPreference='Inquire'; try { sh -c 'exit 7' } catch { $_.FullyQualifiedErrorId; $LASTEXITCODE }"],
+  "input": [{"after_ms": 950, "send": "h\r"}],
+  "timeout_ms": 8000,
+  "cols": 80,
+  "rows": 12
+}

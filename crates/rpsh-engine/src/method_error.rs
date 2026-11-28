@@ -72,3 +72,12 @@ pub(super) fn nonnegative(name: &str, value: i64) -> String {
         "{name} ('{value}') must be a non-negative value. (Parameter '{name}')\nActual value was {value}."
     )
 }
+
+pub(super) fn cast_error(id: &'static str, detail: String) -> RuntimeError {
+    RuntimeError::Script {
+        id,
+        category: "InvalidArgument: (:) [], RuntimeException".into(),
+        exception_type: "System.Management.Automation.RuntimeException",
+        message: detail,
+    }
+}

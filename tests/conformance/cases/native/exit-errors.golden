@@ -1,0 +1,48 @@
+rpsh-golden-v2
+exit=0
+native-default=False
+default=False,3,0
+Ignore|False|10|stdout|0
+SilentlyContinue|False|10|stdout|1
+System.Management.Automation.ErrorRecord
+ProgramExitedWithNonZeroCode
+NotSpecified
+NativeCommandExitException
+System.Management.Automation.NativeCommandExitException
+10
+True
+True
+True
+Program "sh" ended with non-zero exit code: 10 (0x0A).
+Continue|False|10|stdout|1
+System.Management.Automation.ErrorRecord
+ProgramExitedWithNonZeroCode
+NotSpecified
+NativeCommandExitException
+System.Management.Automation.NativeCommandExitException
+10
+True
+True
+True
+Program "sh" ended with non-zero exit code: 10 (0x0A).
+caught|Stop|False|10|1
+Program "sh" ended with non-zero exit code: 10 (0x0A).
+System.Management.Automation.ErrorRecord
+ProgramExitedWithNonZeroCode
+NotSpecified
+NativeCommandExitException
+System.Management.Automation.NativeCommandExitException
+10
+True
+True
+True
+Program "sh" ended with non-zero exit code: 10 (0x0A).
+early|False|0|1
+both|False|19|3
+19
+8
+7
+stderr|True|0|0
+stopped-early|False|26|1|26
+inquire|False|2|1|NativeCommandFailed
+True

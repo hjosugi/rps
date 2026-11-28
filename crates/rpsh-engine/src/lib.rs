@@ -14,11 +14,13 @@
 mod aliases;
 mod array_list;
 mod encoding;
+mod enum_table;
 mod environment;
 mod errors;
 mod globalization;
 mod method_error;
 mod native;
+mod preferences;
 mod redirection;
 mod sorting;
 mod string_compare;
@@ -57,6 +59,7 @@ pub struct Engine {
     /// The console host can hand its actual descriptors to native children.
     /// Embedded engines continue to use the caller's Write implementation.
     console_stdio: bool,
+    non_interactive: bool,
     command_paths: native::LookupPaths,
     /// While running a pipeline stage, output is collected here instead of
     /// being written to the host.
@@ -310,8 +313,14 @@ impl Engine {
 
     /// Use the process's standard streams for native commands that inherit them.
     pub fn for_console() -> Self {
+        Self::for_console_with_mode(false)
+    }
+
+    /// Initialize a real console host, optionally disallowing prompts.
+    pub fn for_console_with_mode(non_interactive: bool) -> Self {
         Self {
             console_stdio: true,
+            non_interactive,
             ..Self::default()
         }
     }
@@ -1062,6 +1071,11 @@ impl Engine {
             self.variables.insert("Error".into(), value);
             return Ok(());
         }
+        let (key, value) = if let Some(canonical) = preferences::variable_name(key) {
+            (canonical, preferences::assignment(canonical, &value)?)
+        } else {
+            (key, value)
+        };
         let key = if let Some(canonical) = encoding::variable_name(key) {
             if !value.is_null_like() && Encoding::from_value(&value).is_none() {
                 return Err(RuntimeError::Script {
@@ -8233,6 +8247,7 @@ fn lookup(name: &str, variables: &Variables, last_success: bool) -> Option<Value
     if key.eq_ignore_ascii_case("Error") {
         return Some(variables.error_value(is_global_scope(name)));
     }
+    let key = preferences::variable_name(key).unwrap_or(key);
     let key = encoding::variable_name(key).unwrap_or(key);
     if let Some(value) = variables.get(key) {
         return Some(value.clone());
@@ -8336,12 +8351,7 @@ fn automatic_variable(name: &str) -> Option<Value> {
         "IsWindows" | "IsMacOS" => Some(Value::Bool(false)),
         "IsCoreCLR" => Some(Value::Bool(true)),
         "PSEdition" => Some(Value::String("Core".into())),
-        "ErrorActionPreference"
-        | "VerbosePreference"
-        | "DebugPreference"
-        | "WarningPreference"
-        | "InformationPreference"
-        | "ProgressPreference" => Some(Value::String("SilentlyContinue".into())),
+        key if let Some(value) = preferences::default_value(key) => Some(value),
         "PID" => Some(Value::Int32(std::process::id() as i32)),
         "HOME" => std::env::var("HOME")
             .ok()
@@ -8379,6 +8389,8 @@ fn type_full_name(name: &str) -> String {
         }
         "cultureinfo" | "globalization.cultureinfo" => globalization::CULTURE_TYPE.to_owned(),
         "text.normalizationform" => globalization::FORM_TYPE.to_owned(),
+        "management.automation.actionpreference"
+        | "system.management.automation.actionpreference" => preferences::TYPE.into(),
         "stringcomparison" => globalization::COMPARISON_TYPE.to_owned(),
         "pscustomobject" => "System.Management.Automation.PSCustomObject".to_owned(),
         _ => name.to_owned(),
@@ -8885,6 +8897,9 @@ fn static_member(
         }
         ("text.normalizationform", form) => {
             Ok(globalization::form_member(form).unwrap_or(Value::Null))
+        }
+        ("management.automation.actionpreference", name) => {
+            Ok(preferences::member(name).unwrap_or(Value::Null))
         }
         ("datetimekind", "utc") => Ok(Value::Int32(1)),
         ("datetimekind", "local") => Ok(Value::Int32(2)),
@@ -9538,6 +9553,8 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         });
     }
     match type_name.to_ascii_lowercase().as_str() {
+        "management.automation.actionpreference"
+        | "system.management.automation.actionpreference" => preferences::cast(&value),
         "collections.arraylist" | "system.collections.arraylist" => array_list::cast(value),
         "cultureinfo" | "globalization.cultureinfo" | "system.globalization.cultureinfo" => {
             globalization::cast_culture(&value)
@@ -10081,7 +10098,7 @@ fn object_method(
     if arguments.is_empty() && name.eq_ignore_ascii_case("ToString") {
         let text_type = entries.iter().any(|(key,value)| key == "__TypeName" && matches!(value, Value::String(ty) if matches!(ty.as_ascii(), Some(
             globalization::CULTURE_TYPE | globalization::FORM_TYPE | globalization::COMPARISON_TYPE
-            | "System.Management.Automation.ErrorRecord" | "System.Management.Automation.ErrorCategoryInfo"
+            | preferences::TYPE | "System.Management.Automation.ErrorRecord" | "System.Management.Automation.ErrorCategoryInfo"
             | "System.Management.Automation.ErrorCategory" | "System.Management.Automation.ScopedItemOptions"
         ))));
         if text_type && let Some((_, text)) = entries.iter().find(|(key, _)| key == "__Text") {

@@ -1,0 +1,5 @@
+{
+  "exit_code": 0,
+  "screen": "\nConfirm\nProgram \"sh\" ended with non-zero exit code: 7 (0x07).\n[Y] Yes  [A] Yes to All  [H] Halt Command  [S] Suspend  [?] Help\n(default is \"Y\"):h\nActionPreferenceStop\n7",
+  "timed_out": false
+}

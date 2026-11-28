@@ -52,6 +52,7 @@ expr/string-normalization
 expr/string-search
 expr/timespan
 expr/version-type
+lang/action-preferences
 lang/alias-filters
 lang/alias-view
 lang/aliases
@@ -111,6 +112,7 @@ native/console-encoding
 native/environment
 native/environment-process
 native/exit-code
+native/exit-errors
 native/glob
 native/glob-arguments
 native/inherited-stdin

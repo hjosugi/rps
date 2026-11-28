@@ -14,6 +14,14 @@ pub enum Destination<W> {
 pub struct PipelineStatus {
     pub last: ExitStatus,
     pub all_succeeded: bool,
+    pub failures: Vec<FailedStage>,
+}
+
+#[derive(Debug)]
+pub struct FailedStage {
+    pub index: usize,
+    pub pid: u32,
+    pub status: ExitStatus,
 }
 
 #[derive(Debug)]
@@ -36,16 +44,23 @@ struct Children(Vec<Child>);
 impl Children {
     fn finish(&mut self) -> io::Result<PipelineStatus> {
         let mut last = None;
-        let mut all_succeeded = true;
-        for child in &mut self.0 {
+        let mut failures = Vec::new();
+        for (index, child) in self.0.iter_mut().enumerate() {
             let status = child.wait()?;
-            all_succeeded &= status.success();
+            if !status.success() {
+                failures.push(FailedStage {
+                    index,
+                    pid: child.id(),
+                    status,
+                });
+            }
             last = Some(status);
         }
         self.0.clear();
         Ok(PipelineStatus {
             last: last.ok_or_else(|| io::Error::other("empty native pipeline"))?,
-            all_succeeded,
+            all_succeeded: failures.is_empty(),
+            failures,
         })
     }
 

@@ -28,4 +28,6 @@ mod application;
 mod pipe;
 
 pub use application::application_command;
-pub use pipe::{Destination, PipelineError, PipelineStatus, run_pipeline, run_pipeline_with_input};
+pub use pipe::{
+    Destination, FailedStage, PipelineError, PipelineStatus, run_pipeline, run_pipeline_with_input,
+};

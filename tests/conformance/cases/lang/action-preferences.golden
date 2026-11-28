@@ -1,0 +1,31 @@
+rpsh-golden-v2
+exit=0
+ErrorActionPreference|Continue|2|System.Management.Automation.ActionPreference
+WarningPreference|Continue|2|System.Management.Automation.ActionPreference
+ProgressPreference|Continue|2|System.Management.Automation.ActionPreference
+VerbosePreference|SilentlyContinue|0|System.Management.Automation.ActionPreference
+DebugPreference|SilentlyContinue|0|System.Management.Automation.ActionPreference
+InformationPreference|SilentlyContinue|0|System.Management.Automation.ActionPreference
+Continue
+SilentlyContinue|0
+System.Management.Automation.ActionPreference
+RuntimeException
+Cannot convert null to type "System.Management.Automation.ActionPreference" due to enumeration values that are not valid. Specify one of the following enumeration values and try again. The possible enumeration values are "SilentlyContinue,Stop,Continue,Inquire,Ignore,Suspend,Break".
+RuntimeException
+Cannot convert value "" to type "System.Management.Automation.ActionPreference". Error: "The identifier name  cannot be processed because it is either too similar or identical to the following enumerator names: SilentlyContinue, Stop, Continue, Inquire, Ignore, Suspend, Break. Use a more specific identifier name."
+RuntimeException
+Cannot convert value "bad" to type "System.Management.Automation.ActionPreference". Error: "Unable to match the identifier name bad to a valid enumerator name. Specify one of the following enumerator names and try again:
+SilentlyContinue, Stop, Continue, Inquire, Ignore, Suspend, Break"
+RuntimeException
+Cannot convert value "7" to type "System.Management.Automation.ActionPreference" due to enumeration values that are not valid. Specify one of the following enumeration values and try again. The possible enumeration values are "SilentlyContinue,Stop,Continue,Inquire,Ignore,Suspend,Break".
+RuntimeException
+The Suspend ActionPreference value is reserved for future use and is not supported at this time. For more information about preference variables, see the Help topic, "about_Preference_Variables."
+RuntimeException
+Cannot convert value "True" to type "System.Management.Automation.ActionPreference". Error: "Invalid cast from 'System.Boolean' to 'System.Management.Automation.ActionPreference'."
+False|System.Boolean
+True|System.Boolean
+True|System.Boolean
+RuntimeException
+Cannot convert value "System.String" to type "System.Boolean". Boolean parameters accept only Boolean values and numbers, such as $True, $False, 1 or 0.
+RuntimeException
+Cannot convert value "" to type "System.Boolean". Boolean parameters accept only Boolean values and numbers, such as $True, $False, 1 or 0.

@@ -92,6 +92,11 @@ fn match_switch(key: &str) -> Option<&'static str> {
 
 /// Parses the arguments that follow the program name.
 pub fn parse_args(args: &[String]) -> Result<Invocation, CliError> {
+    parse_with_mode(args).map(|(invocation, _)| invocation)
+}
+
+pub(crate) fn parse_with_mode(args: &[String]) -> Result<(Invocation, bool), CliError> {
+    let mut non_interactive = false;
     let mut index = 0;
     while let Some(arg) = args.get(index) {
         index += 1;
@@ -106,24 +111,24 @@ pub fn parse_args(args: &[String]) -> Result<Invocation, CliError> {
             .or_else(|| arg.strip_prefix('/'))
             .and_then(|key| match_switch(&key.to_ascii_lowercase()));
         match switch {
-            Some("version") => return Ok(Invocation::Version),
-            Some("help") => return Ok(Invocation::Help),
-            // Nothing to skip yet: there are no profiles, no banner and no
-            // prompts. The switches are accepted so that scripts and the
-            // harness can pass them as they would to pwsh.
-            Some("noprofile" | "nologo" | "noninteractive") => {}
-            Some("command") => return command(&args[index..]),
+            Some("version") => return Ok((Invocation::Version, non_interactive)),
+            Some("help") => return Ok((Invocation::Help, non_interactive)),
+            Some("noprofile" | "nologo") => {}
+            Some("noninteractive") => non_interactive = true,
+            Some("command") => {
+                return command(&args[index..]).map(|action| (action, non_interactive));
+            }
             Some("file") => {
                 let Some(path) = args.get(index) else {
                     return Err(CliError::MissingFile);
                 };
-                return file(path, &args[index + 1..]);
+                return file(path, &args[index + 1..]).map(|action| (action, non_interactive));
             }
             Some(_) => return Err(CliError::NotImplemented("this command-line switch")),
-            None => return file(arg, &args[index..]),
+            None => return file(arg, &args[index..]).map(|action| (action, non_interactive)),
         }
     }
-    Ok(Invocation::Interactive)
+    Ok((Invocation::Interactive, non_interactive))
 }
 
 fn command(rest: &[String]) -> Result<Invocation, CliError> {
