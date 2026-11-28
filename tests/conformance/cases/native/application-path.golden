@@ -14,6 +14,8 @@ True
 NativeCommandFailed
 System.Management.Automation.ApplicationFailedException
 True
+NativeCommandFailed
+True
 a
 b
 absolute

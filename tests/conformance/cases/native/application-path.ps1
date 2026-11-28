@@ -23,6 +23,11 @@ try {
         $_.Exception.GetType().FullName
         $_.Exception.Message -like '*Exec format error*'
     }
+    sh -c 'printf "#!%s/missing-interpreter\n" "$1" > "$1/a/rpsh-bad-interpreter"; chmod +x "$1/a/rpsh-bad-interpreter"' sh $dir
+    try { rpsh-bad-interpreter } catch {
+        $_.FullyQualifiedErrorId
+        $_.Exception.Message -like "*rpsh-bad-interpreter*"
+    }
     Push-Location $dir
     try {
         $env:PATH = "./a:$prior"

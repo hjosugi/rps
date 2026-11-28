@@ -5,11 +5,12 @@ pub(super) use path::LookupPaths;
 use super::encoding::Encoding;
 use super::{encoding, format_out_string, redirection::text_output_width};
 use std::borrow::Cow;
-use std::io::Write;
-use std::process::{Command, Stdio};
+use std::io::{self, Write};
+use std::path::Path;
+use std::process::Stdio;
 
 use rpsh_commands::{CORE_CMDLETS, MODULES};
-use rpsh_native::{Destination, PipelineError, run_pipeline_with_input};
+use rpsh_native::{Destination, PipelineError, application_command, run_pipeline_with_input};
 use rpsh_runtime::{RuntimeError, Value};
 use rpsh_syntax::{
     ArgumentSeparator, CommandArgument, Expr, ExprKind, PipelineCommand, Redirection, Stream,
@@ -133,9 +134,13 @@ impl Engine {
                 .into_iter()
                 .next()
                 .ok_or_else(|| command_not_found(&stage.name))?;
-            let mut command = Command::new(path);
-            command.args(self.native_arguments(stage.arguments)?);
-            super::environment::configure_child(&mut command, &self.variables);
+            let args = self.native_arguments(stage.arguments)?;
+            let command = application_command(
+                &path,
+                &args,
+                super::environment::child_overrides(&self.variables),
+            )
+            .map_err(|err| spawn_failure(&path, err))?;
             commands.push(command);
         }
         let mut bytes = Vec::new();
@@ -162,17 +167,7 @@ impl Engine {
         let status =
             run_pipeline_with_input(commands, stdin, output).map_err(|error| match error {
                 PipelineError::Spawn { program, error } => {
-                    let path = std::path::Path::new(&program);
-                    let file = path.file_name().unwrap_or(path.as_os_str()).to_string_lossy();
-                    let directory = std::env::current_dir().unwrap_or_default();
-                    let reason = error.to_string();
-                    let reason = reason.split(" (os error ").next().unwrap_or(&reason);
-                    RuntimeError::Script {
-                        id: "NativeCommandFailed",
-                        category: "ResourceUnavailable: (:) [], ApplicationFailedException".into(),
-                        exception_type: "System.Management.Automation.ApplicationFailedException",
-                        message: format!("Program '{file}' failed to run: An error occurred trying to start process '{}' with working directory '{}'. {reason}",path.display(),directory.display()),
-                    }.into()
+                    spawn_failure(Path::new(&program), error)
                 }
                 PipelineError::Io(error) => EngineError::Io(error),
             })?;
@@ -250,6 +245,22 @@ impl Engine {
         }
         Ok(())
     }
+}
+
+fn spawn_failure(path: &Path, error: io::Error) -> EngineError {
+    let file = path
+        .file_name()
+        .unwrap_or(path.as_os_str())
+        .to_string_lossy();
+    let directory = std::env::current_dir().unwrap_or_default();
+    let reason = error.to_string();
+    let reason = reason.split(" (os error ").next().unwrap_or(&reason);
+    RuntimeError::Script {
+        id: "NativeCommandFailed",
+        category: "ResourceUnavailable: (:) [], ApplicationFailedException".into(),
+        exception_type: "System.Management.Automation.ApplicationFailedException",
+        message: format!("Program '{file}' failed to run: An error occurred trying to start process '{}' with working directory '{}'. {reason}", path.display(), directory.display()),
+    }.into()
 }
 
 // StreamReader.ReadLine recognizes CR, LF, and CRLF and does not synthesize

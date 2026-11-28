@@ -1,9 +1,9 @@
 //! The Env: drive, System.Environment and native children share this process
 //! environment within a shell. Deletions mask inherited values in child scopes.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::OnceLock;
 
 use rpsh_runtime::{RuntimeError, Value};
@@ -120,8 +120,7 @@ pub(super) fn entries(variables: &Variables) -> BTreeMap<String, Value> {
     entries
 }
 
-pub(super) fn search_path(variables: &Variables) -> std::borrow::Cow<'_, str> {
-    use std::borrow::Cow;
+pub(super) fn search_path(variables: &Variables) -> Cow<'_, str> {
     match variables.get("env:PATH") {
         None => Cow::Borrowed(&startup()[0].1),
         Some(Value::String(s)) => s
@@ -131,19 +130,19 @@ pub(super) fn search_path(variables: &Variables) -> std::borrow::Cow<'_, str> {
     }
 }
 
-pub(super) fn configure_child(command: &mut Command, variables: &Variables) {
-    for (key, value) in startup() {
-        command.env(key, value);
-    }
-    for (key, value) in variables {
-        if let Some(name) = key.strip_prefix("env:") {
-            if value.is_null_like() {
-                command.env_remove(name);
-            } else {
-                command.env(name, value.to_string());
-            }
-        }
-    }
+pub(super) fn child_overrides(
+    variables: &Variables,
+) -> impl Iterator<Item = (&str, Option<Cow<'_, str>>)> {
+    let initial = startup()
+        .iter()
+        .map(|(key, value)| (key.as_str(), Some(Cow::Borrowed(value.as_str()))));
+    let assigned = variables.iter().filter_map(|(key, value)| {
+        Some((
+            key.strip_prefix("env:")?,
+            (!value.is_null_like()).then(|| Cow::Owned(value.to_string())),
+        ))
+    });
+    initial.chain(assigned)
 }
 
 const TARGET: &str = "System.EnvironmentVariableTarget";

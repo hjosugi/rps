@@ -63,6 +63,14 @@ until it closes them. The case-insensitive collator uses the locale's rules
 and .NET's width and kana tailoring. The `ops/string-collation` conformance
 case exercises both collators through PowerShell operators and `.CompareTo()`.
 
+The macOS application launcher for #73 lives in
+`crates/rpsh-native/src/application.rs`. Darwin's `posix_spawnp` can start
+`/bin/sh` when the kernel rejects an executable. The launcher calls `execve`
+with the resolved path so PowerShell can report that error. It constructs the
+argument and environment buffers in the parent and retains them through the
+system call. Unix unit tests cover invalid executables, arguments, environment
+changes and pipes. The `native/application-path` case exercises the shell entry point.
+
 ## Adding a dependency
 
 The procedure is part of the change, not an afterthought:

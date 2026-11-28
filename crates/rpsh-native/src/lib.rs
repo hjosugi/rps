@@ -24,6 +24,8 @@
 //! Connects consecutive native commands with OS pipes. The engine encodes
 //! and decodes values only at the ends of a native pipeline.
 
+mod application;
 mod pipe;
 
+pub use application::application_command;
 pub use pipe::{Destination, PipelineError, PipelineStatus, run_pipeline, run_pipeline_with_input};
