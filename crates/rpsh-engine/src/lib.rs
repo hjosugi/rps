@@ -26,6 +26,7 @@ mod get_command;
 mod globalization;
 mod input;
 mod invocation;
+mod metadata;
 mod method_error;
 mod native;
 mod preferences;
@@ -755,18 +756,17 @@ impl Engine {
             } => {
                 let value = self.eval_expression(value)?;
                 let index = self.eval_expression(index)?;
-                let key = assignment_key(target)?;
-                if let Some(Value::ArrayList(list) | Value::ObjectList(list)) =
-                    self.variables.get(key)
-                {
-                    array_list::set_index(list, &index, value)?;
-                } else {
-                    self.assign_property(
+                match self.eval_expression(target)? {
+                    Value::ArrayList(list) | Value::ObjectList(list) => {
+                        array_list::set_index(&list, &index, value)?
+                    }
+                    Value::Collection(c) => metadata::assign_index(&c, &index, value)?,
+                    _ => self.assign_property(
                         target,
                         &index.to_string(),
                         value,
                         "index assignment on a value that is not an object",
-                    )?;
+                    )?,
                 }
                 self.last_failed = false;
                 Ok(Flow::Normal)
@@ -5690,14 +5690,22 @@ impl Engine {
             name,
             arguments,
         } = &expr.kind
-            && name.eq_ignore_ascii_case("new")
-            && self.classes.contains_key(&type_name.to_ascii_lowercase())
         {
-            let mut values = Vec::with_capacity(arguments.len());
-            for argument in arguments {
-                values.push(self.eval_expression(argument)?);
+            let values = arguments
+                .iter()
+                .map(|a| self.eval_expression(a))
+                .collect::<Result<Vec<_>, _>>()?;
+            if name.eq_ignore_ascii_case("new")
+                && self.classes.contains_key(&type_name.to_ascii_lowercase())
+            {
+                return self.construct_class(type_name, &values);
             }
-            return self.construct_class(type_name, &values);
+            return Ok(invoke_static(
+                type_name,
+                name,
+                &values,
+                &mut self.variables,
+            )?);
         }
         if let ExprKind::InvokeMember {
             target,
@@ -6016,6 +6024,9 @@ impl Engine {
         if let Value::InputEnumerator(input) = value {
             input::check(&input)?;
             return self.write_value(Value::array(input.take_remaining().to_vec()), out);
+        }
+        if let Value::Collection(ref c) = value {
+            return self.write_value(Value::array(c.items.items().to_vec()), out);
         }
         if let Value::ArrayList(list) | Value::ObjectList(list) = value {
             return self.write_value(Value::array(list.items().to_vec()), out);
@@ -6403,6 +6414,23 @@ fn increment(
 }
 
 fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
+    if let Value::Collection(c) = target
+        && c.sync_root.is_some()
+    {
+        let at = |index: &Value| -> Result<Value, RuntimeError> {
+            Ok(if matches!(convert_int32(index)?, 0 | -1) {
+                target.clone()
+            } else {
+                Value::Null
+            })
+        };
+        return match index.sequence() {
+            Some(indices) => Ok(Value::array(
+                indices.iter().map(at).collect::<Result<_, _>>()?,
+            )),
+            None => at(index),
+        };
+    }
     if let Some(items) = target.sequence() {
         let at =
             |index: &Value| -> Result<Value, RuntimeError> {
@@ -7970,6 +7998,11 @@ fn flatten_values(values: Vec<Value>) -> Vec<Value> {
 fn contains_group(expr: &Expr) -> bool {
     match &expr.kind {
         ExprKind::Group(_) | ExprKind::ArrayExpression(_) => true,
+        ExprKind::InvokeStatic { arguments, .. } => arguments.iter().any(contains_group),
+        ExprKind::InvokeMember {
+            target, arguments, ..
+        } => contains_group(target) || arguments.iter().any(contains_group),
+        ExprKind::Cast { value, .. } => contains_group(value),
         ExprKind::Member { target, .. } => contains_group(target),
         ExprKind::Index { target, index } => contains_group(target) || contains_group(index),
         ExprKind::Binary { left, right, .. } => contains_group(left) || contains_group(right),
@@ -8005,6 +8038,7 @@ fn flatten_value(value: Value) -> Vec<Value> {
         Value::InputEnumerator(input) => input.take_remaining().to_vec(),
         Value::Array(items) | Value::StringArray(items) => items.as_ref().clone(),
         Value::ArrayList(list) | Value::ObjectList(list) => list.items().to_vec(),
+        Value::Collection(c) => c.items.items().to_vec(),
         Value::Null | Value::AutomationNull => Vec::new(),
         value => vec![value],
     }
@@ -8839,6 +8873,21 @@ fn invoke_static(
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        ("management.automation.commandmetadata", "new") => metadata::construct(arguments),
+        ("object", "referenceequals")
+            if let [a, b] = arguments
+                && (a.is_null_like() || b.is_null_like()) =>
+        {
+            Ok(Value::Bool(a.is_null_like() && b.is_null_like()))
+        }
+        ("object", "referenceequals") if let [Value::Object(a), Value::Object(b)] = arguments => {
+            Ok(Value::Bool(std::rc::Rc::ptr_eq(a, b)))
+        }
+        ("object", "referenceequals")
+            if let [Value::Collection(a), Value::Collection(b)] = arguments =>
+        {
+            Ok(Value::Bool(a.same_instance(b)))
+        }
         ("object", "referenceequals")
             if let [a, b] = arguments
                 && (matches!(a, Value::InputEnumerator(_))
@@ -9492,6 +9541,7 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         return Ok(match value {
             Value::Array(_) | Value::StringArray(_) => value,
             Value::ArrayList(list) | Value::ObjectList(list) => Value::array(list.items().to_vec()),
+            Value::Collection(c) => Value::array(c.items.items().to_vec()),
             other => Value::array(vec![other]),
         });
     }
@@ -9698,9 +9748,11 @@ fn convert_bool(value: &Value) -> bool {
         Value::SByte(value) => *value != 0,
         Value::Double(value) => *value != 0.0,
         Value::String(text) => !text.is_empty(),
-        Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) | Value::ObjectList(_) => {
-            ops::is_true(value)
-        }
+        Value::Array(_)
+        | Value::StringArray(_)
+        | Value::ArrayList(_)
+        | Value::ObjectList(_)
+        | Value::Collection(_) => ops::is_true(value),
         Value::Decimal(_)
         | Value::BigInteger(_)
         | Value::ScriptBlock(_)
@@ -9784,13 +9836,16 @@ fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeEr
                     "System.Collections.IList"
                         | "System.Collections.ICollection"
                         | "System.Collections.IEnumerable"
-                ) && matches!(
-                    left,
-                    Value::Array(_)
-                        | Value::StringArray(_)
-                        | Value::ArrayList(_)
-                        | Value::ObjectList(_)
-                )
+                ) && !(name == "System.Collections.IList"
+                    && matches!(left,Value::Collection(c) if c.sync_root.is_some()))
+                    && matches!(
+                        left,
+                        Value::Array(_)
+                            | Value::StringArray(_)
+                            | Value::ArrayList(_)
+                            | Value::ObjectList(_)
+                            | Value::Collection(_)
+                    )
         });
     if !same
         && let Value::Object(entries) = left
@@ -9927,6 +9982,9 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
     }
     if let Value::ArrayList(list) = target {
         return array_list::method(array_list::Kind::ArrayList, list, name, arguments);
+    }
+    if let Value::Collection(c) = target {
+        return metadata::collection_method(c, name, arguments);
     }
     if let Value::ObjectList(list) = target {
         return array_list::method(array_list::Kind::ObjectList, list, name, arguments);
@@ -10390,6 +10448,14 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
 
 fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
     let value = value.base_value();
+    if let Some(view) = metadata::dictionary_view(value, name) {
+        return Ok(view);
+    }
+    if name.eq_ignore_ascii_case("Parameters")
+        && let Some(parameters) = metadata::command_parameters(value)
+    {
+        return Ok(parameters);
+    }
     if let Value::Object(entries) = value
         && (name.eq_ignore_ascii_case("Definition") || name.eq_ignore_ascii_case("ScriptBlock"))
         && let Some((_, Value::ArrayList(source))) =
@@ -10462,6 +10528,7 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
         }
         Value::ArrayList(list) => array_list::property(array_list::Kind::ArrayList, list, name),
         Value::ObjectList(list) => array_list::property(array_list::Kind::ObjectList, list, name),
+        Value::Collection(c) => metadata::collection_property(c, name),
         Value::InputEnumerator(input) if name.eq_ignore_ascii_case("Current") => {
             Ok(input.current().cloned().unwrap_or(Value::Null))
         }

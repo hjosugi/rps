@@ -22,7 +22,7 @@ pub mod wildcard;
 use std::fmt;
 use std::rc::Rc;
 
-pub use collection::{ArrayList, InputEnumerator, Sequence};
+pub use collection::{ArrayList, CollectionType, InputEnumerator, Sequence, TypedCollection};
 pub use string::PsString;
 
 /// A PowerShell value.
@@ -76,6 +76,7 @@ pub enum Value {
     ArrayList(ArrayList),
     /// A System.Collections.Generic.List[object] with mutable, shared storage.
     ObjectList(ArrayList),
+    Collection(Rc<TypedCollection>),
     InputEnumerator(InputEnumerator),
     /// A PowerShell object/hashtable with ordered keys. The `Rc` is the
     /// object's identity, so `$o -eq $o` compares the same object, not its
@@ -134,6 +135,7 @@ impl Value {
             Value::StringArray(_) => "System.String[]",
             Value::ArrayList(_) => ArrayList::TYPE,
             Value::ObjectList(_) => ArrayList::OBJECT_LIST_TYPE,
+            Value::Collection(c) => c.ty.full_name,
             Value::InputEnumerator(_) => InputEnumerator::TYPE,
             Value::Object(_) => "System.Management.Automation.PSCustomObject",
             Value::Type(_) => "System.RuntimeType",
@@ -157,9 +159,18 @@ impl Value {
         ))
     }
 
+    pub fn collection(ty: &'static CollectionType, items: Vec<Value>) -> Self {
+        Self::Collection(Rc::new(TypedCollection {
+            ty,
+            items: ArrayList::from_values(items),
+            sync_root: None,
+        }))
+    }
+
     pub fn sequence(&self) -> Option<Sequence<'_>> {
         match self {
             Self::Array(items) | Self::StringArray(items) => Some(Sequence::Array(items)),
+            Self::Collection(c) => Some(Sequence::List(c.items.items())),
             Self::ArrayList(list) | Self::ObjectList(list) => Some(Sequence::List(list.items())),
             _ => None,
         }
@@ -185,6 +196,7 @@ impl Value {
             | Self::StringArray(_)
             | Self::ArrayList(_)
             | Self::ObjectList(_)
+            | Self::Collection(_)
             | Self::InputEnumerator(_) => self.to_ps_string_with_separator(&" ".into()),
             _ => PsString::from(self.to_string()),
         }
@@ -195,6 +207,7 @@ impl Value {
             Self::Array(items) | Self::StringArray(items) => {
                 collection::sequence_text(items, separator)
             }
+            Self::Collection(c) => collection::sequence_text(&c.items.items(), separator),
             Self::ArrayList(list) | Self::ObjectList(list) => {
                 collection::sequence_text(&list.items(), separator)
             }
@@ -236,7 +249,8 @@ impl fmt::Display for Value {
             Value::Array(_)
             | Value::StringArray(_)
             | Value::ArrayList(_)
-            | Value::ObjectList(_) => fmt::Display::fmt(&self.to_ps_string(), f),
+            | Value::ObjectList(_)
+            | Value::Collection(_) => fmt::Display::fmt(&self.to_ps_string(), f),
             Value::Object(entries) => {
                 if let Some((_, Value::String(text))) =
                     entries.iter().find(|(key, _)| key == "__Text")

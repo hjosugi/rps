@@ -1,0 +1,79 @@
+rpsh-golden-v2
+exit=0
+Write-Output|Microsoft.PowerShell.Commands.WriteOutputCommand||None|None|https://go.microsoft.com/fwlink/?LinkID=2097117
+False|True|False|False
+2|14|14
+InputObject,NoEnumerate
+InputObject System.Management.Automation.PSObject False False
+__AllParameterSets 0 True True True
+ParameterAttribute,AllowNullAttribute,AllowEmptyCollectionAttribute
+NoEnumerate System.Management.Automation.SwitchParameter True False
+__AllParameterSets -2147483648 False False False
+ParameterAttribute
+True
+False
+Sort-Object|Microsoft.PowerShell.Commands.SortObjectCommand|Default|None|None|https://go.microsoft.com/fwlink/?LinkID=2097038
+False|True|False|False
+9|21|21
+Stable,Descending,Unique,Top,Bottom,InputObject,Property,Culture,CaseSensitive
+Stable System.Management.Automation.SwitchParameter True False
+Default -2147483648 False False False
+ParameterAttribute
+Descending System.Management.Automation.SwitchParameter True False
+__AllParameterSets -2147483648 False False False
+ParameterAttribute
+Unique System.Management.Automation.SwitchParameter True False
+__AllParameterSets -2147483648 False False False
+ParameterAttribute
+Top System.Int32 False False
+Top -2147483648 True False False
+ParameterAttribute,ValidateRangeAttribute
+Bottom System.Int32 False False
+Bottom -2147483648 True False False
+ParameterAttribute,ValidateRangeAttribute
+InputObject System.Management.Automation.PSObject False False
+__AllParameterSets -2147483648 False True False
+ParameterAttribute
+Property System.Object[] False False
+__AllParameterSets 0 False False False
+ParameterAttribute
+Culture System.String False False
+__AllParameterSets -2147483648 False False False
+ParameterAttribute
+CaseSensitive System.Management.Automation.SwitchParameter True False
+__AllParameterSets -2147483648 False False False
+ParameterAttribute
+True
+False
+Switch-Process|Microsoft.PowerShell.Commands.SwitchProcessCommand||PowerShell|None|https://go.microsoft.com/fwlink/?linkid=2181448
+False|True|False|False
+1|13|13
+WithCommand
+WithCommand System.String[] False False
+__AllParameterSets 0 False False True
+ParameterAttribute
+True
+False
+System.Management.Automation.ParameterMetadata System.Collections.ObjectModel.Collection`1[[System.String, System.Private.CoreLib, Version=11.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]] 1 ov
+ov,captured
+Write-Output
+1 0 True
+ParameterAttribute
+ValidateRangeAttribute
+AliasAttribute
+1
+Write-Output
+PSArgumentNullException
+Exception calling ".ctor" with "1" argument(s): "Cannot process argument because the value of argument "other" is null. Change the value of argument "other" to a non-null value."
+KeyCollection ValueCollection True
+True False KeyCollection True
+True
+True
+List`1 False True
+two,one
+NotSupportedException
+Exception calling "Add" with "1" argument(s): "Mutating a key collection derived from a dictionary is not allowed."
+NotSupportedException
+Exception calling "Clear" with "0" argument(s): "Mutating a value collection derived from a dictionary is not allowed."
+Sort|Object|Microsoft.PowerShell.Commands.SortObjectCommand|Default
+Sort-Object

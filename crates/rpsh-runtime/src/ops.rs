@@ -643,7 +643,11 @@ pub fn is_true(value: &Value) -> bool {
         Value::SByte(value) => *value != 0,
         Value::Double(value) => *value != 0.0,
         Value::String(value) => !value.is_empty(),
-        Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) | Value::ObjectList(_) => {
+        Value::Array(_)
+        | Value::StringArray(_)
+        | Value::ArrayList(_)
+        | Value::ObjectList(_)
+        | Value::Collection(_) => {
             let items = value.sequence().expect("array or ArrayList");
             match &*items {
                 [] => false,

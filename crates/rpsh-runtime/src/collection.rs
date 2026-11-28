@@ -59,6 +59,41 @@ impl PartialEq for ArrayList {
     }
 }
 
+/// Type information for CLR collection adapters whose elements are exposed to scripts.
+#[derive(Debug, PartialEq, Eq)]
+pub struct CollectionType {
+    pub full_name: &'static str,
+    pub display_name: &'static str,
+    pub element: &'static str,
+    pub read_only: bool,
+    pub backing: Option<&'static CollectionType>,
+}
+
+#[derive(Clone, Debug)]
+pub struct TypedCollection {
+    pub ty: &'static CollectionType,
+    pub items: ArrayList,
+    pub sync_root: Option<Value>,
+}
+
+impl TypedCollection {
+    pub fn same_instance(&self, other: &Self) -> bool {
+        if self.ty.full_name != other.ty.full_name {
+            return false;
+        }
+        match (&self.sync_root, &other.sync_root) {
+            (Some(Value::Object(a)), Some(Value::Object(b))) => Rc::ptr_eq(a, b),
+            _ => self.items == other.items,
+        }
+    }
+}
+
+impl PartialEq for TypedCollection {
+    fn eq(&self, other: &Self) -> bool {
+        self.same_instance(other)
+    }
+}
+
 /// The ArrayList enumerator bound to a function's automatic `$input` variable.
 /// Assignments share the same position. Each process clause clears the backing
 /// list after it runs, invalidating enumerators retained by the script.
@@ -147,6 +182,9 @@ pub(crate) fn sequence_text(items: &[Value], separator: &PsString) -> PsString {
             units.extend(separator.units());
         }
         match item {
+            Value::Collection(collection) => {
+                units.extend(collection.ty.display_name.encode_utf16())
+            }
             Value::ObjectList(_) => units.extend(ArrayList::OBJECT_LIST_DISPLAY.encode_utf16()),
             Value::Array(_)
             | Value::StringArray(_)

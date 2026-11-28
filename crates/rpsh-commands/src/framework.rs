@@ -46,14 +46,12 @@ pub trait Cmdlet<E> {
 #[derive(Debug)]
 pub struct Registration<E: 'static> {
     pub signature: &'static Signature,
-    pub implementation: &'static str,
     pub construct: fn() -> Box<dyn Cmdlet<E>>,
 }
 
 impl<E: 'static> Registration<E> {
     pub const BUILTINS: &'static [Self] = &[Self {
         signature: &WRITE_OUTPUT,
-        implementation: "Microsoft.PowerShell.Commands.WriteOutputCommand",
         construct: || Box::new(WriteOutput),
     }];
 

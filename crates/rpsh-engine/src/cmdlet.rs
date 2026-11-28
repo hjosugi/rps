@@ -35,7 +35,7 @@ fn binding_record(entry: &Entry, id: &str, args: &[&str], target: Value) -> Valu
         ("InnerException".into(), Value::Null),
     ]);
     record_with_exception(
-        &format!("{id},{}", entry.implementation),
+        &format!("{id},{}", entry.signature.implementation),
         &format!(
             "InvalidArgument: ({subject}) [{}], ParameterBindingException",
             entry.signature.name
@@ -142,7 +142,7 @@ fn mandatory_error(entry: &Entry, param: &Parameter, value: &Value) -> Option<Va
     };
     let message = rpsh_messages::format(&format!("ParameterBinderStrings/{id}"), &["", param.name]);
     Some(super::error_record(
-        &format!("{id},{}", entry.implementation),
+        &format!("{id},{}", entry.signature.implementation),
         &format!(
             "InvalidData: (:) [{}], ParameterBindingValidationException",
             entry.signature.name
@@ -408,7 +408,10 @@ fn capture_target(
             &["", parameter, "", "", "", "", &detail],
         );
         let record = super::error_record(
-            &format!("ParameterArgumentValidationError,{}", entry.implementation),
+            &format!(
+                "ParameterArgumentValidationError,{}",
+                entry.signature.implementation
+            ),
             &format!(
                 "InvalidData: (:) [{}], ParameterBindingValidationException",
                 entry.signature.name
@@ -616,10 +619,10 @@ mod tests {
         #[derive(rpsh_commands::CmdletParameters)]
         #[parameter(InputObject: PsObject, position(0), mandatory, pipeline)]
         struct StrictInput;
-        static SIGNATURE: Signature = Signature::new("Test-Input", "Test", StrictInput::PARAMETERS);
+        static SIGNATURE: Signature = Signature::new("Test-Input", "Test", StrictInput::PARAMETERS)
+            .implementation("Test.Input", "");
         let entry = Entry {
             signature: &SIGNATURE,
-            implementation: "Test.Input",
             construct: || Box::new(Trace),
         };
         let param = &SIGNATURE.parameters[0];
@@ -655,7 +658,6 @@ mod tests {
     fn construct_after_binding_and_stop_processing_on_error() {
         let entry = Entry {
             signature: &WRITE_OUTPUT,
-            implementation: "Test.WriteOutput",
             construct: || {
                 PHASES.with_borrow_mut(|log| log.push("construct"));
                 Box::new(Trace)

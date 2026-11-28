@@ -333,7 +333,25 @@ pub(super) fn declared_info(name: &str, kind: &str) -> Option<Value> {
         .iter()
         .find(|m| m.name == signature.module);
     let mut props = command_properties(name, kind, CMDLET);
+    let (verb, noun) = name.split_once('-').unwrap_or(("", name));
     props.extend([
+        (
+            "ImplementingType".into(),
+            Value::Type(signature.implementation.into()),
+        ),
+        ("Verb".into(), Value::String(verb.into())),
+        ("Noun".into(), Value::String(noun.into())),
+        ("HelpUri".into(), Value::String(signature.help_uri.into())),
+        (
+            "DefaultParameterSet".into(),
+            signature
+                .default_set
+                .map_or(Value::Null, |s| Value::String(s.into())),
+        ),
+        (
+            "__CommandParameterCache".into(),
+            Value::ArrayList(rpsh_runtime::ArrayList::default()),
+        ),
         ("Source".into(), Value::String(signature.module.into())),
         ("ModuleName".into(), Value::String(signature.module.into())),
         (

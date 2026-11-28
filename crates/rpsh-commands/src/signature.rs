@@ -85,6 +85,8 @@ pub struct Parameter {
     pub remaining: bool,
     pub allow_null: bool,
     pub allow_empty_collection: bool,
+    pub numeric_range: Option<(i32, i32)>,
+    pub variable_name: bool,
 }
 
 impl Parameter {
@@ -100,6 +102,8 @@ impl Parameter {
             remaining: false,
             allow_null: false,
             allow_empty_collection: false,
+            numeric_range: None,
+            variable_name: false,
         }
     }
 
@@ -130,6 +134,14 @@ impl Parameter {
     }
     pub const fn allow_empty_collection(mut self) -> Self {
         self.allow_empty_collection = true;
+        self
+    }
+    pub const fn range(mut self, min: i32, max: i32) -> Self {
+        self.numeric_range = Some((min, max));
+        self
+    }
+    pub const fn variable_name(mut self) -> Self {
+        self.variable_name = true;
         self
     }
     pub const fn aliases(mut self, names: &'static [&'static str]) -> Self {
@@ -178,6 +190,9 @@ pub struct Signature {
     pub name: &'static str,
     pub module: &'static str,
     pub remoting_capability: &'static str,
+    pub implementation: &'static str,
+    pub help_uri: &'static str,
+    pub default_set: Option<&'static str>,
     pub parameters: &'static [Parameter],
     sets: &'static [&'static str],
     unix_only: bool,
@@ -196,7 +211,16 @@ impl Signature {
             sets: &["__AllParameterSets"],
             unix_only: false,
             remoting_capability: "None",
+            implementation: "",
+            help_uri: "",
+            default_set: None,
         }
+    }
+
+    pub const fn implementation(mut self, type_name: &'static str, help_uri: &'static str) -> Self {
+        self.implementation = type_name;
+        self.help_uri = help_uri;
+        self
     }
 
     pub fn available_on(&self, platform: &str) -> bool {
@@ -261,18 +285,25 @@ pub static SORT_OBJECT: Signature = Signature {
     name: "Sort-Object",
     module: "Microsoft.PowerShell.Utility",
     remoting_capability: "None",
+    implementation: "Microsoft.PowerShell.Commands.SortObjectCommand",
+    help_uri: "https://go.microsoft.com/fwlink/?LinkID=2097038",
+    default_set: Some("Default"),
     sets: &["Default", "Top", "Bottom"],
     unix_only: false,
     parameters: &[
         Parameter::new("Stable", Switch).in_sets(&["Default"]),
         Parameter::new("Descending", Switch),
         Parameter::new("Unique", Switch),
-        Parameter::new("Top", Int32).in_sets(&["Top"]).mandatory(),
+        Parameter::new("Top", Int32)
+            .in_sets(&["Top"])
+            .mandatory()
+            .range(1, i32::MAX),
         Parameter::new("Bottom", Int32)
             .in_sets(&["Bottom"])
-            .mandatory(),
-        Parameter::new("Property", ObjectArray).positional(0),
+            .mandatory()
+            .range(1, i32::MAX),
         Parameter::new("InputObject", PsObject).pipeline(),
+        Parameter::new("Property", ObjectArray).positional(0),
         Parameter::new("Culture", Text),
         Parameter::new("CaseSensitive", Switch),
     ],
@@ -282,6 +313,9 @@ pub static SWITCH_PROCESS: Signature = Signature {
     name: "Switch-Process",
     module: "Microsoft.PowerShell.Core",
     remoting_capability: "PowerShell",
+    implementation: "Microsoft.PowerShell.Commands.SwitchProcessCommand",
+    help_uri: "https://go.microsoft.com/fwlink/?linkid=2181448",
+    default_set: None,
     sets: &["__AllParameterSets"],
     unix_only: true,
     parameters: &[Parameter::new("WithCommand", StringArray)
@@ -293,6 +327,10 @@ pub static WRITE_OUTPUT: Signature = Signature::new(
     "Write-Output",
     "Microsoft.PowerShell.Utility",
     crate::framework::WriteOutput::PARAMETERS,
+)
+.implementation(
+    "Microsoft.PowerShell.Commands.WriteOutputCommand",
+    "https://go.microsoft.com/fwlink/?LinkID=2097117",
 );
 
 pub static COMMON_PARAMETERS: &[Parameter] = &[
@@ -302,12 +340,24 @@ pub static COMMON_PARAMETERS: &[Parameter] = &[
     Parameter::new("WarningAction", ParameterType::ActionPreference).aliases(&["wa"]),
     Parameter::new("InformationAction", ParameterType::ActionPreference).aliases(&["infa"]),
     Parameter::new("ProgressAction", ParameterType::ActionPreference).aliases(&["proga"]),
-    Parameter::new("ErrorVariable", Text).aliases(&["ev"]),
-    Parameter::new("WarningVariable", Text).aliases(&["wv"]),
-    Parameter::new("InformationVariable", Text).aliases(&["iv"]),
-    Parameter::new("OutVariable", Text).aliases(&["ov"]),
-    Parameter::new("OutBuffer", Int32).aliases(&["ob"]),
-    Parameter::new("PipelineVariable", Text).aliases(&["pv"]),
+    Parameter::new("ErrorVariable", Text)
+        .variable_name()
+        .aliases(&["ev"]),
+    Parameter::new("WarningVariable", Text)
+        .variable_name()
+        .aliases(&["wv"]),
+    Parameter::new("InformationVariable", Text)
+        .variable_name()
+        .aliases(&["iv"]),
+    Parameter::new("OutVariable", Text)
+        .variable_name()
+        .aliases(&["ov"]),
+    Parameter::new("OutBuffer", Int32)
+        .range(0, i32::MAX)
+        .aliases(&["ob"]),
+    Parameter::new("PipelineVariable", Text)
+        .variable_name()
+        .aliases(&["pv"]),
 ];
 
 pub static SIGNATURES: &[&Signature] = &[&SORT_OBJECT, &SWITCH_PROCESS, &WRITE_OUTPUT];
