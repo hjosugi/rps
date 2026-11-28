@@ -1,3 +1,4 @@
+use crate::command_text::{self, Delimiter};
 use crate::{
     AssignmentValue, BinaryOp, CatchClause, ChainOperator, CommandArgument, Expr, ExprKind,
     MethodDef, Parameter, ParseError, PipelineChain, PipelineCommand, Redirection, ScriptBlockAst,
@@ -674,13 +675,6 @@ impl Parser<'_> {
                 continue;
             }
             let parameter = match &self.peek().kind {
-                TokenKind::Identifier(word) | TokenKind::Bareword(word)
-                    if !end_parameters && word.starts_with('-') && !word.starts_with("--") =>
-                {
-                    let parameter = word.trim_start_matches('-').to_owned();
-                    self.pos += 1;
-                    Some(parameter)
-                }
                 TokenKind::Parameter(parameter) => {
                     let parameter = parameter.clone();
                     self.pos += 1;
@@ -1983,7 +1977,7 @@ impl Parser<'_> {
             TokenKind::ExpandableString(text) => {
                 self.pos += 1;
                 let parts = parse_expandable(&text, span)?;
-                self.expr(ExprKind::ExpandableString(parts), span)
+                self.expr(string_parts(parts, false), span)
             }
             TokenKind::HereString { text, expandable } => {
                 self.pos += 1;
@@ -1993,7 +1987,7 @@ impl Parser<'_> {
                 } else {
                     vec![StringPart::Literal(content.to_owned())]
                 };
-                self.expr(ExprKind::ExpandableString(parts), span)
+                self.expr(string_parts(parts, false), span)
             }
             TokenKind::LCurly => {
                 self.pos += 1;
@@ -2221,24 +2215,71 @@ fn here_string_content(text: &str) -> &str {
 }
 
 fn bareword_expr(word: String, span: Span) -> Result<Expr, ParseError> {
-    let kind = if word.contains(['`', '$']) {
-        let mut parts = parse_expandable_body(&word, span)?;
-        if parts
-            .iter()
-            .all(|part| matches!(part, StringPart::Literal(_)))
+    if !word.contains(|c| matches!(c, '`' | '$') || command_text::quote(c).is_some()) {
+        return Ok(Expr {
+            kind: ExprKind::Bareword(word),
+            span,
+        });
+    }
+    let mut parts = Vec::new();
+    let mut begin = 0;
+    let mut at = 0;
+    while let Some(ch) = word[at..].chars().next() {
+        let next = at + ch.len_utf8();
+        if ch == '`' {
+            at = next + word[next..].chars().next().map_or(0, char::len_utf8);
+        } else if word[at..].starts_with("$(") {
+            at = command_text::closing_end(&word, at + 2, Delimiter::Parentheses)
+                .ok_or_else(|| ParseError::not_implemented("unterminated subexpression", span))?;
+        } else if word[at..].starts_with("${")
+            && let Some(end) = word[at + 2..].find('}')
         {
-            let text = match parts.pop() {
-                Some(StringPart::Literal(text)) => text,
-                _ => String::new(),
-            };
+            at += end + 3;
+        } else if let Some(kind) = command_text::quote(ch) {
+            parts.extend(parse_expandable_body(&word[begin..at], span)?);
+            at = command_text::closing_end(&word, next, kind).ok_or_else(|| {
+                ParseError::not_implemented("unterminated quoted command argument", span)
+            })?;
+            let (closing, _) = word[..at].char_indices().next_back().unwrap();
+            let body = &word[next..closing];
+            if kind == Delimiter::Single {
+                parts.push(StringPart::Literal(command_text::single_text(body)));
+            } else {
+                parts.extend(parse_expandable_body(body, span)?);
+            }
+            begin = at;
+        } else {
+            at = next;
+        }
+    }
+    parts.extend(parse_expandable_body(&word[begin..], span)?);
+    Ok(Expr {
+        kind: string_parts(parts, true),
+        span,
+    })
+}
+
+fn string_parts(parts: Vec<StringPart>, bareword: bool) -> ExprKind {
+    if parts
+        .iter()
+        .all(|part| matches!(part, StringPart::Literal(_)))
+    {
+        let mut text = String::new();
+        for part in parts {
+            if let StringPart::Literal(literal) = part {
+                text.push_str(&literal);
+            }
+        }
+        if bareword {
             ExprKind::Bareword(text)
         } else {
-            ExprKind::ExpandableBareword(parts)
+            ExprKind::String(text)
         }
+    } else if bareword {
+        ExprKind::ExpandableBareword(parts)
     } else {
-        ExprKind::Bareword(word)
-    };
-    Ok(Expr { kind, span })
+        ExprKind::ExpandableString(parts)
+    }
 }
 
 fn parse_expandable(text: &str, span: Span) -> Result<Vec<StringPart>, ParseError> {
@@ -2246,15 +2287,21 @@ fn parse_expandable(text: &str, span: Span) -> Result<Vec<StringPart>, ParseErro
     let Some(first) = chars.next() else {
         return Ok(Vec::new());
     };
-    let mut body = &text[first.len_utf8()..];
-    let close = match first {
-        '\'' | '\u{2018}' | '\u{2019}' | '\u{201a}' | '\u{201b}' => '\'',
-        '"' => '"',
-        '\u{201c}' | '\u{201d}' | '\u{201e}' | '\u{201f}' => '\u{201d}',
-        '@' => '"',
-        _ => return Ok(vec![StringPart::Literal(text.to_owned())]),
+    let Some(last) = chars.next_back() else {
+        return Err(ParseError::not_implemented(
+            "unterminated expandable string",
+            span,
+        ));
     };
-    body = body.strip_suffix(close).unwrap_or(body);
+    if command_text::quote(first) != Some(Delimiter::Double)
+        || command_text::quote(last) != Some(Delimiter::Double)
+    {
+        return Err(ParseError::not_implemented(
+            "unterminated expandable string",
+            span,
+        ));
+    }
+    let body = chars.as_str();
     parse_expandable_body(body, span)
 }
 
@@ -2299,14 +2346,16 @@ fn parse_expandable_body(body: &str, span: Span) -> Result<Vec<StringPart>, Pars
                 }
                 continue;
             }
-            '"' => {
-                if body[at + 1..].starts_with('"') {
-                    literal.push('"');
-                    at += 2;
-                    continue;
+            ch if command_text::quote(ch) == Some(Delimiter::Double) => {
+                at += ch.len_utf8();
+                if let Some(next) = body[at..].chars().next()
+                    && command_text::quote(next) == Some(Delimiter::Double)
+                {
+                    literal.push(next);
+                    at += next.len_utf8();
+                } else {
+                    literal.push(ch);
                 }
-                literal.push('"');
-                at += 1;
                 continue;
             }
             '$' => {
@@ -2315,32 +2364,27 @@ fn parse_expandable_body(body: &str, span: Span) -> Result<Vec<StringPart>, Pars
                         parts.push(StringPart::Literal(std::mem::take(&mut literal)));
                     }
                     let start = at + 2;
-                    let mut depth = 1usize;
-                    let mut end = start;
-                    for (offset, ch) in body[start..].char_indices() {
-                        match ch {
-                            '(' => depth += 1,
-                            ')' => {
-                                depth -= 1;
-                                if depth == 0 {
-                                    end = start + offset;
-                                    break;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    let inner = &body[start..end];
-                    let ast = parse(inner)?;
-                    let Some(Statement::Expression(expr)) = ast.statements.into_iter().next()
-                    else {
-                        return Err(ParseError::not_implemented(
-                            "subexpressions with statements",
+                    let end = command_text::closing_end(body, start, Delimiter::Parentheses)
+                        .ok_or_else(|| {
+                            ParseError::not_implemented("unterminated subexpression", span)
+                        })?;
+                    let inner = command_text::nested_source(&body[start..end - 1]);
+                    let mut ast = parse(&inner)?;
+                    let expr = if ast.statements.len() == 1
+                        && matches!(&ast.statements[0], Statement::Expression(_))
+                    {
+                        let Statement::Expression(expr) = ast.statements.remove(0) else {
+                            unreachable!()
+                        };
+                        expr
+                    } else {
+                        Expr {
+                            kind: ExprKind::Group(ast.statements),
                             span,
-                        ));
+                        }
                     };
                     parts.push(StringPart::Subexpression(Box::new(expr)));
-                    at = end + 1;
+                    at = end;
                     continue;
                 }
                 if body[at + 1..].starts_with('{')

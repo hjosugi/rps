@@ -44,7 +44,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
                     return Err(unterminated(span));
                 }
                 let inner = &text[first.len_utf8()..last_start];
-                TokenKind::StringLiteral(inner.replace("''", "'"))
+                TokenKind::StringLiteral(crate::command_text::single_text(inner))
             }
             FullTokenKind::Plus => TokenKind::Plus,
             FullTokenKind::Minus => TokenKind::Minus,

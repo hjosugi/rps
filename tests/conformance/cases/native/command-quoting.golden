@@ -1,0 +1,44 @@
+rpsh-golden-v2
+exit=0
+Standard
+argc=4 | 5<ab cd> | 5<ab"cd> | 5<ab cd> | 6<ait'sb>
+argc=9 | 1<a> | 1<b> | 1<a> | 1<b> | 1<a> | 3<A Z> | 4<1abc> | 5<-name> | 6<-x=a b>
+argc=6 | 5<-x=$x> | 5<-x=$h> | 2<.x> | 8<-x$z:yes> | 10<--flag:A Z> | 7<-opt=$x>
+argc=6 | 3<a3b> | 1<3> | 1<b> | 7<A Zb cz> | 6<a$xA Z> | 6<@xb dc>
+argc=4 | 6<x*.txt> | 9<a£ü öz> | 6<aA Z.y> | 3<a b>
+argc=5 | 5<a=b=c> | 5<42foo> | 3<-01> | 2<-9> | 1<->
+argc=10 | 4<-foo> | 4<.bar> | 2<-f> | 3<[a]> | 3<-f!> | 3<a#b> | 3<x>z> | 3<x<y> | 2<a$> | 2<ab>
+argc=3 | 6<ax y b> | 2<s3> | 5<a1 2b>
+argc=4 | 5<ab3cd> | 34<aSystem.Collections.Hashtablehello> | 8<afoozbar> | 6<aabc"d>
+argc=1 | 5<afoob>
+argc=1 | 5<afoob>
+argc=1 | 7<abfoozc>
+argc=2 | 16<gleft“rightend> | 8<ait’sb>
+Legacy
+argc=3 | 5<ab cd> | 7<abcd ab> | 9<cd ait'sb>
+argc=9 | 1<a> | 1<b> | 1<a> | 1<b> | 1<a> | 3<A Z> | 4<1abc> | 5<-name> | 6<-x=a b>
+argc=6 | 5<-x=$x> | 5<-x=$h> | 2<.x> | 8<-x$z:yes> | 10<--flag:A Z> | 7<-opt=$x>
+argc=6 | 3<a3b> | 1<3> | 1<b> | 7<A Zb cz> | 6<a$xA Z> | 6<@xb dc>
+argc=4 | 6<x*.txt> | 9<a£ü öz> | 6<aA Z.y> | 3<a b>
+argc=5 | 5<a=b=c> | 5<42foo> | 3<-01> | 2<-9> | 1<->
+argc=10 | 4<-foo> | 4<.bar> | 2<-f> | 3<[a]> | 3<-f!> | 3<a#b> | 3<x>z> | 3<x<y> | 2<a$> | 2<ab>
+argc=3 | 6<ax y b> | 2<s3> | 5<a1 2b>
+argc=4 | 5<ab3cd> | 34<aSystem.Collections.Hashtablehello> | 8<afoozbar> | 5<aabcd>
+argc=1 | 5<afoob>
+argc=1 | 5<afoob>
+argc=1 | 7<abfoozc>
+argc=2 | 16<gleft“rightend> | 8<ait’sb>
+Windows
+argc=4 | 5<ab cd> | 5<ab"cd> | 5<ab cd> | 6<ait'sb>
+argc=9 | 1<a> | 1<b> | 1<a> | 1<b> | 1<a> | 3<A Z> | 4<1abc> | 5<-name> | 6<-x=a b>
+argc=6 | 5<-x=$x> | 5<-x=$h> | 2<.x> | 8<-x$z:yes> | 10<--flag:A Z> | 7<-opt=$x>
+argc=6 | 3<a3b> | 1<3> | 1<b> | 7<A Zb cz> | 6<a$xA Z> | 6<@xb dc>
+argc=4 | 6<x*.txt> | 9<a£ü öz> | 6<aA Z.y> | 3<a b>
+argc=5 | 5<a=b=c> | 5<42foo> | 3<-01> | 2<-9> | 1<->
+argc=10 | 4<-foo> | 4<.bar> | 2<-f> | 3<[a]> | 3<-f!> | 3<a#b> | 3<x>z> | 3<x<y> | 2<a$> | 2<ab>
+argc=3 | 6<ax y b> | 2<s3> | 5<a1 2b>
+argc=4 | 5<ab3cd> | 34<aSystem.Collections.Hashtablehello> | 8<afoozbar> | 6<aabc"d>
+argc=1 | 5<afoob>
+argc=1 | 5<afoob>
+argc=1 | 7<abfoozc>
+argc=2 | 16<gleft“rightend> | 8<ait’sb>

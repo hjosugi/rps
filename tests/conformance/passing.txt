@@ -109,6 +109,7 @@ native/application-path
 native/argument-styles
 native/byte-pipe
 native/capture
+native/command-quoting
 native/console-encoding
 native/environment
 native/environment-process

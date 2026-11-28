@@ -17,6 +17,7 @@
 //! rather than interpreted approximately.
 
 mod ast;
+mod command_text;
 mod error;
 mod full_token_kind;
 mod full_tokenizer;

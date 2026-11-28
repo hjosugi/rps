@@ -9,6 +9,7 @@
 //! #22 replaces it with. Unsupported characters become `Unknown` tokens so the
 //! differential harness can report them without losing the rest.
 
+use crate::command_text::{self, Delimiter};
 use crate::full_token_kind::{FullTokenKind, KEYWORDS, OPERATORS, TokenFlags};
 use crate::{ParseError, Span, parse_number_literal};
 
@@ -43,6 +44,7 @@ pub fn tokenize_full(source: &str) -> Result<Vec<FullToken>, ParseError> {
         hashtable_depth: 0,
         brace_depth: 0,
         command_after_paren: Vec::new(),
+        command_member: false,
     };
     tokenizer.run()?;
     let lines = Lines::new(source);
@@ -123,6 +125,7 @@ struct Tokenizer<'a> {
     hashtable_depth: usize,
     brace_depth: usize,
     command_after_paren: Vec<bool>,
+    command_member: bool,
 }
 
 impl Tokenizer<'_> {
@@ -206,7 +209,7 @@ impl Tokenizer<'_> {
             if self.verbatim_argument() {
                 continue;
             }
-            if self.generic_argument() {
+            if self.parameter() || self.generic_argument() {
                 continue;
             }
             if self.structural()? {
@@ -226,9 +229,6 @@ impl Tokenizer<'_> {
                 continue;
             }
             if self.dash_token() {
-                continue;
-            }
-            if self.parameter() {
                 continue;
             }
             if self.keyword() {
@@ -385,6 +385,7 @@ impl Tokenizer<'_> {
                 && !self.statement_start
                 && self.tokens.last().is_some_and(|token| {
                     token.span.end < start as u32
+                        || self.after_member()
                         || (token.kind == FullTokenKind::Parameter
                             && token.span.text(self.source).ends_with(':'))
                 });
@@ -518,6 +519,7 @@ impl Tokenizer<'_> {
             }
         }
         self.push(FullTokenKind::Variable, start, self.pos);
+        self.command_member = command_argument && self.bytes.get(self.pos) == Some(&b'.');
         self.mode =
             if command_argument && !matches!(self.bytes.get(self.pos), Some(b'.' | b'[' | b'?')) {
                 Mode::Command
@@ -654,48 +656,18 @@ impl Tokenizer<'_> {
         let Some(quote) = self.char() else {
             return Ok(false);
         };
-        let Some((kind, close)) = string_quote(quote) else {
+        let Some(delimiter) = command_text::quote(quote) else {
             return Ok(false);
         };
-        let close = if quote == '\'' || quote == '"' {
-            quote
+        let kind = if delimiter == Delimiter::Single {
+            FullTokenKind::StringLiteral
         } else {
-            close
+            FullTokenKind::StringExpandable
         };
-        // A string in a command's argument list keeps command mode for the
-        // arguments that follow it.
         let command_argument = self.mode == Mode::Command && self.command_seen;
         let start = self.pos;
-        self.pos += quote.len_utf8();
-        while let Some(ch) = self.char() {
-            if ch == close {
-                self.pos += ch.len_utf8();
-                if self.char() == Some(close) {
-                    self.pos += ch.len_utf8();
-                    continue;
-                }
-                self.push(kind, start, self.pos);
-                self.mode = if command_argument {
-                    Mode::Command
-                } else {
-                    Mode::Expression
-                };
-                self.statement_start = false;
-                return Ok(true);
-            }
-            if ch == '`' && kind == FullTokenKind::StringExpandable {
-                self.pos += 1;
-                if let Some(next) = self.char() {
-                    self.pos += next.len_utf8();
-                }
-                continue;
-            }
-            if (ch == '\r' || ch == '\n') && kind == FullTokenKind::StringLiteral {
-                break;
-            }
-            self.pos += ch.len_utf8();
-        }
-        // Unterminated: the parser reports the missing quote.
+        self.pos = command_text::closing_end(self.source, start + quote.len_utf8(), delimiter)
+            .unwrap_or(self.bytes.len());
         self.push(kind, start, self.pos);
         self.mode = if command_argument {
             Mode::Command
@@ -771,33 +743,38 @@ impl Tokenizer<'_> {
     }
 
     fn parameter(&mut self) -> bool {
-        if self.mode != Mode::Command
-            || self.bytes.get(self.pos) != Some(&b'-')
-            || self.after_member()
-        {
+        if self.mode != Mode::Command || self.bytes.get(self.pos) != Some(&b'-') {
             return false;
         }
         let start = self.pos;
-        let mut at = self.pos + 1;
-        let Some(ch) = self.source[at..].chars().next() else {
-            return false;
-        };
-        if !(ch.is_alphabetic() || ch == '_' || ch == '?') {
+        let mut at = start + 1;
+        if !self.source[at..]
+            .chars()
+            .next()
+            .is_some_and(|ch| ch.is_alphabetic() || matches!(ch, '_' | '?'))
+        {
             return false;
         }
         while let Some(ch) = self.source[at..].chars().next() {
-            if ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '?' {
-                at += ch.len_utf8();
-            } else {
+            if ch.is_whitespace()
+                || matches!(
+                    ch,
+                    '{' | '}' | '(' | ')' | ';' | ',' | '|' | '&' | '.' | '['
+                )
+            {
+                break;
+            }
+            if command_text::quote(ch).is_some() {
+                // A quote converts the entire parameter candidate to a generic word.
+                return false;
+            }
+            at += ch.len_utf8();
+            if ch == ':' {
                 break;
             }
         }
-        if is_unary_dash_operator(&self.source[start..at]) {
-            self.pos = start;
+        if !self.command_seen && is_unary_dash_operator(&self.source[start..at]) {
             return false;
-        }
-        if self.bytes.get(at) == Some(&b':') {
-            at += 1;
         }
         self.pos = at;
         self.push(FullTokenKind::Parameter, start, at);
@@ -1093,35 +1070,46 @@ impl Tokenizer<'_> {
         true
     }
 
-    /// Command arguments can start with a bracket, or combine a variable or
-    /// backtick escape with literal text in one Generic token.
+    /// A generic word can embed quoted segments, escaped characters and
+    /// expansions. A standalone quoted expression or variable is its own token.
     fn generic_argument(&mut self) -> bool {
         let start = self.pos;
-        if self.mode != Mode::Command
-            || !self.command_seen
-            || self.statement_start
-            || self.tokens.last().is_some_and(|token| {
-                token.span.end as usize == start || token.kind == FullTokenKind::Catch
-            })
+        if self.mode != Mode::Command || !self.command_seen || self.statement_start {
+            return false;
+        }
+        if self.tokens.last().is_some_and(|prev| {
+            prev.kind == FullTokenKind::Catch
+                || prev.span.end as usize == start
+                    && !matches!(
+                        prev.kind,
+                        FullTokenKind::Parameter
+                            | FullTokenKind::RParen
+                            | FullTokenKind::StringLiteral
+                            | FullTokenKind::StringExpandable
+                            | FullTokenKind::Comma
+                    )
+        }) {
+            return false;
+        }
+        let first = self.char().unwrap();
+        if command_text::quote(first).is_some()
+            || matches!(
+                first,
+                '#' | '(' | ')' | '{' | '}' | '<' | '>' | '|' | '&' | ';' | ','
+            )
         {
             return false;
         }
-        let first = self.bytes[start];
-        if matches!(first, b'#' | b'\'' | b'"')
-            || first == b'-' && self.bytes.get(start + 1) != Some(&b'-')
-        {
-            return false;
-        }
-        let mut at = start;
-        let mut generic = first == b'[';
-        if first == b'@' {
-            let tail = self.source[start + 1..].trim_start_matches(|ch: char| {
+        let mut generic = first == '[';
+        if first == '@' {
+            let rest = &self.source[start + 1..];
+            let tail = rest.trim_start_matches(|ch: char| {
                 ch.is_alphanumeric() || matches!(ch, '_' | ':' | '?')
             });
             let Some(next) = tail.chars().next() else {
                 return false;
             };
-            if tail.len() == self.source.len() - start - 1
+            if tail.len() == rest.len()
                 || next.is_whitespace()
                 || matches!(
                     next,
@@ -1132,42 +1120,45 @@ impl Tokenizer<'_> {
             }
             generic = true;
         }
+        let mut at = start;
         let mut leading_variable_end = None;
         while let Some(ch) = self.source[at..].chars().next() {
-            if ch.is_whitespace()
-                || matches!(
-                    ch,
-                    ';' | ',' | '(' | ')' | '{' | '}' | '|' | '&' | '\'' | '"' | '<' | '>'
-                )
-            {
+            if ch.is_whitespace() || matches!(ch, ';' | ',' | '(' | ')' | '{' | '}' | '|' | '&') {
                 break;
             }
-            if ch == '`' {
+            let next = at + ch.len_utf8();
+            if let Some(kind) = command_text::quote(ch) {
                 generic = true;
-                at += 1;
-                if let Some(escaped) = self.source[at..].chars().next() {
-                    at += escaped.len_utf8();
-                }
+                at =
+                    command_text::closing_end(self.source, next, kind).unwrap_or(self.source.len());
+            } else if ch == '`' {
+                generic = true;
+                at = next + self.source[next..].chars().next().map_or(0, char::len_utf8);
             } else if ch == '$' {
-                let variable_start = at;
-                at += 1;
-                if self.bytes.get(at) == Some(&b'{') {
-                    let Some(end) = self.source[at + 1..].find('}') else {
-                        return false;
-                    };
-                    at += end + 2;
-                } else {
-                    while let Some(next) = self.source[at..].chars().next() {
-                        if !(next.is_alphanumeric() || matches!(next, '_' | ':' | '?')) {
-                            break;
+                let begin = at;
+                at = next;
+                match self.bytes.get(at) {
+                    Some(b'(') if begin == start => return false,
+                    Some(b'(') => {
+                        at = command_text::closing_end(self.source, at + 1, Delimiter::Parentheses)
+                            .unwrap_or(self.source.len())
+                    }
+                    Some(b'{') => {
+                        let Some(close) = self.source[at + 1..].find('}') else {
+                            return false;
+                        };
+                        at += close + 2;
+                    }
+                    _ => {
+                        while let Some(var) = self.source[at..].chars().next() {
+                            if !(var.is_alphanumeric() || matches!(var, '_' | ':' | '?')) {
+                                break;
+                            }
+                            at += var.len_utf8();
                         }
-                        at += next.len_utf8();
                     }
                 }
-                if at == variable_start + 1 {
-                    return false;
-                }
-                if variable_start == start {
+                if begin == start {
                     leading_variable_end = Some(at);
                     if matches!(self.bytes.get(at), Some(b'.' | b'[')) {
                         return false;
@@ -1175,16 +1166,29 @@ impl Tokenizer<'_> {
                 }
                 generic = true;
             } else {
-                at += ch.len_utf8();
+                if matches!(ch, '#' | '<' | '>') && at > start
+                    || ch == '=' && self.hashtable_depth == 0 && at > start
+                {
+                    generic = true;
+                }
+                at = next;
             }
         }
-        if !generic || at == start || leading_variable_end == Some(at) {
+        if at == start || leading_variable_end == Some(at) {
+            return false;
+        }
+        let word = &self.source[start..at];
+        if first == '-'
+            && word != "--"
+            && !word[1..].starts_with(|ch: char| ch.is_alphabetic() || matches!(ch, '_' | '?'))
+        {
+            generic = true;
+        }
+        if !generic {
             return false;
         }
         self.pos = at;
         self.push(FullTokenKind::Generic, start, at);
-        self.mode = Mode::Command;
-        self.statement_start = false;
         true
     }
 
@@ -1240,7 +1244,10 @@ impl Tokenizer<'_> {
             FullTokenKind::MinusMinus
         } else if command_mode && self.statement_start && word == "%" {
             FullTokenKind::Rem
-        } else if has_command_punctuation || contextual_keyword {
+        } else if has_command_punctuation
+            || contextual_keyword
+            || command_mode && self.command_seen && word.as_bytes()[0].is_ascii_digit()
+        {
             FullTokenKind::Generic
         } else {
             FullTokenKind::Identifier
@@ -1249,6 +1256,16 @@ impl Tokenizer<'_> {
             self.command_seen = true;
         }
         self.push(kind, start, at);
+        if after_dot {
+            self.mode = if self.command_member {
+                Mode::Command
+            } else {
+                Mode::Expression
+            };
+            if self.bytes.get(at) != Some(&b'.') {
+                self.command_member = false;
+            }
+        }
         self.statement_start = false;
         true
     }
@@ -1313,18 +1330,6 @@ fn here_string_kind_for(quote: u8) -> FullTokenKind {
         FullTokenKind::HereStringLiteral
     } else {
         FullTokenKind::HereStringExpandable
-    }
-}
-
-fn string_quote(quote: char) -> Option<(FullTokenKind, char)> {
-    match quote {
-        '\'' | '\u{2018}' | '\u{2019}' | '\u{201a}' | '\u{201b}' => {
-            Some((FullTokenKind::StringLiteral, '\u{2019}'))
-        }
-        '"' | '\u{201c}' | '\u{201d}' | '\u{201e}' | '\u{201f}' => {
-            Some((FullTokenKind::StringExpandable, '\u{201d}'))
-        }
-        _ => None,
     }
 }
 

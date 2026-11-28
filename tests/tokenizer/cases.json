@@ -182,5 +182,21 @@
   {
     "name": "pipeline-variable-splat",
     "source": "cmd @args | more @env:flags"
+  },
+  {
+    "name": "mixed-command-quotes",
+    "source": "cmd a\"b c\"d a'b c'd a\"$x\"z 1\"ab\"d \"a\"next"
+  },
+  {
+    "name": "literal-parameter-spelling",
+    "source": "cmd -opt=$x -foo=$h.x -x$z:yes -key=\"a b\" --flag:$x"
+  },
+  {
+    "name": "embedded-subexpressions",
+    "source": "cmd a$(1+2)b a$(Write-Output 'x')z @x\"b d\"c"
+  },
+  {
+    "name": "generic-punctuation",
+    "source": "cmd a=b=c word#x 9foo x>out x<y - a$()z"
   }
 ]
