@@ -10,7 +10,7 @@ use std::path::Path;
 
 enum Arguments {
     List(Vec<String>),
-    Legacy(String),
+    Legacy { line: String, raw_arrays: bool },
 }
 
 struct Parameter {
@@ -31,7 +31,10 @@ impl Arguments {
                 )
         };
         if style == ArgumentStyle::Legacy || style == ArgumentStyle::Windows && special() {
-            Self::Legacy(String::new())
+            Self::Legacy {
+                line: String::new(),
+                raw_arrays: style != ArgumentStyle::Legacy,
+            }
         } else {
             Self::List(Vec::new())
         }
@@ -46,7 +49,7 @@ impl Arguments {
                     out.push(p.text.clone());
                 }
             }
-            Self::Legacy(line) => {
+            Self::Legacy { line, .. } => {
                 if !line.is_empty() {
                     line.push(' ');
                 }
@@ -76,13 +79,24 @@ impl Arguments {
                 Self::List(argv) => {
                     argv.extend(word.split(' ').filter(|s| !s.is_empty()).map(str::to_owned))
                 }
-                Self::Legacy(line) => {
+                Self::Legacy { line, .. } => {
                     line.push_str(separator);
                     line.push_str(&word);
                 }
             }
             return;
         }
+        if let Self::Legacy { line, .. } = self {
+            if word.is_empty() {
+                return;
+            }
+            line.push_str(separator);
+        }
+        let wrap = glob::needs_quotes(&word);
+        self.glob_word(word, quoted, p, wrap);
+    }
+
+    fn glob_word(&mut self, word: String, quoted: bool, p: Option<&Parameter>, wrap: bool) {
         match self {
             Self::List(out) => glob::expand(word, quoted, |word, _| {
                 if let Some(p) = p
@@ -99,9 +113,7 @@ impl Arguments {
                 }
                 out.push(word);
             }),
-            Self::Legacy(line) if !word.is_empty() => {
-                line.push_str(separator);
-                let wrap = glob::needs_quotes(&word);
+            Self::Legacy { line, .. } => {
                 let mut first = true;
                 glob::expand(word, quoted, |word, globbed| {
                     if !first {
@@ -127,14 +139,32 @@ impl Arguments {
                     }
                 });
             }
-            Self::Legacy(_) => {}
+        }
+    }
+
+    fn uses_array_text(&self) -> bool {
+        !matches!(
+            self,
+            Self::Legacy {
+                raw_arrays: false,
+                ..
+            }
+        )
+    }
+
+    fn literal_array(&mut self, text: &str, p: Option<&Parameter>, separator: &str) {
+        if let Self::Legacy { line, .. } = self {
+            line.push_str(separator);
+        }
+        for part in text.split(' ').filter(|part| !part.is_empty()) {
+            self.glob_word(part.to_owned(), false, p, false);
         }
     }
 
     fn finish(self) -> Vec<String> {
         match self {
             Self::List(list) => list,
-            Self::Legacy(line) => split_legacy(&line),
+            Self::Legacy { line, .. } => split_legacy(&line),
         }
     }
 }
@@ -165,7 +195,7 @@ impl Engine {
                         if let Some(value) = value {
                             self.append_native_value(
                                 &value,
-                                false,
+                                None,
                                 p.as_ref(),
                                 &mut output,
                                 &mut verbatim,
@@ -224,19 +254,15 @@ impl Engine {
         out: &mut Arguments,
         verbatim: &mut bool,
     ) -> Result<(), EngineError> {
-        let quoted = matches!(
-            expr.kind,
-            ExprKind::String(_) | ExprKind::ExpandableString(_)
-        );
         let value = self.eval_expression(expr)?;
-        self.append_native_value(&value, quoted, p, out, verbatim);
+        self.append_native_value(&value, Some(expr), p, out, verbatim);
         Ok(())
     }
 
     fn append_native_value(
         &self,
         value: &Value,
-        quoted: bool,
+        expr: Option<&Expr>,
         p: Option<&Parameter>,
         out: &mut Arguments,
         verbatim: &mut bool,
@@ -245,21 +271,60 @@ impl Engine {
             *verbatim = true;
             return;
         }
+        let quoted = expr
+            .is_some_and(|e| matches!(e.kind, ExprKind::String(_) | ExprKind::ExpandableString(_)));
+        let array = expr.and_then(|e| match &e.kind {
+            ExprKind::CommandArray { elements, text } => {
+                Some((elements.as_slice(), text.as_str(), e.span.start))
+            }
+            _ => None,
+        });
         let sequence = value.sequence();
         let items = sequence
             .as_deref()
             .unwrap_or_else(|| std::slice::from_ref(value));
         for (index, item) in items.iter().enumerate() {
-            if !item.is_null_like() {
-                out.word(
-                    item.to_string(),
-                    quoted,
-                    p,
-                    if index == 0 { "" } else { " " },
-                    verbatim.then_some(&self.variables),
-                );
+            if item.is_null_like() {
+                continue;
             }
+            let word = item.to_string();
+            let separator = match (index, array) {
+                (0, _) => "",
+                (_, Some((elements, text, start))) => {
+                    let from = (elements[index - 1].span.end - start) as usize;
+                    let to = (elements[index].span.start - start) as usize;
+                    comma_separator(&text[from..to])
+                }
+                _ => " ",
+            };
+            if !*verbatim
+                && !word.is_empty()
+                && !glob::needs_quotes(&word)
+                && out.uses_array_text()
+                && let Some((_, text, _)) = array
+            {
+                out.literal_array(text, p, separator);
+                break;
+            }
+            out.word(
+                word,
+                quoted,
+                p,
+                separator,
+                verbatim.then_some(&self.variables),
+            );
         }
+    }
+}
+
+// NativeCommandParameterBinder normalizes any whitespace on either side
+// of a literal comma into one ASCII space in the legacy argument string.
+fn comma_separator(gap: &str) -> &'static str {
+    match (gap.starts_with(','), gap.ends_with(',')) {
+        (true, true) => ",",
+        (true, false) => ", ",
+        (false, true) => " ,",
+        (false, false) => " , ",
     }
 }
 

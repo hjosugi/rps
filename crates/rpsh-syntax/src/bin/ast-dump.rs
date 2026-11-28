@@ -149,7 +149,10 @@ fn format_expr(expr: &Expr) -> String {
             name,
             arguments: _,
         } => format!("(invoke {} {name})", format_expr(target)),
-        ExprKind::Array(items) => format!(
+        ExprKind::Array(items)
+        | ExprKind::CommandArray {
+            elements: items, ..
+        } => format!(
             "(array {})",
             items.iter().map(format_expr).collect::<Vec<_>>().join(" ")
         ),

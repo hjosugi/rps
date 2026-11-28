@@ -119,6 +119,7 @@ native/exit-errors
 native/glob
 native/glob-arguments
 native/inherited-stdin
+native/literal-arrays
 native/merged-streams
 native/numeric-arguments
 native/output-redirection

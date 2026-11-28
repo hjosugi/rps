@@ -432,6 +432,9 @@ pub enum ExprKind {
     TypeLiteral(String),
     /// Upstream: `ArrayLiteralAst`.
     Array(Vec<Expr>),
+    /// A comma-separated command argument. Native binders can reconstruct it
+    /// from the original extent, including the spacing between its elements.
+    CommandArray { elements: Vec<Expr>, text: String },
     /// Upstream: `ScriptBlockExpressionAst`.
     ScriptBlock {
         statements: Vec<Statement>,

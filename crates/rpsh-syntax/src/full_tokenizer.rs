@@ -385,6 +385,7 @@ impl Tokenizer<'_> {
                 && !self.statement_start
                 && self.tokens.last().is_some_and(|token| {
                     token.span.end < start as u32
+                        || token.kind == FullTokenKind::Comma
                         || self.after_member()
                         || (token.kind == FullTokenKind::Parameter
                             && token.span.text(self.source).ends_with(':'))

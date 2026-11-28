@@ -621,8 +621,7 @@ impl Parser<'_> {
             && self.chain_operator().is_none()
         {
             if self.peek().kind == TokenKind::Comma {
-                self.pos += 1;
-                continue;
+                return self.refuse("missing element in a command argument list");
             }
             if let TokenKind::SplattedVariable(name) = &self.peek().kind {
                 let next = &self.tokens[self.pos + 1];
@@ -713,67 +712,24 @@ impl Parser<'_> {
                     {
                         None
                     }
-                    TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
-                        let word = word.clone();
-                        let span = self.peek().span;
-                        self.pos += 1;
-                        Some(bareword_expr(word, span)?)
+                    TokenKind::Identifier(_) | TokenKind::Bareword(_) => {
+                        Some(self.command_value()?)
                     }
-                    _ if self.argument_starts() => Some(self.unary()?),
+                    _ if self.argument_starts() => Some(self.command_value()?),
                     _ => None,
-                };
-                let value = if self.peek().kind == TokenKind::Comma {
-                    match value {
-                        Some(first) => {
-                            let span = first.span;
-                            let mut items = vec![first];
-                            while self.peek().kind == TokenKind::Comma {
-                                self.pos += 1;
-                                let item = match &self.peek().kind {
-                                    TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
-                                        let word = word.clone();
-                                        let span = self.peek().span;
-                                        self.pos += 1;
-                                        bareword_expr(word, span)?
-                                    }
-                                    _ => self.unary()?,
-                                };
-                                items.push(item);
-                            }
-                            Some(Expr {
-                                kind: ExprKind::Array(items),
-                                span,
-                            })
-                        }
-                        None => None,
-                    }
-                } else {
-                    value
                 };
                 arguments.push(CommandArgument::Parameter {
                     name: parameter,
-                    value: value.map(|expr| self.command_literal(expr)),
+                    value,
                     separator,
                 });
                 continue;
             }
-            match &self.peek().kind {
-                TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
-                    let word = word.clone();
-                    let span = self.peek().span;
-                    self.pos += 1;
-                    let expr = bareword_expr(word, span)?;
-                    let arg = match expr.kind {
-                        ExprKind::Bareword(word) => CommandArgument::Bareword(word),
-                        _ => CommandArgument::Value(expr),
-                    };
-                    arguments.push(arg);
-                }
-                _ => {
-                    let expr = self.argument_value()?;
-                    arguments.push(CommandArgument::Value(self.command_literal(expr)));
-                }
-            }
+            let expr = self.command_value()?;
+            arguments.push(match expr.kind {
+                ExprKind::Bareword(word) => CommandArgument::Bareword(word),
+                _ => CommandArgument::Value(expr),
+            });
         }
         let span = start.to(self.previous_span());
         if !redirections.is_empty() {
@@ -873,21 +829,38 @@ impl Parser<'_> {
         expr
     }
 
-    /// A single command argument. A bracketed value stops at its closing
-    /// bracket so `(1..3) -NoEnumerate` does not read as subtraction.
-    fn argument_value(&mut self) -> Result<Expr, ParseError> {
-        if matches!(
-            self.peek().kind,
-            TokenKind::LParen
-                | TokenKind::AtParen
-                | TokenKind::AtCurly
-                | TokenKind::LCurly
-                | TokenKind::LBracket
-                | TokenKind::DollarParen
-        ) {
-            self.primary()
-        } else {
-            self.nested_expression()
+    fn command_value(&mut self) -> Result<Expr, ParseError> {
+        let first = self.command_element()?;
+        if self.peek().kind != TokenKind::Comma {
+            return Ok(self.command_literal(first));
+        }
+        let mut span = first.span;
+        let mut elements = vec![first];
+        while self.peek().kind == TokenKind::Comma {
+            self.pos += 1;
+            self.skip_newlines();
+            let item = self.command_element()?;
+            span = span.to(item.span);
+            elements.push(item);
+        }
+        let text = span.text(self.source).to_owned();
+        self.expr(ExprKind::CommandArray { elements, text }, span)
+    }
+
+    /// A command element ends after its primary expression, including member
+    /// access and indexing. A comma at this level belongs to the argument list.
+    fn command_element(&mut self) -> Result<Expr, ParseError> {
+        match &self.peek().kind {
+            TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
+                let word = word.clone();
+                let span = self.peek().span;
+                self.pos += 1;
+                bareword_expr(word, span)
+            }
+            TokenKind::SplattedVariable(_) => {
+                self.refuse("splatting in a comma-separated argument list")
+            }
+            _ => self.unary(),
         }
     }
 
@@ -2548,7 +2521,10 @@ mod tests {
             ExprKind::Subexpression(expr) => format!("$({})", show(expr)),
             ExprKind::Group(_) => "(...)".to_owned(),
             ExprKind::TypeLiteral(name) => format!("[{name}]"),
-            ExprKind::Array(items) => {
+            ExprKind::Array(items)
+            | ExprKind::CommandArray {
+                elements: items, ..
+            } => {
                 format!("[{}]", items.iter().map(show).collect::<Vec<_>>().join(","))
             }
             ExprKind::Index { target, index } => format!("{}[{}]", show(target), show(index)),

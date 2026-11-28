@@ -2397,18 +2397,11 @@ impl Engine {
             }
             "set-itemproperty" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional
-                        .first()
-                        .map(|value| vec![value.to_string()])
-                        .unwrap_or_default(),
-                };
+                let paths = string_parameter(
+                    positional.get(..1).unwrap_or_default(),
+                    &named,
+                    &["Path", "LiteralPath"],
+                );
                 let name = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("name"))
@@ -2452,15 +2445,8 @@ impl Engine {
             }
             "get-itemproperty" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let paths: Vec<String> =
+                    string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-ItemProperty without a path",
@@ -2524,15 +2510,8 @@ impl Engine {
             }
             "get-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let paths: Vec<String> =
+                    string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-Item without a path",
@@ -2791,15 +2770,8 @@ impl Engine {
             }
             "remove-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let paths: Vec<String> =
+                    string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Remove-Item without a path",
@@ -2928,21 +2900,15 @@ impl Engine {
                 let destination_named = named
                     .iter()
                     .any(|(name, _)| name.eq_ignore_ascii_case("destination"));
-                let mut paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None if destination_named => {
-                        positional.iter().map(ToString::to_string).collect()
-                    }
-                    None => positional
-                        .first()
-                        .map(|value| vec![value.to_string()])
-                        .unwrap_or_default(),
-                };
+                let mut paths: Vec<String> = string_parameter(
+                    if destination_named {
+                        &positional
+                    } else {
+                        positional.get(..1).unwrap_or_default()
+                    },
+                    &named,
+                    &["Path", "LiteralPath"],
+                );
                 let destination = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("destination"))
@@ -3001,21 +2967,15 @@ impl Engine {
                 let destination_named = named
                     .iter()
                     .any(|(name, _)| name.eq_ignore_ascii_case("destination"));
-                let paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None if destination_named => {
-                        positional.iter().map(ToString::to_string).collect()
-                    }
-                    None => positional
-                        .first()
-                        .map(|value| vec![value.to_string()])
-                        .unwrap_or_default(),
-                };
+                let paths: Vec<String> = string_parameter(
+                    if destination_named {
+                        &positional
+                    } else {
+                        positional.get(..1).unwrap_or_default()
+                    },
+                    &named,
+                    &["Path", "LiteralPath"],
+                );
                 let destination = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("destination"))
@@ -3060,15 +3020,8 @@ impl Engine {
             }
             "get-childitem" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let mut paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let mut paths: Vec<String> =
+                    string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty() {
                     paths.push(".".to_owned());
                 }
@@ -3394,15 +3347,8 @@ impl Engine {
             }
             "clear-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let paths: Vec<String> =
+                    string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.iter().any(|path| {
                     path.split_once(':').is_some_and(|(provider, name)| {
                         !name.is_empty()
@@ -3436,26 +3382,11 @@ impl Engine {
                 let path_named = named.iter().any(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
                 });
-                let paths: Vec<String> = if path_named {
-                    named
-                        .iter()
-                        .find(|(name, _)| {
-                            name.eq_ignore_ascii_case("path")
-                                || name.eq_ignore_ascii_case("literalpath")
-                        })
-                        .map(|(_, value)| {
-                            flatten_value(value.clone())
-                                .iter()
-                                .map(ToString::to_string)
-                                .collect()
-                        })
-                        .unwrap_or_default()
-                } else {
-                    positional
-                        .first()
-                        .map(|value| vec![value.to_string()])
-                        .unwrap_or_default()
-                };
+                let paths = string_parameter(
+                    positional.get(..1).unwrap_or_default(),
+                    &named,
+                    &["Path", "LiteralPath"],
+                );
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Add-Content without a path",
@@ -3577,15 +3508,8 @@ impl Engine {
             }
             "get-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let paths: Vec<String> =
+                    string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-Content without a path",
@@ -3723,15 +3647,8 @@ impl Engine {
             }
             "test-path" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let mut paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let mut paths: Vec<String> =
+                    string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty()
                     && let Some((_, value)) = named
                         .iter()
@@ -3927,26 +3844,11 @@ impl Engine {
                 let path_named = named.iter().any(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
                 });
-                let paths: Vec<String> = if path_named {
-                    named
-                        .iter()
-                        .find(|(name, _)| {
-                            name.eq_ignore_ascii_case("path")
-                                || name.eq_ignore_ascii_case("literalpath")
-                        })
-                        .map(|(_, value)| {
-                            flatten_value(value.clone())
-                                .iter()
-                                .map(ToString::to_string)
-                                .collect()
-                        })
-                        .unwrap_or_default()
-                } else {
-                    positional
-                        .first()
-                        .map(|value| vec![value.to_string()])
-                        .unwrap_or_default()
-                };
+                let paths = string_parameter(
+                    positional.get(..1).unwrap_or_default(),
+                    &named,
+                    &["Path", "LiteralPath"],
+                );
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Set-Content without a path",
@@ -4042,16 +3944,7 @@ impl Engine {
             }
             "remove-module" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let names: Vec<String> = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let names: Vec<String> = string_parameter(&positional, &named, &["name"]);
                 if names.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Remove-Module without a name",
@@ -4094,16 +3987,7 @@ impl Engine {
             }
             "import-module" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let paths: Vec<String> = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let paths: Vec<String> = string_parameter(&positional, &named, &["name"]);
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Import-Module without a name",
@@ -4197,16 +4081,7 @@ impl Engine {
             }
             "get-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let wanted: Vec<String> = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let wanted: Vec<String> = string_parameter(&positional, &named, &["name"]);
                 let value_only = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("valueonly") && ops::is_true(value)
                 });
@@ -4280,20 +4155,15 @@ impl Engine {
                 let value_named = named
                     .iter()
                     .any(|(name, _)| name.eq_ignore_ascii_case("value"));
-                let names: Vec<String> = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None if value_named => positional.iter().map(ToString::to_string).collect(),
-                    None => positional
-                        .first()
-                        .map(|value| vec![value.to_string()])
-                        .unwrap_or_default(),
-                };
+                let names = string_parameter(
+                    if value_named {
+                        &positional
+                    } else {
+                        positional.get(..1).unwrap_or_default()
+                    },
+                    &named,
+                    &["Name"],
+                );
                 let value = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("value"))
@@ -4337,16 +4207,7 @@ impl Engine {
             }
             "clear-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let names: Vec<String> = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let names: Vec<String> = string_parameter(&positional, &named, &["name"]);
                 if names.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Clear-Variable without a name",
@@ -4375,16 +4236,7 @@ impl Engine {
             }
             "remove-variable" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let names: Vec<String> = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let names: Vec<String> = string_parameter(&positional, &named, &["name"]);
                 for name in names {
                     self.check_error_variable(&lower, &name, &named)?;
 
@@ -4596,15 +4448,8 @@ impl Engine {
             }
             "import-csv" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let paths: Vec<String> =
+                    string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Import-Csv without a path",
@@ -4900,15 +4745,8 @@ impl Engine {
             }
             "get-filehash" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let paths: Vec<String> = match named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
-                }) {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let paths: Vec<String> =
+                    string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Get-FileHash without a path",
@@ -5153,16 +4991,7 @@ impl Engine {
             ])),
             "get-module" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
-                let wanted: Vec<String> = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let wanted: Vec<String> = string_parameter(&positional, &named, &["name"]);
                 let mut outputs = Vec::new();
                 for module in &self.modules {
                     let matches = wanted.is_empty()
@@ -5247,16 +5076,7 @@ impl Engine {
                     outputs.sort_by_key(|value| value.to_string());
                     return Ok(Some(outputs));
                 }
-                let wanted: Vec<String> = match named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("name"))
-                {
-                    Some((_, value)) => flatten_value(value.clone())
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
-                    None => positional.iter().map(ToString::to_string).collect(),
-                };
+                let wanted: Vec<String> = string_parameter(&positional, &named, &["name"]);
                 let command_type = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("commandtype"))
@@ -6139,6 +5959,13 @@ impl Engine {
     }
 
     fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
+        if let ExprKind::CommandArray { elements, .. } = &expr.kind {
+            let values = elements
+                .iter()
+                .map(|item| self.eval_expression(item))
+                .collect::<Result<_, _>>()?;
+            return Ok(Value::array(values));
+        }
         if let ExprKind::TypeLiteral(name) = &expr.kind
             && self.classes.contains_key(&name.to_ascii_lowercase())
         {
@@ -6601,7 +6428,10 @@ fn evaluate(
             }
         }
         ExprKind::ScriptBlock { source, .. } => Ok(Value::ScriptBlock(source.as_str().into())),
-        ExprKind::Array(items) => {
+        ExprKind::Array(items)
+        | ExprKind::CommandArray {
+            elements: items, ..
+        } => {
             let mut values = Vec::with_capacity(items.len());
             for item in items {
                 values.push(evaluate(item, variables, last_success)?);
@@ -8300,6 +8130,29 @@ fn parse_csv_line_with(line: &str, delimiter: char) -> Vec<String> {
     }
     cells.push(cell);
     cells
+}
+
+/// Bind one string-array parameter from either a named argument or the
+/// positional arguments used by this cmdlet. A literal array is a single
+/// argument until the parameter's element conversion runs here.
+fn string_parameter(
+    positional: &[Value],
+    named: &[(String, Value)],
+    names: &[&str],
+) -> Vec<String> {
+    let values = named
+        .iter()
+        .find(|(key, _)| names.iter().any(|name| name.eq_ignore_ascii_case(key)))
+        .map_or(positional, |(_, value)| std::slice::from_ref(value));
+    let mut strings = Vec::new();
+    for value in values {
+        if let Some(items) = value.sequence() {
+            strings.extend(items.iter().map(ToString::to_string));
+        } else {
+            strings.push(value.to_string());
+        }
+    }
+    strings
 }
 
 fn flatten_values(values: Vec<Value>) -> Vec<Value> {
