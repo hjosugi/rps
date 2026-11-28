@@ -27,6 +27,7 @@ enum Status {
 
 struct CaseResult {
     id: String,
+    invocation: &'static str,
     status: Status,
     /// The exit code every pwsh run produced; the hyperfine export repeats it.
     reference_exit: i32,
@@ -200,7 +201,8 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
     }
 
     Ok(!results.iter().any(|result| {
-        matches!(result.status, Status::Mismatch(_)) || result.within_budget() == Some(false)
+        matches!(result.status, Status::Mismatch(_))
+            || (result.budget_ms.is_some() && result.within_budget() != Some(true))
     }))
 }
 
@@ -229,6 +231,7 @@ fn measure(
 ) -> Result<CaseResult, String> {
     let source = fs::read_to_string(&case.path)
         .map_err(|error| format!("cannot read {}: {error}", case.path.display()))?;
+    let inline = cases::inline_command(&source)?;
     let runs = cases::directive(&source, "runs")
         .unwrap_or(settings.runs)
         .max(1);
@@ -237,7 +240,7 @@ fn measure(
         cases::directive(&source, "budget-ms").map(|budget| budget as f64 * settings.budget_scale);
 
     // The first run of each engine establishes the answer and is not timed.
-    let first = pwsh.run_file_measured(&case.path, measurer)?;
+    let first = pwsh.run_measured(&case.path, inline, measurer)?;
     let Some(exit_code) = first.exit_code else {
         return Err(format!("{}: pwsh was killed by a signal", case.id));
     };
@@ -249,7 +252,7 @@ fn measure(
     let bash_script = case.path.with_extension("bash");
     let bash = bash.filter(|_| bash_script.is_file());
     let run_bash = |engine: &Engine| -> Result<Sample, String> {
-        let run = engine.run_file_measured(&bash_script, measurer)?;
+        let run = engine.run_measured(&bash_script, None, measurer)?;
         match engines::judge(&reference, &run) {
             Verdict::Match => sample_of(&run),
             Verdict::Mismatch(why) | Verdict::NotImplemented(why) => {
@@ -257,12 +260,14 @@ fn measure(
             }
         }
     };
-    let mut status =
-        match engines::judge(&reference, &rpsh.run_file_measured(&case.path, measurer)?) {
-            Verdict::Match => Status::Verified,
-            Verdict::NotImplemented(feature) => Status::NotImplemented(feature),
-            Verdict::Mismatch(why) => Status::Mismatch(why),
-        };
+    let mut status = match engines::judge(
+        &reference,
+        &rpsh.run_measured(&case.path, inline, measurer)?,
+    ) {
+        Verdict::Match => Status::Verified,
+        Verdict::NotImplemented(feature) => Status::NotImplemented(feature),
+        Verdict::Mismatch(why) => Status::Mismatch(why),
+    };
 
     if let Some(bash) = bash {
         run_bash(bash)?;
@@ -271,9 +276,9 @@ fn measure(
         if let Some(bash) = bash {
             run_bash(bash)?;
         }
-        pwsh.run_file_measured(&case.path, measurer)?;
+        pwsh.run_measured(&case.path, inline, measurer)?;
         if matches!(status, Status::Verified) {
-            rpsh.run_file_measured(&case.path, measurer)?;
+            rpsh.run_measured(&case.path, inline, measurer)?;
         }
     }
 
@@ -282,7 +287,7 @@ fn measure(
     let mut rpsh_samples = Vec::with_capacity(runs);
     let mut bash_samples = Vec::new();
     for _ in 0..runs {
-        let run = pwsh.run_file_measured(&case.path, measurer)?;
+        let run = pwsh.run_measured(&case.path, inline, measurer)?;
         if run.stdout != reference.stdout || run.exit_code != Some(reference.exit_code) {
             return Err(format!(
                 "{}: pwsh printed something different on a later run; \
@@ -293,7 +298,7 @@ fn measure(
         pwsh_samples.push(sample_of(&run)?);
 
         if matches!(status, Status::Verified) {
-            let run = rpsh.run_file_measured(&case.path, measurer)?;
+            let run = rpsh.run_measured(&case.path, inline, measurer)?;
             match engines::judge(&reference, &run) {
                 Verdict::Match => rpsh_samples.push(sample_of(&run)?),
                 Verdict::NotImplemented(why) | Verdict::Mismatch(why) => {
@@ -309,6 +314,11 @@ fn measure(
     let rpsh = matches!(status, Status::Verified).then(|| stats::summarize(&rpsh_samples));
     Ok(CaseResult {
         id: case.id.clone(),
+        invocation: if inline.is_some() {
+            "-Command"
+        } else {
+            "-File"
+        },
         status,
         reference_exit: exit_code,
         pwsh: stats::summarize(&pwsh_samples),
@@ -500,6 +510,7 @@ fn case_json(result: &CaseResult) -> Json {
     };
     let mut fields = vec![
         ("id", Json::text(result.id.clone())),
+        ("invocation", Json::text(result.invocation)),
         ("status", Json::text(status)),
         ("detail", Json::optional(detail, Json::Text)),
         ("speedup", Json::optional(result.speedup(), Json::Number)),

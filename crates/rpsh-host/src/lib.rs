@@ -48,6 +48,7 @@ const ARGUMENT_FILE_DOES_NOT_EXIST: &str =
 /// Runs rpsh with the arguments that follow the program name and returns the
 /// process exit code.
 pub fn run(args: &[String]) -> i32 {
+    rpsh_engine::startup::host_arguments();
     let (invocation, non_interactive) = match cli::parse_with_mode(args) {
         Ok(invocation) => invocation,
         Err(CliError::NotImplemented(feature)) => return not_implemented(feature),

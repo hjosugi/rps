@@ -192,14 +192,40 @@ yet. When the engine exists, the reserve is what pays for a new dependency
 or a new eager table, and a change that needs more than the reserve is a
 design change, not a tuning change.
 
+## Inspecting first use
+
+Set `RPSH_TRACE_INIT=1` to print initialization events on stderr. Each
+tab-separated line starts with `rpsh init` and identifies a component when
+the process first enters it. Each module load also prints its name. An unset
+variable, an empty value or `0` keeps stderr available for script diagnostics.
+
+```sh
+RPSH_TRACE_INIT=1 target/release/rpsh -NoProfile -Command exit
+RPSH_TRACE_INIT=1 target/release/rpsh -NoProfile -Command '42 | Out-Null'
+RPSH_TRACE_INIT=1 target/release/rpsh -NoProfile -Command 'Import-Module Microsoft.PowerShell.Management'
+```
+
+The first command enters the host argument parser, creates the session and
+parses the script. The second also searches the built-in aliases and cmdlets.
+Their catalogs are static. The third records the Management module load.
+An invocation keeps its arguments and script path until a variable access
+materializes the scope table. Function lookup can rule out a missing global
+name before building the default function table. Accessing `$Error`,
+formatting an object, using a provider and resolving a type each appear
+separately in the trace. The performance harness clears the trace setting
+in its measurement environment.
+
 ## Enforcement
 
-* `bench/cases/startup/*.ps1` carry `# rpsh-bench: budget-ms=5` and
-  `runs=30`. The harness records `within_budget` and fails the run when a
-  timed case exceeds its budget (`--budget-scale` multiplies it).
-* The harness runs cases with `-File`, so `-File empty.ps1` is the case CI
-  enforces. `scripts/time-commands.py` measures `-Command exit` separately
-  and it is part of the same budget; a `-Command` harness case is #9's job.
+* `cargo harness bench --filter startup/` verifies five cases against pwsh.
+  They run an empty file, an expression, one core cmdlet, a module import
+  and `rpsh -NoProfile -Command exit`. The command case sets
+  `mode=command` in its benchmark directive. The other four use `-File`.
+* Each case requests 30 measured runs and a 5 ms median budget. The JSON
+  includes the invocation mode, individual samples and `within_budget`.
+  A budgeted case must produce matching output and exit status and stay
+  within its time limit. A refused operation fails this gate.
+  [Reference-machine results for all five cases](../bench/baselines/2026-11-28-ryzen5-4650u-lazy-startup.json).
 * CI's `startup-budget` job runs those cases on every push to `main` and
   every pull request with `--budget-scale 2`. Shared runners are slower and
   noisier; doubling catches the regressions that matter — an eagerly built

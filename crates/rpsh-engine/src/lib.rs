@@ -29,6 +29,7 @@ mod native;
 mod preferences;
 mod redirection;
 mod sorting;
+pub mod startup;
 mod string_compare;
 mod string_search;
 #[cfg(unix)]
@@ -46,6 +47,7 @@ use invocation::{CallTarget, PipelineStage, ScriptCall, StageCommand};
 use method_error::{ambiguous_overload, overload_error};
 use native::NativeOutput;
 use redirection::{OutputTarget, record_prefix};
+use startup::Stage;
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
@@ -338,6 +340,7 @@ impl From<io::Error> for EngineError {
 
 impl Engine {
     pub fn new() -> Self {
+        Stage::Session.enter();
         Self::default()
     }
 
@@ -348,6 +351,7 @@ impl Engine {
 
     /// Initialize a real console host, optionally disallowing prompts.
     pub fn for_console_with_mode(non_interactive: bool) -> Self {
+        Stage::Session.enter();
         Self {
             console_stdio: true,
             non_interactive,
@@ -368,9 +372,9 @@ impl Engine {
         source: &str,
         out: &mut dyn Write,
     ) -> Result<i32, EngineError> {
+        Stage::Parse.enter();
         let script = parse(source)?;
-        self.variables
-            .insert("args".to_owned(), Value::array(Vec::new()));
+        self.variables.set_invocation(&[], None);
         self.run_ast_with_status(&script, out, true)
     }
 
@@ -383,19 +387,10 @@ impl Engine {
         script_path: Option<&std::path::Path>,
         out: &mut dyn Write,
     ) -> Result<i32, EngineError> {
+        Stage::Parse.enter();
         let script = parse(source)?;
-        self.variables.insert(
-            "args".to_owned(),
-            Value::array(
-                args.iter()
-                    .map(|arg| Value::String(arg.clone().into()))
-                    .collect(),
-            ),
-        );
-        if let Some(path) = script_path {
-            let full = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-            self.variables.set_script_path(&full);
-        }
+        let path = script_path.map(|path| path.canonicalize().unwrap_or_else(|_| path.to_owned()));
+        self.variables.set_invocation(args, path);
         self.run_ast(&script, out)
     }
 
@@ -1205,6 +1200,7 @@ impl Engine {
 
     fn import_builtin(&mut self, module: &'static BuiltinModule) {
         if !self.builtin_loaded(module) {
+            startup::module_loaded(module.name);
             self.modules.push(LoadedModule::Builtin(module));
         }
         self.aliases.import(module);
@@ -1604,6 +1600,7 @@ impl Engine {
         arguments: &PreparedArguments<'_>,
         input: &[Value],
     ) -> Result<Option<Vec<Value>>, EngineError> {
+        Stage::Cmdlets.enter();
         let lower = command_name(name).to_ascii_lowercase();
         let module = MODULES.iter().find(|module| module.exports_cmdlet(&lower));
         if let Some(module) = module
@@ -3925,6 +3922,7 @@ impl Engine {
                         .iter()
                         .any(|module| module.name().eq_ignore_ascii_case(&module_name))
                     {
+                        startup::module_loaded(&module_name);
                         self.modules.push(LoadedModule::Script(module_name));
                     }
                 }
@@ -5094,6 +5092,7 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "get-psdrive" => {
+                Stage::Providers.enter();
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let wanted = named
                     .iter()
@@ -5130,6 +5129,7 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "get-psprovider" => {
+                Stage::Providers.enter();
                 let providers = [
                     ("Alias", "Alias"),
                     ("Environment", "Env"),
@@ -5606,6 +5606,7 @@ impl Engine {
         filter: Option<&str>,
     ) -> Option<Vec<Value>> {
         let (provider, name) = path.split_once(':')?;
+        Stage::Providers.enter();
         let pattern = if name.is_empty() { "*" } else { name };
         let matches = |candidate: &str| {
             ops::wildcard_match(candidate, pattern, false)
@@ -5684,6 +5685,7 @@ impl Engine {
 
     fn provider_item(&self, path: &str) -> Option<Result<Value, RuntimeError>> {
         let (provider, name) = path.split_once(':')?;
+        Stage::Providers.enter();
         let name = name.trim_start_matches("\\");
         let missing = |path: &str| {
             Err(RuntimeError::Script {
@@ -5741,6 +5743,7 @@ impl Engine {
 
     fn provider_path_exists(&self, path: &str) -> Option<bool> {
         let (provider, name) = path.split_once(':')?;
+        Stage::Providers.enter();
         let name = name.trim_start_matches("\\");
         if name.is_empty()
             && matches!(
@@ -6109,7 +6112,10 @@ impl Engine {
     }
 
     fn write_host(&mut self, out: &mut dyn Write, text: fmt::Arguments<'_>) -> io::Result<()> {
-        let encoding = self.host_encoding.get_or_insert_with(encoding::console);
+        let encoding = self.host_encoding.get_or_insert_with(|| {
+            Stage::HostWriter.enter();
+            encoding::console()
+        });
         encoding::write_host(*encoding, out, text)
     }
 
@@ -7491,6 +7497,7 @@ fn next_prime(mut value: usize) -> usize {
 }
 
 fn format_host_stream(objects: &[Value]) -> String {
+    Stage::Format.enter();
     let Some(first) = objects.first() else {
         return String::new();
     };
@@ -8356,6 +8363,7 @@ fn automatic_variable(name: &str) -> Option<Value> {
 }
 
 fn type_full_name(name: &str) -> String {
+    Stage::Types.enter();
     if let Some(element) = name.strip_suffix("[]") {
         return format!("{}[]", type_full_name(element));
     }
@@ -8839,6 +8847,7 @@ fn static_member(
     name: &str,
     variables: &Variables,
 ) -> Result<Value, RuntimeError> {
+    Stage::Types.enter();
     let enum_key = format!("__enum::{type_name}::{name}");
     if let Some(value) = variables.get(&enum_key) {
         return Ok(value.clone());
@@ -8973,6 +8982,7 @@ fn invoke_static(
     arguments: &[Value],
     variables: &mut Variables,
 ) -> Result<Value, RuntimeError> {
+    Stage::Types.enter();
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
@@ -9605,6 +9615,7 @@ fn cast_in_scope(
 }
 
 fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
+    Stage::Types.enter();
     if type_name.eq_ignore_ascii_case("string[]")
         || type_name.eq_ignore_ascii_case("system.string[]")
     {
@@ -10699,6 +10710,39 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn repeated_invocations_rebind_arguments_before_or_after_first_variable_use() {
+        let mut engine = super::Engine::new();
+        let mut out = Vec::new();
+        let path = std::path::Path::new("first.ps1");
+        engine
+            .run_script_with("", &["unused".into()], Some(path), &mut out)
+            .unwrap();
+        engine
+            .run_script_with(
+                "$args.Count; $args[0]; $PSCommandPath",
+                &["next".into()],
+                None,
+                &mut out,
+            )
+            .unwrap();
+        engine
+            .run_command_text("$saved=42; $args.Count", &mut out)
+            .unwrap();
+        engine
+            .run_script_with("$saved; $args[0]", &["last".into()], None, &mut out)
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            format!(
+                "1\nnext\n{}\n0\n42\nlast\n",
+                path.canonicalize()
+                    .unwrap_or_else(|_| path.to_owned())
+                    .display()
+            )
+        );
+    }
+
     use super::*;
 
     fn run(source: &str) -> (Result<i32, EngineError>, String) {

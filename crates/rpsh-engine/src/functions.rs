@@ -1,6 +1,7 @@
+use super::startup::Stage;
 use super::{ArgumentBinding, FunctionDef};
 use rpsh_runtime::Value;
-use std::cell::LazyCell;
+use std::cell::OnceCell;
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -9,33 +10,27 @@ struct FunctionScope {
     script: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(super) struct Functions {
-    global: LazyCell<HashMap<String, FunctionDef>>,
+    global: OnceCell<HashMap<String, FunctionDef>>,
     scopes: Vec<FunctionScope>,
 }
 
-impl Default for Functions {
-    fn default() -> Self {
-        Self {
-            global: LazyCell::new(|| {
-                if cfg!(unix) {
-                    let function = FunctionDef {
-                        name: "exec".into(),
-                        source: "\nSwitch-Process -WithCommand $args\n".into(),
-                        parameters: Vec::new(),
-                        block: Default::default(),
-                        filter: false,
-                        private: false,
-                        live_source: Default::default(),
-                    };
-                    HashMap::from([("exec".into(), function)])
-                } else {
-                    HashMap::new()
-                }
-            }),
-            scopes: Vec::new(),
-        }
+fn initial_functions() -> HashMap<String, FunctionDef> {
+    Stage::Functions.enter();
+    if cfg!(unix) {
+        let function = FunctionDef {
+            name: "exec".into(),
+            source: "\nSwitch-Process -WithCommand $args\n".into(),
+            parameters: Vec::new(),
+            block: Default::default(),
+            filter: false,
+            private: false,
+            live_source: Default::default(),
+        };
+        HashMap::from([("exec".into(), function)])
+    } else {
+        HashMap::new()
     }
 }
 
@@ -66,7 +61,7 @@ impl Functions {
 
     fn table(&self, depth: usize) -> &HashMap<String, FunctionDef> {
         if depth == 0 {
-            &self.global
+            self.global.get_or_init(initial_functions)
         } else {
             &self.scopes[depth - 1].entries
         }
@@ -74,18 +69,27 @@ impl Functions {
 
     fn table_mut(&mut self, depth: usize) -> &mut HashMap<String, FunctionDef> {
         if depth == 0 {
-            LazyCell::force_mut(&mut self.global)
+            self.global.get_or_init(initial_functions);
+            self.global.get_mut().expect("initialized global scope")
         } else {
             &mut self.scopes[depth - 1].entries
         }
+    }
+
+    fn entry(&self, depth: usize, key: &str) -> Option<&FunctionDef> {
+        // Before the first definition the only possible global entry on Unix
+        // is exec. A miss during ordinary command discovery needs no table.
+        if depth == 0 && self.global.get().is_none() && !(cfg!(unix) && key == "exec") {
+            return None;
+        }
+        self.table(depth).get(key)
     }
 
     fn resolve(&self, name: &str) -> Option<(usize, &FunctionDef)> {
         let (depth, _, key) = self.scope(name);
         let current = self.scopes.len();
         let visible = |d| {
-            self.table(d)
-                .get(key)
+            self.entry(d, key)
                 .filter(|f| !f.private || d == current)
                 .map(|f| (d, f))
         };
@@ -152,6 +156,7 @@ impl Functions {
         name: String,
         mut function: FunctionDef,
     ) -> &FunctionDef {
+        Stage::Functions.enter();
         let key = name.to_ascii_lowercase();
         function.name = name;
         function.private = private;
@@ -193,7 +198,7 @@ impl Functions {
     pub(super) fn info(&self, name: &str) -> Option<&FunctionDef> {
         (0..=self.scopes.len())
             .rev()
-            .find_map(|depth| self.table(depth).get(name))
+            .find_map(|depth| self.entry(depth, name))
     }
 
     pub(super) fn values(&self) -> impl Iterator<Item = &FunctionDef> {

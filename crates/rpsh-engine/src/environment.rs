@@ -12,7 +12,10 @@ use crate::variables::Variables;
 
 pub(super) fn drive_name(path: &str) -> Option<&str> {
     let (prefix, name) = path.split_once(':')?;
-    prefix.eq_ignore_ascii_case("env").then_some(name)
+    prefix.eq_ignore_ascii_case("env").then(|| {
+        super::startup::Stage::Providers.enter();
+        name
+    })
 }
 
 pub(super) fn ps_home() -> &'static Path {
@@ -49,6 +52,7 @@ fn module_path(personal: &Path, shared: &Path, system: &Path, inherited: &str) -
 fn startup() -> &'static [(String, String); 2] {
     static STARTUP: OnceLock<[(String, String); 2]> = OnceLock::new();
     STARTUP.get_or_init(|| {
+        super::startup::Stage::Environment.enter();
         let shell = ps_home();
         let path = std::env::var("PATH").unwrap_or_default();
         let prefix = format!("{}:", shell.display());

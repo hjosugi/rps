@@ -48,13 +48,34 @@ fn walk(base: &Path, directory: &Path, cases: &mut Vec<Case>) -> Result<(), Stri
 /// A benchmark script uses this to ask for fewer runs when one run is slow:
 /// `# rpsh-bench: runs=5 warmup=1`.
 pub(crate) fn directive(source: &str, key: &str) -> Option<usize> {
+    setting(source, key)?.parse().ok()
+}
+
+fn setting<'a>(source: &'a str, key: &str) -> Option<&'a str> {
     source
         .lines()
         .filter_map(|line| line.trim().strip_prefix("# rpsh-bench:"))
         .flat_map(str::split_whitespace)
         .filter_map(|setting| setting.split_once('='))
         .find(|(name, _)| *name == key)
-        .and_then(|(_, value)| value.parse().ok())
+        .map(|(_, value)| value)
+}
+
+/// A command-mode benchmark passes the script as one argv element. A leading
+/// harness directive is metadata, so the exit benchmark executes exactly
+/// `rpsh -NoProfile -Command exit`.
+pub(crate) fn inline_command(source: &str) -> Result<Option<&str>, String> {
+    match setting(source, "mode") {
+        None | Some("file") => Ok(None),
+        Some("command") => {
+            let mut text = source.trim_start();
+            while text.starts_with("# rpsh-bench:") {
+                text = text.split_once('\n').map_or("", |(_, rest)| rest);
+            }
+            Ok(Some(text.trim_end_matches(['\r', '\n'])))
+        }
+        Some(other) => Err(format!("unknown benchmark invocation mode '{other}'")),
+    }
 }
 
 #[cfg(test)]
@@ -68,6 +89,20 @@ mod tests {
         assert_eq!(directive(source, "warmup"), Some(1));
         assert_eq!(directive(source, "other"), None);
         assert_eq!(directive("$x = 1\n", "runs"), None);
+    }
+
+    #[test]
+    fn command_mode_passes_one_script_argument() {
+        assert_eq!(
+            inline_command("# rpsh-bench: mode=command runs=30\nexit\n").unwrap(),
+            Some("exit")
+        );
+        assert_eq!(
+            inline_command("# rpsh-bench: mode=command\n'one'\n'line two'\n").unwrap(),
+            Some("'one'\n'line two'")
+        );
+        assert_eq!(inline_command("exit").unwrap(), None);
+        assert!(inline_command("# rpsh-bench: mode=unknown\nexit").is_err());
     }
 
     #[test]

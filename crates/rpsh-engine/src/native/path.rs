@@ -56,6 +56,7 @@ impl LookupPaths {
         if same_name(&self.key, path) {
             return;
         }
+        crate::startup::Stage::NativeSearch.enter();
         self.key.clear();
         self.key.push_str(path);
         self.entries.clear();

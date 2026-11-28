@@ -56,7 +56,7 @@ impl Engine {
     /// prompts, the reference environment, the script's directory as the
     /// working directory.
     pub(crate) fn run_file(&self, script: &Path, locale: Option<&str>) -> Result<Run, String> {
-        let mut command = self.file_command(script);
+        let mut command = self.script_command(script, None);
         let path = script.with_extension("stdin");
         match fs::File::open(&path) {
             Ok(file) => {
@@ -73,12 +73,13 @@ impl Engine {
 
     /// Like [`Engine::run_file`], but records CPU time and peak RSS through
     /// `wait4` (`scripts/spawn-measure.c`).
-    pub(crate) fn run_file_measured(
+    pub(crate) fn run_measured(
         &self,
         script: &Path,
+        inline_command: Option<&str>,
         measurer: &Measurer,
     ) -> Result<Run, String> {
-        let command = self.file_command(script);
+        let command = self.script_command(script, inline_command);
         let measured = measurer.run(command)?;
         Ok(Run {
             stdout: measured.stdout,
@@ -89,10 +90,13 @@ impl Engine {
         })
     }
 
-    fn file_command(&self, script: &Path) -> Command {
+    fn script_command(&self, script: &Path, inline_command: Option<&str>) -> Command {
         let mut command = self.command();
-        command.args(self.file_args);
-        command.arg(script);
+        if let Some(source) = inline_command {
+            command.args(["-NoProfile", "-Command", source]);
+        } else {
+            command.args(self.file_args).arg(script);
+        }
         if let Some(directory) = script.parent() {
             command.current_dir(directory);
         }

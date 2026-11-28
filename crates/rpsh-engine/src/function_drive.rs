@@ -9,9 +9,10 @@ use std::io::{self, Write as _};
 
 pub(super) fn name(path: &str) -> Option<&str> {
     let (drive, name) = path.split_once(':')?;
-    drive
-        .eq_ignore_ascii_case("function")
-        .then(|| name.trim_start_matches(['/', '\\']))
+    drive.eq_ignore_ascii_case("function").then(|| {
+        super::startup::Stage::Providers.enter();
+        name.trim_start_matches(['/', '\\'])
+    })
 }
 
 pub(super) fn option<'a>(named: &'a [(String, Value)], names: &[&str]) -> Option<&'a Value> {

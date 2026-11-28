@@ -1,0 +1,6 @@
+rpsh-golden-v2
+exit=0
+root=Object[]/0/True
+invoked=Object[]/2/first|two words
+file=startup-bindings.ps1/lang
+restored=0/startup-bindings.ps1

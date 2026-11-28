@@ -115,6 +115,7 @@ impl StoredAlias {
 
 impl Aliases {
     pub fn get(&self, name: &str) -> Option<Alias<'_>> {
+        super::startup::Stage::Aliases.enter();
         let key = name.to_ascii_lowercase();
         if let Some(change) = self.changes.get(&key) {
             return change.as_ref().map(StoredAlias::as_alias);

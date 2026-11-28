@@ -1,13 +1,95 @@
 //! Dynamically scoped values and the lazily created, session-wide error list.
+use super::startup::Stage;
 use rpsh_runtime::{ArrayList, Value};
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+use std::path::{Path, PathBuf};
+
+/// Invocation metadata is available immediately, but a cold script that
+/// never consults session variables needs neither PS values nor a hash table.
+#[derive(Clone, Debug, Default)]
+struct Scope {
+    table: OnceCell<HashMap<String, Value>>,
+    pending: RefCell<Option<Invocation>>,
+}
+
+#[derive(Clone, Debug)]
+struct Invocation {
+    args: Vec<String>,
+    path: Option<PathBuf>,
+}
+
+fn bind_invocation(table: &mut HashMap<String, Value>, args: &[String], path: Option<&Path>) {
+    table.insert(
+        "args".into(),
+        Value::array(
+            args.iter()
+                .map(|arg| Value::String(arg.as_str().into()))
+                .collect(),
+        ),
+    );
+    if let Some(path) = path {
+        bind_script_path(table, path);
+    }
+}
+
+fn bind_script_path(table: &mut HashMap<String, Value>, path: &Path) {
+    table.insert(
+        "PSCommandPath".into(),
+        Value::String(path.to_string_lossy().as_ref().into()),
+    );
+    if let Some(parent) = path.parent() {
+        table.insert(
+            "PSScriptRoot".into(),
+            Value::String(parent.to_string_lossy().as_ref().into()),
+        );
+    }
+}
+
+impl Scope {
+    fn set_invocation(&mut self, args: &[String], path: Option<PathBuf>) {
+        if let Some(table) = self.table.get_mut() {
+            bind_invocation(table, args, path.as_deref());
+        } else {
+            let pending = self.pending.get_mut();
+            let path = path.or_else(|| pending.take().and_then(|old| old.path));
+            *pending = Some(Invocation {
+                args: args.to_vec(),
+                path,
+            });
+        }
+    }
+
+    fn initialize(pending: &RefCell<Option<Invocation>>) -> HashMap<String, Value> {
+        Stage::Variables.enter();
+        let mut table = HashMap::new();
+        if let Some(invocation) = pending.take() {
+            bind_invocation(&mut table, &invocation.args, invocation.path.as_deref());
+        }
+        table
+    }
+}
+
+impl Deref for Scope {
+    type Target = HashMap<String, Value>;
+    fn deref(&self) -> &Self::Target {
+        self.table.get_or_init(|| Self::initialize(&self.pending))
+    }
+}
+
+impl DerefMut for Scope {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.table.get_or_init(|| Self::initialize(&self.pending));
+        self.table.get_mut().expect("initialized scope")
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct Variables {
-    entries: HashMap<String, Value>,
+    entries: Scope,
     errors: OnceCell<ArrayList>,
-    parents: Vec<HashMap<String, Value>>,
+    parents: Vec<Scope>,
     script_scope: usize,
     pub(super) nested: bool,
 }
@@ -99,17 +181,12 @@ impl Variables {
         self.iter().map(|(name, _)| name)
     }
 
-    pub(super) fn set_script_path(&mut self, path: &std::path::Path) {
-        self.insert(
-            "PSCommandPath".into(),
-            Value::String(path.to_string_lossy().as_ref().into()),
-        );
-        if let Some(parent) = path.parent() {
-            self.insert(
-                "PSScriptRoot".into(),
-                Value::String(parent.to_string_lossy().as_ref().into()),
-            );
-        }
+    pub(super) fn set_invocation(&mut self, args: &[String], path: Option<PathBuf>) {
+        self.entries.set_invocation(args, path);
+    }
+
+    pub(super) fn set_script_path(&mut self, path: &Path) {
+        bind_script_path(&mut self.entries, path);
     }
 
     pub(super) fn restore_invocation(&mut self, mut caller: Variables) {
@@ -133,7 +210,10 @@ impl Variables {
     }
 
     pub(super) fn errors(&self) -> &ArrayList {
-        self.errors.get_or_init(ArrayList::default)
+        self.errors.get_or_init(|| {
+            Stage::ErrorHistory.enter();
+            ArrayList::default()
+        })
     }
 
     pub(super) fn restore_session(&mut self, child: &mut Self) {

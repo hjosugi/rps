@@ -100,6 +100,7 @@ lang/scriptblock-clean-errors
 lang/scriptblock-file-phases
 lang/scriptblock-phases
 lang/session-aliases
+lang/startup-bindings
 lang/static-members
 lang/string-escapes
 lang/string-index
