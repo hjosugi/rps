@@ -1,0 +1,27 @@
+rpsh-golden-v2
+exit=0
+0
+False
+fhx|Microsoft.PowerShell.Utility|True
+0
+gcb|Get-Clipboard|Microsoft.PowerShell.Management|None
+gtz|Get-TimeZone|Microsoft.PowerShell.Management|None
+scb|Set-Clipboard|Microsoft.PowerShell.Management|None
+local function
+0
+fhx|Format-Hex|Microsoft.PowerShell.Utility|Microsoft.PowerShell.Utility
+7.0.0.0
+7
+Microsoft.PowerShell.Utility|Manifest|7.0.0.0
+111
+False
+0
+Format-Hex
+0
+Get-Item
+Microsoft.PowerShell.Utility
+False
+0
+False
+load Utility
+True

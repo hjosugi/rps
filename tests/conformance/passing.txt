@@ -92,6 +92,7 @@ lang/variables
 lang/wildcard
 modules/import
 modules/import-many
+modules/utility-alias
 native/capture
 native/environment
 native/exit-code

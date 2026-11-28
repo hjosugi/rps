@@ -20,6 +20,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::Stdio;
 
+use rpsh_commands::{BuiltinModule, MODULES};
 use rpsh_format::{CommandTableItem, command_table};
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
@@ -48,8 +49,7 @@ pub struct Engine {
     classes: HashMap<String, ClassDef>,
     /// Session aliases shared by command discovery, dispatch, and the provider.
     aliases: Aliases,
-    /// Names of the modules loaded by Import-Module.
-    modules: Vec<String>,
+    modules: Vec<LoadedModule>,
     /// Functions introduced by each imported module.
     module_functions: HashMap<String, Vec<String>>,
     /// Locations saved by Push-Location.
@@ -57,6 +57,37 @@ pub struct Engine {
     /// True when a typed host value was written, so the format stream gets a
     /// final blank line.
     host_text: bool,
+}
+
+#[derive(Debug)]
+enum LoadedModule {
+    Script(String),
+    Builtin(&'static BuiltinModule),
+}
+
+impl LoadedModule {
+    fn name(&self) -> &str {
+        match self {
+            Self::Script(name) => name,
+            Self::Builtin(module) => module.name,
+        }
+    }
+
+    fn value(&self) -> Value {
+        let mut entries = vec![("Name".to_owned(), Value::String(self.name().into()))];
+        let kind = match self {
+            Self::Script(_) => "Script",
+            Self::Builtin(module) => {
+                entries.push((
+                    "Version".to_owned(),
+                    version_value(module.version.to_owned()),
+                ));
+                "Manifest"
+            }
+        };
+        entries.push(("ModuleType".to_owned(), Value::String(kind.into())));
+        Value::object(entries)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -995,23 +1026,59 @@ impl Engine {
         }
     }
 
-    /// Runs a loop body with the `break`/`continue` handling every loop shares.
-    /// `step` is `None` for `while`, and the `for` iterator otherwise.
+    fn builtin_loaded(&self, module: &BuiltinModule) -> bool {
+        self.modules.iter().any(
+            |entry| matches!(entry, LoadedModule::Builtin(loaded) if loaded.name == module.name),
+        )
+    }
+
+    fn import_builtin(&mut self, module: &'static BuiltinModule) {
+        if !self.builtin_loaded(module) {
+            self.modules.push(LoadedModule::Builtin(module));
+        }
+        self.aliases.import(module);
+    }
+
+    fn autoload_unqualified(&self) -> bool {
+        self.variables
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case("PSModuleAutoLoadingPreference"))
+            .is_none_or(|(_, value)| {
+                value.is_null_like()
+                    || matches!(value.to_string().to_ascii_lowercase().as_str(), "all" | "2")
+            })
+    }
+
+    fn discover_alias(&mut self, name: &str) -> Option<String> {
+        if let Some(alias) = self.aliases.get(name) {
+            return Some(alias.definition.to_owned());
+        }
+        if let Some(module) = MODULES.iter().find(|module| module.exports_alias(name))
+            && !self.functions.contains_key(&name.to_ascii_lowercase())
+            && !self.builtin_loaded(module)
+            && self.autoload_unqualified()
+        {
+            self.import_builtin(module);
+            return self.aliases.definition(name);
+        }
+        None
+    }
+
     fn call_function(
         &mut self,
         name: &str,
         arguments: &[CommandArgument],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
-        let resolved = self.aliases.definition(name);
+        let resolved = self.discover_alias(name);
         let name = resolved.as_deref().unwrap_or(name);
-        if let Some(outputs) = self.run_builtin(name, arguments, &[])? {
-            for value in outputs {
-                self.write_value(value, out)?;
-            }
-            return Ok(Flow::Normal);
-        }
         if !self.functions.contains_key(&name.to_ascii_lowercase()) {
+            if let Some(outputs) = self.run_builtin(name, arguments, &[])? {
+                for value in outputs {
+                    self.write_value(value, out)?;
+                }
+                return Ok(Flow::Normal);
+            }
             if let Some(outputs) = self.run_native(name, arguments, &[])? {
                 for value in outputs {
                     self.write_value(value, out)?;
@@ -1239,12 +1306,12 @@ impl Engine {
         arguments: &[CommandArgument],
         input: Vec<Value>,
     ) -> Result<Vec<Value>, EngineError> {
-        let resolved = self.aliases.definition(name);
+        let resolved = self.discover_alias(name);
         let name = resolved.as_deref().unwrap_or(name);
-        if let Some(outputs) = self.run_builtin(name, arguments, &input)? {
-            return Ok(outputs);
-        }
         if !self.functions.contains_key(&name.to_ascii_lowercase()) {
+            if let Some(outputs) = self.run_builtin(name, arguments, &input)? {
+                return Ok(outputs);
+            }
             if let Some(outputs) = self.run_native(name, arguments, &input)? {
                 return Ok(outputs);
             }
@@ -1328,7 +1395,17 @@ impl Engine {
         arguments: &[CommandArgument],
         input: &[Value],
     ) -> Result<Option<Vec<Value>>, EngineError> {
-        match name.to_ascii_lowercase().as_str() {
+        let lower = name.to_ascii_lowercase();
+        let module = MODULES.iter().find(|module| module.exports_cmdlet(&lower));
+        if let Some(module) = module
+            && !self.builtin_loaded(module)
+        {
+            if !self.autoload_unqualified() {
+                return Ok(None);
+            }
+            self.import_builtin(module);
+        }
+        match lower.as_str() {
             "write-verbose" | "write-debug" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let is_verbose = name.eq_ignore_ascii_case("write-verbose");
@@ -3753,8 +3830,9 @@ impl Engine {
                         targets.extend(
                             self.modules
                                 .iter()
+                                .map(LoadedModule::name)
                                 .filter(|module| ops::wildcard_match(module, &name, false))
-                                .cloned(),
+                                .map(str::to_owned),
                         );
                     } else {
                         targets.push(name);
@@ -3762,8 +3840,16 @@ impl Engine {
                 }
                 for target in targets {
                     let lower = target.to_ascii_lowercase();
-                    self.modules
-                        .retain(|module| !module.eq_ignore_ascii_case(&target));
+                    self.modules.retain(|entry| {
+                        if entry.name().eq_ignore_ascii_case(&target) {
+                            if let LoadedModule::Builtin(module) = entry {
+                                self.aliases.unload(module);
+                            }
+                            false
+                        } else {
+                            true
+                        }
+                    });
                     if let Some(functions) = self.module_functions.remove(&lower) {
                         for function in functions {
                             self.functions.remove(&function);
@@ -3811,6 +3897,21 @@ impl Engine {
                     }
                 }
                 for path in files {
+                    if let Some(module) = MODULES
+                        .iter()
+                        .find(|module| path.eq_ignore_ascii_case(module.name))
+                    {
+                        if named.iter().any(|(key, _)| {
+                            !matches!(key.to_ascii_lowercase().as_str(), "name" | "force")
+                        }) {
+                            return Err(RuntimeError::NotImplemented {
+                                feature: "built-in module import options",
+                            }
+                            .into());
+                        }
+                        self.import_builtin(module);
+                        continue;
+                    }
                     let source =
                         std::fs::read_to_string(&path).map_err(|_| RuntimeError::Script {
                             id: "Modules_ModuleNotFound",
@@ -3836,9 +3937,9 @@ impl Engine {
                     if !self
                         .modules
                         .iter()
-                        .any(|module| module.eq_ignore_ascii_case(&module_name))
+                        .any(|module| module.name().eq_ignore_ascii_case(&module_name))
                     {
-                        self.modules.push(module_name);
+                        self.modules.push(LoadedModule::Script(module_name));
                     }
                 }
                 Ok(Some(Vec::new()))
@@ -4803,16 +4904,13 @@ impl Engine {
                     None => positional.iter().map(ToString::to_string).collect(),
                 };
                 let mut outputs = Vec::new();
-                for name in &self.modules {
+                for module in &self.modules {
                     let matches = wanted.is_empty()
                         || wanted
                             .iter()
-                            .any(|wanted| ops::wildcard_match(name, wanted, false));
+                            .any(|wanted| ops::wildcard_match(module.name(), wanted, false));
                     if matches {
-                        outputs.push(Value::object(vec![
-                            ("Name".to_owned(), Value::String(name.clone().into())),
-                            ("ModuleType".to_owned(), Value::String("Script".into())),
-                        ]));
+                        outputs.push(module.value());
                     }
                 }
                 Ok(Some(outputs))
@@ -4905,6 +5003,16 @@ impl Engine {
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("commandtype"))
                     .map(|(_, value)| value.to_string());
+                if command_type
+                    .as_deref()
+                    .is_none_or(|kind| kind.eq_ignore_ascii_case("Alias"))
+                {
+                    for name in &wanted {
+                        if MODULES.iter().any(|module| module.exports_alias(name)) {
+                            self.discover_alias(name);
+                        }
+                    }
+                }
                 let verb = named
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("verb"))
@@ -4926,6 +5034,18 @@ impl Engine {
                         .iter()
                         .map(|alias| (alias.name.to_owned(), "Alias")),
                 );
+                let imported_only = named.iter().any(|(key, value)| {
+                    key.eq_ignore_ascii_case("ListImported") && ops::is_true(value)
+                });
+                if !imported_only && self.autoload_unqualified() {
+                    for module in MODULES.iter().filter(|module| !self.builtin_loaded(module)) {
+                        for &(name, _) in module.aliases {
+                            if self.aliases.get(name).is_none() {
+                                names.push((name.to_owned(), "Alias"));
+                            }
+                        }
+                    }
+                }
                 names.sort_by(|left, right| left.0.cmp(&right.0));
                 let mut outputs = Vec::new();
                 for (name, kind) in names {
@@ -4950,6 +5070,10 @@ impl Engine {
                         if kind == "Alias" {
                             if let Some(alias) = self.aliases.get(&name) {
                                 outputs.push(alias.value());
+                            } else if let Some(module) =
+                                MODULES.iter().find(|module| module.exports_alias(&name))
+                            {
+                                outputs.push(aliases::available_export(&name, module));
                             }
                         } else {
                             outputs.push(Value::object(vec![
@@ -5469,6 +5593,10 @@ impl Engine {
                 }
                 Ok(Some(items))
             }
+            _ if module.is_some() => Err(RuntimeError::NotImplemented {
+                feature: "invoking an unimplemented built-in module cmdlet",
+            }
+            .into()),
             _ => Ok(None),
         }
     }
@@ -9223,6 +9351,36 @@ fn is_hidden(key: &str) -> bool {
     key.starts_with("__")
 }
 
+fn version_value(text: String) -> Value {
+    let parts: Vec<i32> = text
+        .split('.')
+        .map(|part| part.parse::<i32>().unwrap_or(0))
+        .collect();
+    Value::object(vec![
+        (
+            "__TypeName".to_owned(),
+            Value::String("System.Version".into()),
+        ),
+        (
+            "Major".to_owned(),
+            Value::Int32(parts.first().copied().unwrap_or(0)),
+        ),
+        (
+            "Minor".to_owned(),
+            Value::Int32(parts.get(1).copied().unwrap_or(0)),
+        ),
+        (
+            "Build".to_owned(),
+            Value::Int32(parts.get(2).copied().unwrap_or(-1)),
+        ),
+        (
+            "Revision".to_owned(),
+            Value::Int32(parts.get(3).copied().unwrap_or(-1)),
+        ),
+        ("__Text".to_owned(), Value::String(text.into())),
+    ])
+}
+
 /// `[type]value`, the subset of `LanguagePrimitives.ConvertTo` the skeleton
 /// needs. Failing conversions are refused rather than approximated.
 fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
@@ -9284,36 +9442,7 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
                 })?;
             Ok(datetime_value(year, month, day, hour, minute, second))
         }
-        "version" | "system.version" => {
-            let text = value.to_string();
-            let parts: Vec<i32> = text
-                .split('.')
-                .map(|part| part.parse::<i32>().unwrap_or(0))
-                .collect();
-            Ok(Value::object(vec![
-                (
-                    "__TypeName".to_owned(),
-                    Value::String("System.Version".into()),
-                ),
-                (
-                    "Major".to_owned(),
-                    Value::Int32(parts.first().copied().unwrap_or(0)),
-                ),
-                (
-                    "Minor".to_owned(),
-                    Value::Int32(parts.get(1).copied().unwrap_or(0)),
-                ),
-                (
-                    "Build".to_owned(),
-                    Value::Int32(parts.get(2).copied().unwrap_or(-1)),
-                ),
-                (
-                    "Revision".to_owned(),
-                    Value::Int32(parts.get(3).copied().unwrap_or(-1)),
-                ),
-                ("__Text".to_owned(), Value::String(text.into())),
-            ]))
-        }
+        "version" | "system.version" => Ok(version_value(value.to_string())),
         "switch" | "system.management.automation.switchparameter" => {
             Ok(Value::Bool(convert_bool(&value)))
         }

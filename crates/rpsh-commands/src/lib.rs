@@ -17,6 +17,31 @@
 //!
 //! # Status
 //!
-//! Empty.
+//! The Management and Utility export catalogs are compiled from the pinned
+//! inventory. A name lookup can run before either module is loaded.
 
 #![forbid(unsafe_code)]
+
+/// Exports of a built-in PowerShell module, available before it is loaded.
+#[derive(Debug)]
+pub struct BuiltinModule {
+    pub name: &'static str,
+    pub version: &'static str,
+    pub aliases: &'static [(&'static str, &'static str)],
+    cmdlets: &'static [&'static str],
+}
+
+impl BuiltinModule {
+    /// The dispatcher has already normalized the name for case-insensitive lookup.
+    pub fn exports_cmdlet(&self, lowercase: &str) -> bool {
+        self.cmdlets.binary_search(&lowercase).is_ok()
+    }
+
+    pub fn exports_alias(&self, name: &str) -> bool {
+        self.aliases
+            .iter()
+            .any(|(alias, _)| alias.eq_ignore_ascii_case(name))
+    }
+}
+
+include!(concat!(env!("OUT_DIR"), "/modules.rs"));

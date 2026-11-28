@@ -25,7 +25,7 @@ etsn	Enter-PSSession	(session)	linux-x64	done
 exsn	Exit-PSSession	(session)	linux-x64	done
 fc	Format-Custom	(session)	linux-x64	done
 fdres	Find-PSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
-fhx	Format-Hex	Microsoft.PowerShell.Utility	linux-x64	todo
+fhx	Format-Hex	Microsoft.PowerShell.Utility	linux-x64	done
 fimo	Find-Module	PowerShellGet	linux-x64	todo
 fl	Format-List	(session)	linux-x64	done
 foreach	ForEach-Object	(session)	linux-x64	done
@@ -34,7 +34,7 @@ fw	Format-Wide	(session)	linux-x64	done
 gal	Get-Alias	(session)	linux-x64	done
 gbp	Get-PSBreakpoint	(session)	linux-x64	done
 gc	Get-Content	(session)	linux-x64	done
-gcb	Get-Clipboard	Microsoft.PowerShell.Management	linux-x64	todo
+gcb	Get-Clipboard	Microsoft.PowerShell.Management	linux-x64	done
 gci	Get-ChildItem	(session)	linux-x64	done
 gcm	Get-Command	(session)	linux-x64	done
 gcs	Get-PSCallStack	(session)	linux-x64	done
@@ -53,7 +53,7 @@ gpv	Get-ItemPropertyValue	(session)	linux-x64	done
 gres	Get-InstalledPSResource	Microsoft.PowerShell.PSResourceGet	linux-x64	todo
 group	Group-Object	(session)	linux-x64	done
 gsn	Get-PSSession	(session)	linux-x64	done
-gtz	Get-TimeZone	Microsoft.PowerShell.Management	linux-x64	todo
+gtz	Get-TimeZone	Microsoft.PowerShell.Management	linux-x64	done
 gu	Get-Unique	(session)	linux-x64	done
 gv	Get-Variable	(session)	linux-x64	done
 h	Get-History	(session)	linux-x64	done
@@ -106,7 +106,7 @@ sajb	Start-Job	(session)	linux-x64	done
 sal	Set-Alias	(session)	linux-x64	done
 saps	Start-Process	(session)	linux-x64	done
 sbp	Set-PSBreakpoint	(session)	linux-x64	done
-scb	Set-Clipboard	Microsoft.PowerShell.Management	linux-x64	todo
+scb	Set-Clipboard	Microsoft.PowerShell.Management	linux-x64	done
 select	Select-Object	(session)	linux-x64	done
 set	Set-Variable	(session)	linux-x64	done
 si	Set-Item	(session)	linux-x64	done

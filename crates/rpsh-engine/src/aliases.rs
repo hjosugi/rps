@@ -3,9 +3,10 @@
 
 use std::collections::HashMap;
 
+use rpsh_commands::BuiltinModule;
 use rpsh_runtime::{RuntimeError, Value, ops};
 
-use super::{flatten_value, flatten_values};
+use super::{flatten_value, flatten_values, version_value};
 
 pub(super) const TYPE_NAME: &str = "System.Management.Automation.AliasInfo";
 
@@ -14,6 +15,7 @@ pub(super) struct Alias<'a> {
     pub name: &'a str,
     pub definition: &'a str,
     pub options: Options,
+    pub module: Option<&'static BuiltinModule>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -45,35 +47,77 @@ impl Options {
 
 impl Alias<'_> {
     pub fn value(self) -> Value {
-        Value::object(vec![
-            ("Name".into(), Value::String(self.name.into())),
-            ("__TypeName".into(), Value::String(TYPE_NAME.into())),
-            ("__Text".into(), Value::String(self.name.into())),
-            ("CommandType".into(), Value::String("Alias".into())),
-            (
-                "DisplayName".into(),
-                Value::String(format!("{} -> {}", self.name, self.definition).into()),
-            ),
-            ("Source".into(), Value::String("".into())),
-            ("Version".into(), Value::Null),
-            ("Definition".into(), Value::String(self.definition.into())),
-            ("Options".into(), Value::String(self.options.label().into())),
-            ("ModuleName".into(), Value::String("".into())),
-        ])
+        alias_info(self.name, Some(self.definition), self.options, self.module)
     }
+}
+
+/// Get-Command's wildcard search can describe a manifest export before
+/// importing it. Its Definition is null until the module loads.
+pub(super) fn available_export(name: &str, module: &'static BuiltinModule) -> Value {
+    alias_info(name, None, Options::None, Some(module))
+}
+
+fn alias_info(
+    name: &str,
+    definition: Option<&str>,
+    options: Options,
+    module: Option<&BuiltinModule>,
+) -> Value {
+    let module_name = module.map_or("", |module| module.name);
+    Value::object(vec![
+        ("Name".into(), Value::String(name.into())),
+        ("__TypeName".into(), Value::String(TYPE_NAME.into())),
+        ("__Text".into(), Value::String(name.into())),
+        ("CommandType".into(), Value::String("Alias".into())),
+        (
+            "DisplayName".into(),
+            Value::String(format!("{name} -> {}", definition.unwrap_or_default()).into()),
+        ),
+        ("Source".into(), Value::String(module_name.into())),
+        (
+            "Version".into(),
+            module.map_or(Value::Null, |module| {
+                version_value(module.version.to_owned())
+            }),
+        ),
+        (
+            "Definition".into(),
+            definition.map_or(Value::Null, |text| Value::String(text.into())),
+        ),
+        ("Options".into(), Value::String(options.label().into())),
+        ("ModuleName".into(), Value::String(module_name.into())),
+    ])
 }
 
 #[derive(Debug, Default)]
 pub(super) struct Aliases {
     // Keys are case-insensitive. A removed default must stay hidden.
-    changes: HashMap<String, Option<(String, String)>>,
+    changes: HashMap<String, Option<StoredAlias>>,
+}
+
+#[derive(Debug)]
+struct StoredAlias {
+    name: String,
+    definition: String,
+    module: Option<&'static BuiltinModule>,
+}
+
+impl StoredAlias {
+    fn as_alias(&self) -> Alias<'_> {
+        Alias {
+            name: &self.name,
+            definition: &self.definition,
+            options: Options::None,
+            module: self.module,
+        }
+    }
 }
 
 impl Aliases {
     pub fn get(&self, name: &str) -> Option<Alias<'_>> {
         let key = name.to_ascii_lowercase();
         if let Some(change) = self.changes.get(&key) {
-            return change.as_ref().map(custom_alias);
+            return change.as_ref().map(StoredAlias::as_alias);
         }
         let index = DEFAULTS
             .binary_search_by_key(&key.as_str(), |entry| entry.0)
@@ -91,7 +135,7 @@ impl Aliases {
             .filter(|(name, _, _)| !self.changes.contains_key(*name))
             .copied()
             .map(default_alias);
-        defaults.chain(self.changes.values().flatten().map(custom_alias))
+        defaults.chain(self.changes.values().flatten().map(StoredAlias::as_alias))
     }
 
     /// Get-Alias writes a sorted group for each input pattern, including
@@ -157,7 +201,38 @@ impl Aliases {
 
     pub fn set(&mut self, name: String, definition: String) -> Alias<'_> {
         let change = self.changes.entry(name.to_ascii_lowercase()).or_default();
-        custom_alias(change.insert((name, definition)))
+        change
+            .insert(StoredAlias {
+                name,
+                definition,
+                module: None,
+            })
+            .as_alias()
+    }
+
+    pub fn import(&mut self, module: &'static BuiltinModule) {
+        for &(name, definition) in module.aliases {
+            self.changes.insert(
+                name.to_ascii_lowercase(),
+                Some(StoredAlias {
+                    name: name.to_owned(),
+                    definition: definition.to_owned(),
+                    module: Some(module),
+                }),
+            );
+        }
+    }
+
+    pub fn unload(&mut self, module: &BuiltinModule) {
+        for &(name, _) in module.aliases {
+            if self
+                .get(name)
+                .and_then(|alias| alias.module)
+                .is_some_and(|owner| owner.name == module.name)
+            {
+                self.remove(name);
+            }
+        }
     }
 
     pub fn remove(&mut self, name: &str) {
@@ -173,19 +248,12 @@ impl Aliases {
     }
 }
 
-fn custom_alias((name, definition): &(String, String)) -> Alias<'_> {
-    Alias {
-        name,
-        definition,
-        options: Options::None,
-    }
-}
-
 fn default_alias<'a>((name, definition, options): (&'a str, &'a str, Options)) -> Alias<'a> {
     Alias {
         name,
         definition,
         options,
+        module: None,
     }
 }
 

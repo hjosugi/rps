@@ -1,6 +1,6 @@
 # rpsh-conformance: level=c2
-# Compare the default ConsoleHost view for the whole session alias table.
-Get-Alias | Where-Object { -not $_.ModuleName }
+# Get-Alias itself imports Utility and includes its exported alias.
+Get-Alias
 'Out-String'
 Get-Alias type, gc | Out-String
 'Narrow'

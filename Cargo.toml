@@ -28,6 +28,7 @@ publish = false
 # `rpsh`. A crate is added here only together with the issue that needs it,
 # and a workspace crate only once another crate depends on it.
 [workspace.dependencies]
+rpsh-commands = { version = "0.0.301", path = "crates/rpsh-commands" }
 rpsh-format = { version = "0.0.301", path = "crates/rpsh-format" }
 rpsh-syntax = { version = "0.0.301", path = "crates/rpsh-syntax" }
 rpsh-runtime = { version = "0.0.301", path = "crates/rpsh-runtime" }

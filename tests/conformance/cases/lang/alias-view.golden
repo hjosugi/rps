@@ -32,6 +32,7 @@ Alias           erase -> Remove-Item
 Alias           etsn -> Enter-PSSession                                       
 Alias           exsn -> Exit-PSSession                                        
 Alias           fc -> Format-Custom                                           
+Alias           fhx -> Format-Hex                                  7.0.0.0    M
 Alias           fl -> Format-List                                             
 Alias           foreach -> ForEach-Object                                     
 Alias           ft -> Format-Table                                            
