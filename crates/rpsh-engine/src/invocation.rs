@@ -114,7 +114,7 @@ pub(super) struct PipelineStage<'a> {
 }
 
 impl FunctionDef {
-    fn from_script_block(mut block: ScriptBlockAst) -> Self {
+    pub(super) fn from_script_block(mut block: ScriptBlockAst) -> Self {
         let body = &mut block.statements;
         let parameters = if let Some(Statement::Param { parameters, .. }) = body.first_mut() {
             let parameters = std::mem::take(parameters);
@@ -411,16 +411,11 @@ impl Engine {
             Some(super::functions::CMDLET) => {
                 return Ok(CallTarget::Cmdlet(member(&value, "Name")?.to_string()));
             }
-            Some(kind @ (super::functions::FUNCTION | super::functions::FILTER)) => {
-                let name = member(&value, "Name")?.to_string();
-                let mut function =
-                    if let Value::ScriptBlock(source) = member(&value, "ScriptBlock")? {
-                        FunctionDef::from_script_block(parse(&source.to_string_lossy())?)
-                    } else {
-                        self.function(&name)?
-                    };
-                function.name = name;
-                function.filter = kind == super::functions::FILTER;
+            Some(super::functions::FUNCTION | super::functions::FILTER) => {
+                let function = match FunctionDef::from_info(&value)? {
+                    Some(function) => function,
+                    None => self.function(&member(&value, "Name")?.to_string())?,
+                };
                 return Ok(CallTarget::Block(Box::new(ScriptCall::new(
                     function, operator,
                 ))));

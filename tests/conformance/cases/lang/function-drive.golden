@@ -1,0 +1,42 @@
+rpsh-golden-v2
+exit=0
+Get-DriveValue/Function/ param($n) "v$n" 
+v7
+Get-ChildOnly/None
+child
+changed=param($n) "changed $n"
+v8
+changed 9
+False
+ScriptBlock/ 'second' 
+second
+Select-DriveCopy/Filter
+record 1
+record 2
+12
+Object[]/21
+Object[]/22
+22
+1/Object[]/ScriptBlock
+0
+5
+False
+11
+False
+changed 12
+What if: Performing the operation "Set Item" on target "Item: Get-Preview Value: 32".
+What if: Performing the operation "New Item" on target "Item: Get-Skipped Type:  Value: 0".
+What if: Performing the operation "Clear Item" on target "Item: Get-Preview".
+What if: Performing the operation "Remove Item" on target "Item: Get-Preview".
+What if: Performing the operation "Add Content" on target "Path: Function:/Get-Preview".
+What if: Performing the operation "Set Content" on target "Path: Function:/Get-Preview".
+preview=0/False
+31
+What if: Performing the operation "Set Item" on target "Item: Get-Preview Value: 35".
+36
+51
+True
+False
+Filter
+record 1
+52

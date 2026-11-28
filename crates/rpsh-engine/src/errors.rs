@@ -244,6 +244,10 @@ impl ScriptException {
         }
     }
 
+    pub(super) fn record(&self) -> &Value {
+        &self.record
+    }
+
     pub(super) fn rethrow(&self) -> Self {
         Self {
             recorded: false,

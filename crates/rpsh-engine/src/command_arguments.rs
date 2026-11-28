@@ -65,7 +65,8 @@ fn dictionary_parameter_text(name: &str) -> String {
 
 impl Engine {
     pub(super) fn splat(&self, name: &str) -> Vec<CallArgument> {
-        let value = lookup(name, &self.variables, !self.last_failed).unwrap_or(Value::Null);
+        let value = lookup(name, &self.variables, !self.last_failed, &self.functions)
+            .unwrap_or(Value::Null);
         if let Value::Object(entries) = &value
             && hidden_type(&value)
                 .is_some_and(|ty| ty.contains("Hashtable") || ty.contains("Dictionary"))

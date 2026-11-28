@@ -14,10 +14,12 @@
 mod aliases;
 mod array_list;
 mod command_arguments;
+mod content;
 mod encoding;
 mod enum_table;
 mod environment;
 mod errors;
+mod function_drive;
 mod functions;
 mod globalization;
 mod input;
@@ -39,6 +41,7 @@ use command_arguments::{CallArgument, PreparedArguments};
 use encoding::Encoding;
 pub use errors::ScriptException;
 use errors::error_record;
+use function_drive::Command as ProviderCommand;
 use invocation::{CallTarget, PipelineStage, ScriptCall, StageCommand};
 use method_error::{ambiguous_overload, overload_error};
 use native::NativeOutput;
@@ -64,6 +67,8 @@ pub struct Engine {
     variables: Variables,
     functions: functions::Functions,
     last_failed: bool,
+    /// Whether the active cmdlet wrote a non-terminating error.
+    cmdlet_has_errors: bool,
     /// The console host can hand its actual descriptors to native children.
     /// Embedded engines continue to use the caller's Write implementation.
     console_stdio: bool,
@@ -78,6 +83,8 @@ pub struct Engine {
     current_exception: Option<ScriptException>,
     /// Objects written to the host, formatted as one table at the end.
     host_objects: Vec<Value>,
+    /// ShouldProcess notices belong to the host, independently of success output.
+    host_notices: Vec<String>,
     /// Out-Default opens an implicit list once per format stream, even
     /// when individual strings appear between its objects.
     host_list_started: bool,
@@ -662,7 +669,8 @@ impl Engine {
                 Ok(Flow::Normal)
             }
             Statement::CoalesceAssign { name, value, .. } => {
-                if lookup(name, &self.variables, !self.last_failed).is_none_or(|v| v.is_null_like())
+                if lookup(name, &self.variables, !self.last_failed, &self.functions)
+                    .is_none_or(|v| v.is_null_like())
                 {
                     let value = self.eval_expression(value)?;
                     self.assign_variable(name, value)?;
@@ -672,7 +680,8 @@ impl Engine {
             }
             Statement::AppendAssign { name, value, .. } => {
                 let value = self.eval_expression(value)?;
-                let old = lookup(name, &self.variables, !self.last_failed).unwrap_or(Value::Null);
+                let old = lookup(name, &self.variables, !self.last_failed, &self.functions)
+                    .unwrap_or(Value::Null);
                 let updated = ops::add(&old, &value)?;
                 self.assign_variable(name, updated)?;
                 self.last_failed = false;
@@ -682,7 +691,8 @@ impl Engine {
                 name, op, value, ..
             } => {
                 let value = self.eval_expression(value)?;
-                let old = lookup(name, &self.variables, !self.last_failed).unwrap_or(Value::Null);
+                let old = lookup(name, &self.variables, !self.last_failed, &self.functions)
+                    .unwrap_or(Value::Null);
                 let updated = match op {
                     BinaryOp::Subtract => ops::subtract(&old, &value)?,
                     BinaryOp::Multiply => ops::multiply(&old, &value)?,
@@ -1004,7 +1014,12 @@ impl Engine {
                         bound += 1;
                         value.clone()
                     } else if let Some(default) = &parameter.default {
-                        evaluate(default, &mut self.variables, !self.last_failed)?
+                        evaluate(
+                            default,
+                            &mut self.variables,
+                            !self.last_failed,
+                            &self.functions,
+                        )?
                     } else {
                         Value::Null
                     };
@@ -1067,6 +1082,10 @@ impl Engine {
     }
 
     fn assign_variable(&mut self, name: &str, value: Value) -> Result<(), EngineError> {
+        if let Some(name) = function_drive::name(name) {
+            self.set_drive_function(name, &value, ProviderCommand::Variable, &[])?;
+            return Ok(());
+        }
         if let Some(name) = environment::drive_name(name) {
             environment::set(&mut self.variables, name, &value);
             return Ok(());
@@ -1239,7 +1258,7 @@ impl Engine {
             }
             if let Some(outputs) = self.invoke_builtin(name, arguments, &[])? {
                 for value in outputs {
-                    self.write_value(value, out)?;
+                    self.write_record(value, out)?;
                 }
                 return Ok(Flow::Normal);
             }
@@ -1250,7 +1269,7 @@ impl Engine {
                 NativeOutput::Host(out)
             };
             for value in self.run_native(name, arguments, None, destination)? {
-                self.write_value(value, out)?;
+                self.write_record(value, out)?;
             }
             return Ok(Flow::Normal);
         }
@@ -1291,7 +1310,12 @@ impl Engine {
             for clause in clauses.iter().filter(|clause| clause.label.is_some()) {
                 let label = clause.label.as_ref().unwrap();
                 let is_match = if wildcard {
-                    let value = evaluate(label, &mut self.variables, !self.last_failed)?;
+                    let value = evaluate(
+                        label,
+                        &mut self.variables,
+                        !self.last_failed,
+                        &self.functions,
+                    )?;
                     let pattern = match &value {
                         Value::Object(entries)
                             if let Some((pattern, _)) = rpsh_runtime::wildcard::stored(entries) =>
@@ -1306,7 +1330,12 @@ impl Engine {
                         case_sensitive,
                     )?
                 } else if regex {
-                    let pattern = evaluate(label, &mut self.variables, !self.last_failed)?;
+                    let pattern = evaluate(
+                        label,
+                        &mut self.variables,
+                        !self.last_failed,
+                        &self.functions,
+                    )?;
                     matches!(
                         regex_match(&item, &pattern, case_sensitive, false, &mut self.variables)?,
                         Value::Bool(true)
@@ -1314,7 +1343,12 @@ impl Engine {
                 } else if matches!(label.kind, ExprKind::ScriptBlock { .. }) {
                     self.scriptblock_truth(label)?
                 } else {
-                    let expected = evaluate(label, &mut self.variables, !self.last_failed)?;
+                    let expected = evaluate(
+                        label,
+                        &mut self.variables,
+                        !self.last_failed,
+                        &self.functions,
+                    )?;
                     matches!(
                         compare_values(&item, &expected, ops::Comparison::Eq, case_sensitive)?,
                         Value::Bool(true)
@@ -1402,7 +1436,7 @@ impl Engine {
                         out.flush()?;
                     }
                     for value in self.cmdlet_output(&name, &args, &[])? {
-                        self.write_value(value, out)?;
+                        self.write_record(value, out)?;
                     }
                     Ok(Flow::Normal)
                 }
@@ -1410,7 +1444,7 @@ impl Engine {
         }
         let (outputs, flow) = self.collect_pipeline(commands, Some(out))?;
         for value in outputs {
-            self.write_value(value, out)?;
+            self.write_record(value, out)?;
         }
         Ok(flow)
     }
@@ -1552,11 +1586,12 @@ impl Engine {
         arguments: &PreparedArguments<'_>,
         input: &[Value],
     ) -> Result<Option<Vec<Value>>, EngineError> {
-        let outputs = self.run_builtin(name, arguments, input)?;
-        if outputs.is_some()
-            && !(command_name(name).eq_ignore_ascii_case("Switch-Process") && !input.is_empty())
-        {
-            self.last_failed = name.eq_ignore_ascii_case("Write-Error");
+        let outer_errors = std::mem::take(&mut self.cmdlet_has_errors);
+        let result = self.run_builtin(name, arguments, input);
+        let had_errors = std::mem::replace(&mut self.cmdlet_has_errors, outer_errors);
+        let outputs = result?;
+        if outputs.is_some() {
+            self.last_failed = had_errors || name.eq_ignore_ascii_case("Write-Error");
         }
         Ok(outputs)
     }
@@ -2224,48 +2259,85 @@ impl Engine {
                 )])]))
             }
             "set-item" => {
-                let (positional, named) = self.evaluate_arguments(arguments)?;
-                let path = named
-                    .iter()
-                    .find(|(name, _)| {
-                        name.eq_ignore_ascii_case("path")
-                            || name.eq_ignore_ascii_case("literalpath")
-                    })
-                    .map(|(_, value)| value.to_string())
-                    .or_else(|| positional.first().map(ToString::to_string));
-                let Some(path) = path else {
+                let (positional, named) =
+                    self.evaluate_arguments_matching(arguments, function_drive::binding)?;
+                let named_path = function_drive::option(&named, &["Path", "LiteralPath"]);
+                let paths = string_parameter(
+                    positional.get(..1).unwrap_or_default(),
+                    &named,
+                    &["Path", "LiteralPath"],
+                );
+                if paths.is_empty() {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Set-Item without a path",
                     }
                     .into());
-                };
-                let value = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("value"))
-                    .map(|(_, value)| value.clone())
-                    .or_else(|| positional.get(1).cloned())
-                    .unwrap_or(Value::Null);
-                let Some((provider, name)) = path.split_once(':') else {
-                    return Err(RuntimeError::NotImplemented {
-                        feature: "Set-Item outside a provider",
+                }
+                let supplied = function_drive::option(&named, &["Value"])
+                    .or_else(|| positional.get(usize::from(named_path.is_none())));
+                let passthru = function_drive::switch(&named, "PassThru");
+                let literal = function_drive::option(&named, &["LiteralPath"]).is_some();
+                let mut output = Vec::new();
+                for path in paths {
+                    if let Some(name) = function_drive::name(&path) {
+                        let op = ProviderCommand::SetItem;
+                        let values = self.provider_input(supplied, input, op, &named)?;
+                        for value in values {
+                            for name in self.function_names(name, literal) {
+                                let result = self
+                                    .set_drive_function(&name, value, op, &named)
+                                    .map(|f| f.filter(|_| passthru).map(FunctionDef::info));
+                                output.extend(self.provider_result(result, &named)?.flatten());
+                            }
+                        }
+                        continue;
                     }
-                    .into());
-                };
-                let name = name.trim_start_matches("\\");
-                match provider.to_ascii_lowercase().as_str() {
-                    "env" => {
-                        environment::set(&mut self.variables, name, &value);
-                    }
-                    "variable" => {
+                    let value = supplied.unwrap_or(&Value::Null);
+                    let Some((provider, name)) = path.split_once(':') else {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "Set-Item outside a provider",
+                        }
+                        .into());
+                    };
+                    let name = name.trim_start_matches('\\');
+                    if provider.eq_ignore_ascii_case("env") {
+                        environment::set(&mut self.variables, name, value);
+                    } else if provider.eq_ignore_ascii_case("variable") {
                         let key = strip_scope(name);
                         let key = encoding::variable_name(key).unwrap_or(key).to_owned();
-                        self.variables.insert_scoped(name, key, value);
-                    }
-                    _ => {
+                        self.variables.insert_scoped(name, key, value.clone());
+                    } else {
                         return Err(RuntimeError::NotImplemented {
                             feature: "Set-Item for this provider",
                         }
                         .into());
+                    }
+                }
+                Ok(Some(output))
+            }
+            "clear-item" => {
+                let (positional, named) =
+                    self.evaluate_arguments_matching(arguments, function_drive::binding)?;
+                let op = ProviderCommand::ClearItem;
+                op.check_parameters(&named)?;
+                let paths = string_parameter(&positional, &named, &["Path", "LiteralPath"]);
+                if paths.is_empty() {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "Clear-Item without a path",
+                    }
+                    .into());
+                }
+                let literal = function_drive::option(&named, &["LiteralPath"]).is_some();
+                for path in paths {
+                    let Some(name) = function_drive::name(&path) else {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "Clear-Item for this provider",
+                        }
+                        .into());
+                    };
+                    for name in self.function_names(name, literal) {
+                        let result = self.clear_drive_function(&name, op, &named);
+                        self.provider_result(result, &named)?;
                     }
                 }
                 Ok(Some(Vec::new()))
@@ -2502,7 +2574,8 @@ impl Engine {
                 .into())
             }
             "new-item" => {
-                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let (positional, named) =
+                    self.evaluate_arguments_matching(arguments, function_drive::binding)?;
                 let path = named
                     .iter()
                     .find(|(name, _)| {
@@ -2523,6 +2596,28 @@ impl Engine {
                     .map(|(_, value)| value.to_string())
                     .filter(|_| path.ends_with(':'))
                     .map_or_else(|| path.clone(), |name| format!("{path}{name}"));
+                if let Some(name) = function_drive::name(&provider_path) {
+                    let op = ProviderCommand::NewItem;
+                    let path_named =
+                        function_drive::option(&named, &["Path", "LiteralPath"]).is_some();
+                    if let Some(extra) = positional.get(usize::from(!path_named)) {
+                        return Err(op.extra_positional(extra));
+                    }
+                    let mut output = Vec::new();
+                    let values = self.provider_input(
+                        function_drive::option(&named, &["Value"]),
+                        input,
+                        op,
+                        &named,
+                    )?;
+                    for value in values {
+                        let result = self
+                            .set_drive_function(name, value, op, &named)
+                            .map(|f| f.map(FunctionDef::info));
+                        output.extend(self.provider_result(result, &named)?.flatten());
+                    }
+                    return Ok(Some(output));
+                }
                 if let Some((provider, name)) = provider_path.split_once(':') {
                     let name = name.trim_start_matches("\\");
                     if !name.is_empty() && provider.eq_ignore_ascii_case("alias") {
@@ -2644,7 +2739,8 @@ impl Engine {
                 ])]))
             }
             "remove-item" => {
-                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let (positional, named) =
+                    self.evaluate_arguments_matching(arguments, function_drive::binding)?;
                 let paths: Vec<String> =
                     string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty() {
@@ -2735,18 +2831,22 @@ impl Engine {
                                 continue;
                             }
                             "function" => {
-                                if wildcard {
-                                    let keys: Vec<String> = self
-                                        .functions
-                                        .keys()
-                                        .filter(|key| ops::wildcard_match(key, name, false))
-                                        .cloned()
-                                        .collect();
-                                    for key in keys {
-                                        self.functions.remove(&key);
+                                let name = function_drive::name(&path).expect("Function drive");
+                                if name.is_empty() {
+                                    return Err(RuntimeError::NotImplemented {
+                                        feature: "Remove-Item on the Function drive root",
                                     }
-                                } else {
-                                    self.functions.remove(&name.to_ascii_lowercase());
+                                    .into());
+                                }
+                                let literal =
+                                    function_drive::option(&named, &["LiteralPath"]).is_some();
+                                for name in self.function_names(name, literal) {
+                                    let result = self.clear_drive_function(
+                                        &name,
+                                        ProviderCommand::RemoveItem,
+                                        &named,
+                                    );
+                                    self.provider_result(result, &named)?;
                                 }
                                 continue;
                             }
@@ -3219,7 +3319,8 @@ impl Engine {
                 )]))
             }
             "clear-content" => {
-                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let (positional, named) =
+                    self.evaluate_arguments_matching(arguments, function_drive::binding)?;
                 let paths: Vec<String> =
                     string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.iter().any(|path| {
@@ -3227,7 +3328,7 @@ impl Engine {
                         !name.is_empty()
                             && matches!(
                                 provider.to_ascii_lowercase().as_str(),
-                                "env" | "variable" | "alias" | "function"
+                                "env" | "variable" | "alias"
                             )
                     })
                 }) {
@@ -3237,6 +3338,16 @@ impl Engine {
                     .into());
                 }
                 for path in paths {
+                    if let Some(name) = function_drive::name(&path) {
+                        let op = ProviderCommand::ClearContent;
+                        op.check_parameters(&named)?;
+                        let literal = function_drive::option(&named, &["LiteralPath"]).is_some();
+                        for name in self.function_names(name, literal) {
+                            let result = self.clear_drive_function(&name, op, &named);
+                            self.provider_result(result, &named)?;
+                        }
+                        continue;
+                    }
                     let files = if path.contains(['*', '?']) {
                         expand_glob(&path)
                     } else {
@@ -3251,7 +3362,8 @@ impl Engine {
                 Ok(Some(Vec::new()))
             }
             "add-content" => {
-                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let (positional, named) =
+                    self.evaluate_arguments_matching(arguments, function_drive::binding)?;
                 let path_named = named.iter().any(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
                 });
@@ -3271,7 +3383,7 @@ impl Engine {
                         !name.is_empty()
                             && matches!(
                                 provider.to_ascii_lowercase().as_str(),
-                                "env" | "variable" | "alias" | "function"
+                                "env" | "variable" | "alias"
                             )
                     })
                 }) {
@@ -3311,6 +3423,19 @@ impl Engine {
                 }
                 use std::io::Write as _;
                 for path in paths {
+                    if let Some(name) = function_drive::name(&path) {
+                        let op = ProviderCommand::AddContent;
+                        op.check_parameters(&named)?;
+                        let literal = function_drive::option(&named, &["LiteralPath"]).is_some();
+                        for name in self.function_names(name, literal) {
+                            if !self.drive_should_process(op, &name, &Value::Null, &named)? {
+                                continue;
+                            }
+                            let result = Err::<(), _>(op.unsupported_content());
+                            self.provider_result(result, &named)?;
+                        }
+                        continue;
+                    }
                     let files = if path.contains(['*', '?']) {
                         expand_glob(&path)
                     } else {
@@ -3380,7 +3505,8 @@ impl Engine {
                 Ok(Some(Vec::new()))
             }
             "get-content" => {
-                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let (positional, named) =
+                    self.evaluate_arguments_matching(arguments, function_drive::binding)?;
                 let paths: Vec<String> =
                     string_parameter(&positional, &named, &["Path", "LiteralPath"]);
                 if paths.is_empty() {
@@ -3389,134 +3515,26 @@ impl Engine {
                     }
                     .into());
                 }
-                if paths.iter().any(|path| {
-                    path.split_once(':').is_some_and(|(provider, name)| {
-                        !name.is_empty()
-                            && matches!(
-                                provider.to_ascii_lowercase().as_str(),
-                                "alias" | "function"
-                            )
-                    })
+                let mut output = Vec::new();
+                let literal = function_drive::option(&named, &["LiteralPath"]).is_some();
+                for group in paths.chunk_by(|a, b| {
+                    function_drive::name(a).is_some() == function_drive::name(b).is_some()
                 }) {
-                    return Err(RuntimeError::NotImplemented {
-                        feature: "Set-Content for this provider",
+                    if function_drive::name(&group[0]).is_none() {
+                        output.extend(self.read_plain_content(group, &named)?);
+                        continue;
                     }
-                    .into());
-                }
-                if named.iter().any(|(name, value)| {
-                    name.eq_ignore_ascii_case("asbytestream") && ops::is_true(value)
-                }) {
-                    let mut outputs = Vec::new();
-                    for path in paths {
-                        let path = expand_home(&path);
-                        let files = if path.contains(['*', '?']) {
-                            expand_glob(&path)
-                        } else {
-                            vec![path]
-                        };
-                        for file in files {
-                            let bytes =
-                                std::fs::read(&file).map_err(|_| RuntimeError::NotImplemented {
-                                    feature: "Get-Content of a missing file",
-                                })?;
-                            outputs.extend(bytes.into_iter().map(Value::Byte));
+                    ProviderCommand::GetContent.check_parameters(&named)?;
+                    for path in group {
+                        for name in
+                            self.function_names(function_drive::name(path).unwrap(), literal)
+                        {
+                            let result = self.read_drive_function(&name, &named);
+                            output.extend(self.provider_result(result, &named)?.flatten());
                         }
                     }
-                    return Ok(Some(outputs));
                 }
-                let mut text = String::new();
-                for path in paths {
-                    if let Some((provider, name)) = path.split_once(':') {
-                        let name = name.trim_start_matches("\\");
-                        if !name.is_empty() {
-                            let value = if provider.eq_ignore_ascii_case("env") {
-                                environment::get(&self.variables, name)
-                            } else if provider.eq_ignore_ascii_case("variable") {
-                                let key = strip_scope(name);
-                                self.variables
-                                    .get(key)
-                                    .cloned()
-                                    .or_else(|| automatic_variable(key))
-                            } else {
-                                None
-                            };
-                            if let Some(value) = value {
-                                if !text.is_empty() && !text.ends_with('\n') {
-                                    text.push('\n');
-                                }
-                                text.push_str(&value.to_string());
-                                continue;
-                            }
-                        }
-                    }
-                    let path = expand_home(&path);
-                    if path.contains(['*', '?']) {
-                        for matched in expand_glob(&path) {
-                            let Ok(content) = std::fs::read_to_string(&matched) else {
-                                continue;
-                            };
-                            if !text.is_empty() && !text.ends_with('\n') {
-                                text.push('\n');
-                            }
-                            text.push_str(&content);
-                        }
-                    } else {
-                        let content = std::fs::read_to_string(&path).map_err(|_| {
-                            RuntimeError::NotImplemented {
-                                feature: "Get-Content of a missing file",
-                            }
-                        })?;
-                        if !text.is_empty() && !text.ends_with('\n') {
-                            text.push('\n');
-                        }
-                        text.push_str(&content);
-                    }
-                }
-                if named
-                    .iter()
-                    .any(|(name, value)| name.eq_ignore_ascii_case("raw") && ops::is_true(value))
-                {
-                    return Ok(Some(vec![Value::String(text.into())]));
-                }
-                if let Some((_, delimiter)) = named
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case("delimiter"))
-                {
-                    let delimiter = delimiter.to_string();
-                    let mut parts: Vec<Value> = text
-                        .split(&delimiter)
-                        .map(|part| Value::String(part.into()))
-                        .collect();
-                    if text.ends_with(&delimiter) {
-                        parts.pop();
-                    }
-                    return Ok(Some(parts));
-                }
-                let mut lines: Vec<Value> = text
-                    .split('\n')
-                    .map(|line| Value::String(line.trim_end_matches('\r').into()))
-                    .collect();
-                if text.ends_with('\n') {
-                    lines.pop();
-                }
-                if let Some((_, count)) = named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("totalcount")
-                        || name.eq_ignore_ascii_case("first")
-                        || name.eq_ignore_ascii_case("head")
-                        || name.eq_ignore_ascii_case("totalcount")
-                }) {
-                    let count = convert_int32(count)?.max(0) as usize;
-                    lines.truncate(count);
-                }
-                if let Some((_, count)) = named.iter().find(|(name, _)| {
-                    name.eq_ignore_ascii_case("tail") || name.eq_ignore_ascii_case("last")
-                }) {
-                    let count = convert_int32(count)?.max(0) as usize;
-                    if lines.len() > count {
-                        lines = lines.split_off(lines.len() - count);
-                    }
-                }
-                Ok(Some(lines))
+                Ok(Some(output))
             }
             "test-path" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -3719,7 +3737,8 @@ impl Engine {
                 Ok(Some(vec![Value::String(parts.join(&separator).into())]))
             }
             "set-content" => {
-                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let (positional, named) =
+                    self.evaluate_arguments_matching(arguments, function_drive::binding)?;
                 let path_named = named.iter().any(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
                 });
@@ -3734,92 +3753,62 @@ impl Engine {
                     }
                     .into());
                 }
-                let no_newline = named.iter().any(|(name, value)| {
-                    name.eq_ignore_ascii_case("nonewline") && ops::is_true(value)
-                });
-                let mut text = String::new();
-                let values: Vec<Value> = if !input.is_empty() {
-                    input.to_vec()
+                let supplied = function_drive::option(&named, &["Value"])
+                    .or_else(|| positional.get(usize::from(!path_named)));
+                let records = if let Some(value) = supplied {
+                    std::slice::from_ref(value)
                 } else {
-                    let named_values: Vec<Value> = named
-                        .iter()
-                        .filter(|(name, _)| name.eq_ignore_ascii_case("value"))
-                        .map(|(_, value)| value.clone())
-                        .collect();
-                    if named_values.is_empty() {
-                        let skip = usize::from(!path_named);
-                        positional
-                            .iter()
-                            .skip(skip)
-                            .flat_map(|value| flatten_value(value.clone()))
-                            .collect()
-                    } else {
-                        named_values
-                    }
+                    input
                 };
-                let values = flatten_values(values);
-                let provider_paths = paths.iter().all(|path| {
-                    path.split_once(':').is_some_and(|(provider, name)| {
-                        !name.is_empty()
-                            && (provider.eq_ignore_ascii_case("env")
-                                || provider.eq_ignore_ascii_case("variable"))
-                    })
-                });
-                if provider_paths {
-                    let text = values
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    for path in paths {
-                        let Some((provider, name)) = path.split_once(':') else {
-                            continue;
-                        };
-                        let name = name.trim_start_matches("\\");
-                        let value = Value::String(text.as_str().into());
-                        if provider.eq_ignore_ascii_case("env") {
-                            environment::set(&mut self.variables, name, &value);
-                        } else {
-                            self.variables.insert(strip_scope(name).to_owned(), value);
+                let values = flatten_values(records.to_vec());
+                let mut output = Vec::new();
+                let literal = function_drive::option(&named, &["LiteralPath"]).is_some();
+                let passthru = function_drive::switch(&named, "PassThru");
+                for group in paths.chunk_by(|a, b| {
+                    function_drive::name(a).is_some() == function_drive::name(b).is_some()
+                }) {
+                    if function_drive::name(&group[0]).is_none() {
+                        self.write_plain_content(group, &values, &named)?;
+                        continue;
+                    }
+                    let op = ProviderCommand::SetContent;
+                    op.check_parameters(&named)?;
+                    let records = self.provider_input(supplied, input, op, &named)?;
+                    let mut names = Vec::new();
+                    for path in group {
+                        for name in
+                            self.function_names(function_drive::name(path).unwrap(), literal)
+                        {
+                            if self.drive_should_process(op, &name, &Value::Null, &named)? {
+                                names.push(name);
+                            }
                         }
                     }
-                    return Ok(Some(Vec::new()));
-                }
-                if named.iter().any(|(name, value)| {
-                    name.eq_ignore_ascii_case("asbytestream") && ops::is_true(value)
-                }) {
-                    let bytes: Vec<u8> = values
-                        .iter()
-                        .map(|value| convert_int32(value).map(|value| value as u8))
-                        .collect::<Result<_, _>>()?;
-                    for path in paths {
-                        std::fs::write(&path, &bytes).map_err(|_| {
-                            RuntimeError::NotImplemented {
-                                feature: "Set-Content of an unwritable file",
+                    for record in records {
+                        // A null bound to the cmdlet's Object[] parameter becomes
+                        // an empty write. A null inside a one-element array is
+                        // passed to the provider and removes the item.
+                        let empty = Value::array(Vec::new());
+                        let record = if record.is_null_like() {
+                            &empty
+                        } else {
+                            record
+                        };
+                        let items = record.sequence();
+                        let values: &[Value] = items
+                            .as_deref()
+                            .unwrap_or_else(|| std::slice::from_ref(record));
+                        let value = if let [only] = values { only } else { record };
+                        for name in &names {
+                            let result =
+                                self.set_drive_function(name, value, op, &named).map(|_| ());
+                            if self.provider_result(result, &named)?.is_some() && passthru {
+                                output.push(Value::array(values.to_vec()));
                             }
-                        })?;
-                    }
-                    return Ok(Some(Vec::new()));
-                }
-                for item in values {
-                    text.push_str(&item.to_string());
-                    if !no_newline {
-                        text.push('\n');
+                        }
                     }
                 }
-                for path in paths {
-                    let files = if path.contains(['*', '?']) {
-                        expand_glob(&path)
-                    } else {
-                        vec![path]
-                    };
-                    for path in files {
-                        std::fs::write(&path, &text).map_err(|_| RuntimeError::NotImplemented {
-                            feature: "Set-Content of an unwritable file",
-                        })?;
-                    }
-                }
-                Ok(Some(Vec::new()))
+                Ok(Some(output))
             }
             "remove-module" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -3991,8 +3980,8 @@ impl Engine {
                             ("Description".into(), Value::String("".into())),
                         ]);
                     }
-                    let value =
-                        lookup(name, &self.variables, !self.last_failed).unwrap_or(Value::Null);
+                    let value = lookup(name, &self.variables, !self.last_failed, &self.functions)
+                        .unwrap_or(Value::Null);
                     if value_only {
                         value
                     } else if let Some(canonical) = preferences::variable_name(key) {
@@ -5652,7 +5641,7 @@ impl Engine {
                             ("Name".into(), Value::String(name.into())),
                             (
                                 "Value".into(),
-                                lookup(name, &self.variables, !self.last_failed)
+                                lookup(name, &self.variables, !self.last_failed, &self.functions)
                                     .unwrap_or(Value::Null),
                             ),
                         ])
@@ -5892,7 +5881,9 @@ impl Engine {
                 match part {
                     rpsh_syntax::StringPart::Literal(value) => text.extend(value.encode_utf16()),
                     rpsh_syntax::StringPart::Variable(name) => {
-                        if let Some(value) = lookup(name, &self.variables, !self.last_failed) {
+                        if let Some(value) =
+                            lookup(name, &self.variables, !self.last_failed, &self.functions)
+                        {
                             text.extend(expansion_text(&value, &self.variables).units());
                         }
                     }
@@ -5958,7 +5949,12 @@ impl Engine {
             };
             return Ok(result);
         }
-        Ok(evaluate(expr, &mut self.variables, !self.last_failed)?)
+        Ok(evaluate(
+            expr,
+            &mut self.variables,
+            !self.last_failed,
+            &self.functions,
+        )?)
     }
 
     fn eval_group(&mut self, statements: &[Statement]) -> Result<Value, EngineError> {
@@ -6051,7 +6047,7 @@ impl Engine {
             {
                 value.clone()
             } else if let Some(default) = &parameter.default {
-                evaluate(default, local, !self.last_failed)?
+                evaluate(default, local, !self.last_failed, &self.functions)?
             } else {
                 Value::Null
             };
@@ -6118,6 +6114,14 @@ impl Engine {
     }
 
     fn flush_host(&mut self, out: &mut dyn Write) -> Result<(), EngineError> {
+        self.flush_host_objects(out)?;
+        for notice in std::mem::take(&mut self.host_notices) {
+            self.write_host(out, format_args!("{notice}\n"))?;
+        }
+        Ok(())
+    }
+
+    fn flush_host_objects(&mut self, out: &mut dyn Write) -> Result<(), EngineError> {
         if self.host_objects.is_empty() {
             return Ok(());
         }
@@ -6139,6 +6143,19 @@ impl Engine {
         Ok(())
     }
 
+    /// Cmdlets and pipeline stages have already enumerated their output.
+    /// A record can itself be an array, for example Get-Content -ReadCount.
+    fn write_record(&mut self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
+        if let Some(capture) = &mut self.capture {
+            if !matches!(value, Value::AutomationNull) {
+                capture.push(value);
+            }
+            Ok(())
+        } else {
+            self.write_value(value, out)
+        }
+    }
+
     fn write_value(&mut self, value: Value, out: &mut dyn Write) -> Result<(), EngineError> {
         if let Value::InputEnumerator(input) = value {
             input::check(&input)?;
@@ -6156,6 +6173,9 @@ impl Engine {
                 value => capture.push(value),
             }
             return Ok(());
+        }
+        if !self.host_notices.is_empty() {
+            self.flush_host(out)?;
         }
         if let Some(prefix) = native::error_prefix(&value) {
             self.flush_host(out)?;
@@ -6260,6 +6280,7 @@ fn evaluate(
     expr: &Expr,
     variables: &mut Variables,
     last_success: bool,
+    functions: &functions::Functions,
 ) -> Result<Value, RuntimeError> {
     match &expr.kind {
         ExprKind::Int32(value) => Ok(Value::Int32(*value)),
@@ -6270,10 +6291,10 @@ fn evaluate(
         ExprKind::String(value) | ExprKind::Bareword(value) => {
             Ok(Value::String(value.clone().into()))
         }
-        ExprKind::Paren(inner) => evaluate(inner, variables, last_success),
+        ExprKind::Paren(inner) => evaluate(inner, variables, last_success, functions),
         // An undefined variable reads as `$null` outside strict mode.
         ExprKind::Variable(name) => {
-            Ok(lookup(name, variables, last_success).unwrap_or(Value::Null))
+            Ok(lookup(name, variables, last_success, functions).unwrap_or(Value::Null))
         }
         ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) => {
             let mut text = Vec::new();
@@ -6281,19 +6302,19 @@ fn evaluate(
                 match part {
                     rpsh_syntax::StringPart::Literal(value) => text.extend(value.encode_utf16()),
                     rpsh_syntax::StringPart::Variable(name) => {
-                        if let Some(value) = lookup(name, variables, last_success) {
+                        if let Some(value) = lookup(name, variables, last_success, functions) {
                             text.extend(expansion_text(&value, variables).units());
                         }
                     }
                     rpsh_syntax::StringPart::Subexpression(expr) => {
-                        let value = evaluate(expr, variables, last_success)?;
+                        let value = evaluate(expr, variables, last_success, functions)?;
                         text.extend(expansion_text(&value, variables).units());
                     }
                 }
             }
             Ok(Value::String(PsString::from_units(text)))
         }
-        ExprKind::Subexpression(expr) => evaluate(expr, variables, last_success),
+        ExprKind::Subexpression(expr) => evaluate(expr, variables, last_success, functions),
         ExprKind::Group(_) => Err(RuntimeError::NotImplemented {
             feature: "a parenthesized command in this expression",
         }),
@@ -6302,17 +6323,17 @@ fn evaluate(
             when_true,
             when_false,
         } => {
-            if ops::is_true(&evaluate(condition, variables, last_success)?) {
-                evaluate(when_true, variables, last_success)
+            if ops::is_true(&evaluate(condition, variables, last_success, functions)?) {
+                evaluate(when_true, variables, last_success, functions)
             } else {
-                evaluate(when_false, variables, last_success)
+                evaluate(when_false, variables, last_success, functions)
             }
         }
         ExprKind::TypeLiteral(name) => Ok(Value::Type(type_full_name(name).into())),
         ExprKind::Coalesce { left, right } => {
-            let value = evaluate(left, variables, last_success)?;
+            let value = evaluate(left, variables, last_success, functions)?;
             if matches!(value, Value::Null) {
-                evaluate(right, variables, last_success)
+                evaluate(right, variables, last_success, functions)
             } else {
                 Ok(value)
             }
@@ -6326,7 +6347,7 @@ fn evaluate(
                         feature: "a statement in an array expression in this context",
                     });
                 };
-                match evaluate(expr, variables, last_success)? {
+                match evaluate(expr, variables, last_success, functions)? {
                     Value::Null => values.push(Value::Null),
                     Value::InputEnumerator(input) => {
                         input::check(&input)?;
@@ -6343,17 +6364,17 @@ fn evaluate(
         } => {
             let mut values = Vec::with_capacity(items.len());
             for item in items {
-                values.push(evaluate(item, variables, last_success)?);
+                values.push(evaluate(item, variables, last_success, functions)?);
             }
             Ok(Value::array(values))
         }
         ExprKind::Index { target, index } => {
-            let target = evaluate(target, variables, last_success)?;
-            let index = evaluate(index, variables, last_success)?;
+            let target = evaluate(target, variables, last_success, functions)?;
+            let index = evaluate(index, variables, last_success, functions)?;
             index_value(&target, &index)
         }
         ExprKind::Object(entries) => {
-            evaluate_hashtable(entries, "hashtable", variables, last_success)
+            evaluate_hashtable(entries, "hashtable", variables, last_success, functions)
         }
         ExprKind::Cast { type_name, value } => {
             if let ExprKind::Object(entries) = &value.kind {
@@ -6362,10 +6383,10 @@ fn evaluate(
                     ty.as_str(),
                     "ordered" | "pscustomobject" | "system.management.automation.pscustomobject"
                 ) {
-                    return evaluate_hashtable(entries, &ty, variables, last_success);
+                    return evaluate_hashtable(entries, &ty, variables, last_success, functions);
                 }
             }
-            let value = evaluate(value, variables, last_success)?;
+            let value = evaluate(value, variables, last_success, functions)?;
             cast_in_scope(type_name, value, variables)
         }
         ExprKind::StaticMember { type_name, name } => static_member(type_name, name, variables),
@@ -6376,22 +6397,22 @@ fn evaluate(
         } => {
             let mut values = Vec::with_capacity(arguments.len());
             for argument in arguments {
-                values.push(evaluate(argument, variables, last_success)?);
+                values.push(evaluate(argument, variables, last_success, functions)?);
             }
             invoke_static(type_name, name, &values, variables)
         }
         ExprKind::Member { target, name } => {
-            member(&evaluate(target, variables, last_success)?, name)
+            member(&evaluate(target, variables, last_success, functions)?, name)
         }
         ExprKind::InvokeMember {
             target,
             name,
             arguments,
         } => {
-            let target = evaluate(target, variables, last_success)?;
+            let target = evaluate(target, variables, last_success, functions)?;
             let mut values = Vec::with_capacity(arguments.len());
             for argument in arguments {
-                values.push(evaluate(argument, variables, last_success)?);
+                values.push(evaluate(argument, variables, last_success, functions)?);
             }
             invoke_member(&target, name, &values)
         }
@@ -6402,30 +6423,35 @@ fn evaluate(
                 | UnaryOp::PostIncrement
                 | UnaryOp::PostDecrement),
             operand,
-        } => increment(operand, variables, last_success, *op),
+        } => increment(operand, variables, last_success, *op, functions),
         ExprKind::Unary {
             op: UnaryOp::Negate,
             operand,
-        } => negate_value(&evaluate(operand, variables, last_success)?),
+        } => negate_value(&evaluate(operand, variables, last_success, functions)?),
         ExprKind::Unary {
             op: UnaryOp::Join,
             operand,
         } => join_values(
-            &evaluate(operand, variables, last_success)?,
+            &evaluate(operand, variables, last_success, functions)?,
             &Value::String(Default::default()),
             variables,
         ),
         ExprKind::Unary {
             op: UnaryOp::Not,
             operand,
-        } => Ok(ops::not(&evaluate(operand, variables, last_success)?)),
+        } => Ok(ops::not(&evaluate(
+            operand,
+            variables,
+            last_success,
+            functions,
+        )?)),
         ExprKind::Unary {
             op: UnaryOp::Bnot,
             operand,
-        } => ops::bnot(&evaluate(operand, variables, last_success)?),
+        } => ops::bnot(&evaluate(operand, variables, last_success, functions)?),
         ExprKind::Binary { op, left, right } => {
-            let left = evaluate(left, variables, last_success)?;
-            let right = evaluate(right, variables, last_success)?;
+            let left = evaluate(left, variables, last_success, functions)?;
+            let right = evaluate(right, variables, last_success, functions)?;
             match op {
                 BinaryOp::Add => add_values(&left, &right),
                 BinaryOp::Subtract => subtract_values(&left, &right),
@@ -6494,13 +6520,14 @@ fn increment(
     variables: &mut Variables,
     last_success: bool,
     op: UnaryOp,
+    functions: &functions::Functions,
 ) -> Result<Value, RuntimeError> {
     let ExprKind::Variable(name) = &operand.kind else {
         return Err(RuntimeError::NotImplemented {
             feature: "incrementing anything but a variable",
         });
     };
-    let old = lookup(name, variables, last_success).unwrap_or(Value::Null);
+    let old = lookup(name, variables, last_success, functions).unwrap_or(Value::Null);
     if matches!(old, Value::String(_)) {
         return Err(RuntimeError::NotImplemented {
             feature: "incrementing a string",
@@ -7800,6 +7827,7 @@ const BUILTIN_COMMANDS: &[&str] = &[
     #[cfg(unix)]
     "Switch-Process",
     "Add-Content",
+    "Clear-Item",
     "ConvertFrom-Json",
     "New-Object",
     "New-TimeSpan",
@@ -8184,7 +8212,19 @@ fn automatic_spelling(key: &str) -> &str {
     }
 }
 
-fn lookup(name: &str, variables: &Variables, last_success: bool) -> Option<Value> {
+fn lookup(
+    name: &str,
+    variables: &Variables,
+    last_success: bool,
+    functions: &functions::Functions,
+) -> Option<Value> {
+    if let Some(name) = function_drive::name(name) {
+        return Some(
+            functions
+                .get(&name.to_ascii_lowercase())
+                .map_or(Value::Null, FunctionDef::script_block),
+        );
+    }
     match name {
         "null" => return Some(Value::Null),
         "true" => return Some(Value::Bool(true)),
@@ -8300,6 +8340,7 @@ fn automatic_variable(name: &str) -> Option<Value> {
                 )]),
             ),
         ])),
+        "WhatIfPreference" => Some(Value::Bool(false)),
         "PSVersionTable" => Some(ps_version_table()),
         "IsLinux" => Some(Value::Bool(true)),
         "IsWindows" | "IsMacOS" => Some(Value::Bool(false)),
@@ -9471,10 +9512,14 @@ fn evaluate_hashtable(
     target: &str,
     variables: &mut Variables,
     last_success: bool,
+    functions: &functions::Functions,
 ) -> Result<Value, RuntimeError> {
     let mut object = Vec::with_capacity(entries.len());
     for (key, expr) in entries {
-        object.push((key.clone(), evaluate(expr, variables, last_success)?));
+        object.push((
+            key.clone(),
+            evaluate(expr, variables, last_success, functions)?,
+        ));
     }
     match target {
         "hashtable" => {

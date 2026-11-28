@@ -114,28 +114,70 @@ impl Functions {
         self.scopes.pop().expect("active function scope");
     }
 
-    pub(super) fn insert(&mut self, mut function: FunctionDef) {
+    pub(super) fn insert(&mut self, function: FunctionDef) {
+        let (depth, private, name) = self.scope(&function.name);
+        self.install(
+            depth.unwrap_or(self.scopes.len()),
+            private,
+            name.to_owned(),
+            function,
+        );
+    }
+
+    pub(super) fn set_item(&mut self, function: FunctionDef, copy_options: bool) -> &FunctionDef {
         let (depth, private, name) = self.scope(&function.name);
         let name = name.to_owned();
+        // The overload that copies a FunctionInfo also supplies its options
+        // and writes in the requested scope, even when a parent has this name.
+        if copy_options {
+            return self.install(
+                depth.unwrap_or(self.scopes.len()),
+                private || function.private,
+                name,
+                function,
+            );
+        }
+        let existing = self.resolve(&function.name.to_ascii_lowercase());
+        let depth = depth
+            .or_else(|| existing.map(|(depth, _)| depth))
+            .unwrap_or(self.scopes.len());
+        let private = private || function.private || existing.is_some_and(|(_, f)| f.private);
+        self.install(depth, private, name, function)
+    }
+
+    fn install(
+        &mut self,
+        depth: usize,
+        private: bool,
+        name: String,
+        mut function: FunctionDef,
+    ) -> &FunctionDef {
         let key = name.to_ascii_lowercase();
         function.name = name;
         function.private = private;
-        let depth = depth.unwrap_or(self.scopes.len());
-        let table = self.table_mut(depth);
-        if let Some(old) = table.get_mut(&key)
-            && old.filter == function.filter
-            && let Some(source) = old.live_source.take()
-        {
-            source.items_mut()[0] = Value::ScriptBlock(function.source.as_ref().into());
-            function.live_source = source.into();
+        let slot = self.table_mut(depth).entry(key);
+        match slot {
+            std::collections::hash_map::Entry::Vacant(slot) => slot.insert(function),
+            std::collections::hash_map::Entry::Occupied(mut slot) => {
+                let old = slot.get_mut();
+                if old.filter == function.filter {
+                    function.name.clone_from(&old.name);
+                    if let Some(source) = old.live_source.take() {
+                        source.items_mut()[0] = function.script_block();
+                        function.live_source = source.into();
+                    }
+                }
+                slot.insert(function);
+                slot.into_mut()
+            }
         }
-        table.insert(key, function);
     }
 
     pub(super) fn remove(&mut self, name: &str) {
         if let Some((depth, _)) = self.resolve(name) {
-            let key = self.scope(name).2.to_owned();
-            self.table_mut(depth).remove(&key);
+            // SessionStateInternal.RemoveFunction resolves the scope but passes
+            // the original provider name to the scope dictionary.
+            self.table_mut(depth).remove(name);
         }
     }
 
@@ -189,6 +231,30 @@ pub(super) fn command_info(name: &str, kind: &str) -> Value {
 }
 
 impl FunctionDef {
+    pub(super) fn from_source(source: &str) -> Result<Self, rpsh_syntax::ParseError> {
+        let mut function = Self::from_script_block(rpsh_syntax::parse(source)?);
+        function.source = source.into();
+        Ok(function)
+    }
+
+    pub(super) fn from_info(info: &Value) -> Result<Option<Self>, super::EngineError> {
+        let kind = super::hidden_type(info);
+        let Some(kind @ (FUNCTION | FILTER)) = kind.as_deref() else {
+            return Ok(None);
+        };
+        let Value::ScriptBlock(source) = super::member(info, "ScriptBlock")? else {
+            return Ok(None);
+        };
+        let mut function = Self::from_source(&source.to_string_lossy())?;
+        function.name = super::member(info, "Name")?.to_string();
+        function.filter = kind == FILTER;
+        function.private = super::member(info, "Options")?
+            .to_string()
+            .split(", ")
+            .any(|v| v == "Private");
+        Ok(Some(function))
+    }
+
     pub(super) fn syntax(&self) -> Result<&rpsh_syntax::ScriptBlockAst, rpsh_syntax::ParseError> {
         if let Some(block) = self.block.get() {
             return Ok(block);
@@ -201,8 +267,12 @@ impl FunctionDef {
         if self.filter { "Filter" } else { "Function" }
     }
 
+    pub(super) fn script_block(&self) -> Value {
+        Value::ScriptBlock(self.source.as_ref().into())
+    }
+
     pub(super) fn info(&self) -> Value {
-        let script = Value::ScriptBlock(self.source.as_ref().into());
+        let script = self.script_block();
         let reference = self
             .live_source
             .get_or_init(|| rpsh_runtime::ArrayList::from_values(vec![script.clone()]));

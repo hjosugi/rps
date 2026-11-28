@@ -1,0 +1,47 @@
+rpsh-golden-v2
+exit=0
+Argument,Microsoft.PowerShell.Commands.NewItemCommand
+InvalidArgument: (:) [New-Item], PSArgumentException
+System.Management.Automation.PSArgumentException
+The item at path 'Test-Drive' already exists.
+NewItemValueNotSpecified,Microsoft.PowerShell.Commands.NewItemCommand
+InvalidArgument: (Test-Drive:String) [New-Item], PSArgumentNullException
+System.Management.Automation.PSArgumentNullException
+Cannot process argument because the value of argument "value" is null. Change the value of argument "value" to a non-null value.
+Argument,Microsoft.PowerShell.Commands.SetItemCommand
+InvalidArgument: (:) [Set-Item], PSArgumentException
+System.Management.Automation.PSArgumentException
+Cannot process argument because the value of argument "value" is not valid. Change the value of the "value" argument and run the operation again.
+Argument
+InvalidArgument: (:) [], PSArgumentException
+System.Management.Automation.PSArgumentException
+Cannot process argument because the value of argument "value" is not valid. Change the value of the "value" argument and run the operation again.
+Argument,Microsoft.PowerShell.Commands.SetContentCommand
+InvalidArgument: (:) [Set-Content], PSArgumentException
+System.Management.Automation.PSArgumentException
+Cannot process argument because the value of argument "value" is not valid. Change the value of the "value" argument and run the operation again.
+NotSupported,Microsoft.PowerShell.Commands.AddContentCommand
+NotImplemented: (:) [Add-Content], PSNotSupportedException
+System.Management.Automation.PSNotSupportedException
+Cannot call method. The content Seek method is not supported by this provider.
+NotSupported,Microsoft.PowerShell.Commands.ClearContentCommand
+NotImplemented: (:) [Clear-Content], PSNotSupportedException
+System.Management.Automation.PSNotSupportedException
+Cannot perform the ClearContent operation. The ClearContent operation is not supported by this provider.
+NamedParameterNotFound,Microsoft.PowerShell.Commands.GetContentCommand
+InvalidArgument: (:) [Get-Content], ParameterBindingException
+System.Management.Automation.ParameterBindingException
+A parameter cannot be found that matches parameter name 'Raw'.
+TailNotSupported,Microsoft.PowerShell.Commands.GetContentCommand
+InvalidOperation: (1:Int32) [Get-Content], InvalidOperationException
+System.InvalidOperationException
+The Tail parameter currently is supported only for the FileSystem provider.
+NamedParameterNotFound,Microsoft.PowerShell.Commands.ClearItemCommand
+InvalidArgument: (:) [Clear-Item], ParameterBindingException
+System.Management.Automation.ParameterBindingException
+A parameter cannot be found that matches parameter name 'PassThru'.
+ignored=False/0
+quiet=False/1/PathNotFound,Microsoft.PowerShell.Commands.ClearItemCommand
+invalid=False/Argument,Microsoft.PowerShell.Commands.SetContentCommand
+1
+False

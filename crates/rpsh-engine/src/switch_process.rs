@@ -147,7 +147,7 @@ impl Engine {
                 .map(|(_, v)| v)
                 .or_else(|| self.variables.get("ErrorActionPreference"))
                 .map_or_else(|| "continue".into(), |v| v.to_string().to_ascii_lowercase());
-            self.last_failed = true;
+            self.cmdlet_has_errors = true;
             let message = rpsh_messages::text("ParameterBinderStrings/InputObjectNotBound");
             for value in input {
                 let error = record(

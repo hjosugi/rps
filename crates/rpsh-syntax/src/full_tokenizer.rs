@@ -443,7 +443,10 @@ impl Tokenizer<'_> {
             _ => {}
         }
         match kind {
-            FullTokenKind::LCurly | FullTokenKind::Semi => {
+            FullTokenKind::LCurly
+            | FullTokenKind::Semi
+            | FullTokenKind::AtParen
+            | FullTokenKind::DollarParen => {
                 self.mode = Mode::Command;
                 self.command_seen = false;
                 self.statement_start = true;
@@ -491,10 +494,7 @@ impl Tokenizer<'_> {
                     self.statement_start = true;
                 }
             }
-            FullTokenKind::LBracket
-            | FullTokenKind::DollarParen
-            | FullTokenKind::AtParen
-            | FullTokenKind::AtCurly => {
+            FullTokenKind::LBracket | FullTokenKind::AtCurly => {
                 self.mode = Mode::Expression;
                 self.statement_start = false;
             }

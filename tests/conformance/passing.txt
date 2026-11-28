@@ -74,6 +74,8 @@ lang/fixtures/invocation-file with spaces
 lang/format-operator
 lang/function
 lang/function-basic
+lang/function-drive
+lang/function-drive-errors
 lang/function-info
 lang/function-input
 lang/function-scopes

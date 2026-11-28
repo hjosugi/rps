@@ -250,5 +250,9 @@
   {
     "name": "dot-relative-script",
     "source": ". ./script.ps1 -Param hello"
+  },
+  {
+    "name": "array-subexpression-command-parameters",
+    "source": "@(Get-Content Function:Get-Value -TotalCount 0).Count"
   }
 ]

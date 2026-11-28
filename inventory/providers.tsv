@@ -2,5 +2,5 @@ provider	capabilities	drives	platform	status
 Alias	ShouldProcess	Alias	linux-x64	todo
 Environment	ShouldProcess	Env	linux-x64	todo
 FileSystem	Filter,ShouldProcess,Credentials	/,Temp	linux-x64	todo
-Function	ShouldProcess	Function	linux-x64	todo
+Function	ShouldProcess	Function	linux-x64	partial
 Variable	ShouldProcess	Variable	linux-x64	todo
