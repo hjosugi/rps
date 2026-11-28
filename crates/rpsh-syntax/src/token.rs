@@ -18,6 +18,8 @@ pub enum TokenKind {
     Divide,
     Remainder,
     Pipe,
+    AndAnd,
+    OrOr,
     LParen,
     RParen,
     Semi,

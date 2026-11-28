@@ -1,0 +1,20 @@
+rpsh-golden-v2
+exit=0
+fallback
+after fallback
+after success
+False
+false value succeeded
+True
+left
+right
+caught
+False
+last=True|7
+one,two
+first|second,third
+1,2
+2,4,finish
+array condition
+inside
+catch

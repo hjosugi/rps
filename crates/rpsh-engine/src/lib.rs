@@ -24,9 +24,9 @@ use rpsh_commands::{BuiltinModule, MODULES};
 use rpsh_format::{CommandTableItem, command_table};
 use rpsh_runtime::{PsString, RuntimeError, Value, ops};
 use rpsh_syntax::{
-    AssignmentValue, BinaryOp, CommandArgument, Expr, ExprKind, MethodDef, NumberLiteral,
-    Parameter, ParseError, PipelineCommand, ScriptBlockAst, Statement, SwitchClause, UnaryOp,
-    parse,
+    AssignmentValue, BinaryOp, ChainOperator, CommandArgument, Expr, ExprKind, MethodDef,
+    NumberLiteral, Parameter, ParseError, PipelineChain, PipelineCommand, ScriptBlockAst,
+    Statement, SwitchClause, UnaryOp, parse,
 };
 
 /// Runs scripts.
@@ -727,6 +727,14 @@ impl Engine {
                 name, arguments, ..
             } => self.call_function(name, arguments, out),
             Statement::Pipeline { commands, .. } => self.exec_pipeline(commands, out),
+            Statement::PipelineChain { chain, .. } => self.exec_chain(chain, out),
+            Statement::AssignChain { name, chain, .. } => {
+                let (flow, output) = self.capture_chain(chain)?;
+                if matches!(flow, Flow::Normal) {
+                    self.assign_variable(name, output);
+                }
+                Ok(flow)
+            }
             Statement::AssignPipeline { name, commands, .. } => {
                 let outputs = self.pipeline_output(commands)?;
                 self.assign_variable(name, scalar_or_array(outputs.into_iter()));
@@ -735,6 +743,13 @@ impl Engine {
             Statement::MultiAssign { targets, value, .. } => {
                 let result = match value {
                     AssignmentValue::Expression(expr) => self.eval_pipeline_expression(expr)?,
+                    AssignmentValue::Chain(chain) => {
+                        let (flow, output) = self.capture_chain(chain)?;
+                        if !matches!(flow, Flow::Normal) {
+                            return Ok(flow);
+                        }
+                        output
+                    }
                     AssignmentValue::Pipeline(commands) => {
                         scalar_or_array(self.pipeline_output(commands)?.into_iter())
                     }
@@ -1157,8 +1172,7 @@ impl Engine {
         }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
-        let saved = std::mem::take(&mut self.variables);
-        let mut local = saved.clone();
+        let mut local = self.variables.clone();
         let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
         local.insert(
             "args".to_owned(),
@@ -1168,7 +1182,7 @@ impl Engine {
             local.entry("_".to_owned()).or_insert(Value::Null);
         }
         let saved_trap = self.trap.take();
-        self.variables = local;
+        let saved = std::mem::replace(&mut self.variables, local);
         let flow = if function.has_blocks() {
             self.exec_named_blocks(&function, None, out)
         } else {
@@ -1334,7 +1348,7 @@ impl Engine {
         let captured = self.capture.take().unwrap_or_default();
         self.capture = saved;
         flow?;
-        Ok(captured.first().is_some_and(ops::is_true))
+        Ok(ops::is_true(&scalar_or_array(captured.into_iter())))
     }
 
     fn exec_pipeline(
@@ -1347,6 +1361,47 @@ impl Engine {
             self.write_value(value, out)?;
         }
         Ok(Flow::Normal)
+    }
+
+    fn exec_chain(
+        &mut self,
+        chain: &PipelineChain,
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        let mut flow = self.exec_chain_operand(&chain.first, out)?;
+        for (operator, commands) in &chain.rest {
+            if !matches!(flow, Flow::Normal) {
+                break;
+            }
+            let run = match operator {
+                ChainOperator::AndAnd => !self.last_failed,
+                ChainOperator::OrOr => self.last_failed,
+            };
+            if run {
+                flow = self.exec_chain_operand(commands, out)?;
+            }
+        }
+        Ok(flow)
+    }
+
+    fn exec_chain_operand(
+        &mut self,
+        commands: &[PipelineCommand],
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        match commands {
+            [PipelineCommand::Command { name, arguments }] => {
+                self.call_function(name, arguments, out)
+            }
+            _ => self.exec_pipeline(commands, out),
+        }
+    }
+
+    fn capture_chain(&mut self, chain: &PipelineChain) -> Result<(Flow, Value), EngineError> {
+        let saved = self.capture.replace(Vec::new());
+        let flow = self.exec_chain(chain, &mut capture_sink());
+        let outputs = std::mem::replace(&mut self.capture, saved).unwrap_or_default();
+        Ok((flow?, scalar_or_array(outputs.into_iter())))
     }
 
     fn pipeline_output(&mut self, commands: &[PipelineCommand]) -> Result<Vec<Value>, EngineError> {
@@ -1389,18 +1444,34 @@ impl Engine {
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
         let saved_trap = self.trap.take();
+        let saved_capture = self.capture.take();
+        let result = self.pipeline_function_output(&function, &positional, &named, input);
+        self.capture = saved_capture;
+        self.trap = saved_trap;
+        if result.is_ok() {
+            self.last_failed = false;
+        }
+        result
+    }
+
+    fn pipeline_function_output(
+        &mut self,
+        function: &FunctionDef,
+        positional: &[Value],
+        named: &[(String, Value)],
+        input: Vec<Value>,
+    ) -> Result<Vec<Value>, EngineError> {
         let mut outputs = Vec::new();
         if function.filter {
             for item in input {
-                let saved = std::mem::take(&mut self.variables);
-                let mut local = saved.clone();
-                let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
+                let mut local = self.variables.clone();
+                let bound = self.bind_parameters(function, positional, named, &mut local)?;
                 local.insert(
                     "args".to_owned(),
                     Value::array(positional[bound..].to_vec()),
                 );
                 local.insert("_".to_owned(), item);
-                self.variables = local;
+                let saved = std::mem::replace(&mut self.variables, local);
                 self.capture = Some(Vec::new());
                 let flow = self.exec_block(&function.body, &mut capture_sink());
                 let captured = self.capture.take().unwrap_or_default();
@@ -1420,9 +1491,8 @@ impl Engine {
             }
         } else {
             let has_blocks = function.has_blocks();
-            let saved = std::mem::take(&mut self.variables);
-            let mut local = saved.clone();
-            let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
+            let mut local = self.variables.clone();
+            let bound = self.bind_parameters(function, positional, named, &mut local)?;
             local.insert(
                 "args".to_owned(),
                 Value::array(positional[bound..].to_vec()),
@@ -1430,10 +1500,10 @@ impl Engine {
             if !has_blocks {
                 local.insert("input".to_owned(), Value::array(input.clone()));
             }
-            self.variables = local;
+            let saved = std::mem::replace(&mut self.variables, local);
             self.capture = Some(Vec::new());
             let flow = if has_blocks {
-                self.exec_named_blocks(&function, Some(input), &mut capture_sink())
+                self.exec_named_blocks(function, Some(input), &mut capture_sink())
             } else {
                 self.exec_block(&function.body, &mut capture_sink())
             };
@@ -1452,8 +1522,6 @@ impl Engine {
                 }
             }
         }
-        self.trap = saved_trap;
-        self.last_failed = false;
         Ok(outputs)
     }
 

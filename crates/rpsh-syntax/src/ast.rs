@@ -49,6 +49,11 @@ pub enum Statement {
         commands: Vec<PipelineCommand>,
         span: Span,
     },
+    AssignChain {
+        name: String,
+        chain: PipelineChain,
+        span: Span,
+    },
     /// An AssignmentStatementAst with an ArrayLiteralAst on the left.
     MultiAssign {
         targets: Vec<Expr>,
@@ -89,6 +94,10 @@ pub enum Statement {
     /// A pipeline, `expr | command | ...`.
     Pipeline {
         commands: Vec<PipelineCommand>,
+        span: Span,
+    },
+    PipelineChain {
+        chain: PipelineChain,
         span: Span,
     },
     /// `switch [-Wildcard|-Regex] (expr) { label { body } ... }`.
@@ -165,24 +174,45 @@ pub enum Statement {
         span: Span,
     },
     /// `. path`: run a script in the current scope.
-    DotSource { path: String, span: Span },
+    DotSource {
+        path: String,
+        span: Span,
+    },
     /// A script-level `param(...)` declaration.
     Param {
         parameters: Vec<Parameter>,
         span: Span,
     },
     /// `trap { ... }`. Upstream: `TrapStatementAst`.
-    Trap { body: Vec<Statement>, span: Span },
+    Trap {
+        body: Vec<Statement>,
+        span: Span,
+    },
     /// `throw expression`. Upstream: `ThrowStatementAst`.
-    Throw { value: Expr, span: Span },
+    Throw {
+        value: Expr,
+        span: Span,
+    },
     /// `return` with an optional value. Upstream: `ReturnStatementAst`.
-    Return { value: Option<Expr>, span: Span },
+    Return {
+        value: Option<Expr>,
+        span: Span,
+    },
     /// `break [label]`. Upstream: `BreakStatementAst`.
-    Break { label: Option<String>, span: Span },
+    Break {
+        label: Option<String>,
+        span: Span,
+    },
     /// `continue [label]`. Upstream: `ContinueStatementAst`.
-    Continue { label: Option<String>, span: Span },
+    Continue {
+        label: Option<String>,
+        span: Span,
+    },
     /// `exit` with an optional exit code. Upstream: `ExitStatementAst`.
-    Exit { code: Option<Expr>, span: Span },
+    Exit {
+        code: Option<Expr>,
+        span: Span,
+    },
 }
 
 /// One label and body of a `switch` statement.
@@ -211,6 +241,20 @@ pub enum PipelineCommand {
 pub enum AssignmentValue {
     Expression(Expr),
     Pipeline(Vec<PipelineCommand>),
+    Chain(PipelineChain),
+}
+
+/// A left-associative sequence of pipelines separated by && or ||.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PipelineChain {
+    pub first: Vec<PipelineCommand>,
+    pub rest: Vec<(ChainOperator, Vec<PipelineCommand>)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChainOperator {
+    AndAnd,
+    OrOr,
 }
 
 /// A declared parameter. Upstream: `ParameterAst`.

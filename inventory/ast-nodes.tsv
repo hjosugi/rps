@@ -50,7 +50,7 @@ ParameterAst	Ast	open	linux-x64	todo
 ParenExpressionAst	ExpressionAst	open	linux-x64	todo
 PipelineAst	ChainableAst	open	linux-x64	todo
 PipelineBaseAst	StatementAst	abstract	linux-x64	todo
-PipelineChainAst	ChainableAst	open	linux-x64	todo
+PipelineChainAst	ChainableAst	open	linux-x64	partial
 PropertyMemberAst	MemberAst	open	linux-x64	todo
 RedirectionAst	Ast	abstract	linux-x64	todo
 ReturnStatementAst	StatementAst	open	linux-x64	todo

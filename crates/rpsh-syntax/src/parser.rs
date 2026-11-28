@@ -1,7 +1,7 @@
 use crate::{
-    AssignmentValue, BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, MethodDef, Parameter,
-    ParseError, PipelineCommand, ScriptBlockAst, Span, Statement, StringPart, SwitchClause, Token,
-    TokenKind, UnaryOp, tokenize,
+    AssignmentValue, BinaryOp, CatchClause, ChainOperator, CommandArgument, Expr, ExprKind,
+    MethodDef, Parameter, ParseError, PipelineChain, PipelineCommand, ScriptBlockAst, Span,
+    Statement, StringPart, SwitchClause, Token, TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -85,6 +85,14 @@ impl Parser {
         )
     }
 
+    fn chain_operator(&self) -> Option<ChainOperator> {
+        match self.peek().kind {
+            TokenKind::AndAnd => Some(ChainOperator::AndAnd),
+            TokenKind::OrOr => Some(ChainOperator::OrOr),
+            _ => None,
+        }
+    }
+
     fn previous_span(&self) -> Span {
         self.tokens[self.pos.saturating_sub(1)].span
     }
@@ -139,6 +147,7 @@ impl Parser {
                 let span = start.to(self.previous_span());
                 return Ok(match value {
                     AssignmentValue::Expression(value) => Statement::Assign { name, value, span },
+                    AssignmentValue::Chain(chain) => Statement::AssignChain { name, chain, span },
                     AssignmentValue::Pipeline(commands) => Statement::AssignPipeline {
                         name,
                         commands,
@@ -258,16 +267,16 @@ impl Parser {
             }
             PipelineCommand::Expression(expr)
         };
-        let mut commands = vec![first];
-        while self.peek().kind == TokenKind::Pipe {
-            self.pos += 1;
-            self.skip_newlines();
-            commands.push(self.pipeline_element()?);
-        }
+        let commands = self.pipeline_tail(first)?;
+        let value = if self.chain_operator().is_some() {
+            AssignmentValue::Chain(self.pipeline_chain(commands)?)
+        } else {
+            AssignmentValue::Pipeline(commands)
+        };
         if !self.at_statement_end() {
             return self.refuse(SYNTAX_ERRORS);
         }
-        Ok(AssignmentValue::Pipeline(commands))
+        Ok(value)
     }
 
     fn labeled_statement(&mut self, label: String, start: Span) -> Result<Statement, ParseError> {
@@ -383,7 +392,7 @@ impl Parser {
         Ok(condition)
     }
 
-    /// True when a `|` occurs at the top level before the matching `)`.
+    /// True when a pipe or chain operator occurs before the matching `)`.
     fn paren_has_pipe(&self) -> bool {
         let mut depth = 0usize;
         for token in &self.tokens[self.pos..] {
@@ -395,7 +404,7 @@ impl Parser {
                     }
                     depth -= 1;
                 }
-                TokenKind::Pipe if depth == 0 => return true,
+                TokenKind::Pipe | TokenKind::AndAnd | TokenKind::OrOr if depth == 0 => return true,
                 TokenKind::EndOfInput => return false,
                 _ => {}
             }
@@ -512,7 +521,7 @@ impl Parser {
 
     /// Wraps the first stage in a pipeline when a `|` follows.
     fn pipeline_after(&mut self, first: Statement) -> Result<Statement, ParseError> {
-        if self.peek().kind != TokenKind::Pipe {
+        if self.peek().kind != TokenKind::Pipe && self.chain_operator().is_none() {
             return Ok(first);
         }
         let start = match &first {
@@ -520,23 +529,47 @@ impl Parser {
             Statement::Command { span, .. } => *span,
             _ => return Ok(first),
         };
-        let mut commands = Vec::new();
-        match first {
-            Statement::Expression(expr) => commands.push(PipelineCommand::Expression(expr)),
+        let first = match first {
+            Statement::Expression(expr) => PipelineCommand::Expression(expr),
             Statement::Command {
                 name, arguments, ..
-            } => {
-                commands.push(PipelineCommand::Command { name, arguments });
-            }
+            } => PipelineCommand::Command { name, arguments },
             other => return Ok(other),
+        };
+        let commands = self.pipeline_tail(first)?;
+        if self.chain_operator().is_some() {
+            let chain = self.pipeline_chain(commands)?;
+            return Ok(Statement::PipelineChain {
+                chain,
+                span: start.to(self.previous_span()),
+            });
         }
+        let span = start.to(self.previous_span());
+        Ok(Statement::Pipeline { commands, span })
+    }
+
+    fn pipeline_tail(
+        &mut self,
+        first: PipelineCommand,
+    ) -> Result<Vec<PipelineCommand>, ParseError> {
+        let mut commands = vec![first];
         while self.peek().kind == TokenKind::Pipe {
             self.pos += 1;
             self.skip_newlines();
             commands.push(self.pipeline_element()?);
         }
-        let span = start.to(self.previous_span());
-        Ok(Statement::Pipeline { commands, span })
+        Ok(commands)
+    }
+
+    fn pipeline_chain(&mut self, first: Vec<PipelineCommand>) -> Result<PipelineChain, ParseError> {
+        let mut rest = Vec::new();
+        while let Some(operator) = self.chain_operator() {
+            self.pos += 1;
+            self.skip_newlines();
+            let first = self.pipeline_element()?;
+            rest.push((operator, self.pipeline_tail(first)?));
+        }
+        Ok(PipelineChain { first, rest })
     }
 
     fn pipeline_element(&mut self) -> Result<PipelineCommand, ParseError> {
@@ -564,6 +597,7 @@ impl Parser {
         let mut arguments = Vec::new();
         while (!self.at_statement_end() || self.peek().kind == TokenKind::Comma)
             && self.peek().kind != TokenKind::Pipe
+            && self.chain_operator().is_none()
         {
             if self.peek().kind == TokenKind::Comma {
                 self.pos += 1;
@@ -2350,10 +2384,15 @@ mod tests {
         match statement {
             Statement::Expression(expr) => show(expr),
             Statement::Assign { name, value, .. } => format!("${name} = {}", show(value)),
+            Statement::AssignChain { name, chain, .. } => {
+                format!("${name} = {}", show_chain(chain))
+            }
+            Statement::PipelineChain { chain, .. } => show_chain(chain),
             Statement::MultiAssign { targets, value, .. } => {
                 let targets = targets.iter().map(show).collect::<Vec<_>>().join(", ");
                 let value = match value {
                     AssignmentValue::Expression(expr) => show(expr),
+                    AssignmentValue::Chain(chain) => show_chain(chain),
                     AssignmentValue::Pipeline(commands) => commands
                         .iter()
                         .map(|command| match command {
@@ -2628,6 +2667,28 @@ mod tests {
 
     fn refused(source: &str) -> &'static str {
         parse(source).unwrap_err().feature()
+    }
+
+    fn show_chain(chain: &PipelineChain) -> String {
+        fn stage(commands: &[PipelineCommand]) -> String {
+            commands
+                .iter()
+                .map(|command| match command {
+                    PipelineCommand::Expression(expr) => show(expr),
+                    PipelineCommand::Command { name, .. } => name.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join(" | ")
+        }
+        let mut result = stage(&chain.first);
+        for (op, commands) in &chain.rest {
+            result.push_str(match op {
+                ChainOperator::AndAnd => " && ",
+                ChainOperator::OrOr => " || ",
+            });
+            result.push_str(&stage(commands));
+        }
+        result
     }
 
     #[test]

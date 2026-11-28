@@ -53,31 +53,41 @@ function Format-Expr($e) {
         default { return "?$name" }
     }
 }
+function Format-Pipeline($pipeline) {
+    if ($pipeline -is [System.Management.Automation.Language.PipelineChainAst]) {
+        $left = Format-Pipeline $pipeline.LhsPipelineChain
+        $right = Format-Pipeline $pipeline.RhsPipeline
+        return "(chain $($pipeline.Operator) $left $right)"
+    }
+    $stages = foreach ($stage in $pipeline.PipelineElements) {
+        if ($stage -is [System.Management.Automation.Language.CommandExpressionAst]) {
+            "(command-expression $(Format-Expr $stage.Expression))"
+        } else {
+            $elements = foreach ($element in $stage.CommandElements) {
+                if ($element -is [System.Management.Automation.Language.CommandParameterAst]) {
+                    "(parameter $($element.ParameterName))"
+                    if ($null -ne $element.Argument) { Format-Expr $element.Argument }
+                } else {
+                    Format-Expr $element
+                }
+            }
+            "(command $($elements -join ' '))"
+        }
+    }
+    "(pipeline $($stages -join ' '))"
+}
+
 $statement = $ast.EndBlock.Statements[0]
-if ($statement -is [System.Management.Automation.Language.AssignmentStatementAst]) {
+if ($statement -is [System.Management.Automation.Language.PipelineChainAst]) {
+    Format-Pipeline $statement
+} elseif ($statement -is [System.Management.Automation.Language.AssignmentStatementAst]) {
     $right = $statement.Right
     if ($right -is [System.Management.Automation.Language.CommandExpressionAst]) {
         $rhs = "(command-expression $(Format-Expr $right.Expression))"
     } else {
-        $stages = foreach ($stage in $right.PipelineElements) {
-            if ($stage -is [System.Management.Automation.Language.CommandExpressionAst]) {
-                "(command-expression $(Format-Expr $stage.Expression))"
-            } else {
-                $elements = foreach ($element in $stage.CommandElements) {
-                    if ($element -is [System.Management.Automation.Language.CommandParameterAst]) {
-                        "(parameter $($element.ParameterName))"
-                        if ($null -ne $element.Argument) { Format-Expr $element.Argument }
-                    } else {
-                        Format-Expr $element
-                    }
-                }
-                "(command $($elements -join ' '))"
-            }
-        }
-        $rhs = "(pipeline $($stages -join ' '))"
+        $rhs = Format-Pipeline $right
     }
     "(assign $($statement.Operator) $(Format-Expr $statement.Left) $rhs)"
-    return
+} else {
+    Format-Expr $statement.PipelineElements[0].Expression
 }
-$expression = $statement.PipelineElements[0].Expression
-Format-Expr $expression

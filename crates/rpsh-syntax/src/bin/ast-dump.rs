@@ -3,8 +3,8 @@
 use std::io::Read;
 
 use rpsh_syntax::{
-    AssignmentValue, BinaryOp, CommandArgument, Expr, ExprKind, PipelineCommand, Statement,
-    StringPart, UnaryOp, parse,
+    AssignmentValue, BinaryOp, CommandArgument, Expr, ExprKind, PipelineChain, PipelineCommand,
+    Statement, StringPart, UnaryOp, parse,
 };
 
 fn main() {
@@ -15,6 +15,10 @@ fn main() {
     let ast = parse(&source).expect("ast-dump: parse");
     let text = match &ast.statements[0] {
         Statement::Expression(expr) => format_expr(expr),
+        Statement::PipelineChain { chain, .. } => format_chain(chain),
+        Statement::AssignChain { name, chain, .. } => {
+            format!("(assign Equals (var {name}) {})", format_chain(chain))
+        }
         Statement::MultiAssign { targets, value, .. } => {
             let targets = targets
                 .iter()
@@ -26,6 +30,7 @@ fn main() {
                     format!("(command-expression {})", format_expr(expr))
                 }
                 AssignmentValue::Pipeline(commands) => format_pipeline(commands),
+                AssignmentValue::Chain(chain) => format_chain(chain),
             };
             format!("(assign Equals (array {targets}) {rhs})")
         }
@@ -68,6 +73,14 @@ fn format_pipeline(commands: &[PipelineCommand]) -> String {
         .collect::<Vec<_>>()
         .join(" ");
     format!("(pipeline {stages})")
+}
+
+fn format_chain(chain: &PipelineChain) -> String {
+    let mut left = format_pipeline(&chain.first);
+    for (operator, right) in &chain.rest {
+        left = format!("(chain {operator:?} {left} {})", format_pipeline(right));
+    }
+    left
 }
 
 fn format_expr(expr: &Expr) -> String {

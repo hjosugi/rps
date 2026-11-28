@@ -27,8 +27,9 @@ mod token;
 mod tokenizer;
 
 pub use ast::{
-    AssignmentValue, BinaryOp, CatchClause, CommandArgument, Expr, ExprKind, MethodDef, Parameter,
-    PipelineCommand, ScriptBlockAst, Statement, StringPart, SwitchClause, UnaryOp,
+    AssignmentValue, BinaryOp, CatchClause, ChainOperator, CommandArgument, Expr, ExprKind,
+    MethodDef, Parameter, PipelineChain, PipelineCommand, ScriptBlockAst, Statement, StringPart,
+    SwitchClause, UnaryOp,
 };
 pub use error::ParseError;
 pub use full_token_kind::{FullTokenKind, TOKEN_KINDS, TokenFlags, TokenKindInfo};

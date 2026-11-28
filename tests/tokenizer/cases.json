@@ -138,5 +138,9 @@
   {
     "name": "percent-command",
     "source": "$value = (% -End { 1 ? 2 : 3 })"
+  },
+  {
+    "name": "pipeline-chain",
+    "source": "Write-Output hi && Get-Item . ||\n$false"
   }
 ]
