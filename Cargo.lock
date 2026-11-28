@@ -18,9 +18,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rpsh-command-macros"
+version = "0.0.348"
+
+[[package]]
 name = "rpsh-commands"
 version = "0.0.348"
 dependencies = [
+ "rpsh-command-macros",
  "rpsh-runtime",
 ]
 

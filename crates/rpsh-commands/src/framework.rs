@@ -64,7 +64,10 @@ impl<E: 'static> Registration<E> {
     }
 }
 
-struct WriteOutput;
+#[derive(crate::CmdletParameters)]
+#[parameter(InputObject: PsObject, position(0), mandatory, pipeline, remaining, allow_null, allow_empty_collection)]
+#[parameter(NoEnumerate: Switch)]
+pub(crate) struct WriteOutput;
 
 impl<E> Cmdlet<E> for WriteOutput {
     fn process(

@@ -22,6 +22,9 @@
 
 #![forbid(unsafe_code)]
 
+extern crate self as rpsh_commands;
+
+pub use rpsh_command_macros::CmdletParameters;
 pub mod framework;
 pub mod signature;
 

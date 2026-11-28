@@ -125,6 +125,34 @@ fn switch(entry: &Entry, param: &Parameter, value: Value) -> Result<Value, Engin
     }
 }
 
+fn mandatory_error(entry: &Entry, param: &Parameter, value: &Value) -> Option<Value> {
+    if !param.mandatory {
+        return None;
+    }
+    let id = if !param.allow_null && value.is_null_like() {
+        "ParameterArgumentValidationErrorNullNotAllowed"
+    } else if !param.allow_empty_collection && value.sequence().is_some_and(|v| v.is_empty()) {
+        if matches!(value, Value::Array(_) | Value::StringArray(_)) {
+            "ParameterArgumentValidationErrorEmptyArrayNotAllowed"
+        } else {
+            "ParameterArgumentValidationErrorEmptyCollectionNotAllowed"
+        }
+    } else {
+        return None;
+    };
+    let message = rpsh_messages::format(&format!("ParameterBinderStrings/{id}"), &["", param.name]);
+    Some(super::error_record(
+        &format!("{id},{}", entry.implementation),
+        &format!(
+            "InvalidData: (:) [{}], ParameterBindingValidationException",
+            entry.signature.name
+        ),
+        "System.Management.Automation.ParameterBindingValidationException",
+        &message,
+        &message,
+    ))
+}
+
 fn remaining_arguments(mut items: Vec<Value>) -> Value {
     if items.len() == 1 && items[0].sequence().is_some() {
         return items.pop().unwrap();
@@ -264,6 +292,13 @@ fn bind(entry: &Entry, args: &PreparedArguments<'_>) -> Result<Invocation, Engin
             "PositionalParameterNotFound",
             &["", &text],
         ));
+    }
+    for param in entry.signature.parameters {
+        if let Some(value) = bound.get(param.name)
+            && let Some(record) = mandatory_error(entry, param, value)
+        {
+            return Err(EngineError::Script(ScriptException::new(record)));
+        }
     }
     Ok(Invocation { bound, common })
 }
@@ -469,6 +504,10 @@ impl Engine {
                 Some(inputs) => {
                     for value in inputs {
                         if let Some(param) = pipeline_param {
+                            if let Some(record) = mandatory_error(entry, param, value) {
+                                runtime.write_error(record)?;
+                                continue;
+                            }
                             bound.set(param.name, value.clone());
                             cmdlet.process(&bound, &mut runtime)?;
                         } else {
@@ -568,6 +607,47 @@ mod tests {
         }
         fn stop(&mut self, _: &mut dyn CommandRuntime<EngineError>) {
             PHASES.with_borrow_mut(|log| log.push("stop"));
+        }
+    }
+
+    #[test]
+    fn mandatory_null_and_empty_collection_follow_the_declaration() {
+        use rpsh_commands::signature::{CmdletParameters as _, Signature};
+        #[derive(rpsh_commands::CmdletParameters)]
+        #[parameter(InputObject: PsObject, position(0), mandatory, pipeline)]
+        struct StrictInput;
+        static SIGNATURE: Signature = Signature::new("Test-Input", "Test", StrictInput::PARAMETERS);
+        let entry = Entry {
+            signature: &SIGNATURE,
+            implementation: "Test.Input",
+            construct: || Box::new(Trace),
+        };
+        let param = &SIGNATURE.parameters[0];
+        let permitted = Entry::lookup("Write-Output").unwrap();
+        for (value, id) in [
+            (
+                Value::Null,
+                "ParameterArgumentValidationErrorNullNotAllowed",
+            ),
+            (
+                Value::array(vec![]),
+                "ParameterArgumentValidationErrorEmptyArrayNotAllowed",
+            ),
+            (
+                Value::ObjectList(ArrayList::default()),
+                "ParameterArgumentValidationErrorEmptyCollectionNotAllowed",
+            ),
+        ] {
+            let record = mandatory_error(&entry, param, &value).unwrap();
+            assert_eq!(
+                super::super::member(&record, "FullyQualifiedErrorId")
+                    .unwrap()
+                    .to_string(),
+                format!("{id},Test.Input")
+            );
+            assert!(
+                mandatory_error(permitted, &permitted.signature.parameters[0], &value).is_none()
+            );
         }
     }
 

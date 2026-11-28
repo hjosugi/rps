@@ -60,3 +60,10 @@ Microsoft.PowerShell.Utility\Sort-Object [[-Property] <Object[]>] -Bottom <int> 
 Switch-Process [[-WithCommand] <string[]>] [<CommonParameters>]
 
 Sort-Object
+SendRecord (alias) -> Write-Output
+
+SendRecord [-InputObject] <psobject> [-NoEnumerate] [<CommonParameters>]
+
+True
+bound null
+System.Object[] 0

@@ -14,3 +14,9 @@ Set-Alias -Name AnotherList -Value ListSorted
 (Get-Command Microsoft.PowerShell.Utility\Sort-Object -Syntax)
 (Get-Command -Name 'Switch-Proce*' -Syntax)
 (Get-Command -Syntax:$false Sort-Object).Name
+Set-Alias -Name SendRecord -Value Write-Output
+(Get-Command SendRecord -Syntax)
+(Get-Command Write-Output).Definition -ceq (Get-Command Write-Output -Syntax)
+Write-Output -InputObject $null | ForEach-Object { 'bound null' }
+$empty = Write-Output -InputObject @() -NoEnumerate
+"$($empty.GetType().FullName) $($empty.Count)"

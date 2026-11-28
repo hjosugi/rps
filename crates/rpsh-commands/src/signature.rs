@@ -39,6 +39,39 @@ impl ParameterType {
     }
 }
 
+/// Compile-time metadata consumed by binding, syntax generation and the upstream audit.
+/// The derive accepts a concrete cmdlet struct with one attribute per parameter.
+///
+/// ```
+/// use rpsh_commands::{CmdletParameters, signature::CmdletParameters as _};
+///
+/// #[derive(CmdletParameters)]
+/// #[parameter(InputObject: PsObject, position(0), mandatory, pipeline, remaining)]
+/// #[parameter(Unique: Switch, aliases("u"), sets("Default"))]
+/// struct Example;
+///
+/// assert_eq!(Example::PARAMETERS[0].position, Some(0));
+/// assert!(Example::PARAMETERS[0].from_pipeline);
+/// assert_eq!(Example::PARAMETERS[1].aliases, ["u"]);
+/// assert_eq!(Example::PARAMETERS[1].sets, ["Default"]);
+/// ```
+///
+/// ```compile_fail
+/// #[derive(rpsh_commands::CmdletParameters)]
+/// #[parameter(InputObject: PsObject)]
+/// #[parameter(inputobject: String)]
+/// struct Duplicate;
+/// ```
+///
+/// ```compile_fail
+/// #[derive(rpsh_commands::CmdletParameters)]
+/// #[parameter(InputObject: PsObject, position(-1))]
+/// struct InvalidPosition;
+/// ```
+pub trait CmdletParameters {
+    const PARAMETERS: &'static [Parameter];
+}
+
 #[derive(Debug)]
 pub struct Parameter {
     pub name: &'static str,
@@ -50,10 +83,12 @@ pub struct Parameter {
     pub mandatory: bool,
     pub from_pipeline: bool,
     pub remaining: bool,
+    pub allow_null: bool,
+    pub allow_empty_collection: bool,
 }
 
 impl Parameter {
-    const fn new(name: &'static str, ty: ParameterType) -> Self {
+    pub const fn new(name: &'static str, ty: ParameterType) -> Self {
         Self {
             name,
             ty,
@@ -63,31 +98,41 @@ impl Parameter {
             mandatory: false,
             from_pipeline: false,
             remaining: false,
+            allow_null: false,
+            allow_empty_collection: false,
         }
     }
 
-    const fn in_sets(mut self, sets: &'static [&'static str]) -> Self {
+    pub const fn in_sets(mut self, sets: &'static [&'static str]) -> Self {
         self.sets = sets;
         self
     }
-    const fn positional(mut self, position: u16) -> Self {
+    pub const fn positional(mut self, position: u16) -> Self {
         self.position = Some(position);
         self
     }
-    const fn mandatory(mut self) -> Self {
+    pub const fn mandatory(mut self) -> Self {
         self.mandatory = true;
         self
     }
 
-    const fn pipeline(mut self) -> Self {
+    pub const fn pipeline(mut self) -> Self {
         self.from_pipeline = true;
         self
     }
-    const fn remaining(mut self) -> Self {
+    pub const fn remaining(mut self) -> Self {
         self.remaining = true;
         self
     }
-    const fn aliases(mut self, names: &'static [&'static str]) -> Self {
+    pub const fn allow_null(mut self) -> Self {
+        self.allow_null = true;
+        self
+    }
+    pub const fn allow_empty_collection(mut self) -> Self {
+        self.allow_empty_collection = true;
+        self
+    }
+    pub const fn aliases(mut self, names: &'static [&'static str]) -> Self {
         self.aliases = names;
         self
     }
@@ -139,6 +184,21 @@ pub struct Signature {
 }
 
 impl Signature {
+    pub const fn new(
+        name: &'static str,
+        module: &'static str,
+        parameters: &'static [Parameter],
+    ) -> Self {
+        Self {
+            name,
+            module,
+            parameters,
+            sets: &["__AllParameterSets"],
+            unix_only: false,
+            remoting_capability: "None",
+        }
+    }
+
     pub fn available_on(&self, platform: &str) -> bool {
         !self.unix_only || platform.starts_with("linux-") || platform.starts_with("macos-")
     }
@@ -229,21 +289,11 @@ pub static SWITCH_PROCESS: Signature = Signature {
         .remaining()],
 };
 
-pub static WRITE_OUTPUT: Signature = Signature {
-    name: "Write-Output",
-    module: "Microsoft.PowerShell.Utility",
-    remoting_capability: "None",
-    sets: &["__AllParameterSets"],
-    unix_only: false,
-    parameters: &[
-        Parameter::new("InputObject", PsObject)
-            .positional(0)
-            .mandatory()
-            .pipeline()
-            .remaining(),
-        Parameter::new("NoEnumerate", Switch),
-    ],
-};
+pub static WRITE_OUTPUT: Signature = Signature::new(
+    "Write-Output",
+    "Microsoft.PowerShell.Utility",
+    crate::framework::WriteOutput::PARAMETERS,
+);
 
 pub static COMMON_PARAMETERS: &[Parameter] = &[
     Parameter::new("Verbose", Switch).aliases(&["vb"]),

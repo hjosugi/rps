@@ -8,6 +8,7 @@ members = [
     "crates/rpsh-native",
     "crates/rpsh-format",
     "crates/rpsh-commands",
+    "crates/rpsh-command-macros",
     "crates/rpsh-messages",
     "crates/rpsh-host",
     "crates/rpsh-cli",
@@ -28,6 +29,7 @@ publish = false
 # `rpsh`. A crate is added here only together with the issue that needs it,
 # and a workspace crate only once another crate depends on it.
 [workspace.dependencies]
+rpsh-command-macros = { version = "0.0.348", path = "crates/rpsh-command-macros" }
 rpsh-commands = { version = "0.0.348", path = "crates/rpsh-commands" }
 rpsh-format = { version = "0.0.348", path = "crates/rpsh-format" }
 rpsh-syntax = { version = "0.0.348", path = "crates/rpsh-syntax" }
