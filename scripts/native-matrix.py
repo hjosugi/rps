@@ -22,7 +22,7 @@ class Scenario:
     script: str
     expected: str  # full-match regex on stdout, or on the final PTY screen
     exit_code: int = 0
-    keys: str = ''
+    terminal_input: tuple[str, str] | None = None  # visible text, then keys
 
 
 CASES = [
@@ -38,12 +38,12 @@ CASES = [
              """vim -Nu NONE -n -i NONE -- 'input file.txt'
 $status=$LASTEXITCODE
 "editor-exit=$status"
-exit $status""", r'(?s).*editor-exit=0\s*', keys=':q!\r'),
+exit $status""", r'(?s).*editor-exit=0\s*', terminal_input=('alpha', ':q!\r')),
     Scenario('less', 'Display a file on a terminal and quit',
              """less -X -P matrix-pager 'page.txt'
 $status=$LASTEXITCODE
 "pager-exit=$status"
-exit $status""", r'(?s).*matrix-page.*pager-exit=0\s*', keys='q'),
+exit $status""", r'(?s).*matrix-page.*pager-exit=0\s*', terminal_input=('matrix-page 000', 'q')),
     Scenario('man', 'Render a local manual page through a pipe',
              "man -P cat -l matrix.1 | grep -o matrix-man-ok", 'matrix-man-ok\n'),
     Scenario('fzf', 'Filter input from a native pipeline',
@@ -137,12 +137,13 @@ def execute(case, engine, kind, directory):
     env = environment(directory)
     args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-File', script.name]
     command = [str(engine), *args]
-    if case.keys:
+    if case.terminal_input:
+        visible, keys = case.terminal_input
         manifest = directory / 'terminal.json'
         manifest.write_text(json.dumps({
             'program': '{engine}', 'args': args, 'cwd': str(directory), 'cols': 72,
             'rows': 12, 'timeout_ms': 8000,
-            'input': [{'after_ms': 1200, 'send': case.keys}],
+            'input': [{'after_text': visible, 'send': keys}],
         }), encoding='utf-8')
         command = [sys.executable, str(ROOT / 'scripts/pty-run.py'), str(manifest),
                    '--engine', kind, '--' + kind, str(engine)]
@@ -153,7 +154,7 @@ def execute(case, engine, kind, directory):
         if case.program == 'tmux' and (directory / 'matrix.sock').exists():
             subprocess.run(['tmux', '-S', str(directory / 'matrix.sock'), 'kill-server'],
                            env=env, capture_output=True, timeout=5, check=False)
-    if case.keys:
+    if case.terminal_input:
         if result.returncode:
             raise RuntimeError(f'{kind} PTY driver failed: {result.stderr.decode(errors="replace").strip()}')
         terminal = json.loads(result.stdout)

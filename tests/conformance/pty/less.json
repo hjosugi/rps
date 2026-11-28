@@ -1,7 +1,7 @@
 {
   "program": "less",
   "args": ["-X", "-R", "fixture.txt"],
-  "input": [{"after_ms": 600, "send": "q"}],
+  "input": [{"after_text": "pty fixture line 1", "send": "q"}],
   "timeout_ms": 5000,
   "cols": 40,
   "rows": 10

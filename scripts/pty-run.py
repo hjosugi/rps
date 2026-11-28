@@ -7,12 +7,12 @@ The spec is `tests/conformance/pty/*.json`:
 
     {
       "program": "{engine}", "args": ["-NoLogo", "-NoExit", "-Command", "..."],
-      "input": [{"after_ms": 400, "send": "exit\\r"}],
+      "input": [{"after_text": "PS>", "send": "exit\\r"}],
       "timeout_ms": 5000, "cols": 80, "rows": 24
     }
 
 `{engine}` is replaced by the pwsh or rpsh path. The runner forks a PTY,
-feeds input on a millisecond schedule, interprets ANSI escapes into a small
+feeds input after a delay or when text appears on screen, interprets ANSI escapes into a small
 screen model and prints `{"exit_code", "screen", "timed_out"}`. The caller
 (the Rust harness) compares that JSON with the recorded golden.
 """
@@ -200,7 +200,7 @@ def run(spec, engine, pwsh, rpsh):
     rows = int(spec.get("rows", 24))
     timeout = int(spec.get("timeout_ms", 5000)) / 1000.0
     stop_after = spec.get("stop_after_ms")
-    events = sorted(spec.get("input", []), key=lambda event: event["after_ms"])
+    events = sorted(spec.get("input", []), key=lambda event: event.get("after_ms", 0))
 
     pid, fd = pty.fork()
     if pid == 0:
@@ -239,10 +239,12 @@ def run(spec, engine, pwsh, rpsh):
                 break
             wait = min(deadline - now, 0.05)
             if index < len(events):
-                next_event = started + events[index]["after_ms"] / 1000.0
-                wait = min(wait, max(0.0, next_event - now))
-                if now >= next_event:
-                    os.write(fd, events[index]["send"].encode("utf-8"))
+                event = events[index]
+                next_event = started + event.get("after_ms", 0) / 1000.0
+                if now < next_event:
+                    wait = min(wait, next_event - now)
+                elif "after_text" not in event or event["after_text"] in screen.render():
+                    os.write(fd, event["send"].encode("utf-8"))
                     index += 1
                     continue
             readable, _, _ = select.select([fd], [], [], max(0.0, wait))
