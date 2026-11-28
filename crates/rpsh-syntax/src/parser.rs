@@ -752,7 +752,7 @@ impl Parser<'_> {
                 };
                 arguments.push(CommandArgument::Parameter {
                     name: parameter,
-                    value,
+                    value: value.map(|expr| self.command_literal(expr)),
                     separator,
                 });
                 continue;
@@ -769,7 +769,10 @@ impl Parser<'_> {
                     };
                     arguments.push(arg);
                 }
-                _ => arguments.push(CommandArgument::Value(self.argument_value()?)),
+                _ => {
+                    let expr = self.argument_value()?;
+                    arguments.push(CommandArgument::Value(self.command_literal(expr)));
+                }
             }
         }
         let span = start.to(self.previous_span());
@@ -850,6 +853,24 @@ impl Parser<'_> {
         };
         redirections.insert(slot, Redirection::File { from, append, path });
         Ok(())
+    }
+
+    fn command_literal(&self, mut expr: Expr) -> Expr {
+        let number = match &expr.kind {
+            ExprKind::Int32(value) => Some(crate::NumberLiteral::Int32(*value)),
+            ExprKind::Number(value) => Some(value.clone()),
+            _ => None,
+        };
+        if let Some(value) = number {
+            let text = expr.span.text(self.source);
+            if matches!(value, crate::NumberLiteral::Double(_)) || value.to_string() != text {
+                expr.kind = ExprKind::CommandNumber {
+                    value,
+                    text: text.to_owned(),
+                };
+            }
+        }
+        expr
     }
 
     /// A single command argument. A bracketed value stops at its closing
@@ -2442,7 +2463,7 @@ mod tests {
     fn show(expr: &Expr) -> String {
         match &expr.kind {
             ExprKind::Int32(value) => value.to_string(),
-            ExprKind::Number(value) => value.to_string(),
+            ExprKind::Number(value) | ExprKind::CommandNumber { value, .. } => value.to_string(),
             ExprKind::String(value) => format!("'{value}'"),
             ExprKind::Bareword(value) => value.clone(),
             ExprKind::Unary { op, operand } => match op {

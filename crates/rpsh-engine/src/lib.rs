@@ -6192,12 +6192,12 @@ impl Engine {
                     rpsh_syntax::StringPart::Variable(name) => {
                         if let Some(value) = lookup(name, &self.variables, !self.last_failed) {
                             use std::fmt::Write as _;
-                            let _ = write!(text, "{value}");
+                            let _ = write!(text, "{}", value.base_value());
                         }
                     }
                     rpsh_syntax::StringPart::Subexpression(expr) => {
                         use std::fmt::Write as _;
-                        let _ = write!(text, "{}", self.eval_expression(expr)?);
+                        let _ = write!(text, "{}", self.eval_expression(expr)?.base_value());
                     }
                 }
             }
@@ -6542,6 +6542,9 @@ fn evaluate(
     match &expr.kind {
         ExprKind::Int32(value) => Ok(Value::Int32(*value)),
         ExprKind::Number(value) => Ok(number_value(value)),
+        ExprKind::CommandNumber { value, text } => {
+            Ok(Value::command_number(number_value(value), text))
+        }
         ExprKind::String(value) | ExprKind::Bareword(value) => {
             Ok(Value::String(value.clone().into()))
         }
@@ -6558,12 +6561,16 @@ fn evaluate(
                     rpsh_syntax::StringPart::Variable(name) => {
                         if let Some(value) = lookup(name, variables, last_success) {
                             use std::fmt::Write as _;
-                            let _ = write!(text, "{value}");
+                            let _ = write!(text, "{}", value.base_value());
                         }
                     }
                     rpsh_syntax::StringPart::Subexpression(expr) => {
                         use std::fmt::Write as _;
-                        let _ = write!(text, "{}", evaluate(expr, variables, last_success)?);
+                        let _ = write!(
+                            text,
+                            "{}",
+                            evaluate(expr, variables, last_success)?.base_value()
+                        );
                     }
                 }
             }
@@ -6839,6 +6846,7 @@ fn script_block_argument(arguments: &[CommandArgument]) -> Option<&Vec<Statement
 }
 
 fn json_stringify(value: &Value) -> Result<String, RuntimeError> {
+    let value = value.base_value();
     match value {
         Value::Null | Value::AutomationNull => Ok("null".to_owned()),
         Value::Bool(value) => Ok(value.to_string()),
@@ -7230,6 +7238,7 @@ fn get_type(value: &Value) -> Value {
 }
 
 fn is_numeric_value(value: &Value) -> bool {
+    let value = value.base_value();
     matches!(
         value,
         Value::Int32(_)
@@ -9833,6 +9842,7 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
 }
 
 fn convert_int64(value: &Value) -> Result<i64, RuntimeError> {
+    let value = value.base_value();
     match value {
         Value::Null | Value::AutomationNull => Ok(0),
         Value::Bool(value) => Ok(i64::from(*value)),
@@ -9897,6 +9907,7 @@ fn convert_int32(value: &Value) -> Result<i32, RuntimeError> {
 }
 
 fn convert_double(value: &Value) -> Result<f64, RuntimeError> {
+    let value = value.base_value();
     match value {
         Value::Null | Value::AutomationNull => Ok(0.0),
         Value::Bool(value) => Ok(if *value { 1.0 } else { 0.0 }),
@@ -9927,6 +9938,7 @@ fn convert_double(value: &Value) -> Result<f64, RuntimeError> {
 /// `[bool]`: an empty string or zero is false, a one-element array uses that
 /// element, and any longer array is true.
 fn convert_bool(value: &Value) -> bool {
+    let value = value.base_value();
     match value {
         Value::Null | Value::AutomationNull => false,
         Value::Bool(value) => *value,
@@ -9952,6 +9964,7 @@ fn convert_bool(value: &Value) -> bool {
 }
 
 fn convert_char(value: &Value) -> Result<Value, RuntimeError> {
+    let value = value.base_value();
     match value {
         Value::Char(unit) => Ok(Value::Char(*unit)),
         Value::Int32(value) => {
@@ -9997,6 +10010,7 @@ fn as_operator(value: &Value, type_value: &Value) -> Result<Value, RuntimeError>
 }
 
 fn type_is(left: &Value, right: &Value, negate: bool) -> Result<Value, RuntimeError> {
+    let left = left.base_value();
     let Value::Type(full) = right else {
         return Err(RuntimeError::NotImplemented {
             feature: "-is / -as with a non-type right operand",
@@ -10146,6 +10160,13 @@ fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
 }
 
 fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
+    let target = target.base_value();
+    if name.eq_ignore_ascii_case("ToString")
+        && arguments.is_empty()
+        && let Value::Double(value) = target
+    {
+        return Ok(Value::String(rpsh_runtime::clr_double_text(*value).into()));
+    }
     if name.eq_ignore_ascii_case("GetType") && arguments.is_empty() {
         return Ok(get_type(target));
     }
@@ -10610,6 +10631,7 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
 }
 
 fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
+    let value = value.base_value();
     if let Some(result) = globalization::culture_property(value, name) {
         return result;
     }

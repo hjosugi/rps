@@ -120,6 +120,7 @@ native/glob
 native/glob-arguments
 native/inherited-stdin
 native/merged-streams
+native/numeric-arguments
 native/output-redirection
 native/parameter-colon
 native/path-precedence

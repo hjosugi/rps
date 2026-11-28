@@ -72,6 +72,7 @@ fn float_value(value: &Value) -> Option<f64> {
 /// Compare CLR numeric values as numbers, including the full precision of
 /// integer and decimal keys. Double.CompareTo puts NaN before other values.
 pub fn number_order(left: &Value, right: &Value) -> Option<std::cmp::Ordering> {
+    let (left, right) = (left.base_value(), right.base_value());
     use std::cmp::Ordering;
     if let (Some(a), Some(b)) = (int_value(left), int_value(right)) {
         return Some(a.cmp(&b));
@@ -194,6 +195,7 @@ fn double_operands(left: &Value, right: &Value, operation: impl FnOnce(f64, f64)
 /// A numeric operand, converting a string the way `LanguagePrimitives` does
 /// for arithmetic: `1 + '2'` is `3`.
 fn numeric_of(value: &Value) -> Option<Value> {
+    let value = value.base_value();
     match value {
         Value::Null | Value::AutomationNull => Some(Value::Int32(0)),
         Value::String(text) => parse_number_text(&text.to_string_lossy()),
@@ -276,7 +278,9 @@ pub fn add(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
     }
     if matches!(left, Value::String(_) | Value::Char(_)) || matches!(right, Value::Char(_)) {
         return Ok(Value::String(
-            left.to_ps_string().concat(&right.to_ps_string()),
+            left.base_value()
+                .to_ps_string()
+                .concat(&right.base_value().to_ps_string()),
         ));
     }
     let (left, right) = numeric_pair(left, right)?;
@@ -304,6 +308,7 @@ pub fn subtract(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
 /// Binary `*`. A string on the left repeats when the right is an `Int32`:
 /// `'ab' * 3` is `"ababab"`.
 pub fn multiply(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    let (left, right) = (left.base_value(), right.base_value());
     if let (Some(items), Value::Int32(times)) = (left.sequence(), right) {
         let times = usize::try_from(*times).map_err(|_| RuntimeError::NotImplemented {
             feature: "negative array repetition",
@@ -443,6 +448,7 @@ fn compare_scalar(
     op: Comparison,
     case_sensitive: bool,
 ) -> Result<bool, RuntimeError> {
+    let (left, right) = (left.base_value(), right.base_value());
     if let (Some(left), Some(right)) = (typed_text(left), typed_text(right)) {
         return compare_scalar(
             &Value::String(left.into()),
@@ -569,6 +575,7 @@ pub fn contains(
 
 /// `-shl` / `-shr`.
 pub fn shift(left: &Value, right: &Value, left_shift: bool) -> Result<Value, RuntimeError> {
+    let (left, right) = (left.base_value(), right.base_value());
     match (left, right) {
         (Value::Int32(a), Value::Int32(b)) => {
             let amount = *b as u32;
@@ -596,6 +603,7 @@ pub fn logical(left: &Value, right: &Value, op: &str) -> Result<Value, RuntimeEr
 
 /// Bitwise operators.
 pub fn bitwise(left: &Value, right: &Value, op: &str) -> Result<Value, RuntimeError> {
+    let (left, right) = (left.base_value(), right.base_value());
     match (left, right) {
         (Value::Int32(a), Value::Int32(b)) => Ok(Value::Int32(match op {
             "band" => a & b,
@@ -612,6 +620,7 @@ pub fn not(operand: &Value) -> Value {
 }
 
 pub fn bnot(operand: &Value) -> Result<Value, RuntimeError> {
+    let operand = operand.base_value();
     match operand {
         Value::Int32(value) => Ok(Value::Int32(!value)),
         _ => refuse("bitwise not on non-Int32 operands"),
@@ -620,6 +629,7 @@ pub fn bnot(operand: &Value) -> Result<Value, RuntimeError> {
 
 pub fn is_true(value: &Value) -> bool {
     match value {
+        Value::NumberWithText(number) => is_true(&number.0),
         Value::Null | Value::AutomationNull => false,
         Value::Bool(value) => *value,
         Value::Char(unit) => *unit != 0,
@@ -653,6 +663,7 @@ pub fn is_true(value: &Value) -> bool {
 
 /// The range operator `a..b`.
 pub fn range(left: &Value, right: &Value) -> Result<Value, RuntimeError> {
+    let (left, right) = (left.base_value(), right.base_value());
     match (left, right) {
         (Value::Int32(a), Value::Int32(b)) => {
             let mut values = Vec::new();
@@ -750,7 +761,7 @@ pub fn format(template: &Value, arguments: &Value) -> Result<Value, RuntimeError
 }
 
 fn format_one(value: &Value, spec: &str) -> Result<String, RuntimeError> {
-    if spec.is_empty() {
+    if spec.is_empty() || matches!(value, Value::NumberWithText(_)) {
         return Ok(value.to_string());
     }
     let kind = spec.chars().next().unwrap_or(' ').to_ascii_uppercase();
@@ -830,6 +841,7 @@ pub fn unary_join(operand: &Value) -> Result<Value, RuntimeError> {
 
 /// Unary `-`.
 pub fn negate(operand: &Value) -> Result<Value, RuntimeError> {
+    let operand = operand.base_value();
     match operand {
         Value::Double(value) => Ok(Value::Double(-value)),
         Value::Int32(value) => Ok(value

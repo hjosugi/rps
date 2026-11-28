@@ -402,6 +402,8 @@ pub enum ExprKind {
     Int32(i32),
     /// Upstream: `ConstantExpressionAst` holding another numeric type.
     Number(NumberLiteral),
+    /// A command-mode number whose original spelling is carried with its value.
+    CommandNumber { value: NumberLiteral, text: String },
     /// Upstream: `StringConstantExpressionAst` (single-quoted).
     String(String),
     /// An unquoted StringConstantExpressionAst used as a command parameter value.

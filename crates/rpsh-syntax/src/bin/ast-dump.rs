@@ -122,7 +122,7 @@ fn format_chain(chain: &PipelineChain) -> String {
 fn format_expr(expr: &Expr) -> String {
     match &expr.kind {
         ExprKind::Int32(value) => format!("(int {value})"),
-        ExprKind::Number(value) => format!("(int {value})"),
+        ExprKind::Number(value) | ExprKind::CommandNumber { value, .. } => format!("(int {value})"),
         ExprKind::String(value) | ExprKind::Bareword(value) => format!("(str {})", json(value)),
         ExprKind::Variable(name) => format!("(var {name})"),
         ExprKind::Unary { op, operand } => {

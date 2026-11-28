@@ -65,6 +65,8 @@ pub enum Value {
     Double(f64),
     /// `System.Numerics.BigInteger`
     BigInteger(PsString),
+    /// A command-mode numeric PSObject with its original TokenText.
+    NumberWithText(Rc<(Value, PsString)>),
     /// A script block literal.
     ScriptBlock(PsString),
     /// A PowerShell array. The `Rc` keeps `Value` 16 bytes.
@@ -86,6 +88,26 @@ pub enum Value {
 const _: () = assert!(std::mem::size_of::<Value>() == 16);
 
 impl Value {
+    /// The compiler wraps a command literal only when its .NET ToString()
+    /// differs from the token. The host uses G15 for unwrapped doubles.
+    pub fn command_number(value: Value, text: &str) -> Self {
+        if let Value::Double(x) = value
+            && clr_double_text(x) == text
+        {
+            return value;
+        }
+        Self::NumberWithText(Rc::new((value, text.into())))
+    }
+
+    /// Operations on a numeric PSObject use its CLR base value. PowerShell
+    /// formatting and argument conversion can separately use its TokenText.
+    pub fn base_value(&self) -> &Self {
+        match self {
+            Self::NumberWithText(number) => &number.0,
+            _ => self,
+        }
+    }
+
     /// The .NET type name scripts see through `.GetType().FullName`.
     pub fn type_name(&self) -> &'static str {
         match self {
@@ -103,6 +125,7 @@ impl Value {
             Value::Decimal(_) => "System.Decimal",
             Value::Double(_) => "System.Double",
             Value::BigInteger(_) => "System.Numerics.BigInteger",
+            Value::NumberWithText(number) => number.0.type_name(),
             Value::ScriptBlock(_) => "System.Management.Automation.ScriptBlock",
             Value::Array(_) => "System.Object[]",
             Value::StringArray(_) => "System.String[]",
@@ -151,6 +174,7 @@ impl Value {
     pub fn to_ps_string(&self) -> PsString {
         match self {
             Self::String(text) | Self::ScriptBlock(text) => text.clone(),
+            Self::NumberWithText(number) => number.1.clone(),
             Self::Char(unit) => PsString::from_units(vec![*unit]),
             Self::Array(items) | Self::StringArray(items) => {
                 collection::sequence_text(items, &" ".into())
@@ -183,6 +207,7 @@ impl fmt::Display for Value {
             Value::Decimal(value) | Value::BigInteger(value) | Value::Type(value) => {
                 fmt::Display::fmt(value, f)
             }
+            Value::NumberWithText(number) => fmt::Display::fmt(&number.1, f),
             Value::Double(value) => f.write_str(&format_double(*value)),
             Value::ScriptBlock(text) => fmt::Display::fmt(text, f),
             Value::Array(_) | Value::StringArray(_) | Value::ArrayList(_) => {
@@ -218,6 +243,22 @@ impl fmt::Display for Value {
             }
             Value::String(value) => fmt::Display::fmt(value, f),
         }
+    }
+}
+
+/// CLR Double.ToString() uses the shortest round-trip digits and scientific
+/// notation for exponents below -4 or at least 17.
+pub fn clr_double_text(value: f64) -> String {
+    if !value.is_finite() {
+        return format_double(value);
+    }
+    let scientific = format!("{value:e}");
+    let (mantissa, exponent) = scientific.split_once('e').expect("scientific exponent");
+    let exponent: i32 = exponent.parse().expect("finite Double exponent");
+    if (-4..17).contains(&exponent) {
+        value.to_string()
+    } else {
+        format!("{mantissa}E{exponent:+03}")
     }
 }
 
