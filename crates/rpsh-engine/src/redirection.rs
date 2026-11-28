@@ -83,9 +83,7 @@ impl OutputTarget {
     }
 
     fn write_values(&self, values: &[Value]) -> io::Result<()> {
-        if let Self::File(file) = self
-            && !values.is_empty()
-        {
+        if let Self::File(file) = self {
             let mut writer = file;
             writer.write_all(format_out_string(values, text_output_width()).as_bytes())?;
         }
@@ -106,6 +104,7 @@ impl Engine {
         &mut self,
         command: &StageCommand<'_>,
         input: Vec<Value>,
+        has_upstream: bool,
         redirections: &[Redirection],
     ) -> Result<Vec<Value>, EngineError> {
         let stream = match command {
@@ -147,18 +146,20 @@ impl Engine {
             Some((path, append)) => Some(OutputTarget::open(self.eval_expression(path)?, append)?),
             None => None,
         };
-        let mut values = self.run_object_stage(command, input, output.as_ref())?;
-        if let Some(stream) = merged {
-            values = values
+        let values = self.run_object_stage(command, input, has_upstream, output.as_ref())?;
+        let records = match merged {
+            Some(stream) => values
                 .into_iter()
                 .map(|value| stream_record(stream, value))
-                .collect();
-        }
-        if let Some(target) = output {
-            target.write_values(&values)?;
-            Ok(Vec::new())
-        } else {
-            Ok(values)
+                .collect(),
+            None => values,
+        };
+        match output {
+            Some(target) => {
+                target.write_values(&records)?;
+                Ok(Vec::new())
+            }
+            None => Ok(records),
         }
     }
 }

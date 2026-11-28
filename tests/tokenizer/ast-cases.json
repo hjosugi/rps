@@ -63,5 +63,12 @@
   {"name":"dot-script-block","source":". {param($x) $x} 'arg'"},
   {"name":"dot-command-info","source":"$r = . (Get-Command Test-F) -n: 2"},
   {"name":"dot-pipeline","source":"'hi' | . $stage 3>&1 && . ./second.ps1"},
-  {"name":"dot-relative-script","source":". ./script.ps1 -Param hello"}
+  {"name":"dot-relative-script","source":". ./script.ps1 -Param hello"},
+  {"name":"named-order","source":"end {1}; begin {}; dynamicparam {}; clean {2}; process {$_}"},
+  {"name":"named-literal","source":"{ clean {1}; end {}; process {2} }"},
+  {"name":"named-function","source":"function Test-Body { param($p) begin {1} process {$p} clean {} }"},
+  {"name":"named-filter","source":"filter Read-Phase { process {$_}; end {2} }"},
+  {"name":"named-file","source":"param($x) process {$x}; end {1}"},
+  {"name":"named-nested","source":"{ begin { function Nested { process {}; clean {} } } }"},
+  {"name":"end-as-command","source":"{begin { end 1 }}"}
 ]

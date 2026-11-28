@@ -19,10 +19,7 @@ impl Default for Functions {
                         name: "exec".into(),
                         definition: Some("\nSwitch-Process -WithCommand $args\n"),
                         parameters: Vec::new(),
-                        begin: Vec::new(),
-                        process: None,
-                        end: Vec::new(),
-                        body: Vec::new(),
+                        block: Default::default(),
                         filter: false,
                     };
                     HashMap::from([("exec".into(), function)])

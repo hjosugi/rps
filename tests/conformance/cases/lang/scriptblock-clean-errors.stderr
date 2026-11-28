@@ -1,0 +1,12 @@
+Exception: <case>/scriptblock-clean-errors.ps1:4
+Line |
+   4 |      clean { throw 'secondary' }
+     |              ~~~~~~~~~~~~~~~~~
+     | secondary
+
+Exception: <case>/scriptblock-clean-errors.ps1:10
+Line |
+  10 |      clean { throw 'cleanup' }
+     |              ~~~~~~~~~~~~~~~
+     | cleanup
+

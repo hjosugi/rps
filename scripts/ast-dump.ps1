@@ -63,7 +63,7 @@ function Format-Expr($e) {
             }
             return "(object " + ($entries -join ' ') + ")"
         }
-        'ScriptBlockExpressionAst' { return '(scriptblock)' }
+        'ScriptBlockExpressionAst' { return Format-Block $e.ScriptBlock }
         default { return "?$name" }
     }
 }
@@ -104,7 +104,22 @@ function Format-Pipeline($pipeline) {
     "(pipeline $($stages -join ' '))"
 }
 
+function Format-Block($block) {
+    $output = '(scriptblock'
+    $clauses = @($block.BeginBlock, $block.ProcessBlock, $block.EndBlock, $block.CleanBlock, $block.DynamicParamBlock) |
+        Where-Object { $null -ne $_ -and -not $_.Unnamed } | Sort-Object { $_.Extent.StartOffset }
+    foreach ($clause in $clauses) {
+        $output += ' (' + $clause.BlockKind.ToString().ToLowerInvariant()
+        foreach ($statement in $clause.Statements) { $output += ' ' + (Format-Statement $statement) }
+        $output += ')'
+    }
+    return $output + ')'
+}
 function Format-Statement($statement) {
+    if ($statement -is [System.Management.Automation.Language.FunctionDefinitionAst]) {
+        $kind = if ($statement.IsFilter) { 'filter' } else { 'function' }
+        return "($kind $($statement.Name) $(Format-Block $statement.Body))"
+    }
     if ($statement -is [System.Management.Automation.Language.PipelineChainAst]) {
         Format-Pipeline $statement
     } elseif ($statement -is [System.Management.Automation.Language.PipelineAst] -and
@@ -124,4 +139,5 @@ function Format-Statement($statement) {
     }
 }
 
-Format-Statement $ast.EndBlock.Statements[0]
+if ($ast.EndBlock -and $ast.EndBlock.Unnamed) { Format-Statement $ast.EndBlock.Statements[0] }
+else { Format-Block $ast }

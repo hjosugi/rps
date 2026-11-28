@@ -4,8 +4,8 @@ use rpsh_syntax::Redirection;
 use std::io::Read;
 
 use rpsh_syntax::{
-    AssignmentValue, BinaryOp, CommandArgument, Expr, ExprKind, PipelineChain, PipelineCommand,
-    Statement, StringPart, UnaryOp, parse,
+    AssignmentValue, BinaryOp, BlockKind, CommandArgument, Expr, ExprKind, PipelineChain,
+    PipelineCommand, ScriptBlockAst, Statement, StringPart, UnaryOp, parse,
 };
 
 fn main() {
@@ -14,12 +14,50 @@ fn main() {
         .read_to_string(&mut source)
         .expect("ast-dump: stdin is not UTF-8");
     let ast = parse(&source).expect("ast-dump: parse");
-    println!("{}", format_statement(&ast.statements[0]));
+    if ast.named_blocks.is_empty() {
+        println!("{}", format_statement(&ast.statements[0]));
+    } else {
+        println!("{}", format_block(&ast));
+    }
+}
+
+fn format_block(block: &ScriptBlockAst) -> String {
+    let mut output = String::from("(scriptblock");
+    for clause in &block.named_blocks {
+        let kind = match clause.kind {
+            BlockKind::Begin => "begin",
+            BlockKind::Process => "process",
+            BlockKind::End => "end",
+            BlockKind::Clean => "clean",
+            BlockKind::DynamicParam => "dynamicparam",
+        };
+        output.push_str(" (");
+        output.push_str(kind);
+        for statement in &clause.statements {
+            output.push(' ');
+            output.push_str(&format_statement(statement));
+        }
+        output.push(')');
+    }
+    output.push(')');
+    output
 }
 
 fn format_statement(statement: &Statement) -> String {
     match statement {
         Statement::Expression(expr) => format_expr(expr),
+        Statement::Function {
+            name,
+            filter,
+            block,
+            ..
+        } => {
+            format!(
+                "({} {name} {})",
+                if *filter { "filter" } else { "function" },
+                format_block(block)
+            )
+        }
         Statement::Command {
             name, arguments, ..
         } => format!("(pipeline {})", format_command(name, arguments)),
@@ -211,7 +249,7 @@ fn format_expr(expr: &Expr) -> String {
                 .collect::<Vec<_>>()
                 .join(" ")
         ),
-        ExprKind::ScriptBlock { .. } => "(scriptblock)".to_owned(),
+        ExprKind::ScriptBlock { block, .. } => format_block(block),
         ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) => format!(
             "(expand {})",
             parts

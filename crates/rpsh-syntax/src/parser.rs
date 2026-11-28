@@ -1,9 +1,9 @@
 use crate::command_text::{self, Delimiter};
 use crate::{
-    AssignmentValue, BinaryOp, CatchClause, ChainOperator, CommandArgument, Expr, ExprKind,
-    InvocationOperator, MethodDef, Parameter, ParseError, PipelineChain, PipelineCommand,
-    Redirection, ScriptBlockAst, Span, Statement, Stream, StringPart, SwitchClause, Token,
-    TokenKind, UnaryOp, tokenize,
+    AssignmentValue, BinaryOp, BlockKind, CatchClause, ChainOperator, CommandArgument, Expr,
+    ExprKind, InvocationOperator, MethodDef, NamedBlock, Parameter, ParseError, PipelineChain,
+    PipelineCommand, Redirection, ScriptBlockAst, Span, Statement, Stream, StringPart,
+    SwitchClause, Token, TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -34,11 +34,7 @@ pub fn parse(source: &str) -> Result<ScriptBlockAst, ParseError> {
         nodes: 0,
         stop_comma: false,
     };
-    let statements = parser.statements()?;
-    Ok(ScriptBlockAst {
-        statements,
-        span: Span::new(0, source.len()),
-    })
+    parser.script_contents(Span::new(0, 0), false)
 }
 
 struct Parser<'a> {
@@ -64,6 +60,9 @@ impl Parser<'_> {
         match &self.peek().kind {
             TokenKind::Identifier(name) | TokenKind::Bareword(name) => Some(name),
             TokenKind::Remainder => Some("%"),
+            TokenKind::Begin | TokenKind::Process | TokenKind::End => {
+                Some(self.peek().span.text(self.source))
+            }
             _ => None,
         }
     }
@@ -119,20 +118,73 @@ impl Parser<'_> {
         Err(ParseError::not_implemented(feature, self.peek().span))
     }
 
-    fn statements(&mut self) -> Result<Vec<Statement>, ParseError> {
+    fn named_kind(&self) -> Option<BlockKind> {
+        match &self.peek().kind {
+            TokenKind::Begin => Some(BlockKind::Begin),
+            TokenKind::Process => Some(BlockKind::Process),
+            TokenKind::End => Some(BlockKind::End),
+            TokenKind::Bareword(word) if word.eq_ignore_ascii_case("clean") => {
+                Some(BlockKind::Clean)
+            }
+            TokenKind::Bareword(word) if word.eq_ignore_ascii_case("dynamicparam") => {
+                Some(BlockKind::DynamicParam)
+            }
+            _ => None,
+        }
+    }
+
+    // Functions, files and block literals share the same ScriptBlock grammar.
+    fn script_contents(&mut self, open: Span, braced: bool) -> Result<ScriptBlockAst, ParseError> {
         let mut statements = Vec::new();
+        let mut named_blocks = Vec::new();
+        let mut unnamed = false;
         loop {
             while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
                 self.pos += 1;
             }
-            if self.peek().kind == TokenKind::EndOfInput {
-                return Ok(statements);
+            if self.peek().kind == TokenKind::EndOfInput
+                || (braced && self.peek().kind == TokenKind::RCurly)
+            {
+                if braced && self.peek().kind != TokenKind::RCurly {
+                    return self.refuse(SYNTAX_ERRORS);
+                }
+                let close = self.peek().span;
+                if braced {
+                    self.pos += 1;
+                }
+                return Ok(ScriptBlockAst {
+                    statements,
+                    named_blocks,
+                    span: open.to(close),
+                });
             }
             self.nodes = 0;
-            statements.push(self.statement()?);
-            if !self.at_statement_end()
-                && !matches!(statements.as_slice(), [Statement::Param { .. }])
-            {
+            if !unnamed && let Some(kind) = self.named_kind() {
+                if named_blocks
+                    .iter()
+                    .any(|block: &NamedBlock| block.kind == kind)
+                {
+                    return self.refuse("duplicate named script block");
+                }
+                let keyword = self.peek().span;
+                self.pos += 1;
+                let (statements, extent) = self.block()?;
+                named_blocks.push(NamedBlock {
+                    kind,
+                    statements,
+                    span: keyword.to(extent),
+                });
+                continue;
+            }
+            if !named_blocks.is_empty() {
+                return self.refuse("a statement after a named script block");
+            }
+            let statement = self.statement()?;
+            let leading_param =
+                statements.is_empty() && matches!(statement, Statement::Param { .. });
+            unnamed |= !leading_param;
+            statements.push(statement);
+            if !self.at_statement_end() && !leading_param {
                 return self.refuse(SYNTAX_ERRORS);
             }
         }
@@ -1077,59 +1129,21 @@ impl Parser<'_> {
         if self.peek().kind != TokenKind::LCurly {
             return self.refuse(SYNTAX_ERRORS);
         }
+        let open = self.peek().span;
         self.pos += 1;
-        let mut body = Vec::new();
-        let mut begin = Vec::new();
-        let mut process = None;
-        let mut end = Vec::new();
-        loop {
-            while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
-                self.pos += 1;
-            }
-            if self.peek().kind == TokenKind::RCurly {
-                self.pos += 1;
-                break;
-            }
-            if self.peek().kind == TokenKind::EndOfInput {
-                return self.refuse(SYNTAX_ERRORS);
-            }
-            if self.peek().kind == TokenKind::Param {
-                self.pos += 1;
-                parameters = self.parameter_list()?;
-                continue;
-            }
-            match self.peek().kind {
-                TokenKind::Begin => {
-                    self.pos += 1;
-                    begin = self.block()?.0;
-                    continue;
-                }
-                TokenKind::Process => {
-                    self.pos += 1;
-                    process = Some(self.block()?.0);
-                    continue;
-                }
-                TokenKind::End => {
-                    self.pos += 1;
-                    end = self.block()?.0;
-                    continue;
-                }
-                _ => {}
-            }
-            self.nodes = 0;
-            body.push(self.statement()?);
-            if !self.at_statement_end() {
-                return self.refuse(SYNTAX_ERRORS);
-            }
+        let mut block = self.script_contents(open, true)?;
+        if let Some(Statement::Param {
+            parameters: inner, ..
+        }) = block.statements.first_mut()
+        {
+            parameters = std::mem::take(inner);
+            block.statements.remove(0);
         }
-        let span = start.to(self.previous_span());
+        let span = start.to(block.span);
         Ok(Statement::Function {
             name,
             parameters,
-            begin,
-            process,
-            end,
-            body,
+            block: Box::new(block),
             filter,
             span,
         })
@@ -2016,21 +2030,16 @@ impl Parser<'_> {
             }
             TokenKind::LCurly => {
                 self.pos += 1;
-                let mut statements = Vec::new();
-                loop {
-                    while matches!(self.peek().kind, TokenKind::NewLine | TokenKind::Semi) {
-                        self.pos += 1;
-                    }
-                    if self.peek().kind == TokenKind::RCurly {
-                        let close = self.peek().span;
-                        self.pos += 1;
-                        let source =
-                            self.source[span.end as usize..close.start as usize].to_owned();
-                        return self
-                            .expr(ExprKind::ScriptBlock { statements, source }, span.to(close));
-                    }
-                    statements.push(self.statement()?);
-                }
+                let block = self.script_contents(span, true)?;
+                let close = self.previous_span();
+                let source = self.source[span.end as usize..close.start as usize].to_owned();
+                self.expr(
+                    ExprKind::ScriptBlock {
+                        block: Box::new(block),
+                        source,
+                    },
+                    span.to(close),
+                )
             }
             TokenKind::AtParen => {
                 self.pos += 1;
@@ -2825,7 +2834,7 @@ mod tests {
             Statement::Function {
                 name,
                 parameters,
-                body,
+                block,
                 filter,
                 ..
             } => format!(
@@ -2836,7 +2845,7 @@ mod tests {
                     .map(|parameter| parameter.name.clone())
                     .collect::<Vec<_>>()
                     .join(","),
-                show_block(body)
+                show_block(&block.statements)
             ),
             Statement::Switch {
                 condition, clauses, ..

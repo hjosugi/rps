@@ -3,12 +3,34 @@ use std::path::{Path, PathBuf};
 
 use rpsh_runtime::{InputEnumerator, RuntimeError, Value};
 use rpsh_syntax::{
-    Expr, ExprKind, InvocationOperator, PipelineCommand, Redirection, Statement, parse,
+    BlockKind, Expr, ExprKind, InvocationOperator, PipelineCommand, Redirection, ScriptBlockAst,
+    Statement, parse,
 };
 
 use super::{
     Engine, EngineError, Flow, FunctionDef, OutputTarget, PreparedArguments, hidden_type, member,
 };
+
+pub(super) fn single_clause<'a>(
+    block: &'a ScriptBlockAst,
+    command: &str,
+) -> Result<&'a [Statement], RuntimeError> {
+    block.single_clause().ok_or_else(|| RuntimeError::Script {
+        id: match command {
+            "ForEach-Object" => {
+                "InvalidOperation,Microsoft.PowerShell.Commands.ForEachObjectCommand"
+            }
+            "Where-Object" => "InvalidOperation,Microsoft.PowerShell.Commands.WhereObjectCommand",
+            _ => "InvalidOperation",
+        },
+        category: format!("InvalidOperation: (:) [{command}], PSInvalidOperationException"),
+        exception_type: "System.Management.Automation.PSInvalidOperationException",
+        message: rpsh_messages::format(
+            "AutomationExceptions/ScriptBlockInvokeOnOneClauseOnly",
+            &[],
+        ),
+    })
+}
 
 pub(super) enum CallTarget<'a> {
     Name(Cow<'a, str>),
@@ -37,7 +59,7 @@ impl ScriptCall {
             .map_err(|_| RuntimeError::NotImplemented {
                 feature: "script files that are not UTF-8",
             })?;
-        let mut function = FunctionDef::from_script_block(parse(text)?.statements);
+        let mut function = FunctionDef::from_script_block(parse(text)?);
         function.name = path
             .file_name()
             .unwrap_or_default()
@@ -92,7 +114,8 @@ pub(super) struct PipelineStage<'a> {
 }
 
 impl FunctionDef {
-    fn from_script_block(mut body: Vec<Statement>) -> Self {
+    fn from_script_block(mut block: ScriptBlockAst) -> Self {
+        let body = &mut block.statements;
         let parameters = if let Some(Statement::Param { parameters, .. }) = body.first_mut() {
             let parameters = std::mem::take(parameters);
             body.remove(0);
@@ -104,10 +127,7 @@ impl FunctionDef {
             name: String::new(),
             definition: None,
             parameters,
-            begin: Vec::new(),
-            process: None,
-            end: Vec::new(),
-            body,
+            block: std::rc::Rc::new(block),
             filter: false,
         }
     }
@@ -182,37 +202,87 @@ impl Engine {
         input: Option<Vec<Value>>,
         out: &mut dyn std::io::Write,
     ) -> Result<Flow, EngineError> {
-        if !function.filter && !function.has_blocks() {
+        if !function.filter && function.block.named_blocks.is_empty() {
             self.bind_input(input.unwrap_or_default());
-            return self.exec_block(&function.body, out);
+            return self.exec_block(&function.block.statements, out);
         }
+        self.execute_named_blocks(&function.block, function.filter, input.map(Into::into), out)
+    }
 
+    pub(super) fn execute_named_blocks(
+        &mut self,
+        block: &ScriptBlockAst,
+        filter: bool,
+        input: Option<super::input::Records>,
+        out: &mut dyn std::io::Write,
+    ) -> Result<Flow, EngineError> {
+        let mut started = false;
+        let result = self.run_pipeline_clauses(block, filter, input, out, &mut started);
+        if started && let Some(clean) = block.clause(BlockKind::Clean) {
+            let saved = self.capture.replace(Vec::new());
+            let cleanup = self.exec_block(clean, out);
+            self.capture = saved;
+            match cleanup {
+                Err(EngineError::Script(error)) => {
+                    use std::io::Write as _;
+                    let path = self.variables.get("PSCommandPath").map(ToString::to_string);
+                    let source = path
+                        .as_deref()
+                        .and_then(|p| std::fs::read_to_string(p).ok())
+                        .unwrap_or_default();
+                    writeln!(
+                        std::io::stderr().lock(),
+                        "{}",
+                        error.diagnostic(&source, path.as_deref().map(Path::new))
+                    )?;
+                    if let Err(EngineError::Script(primary)) = result {
+                        return Err(EngineError::Script(primary.rethrow()));
+                    }
+                }
+                Err(err) => return Err(err),
+                Ok(_) => {}
+            }
+        }
+        result
+    }
+
+    fn run_pipeline_clauses(
+        &mut self,
+        block: &ScriptBlockAst,
+        filter: bool,
+        input: Option<super::input::Records>,
+        out: &mut dyn std::io::Write,
+        started: &mut bool,
+    ) -> Result<Flow, EngineError> {
         let begin_input = self.bind_input(Vec::new());
-        let flow = self.run_input_clause(&function.begin, out)?;
-        if !matches!(flow, Flow::Normal) {
-            return Ok(flow);
+        if let Some(begin) = block.clause(BlockKind::Begin) {
+            *started = true;
+            let flow = self.run_input_clause(begin, out)?;
+            if !matches!(flow, Flow::Normal) {
+                return Ok(flow);
+            }
         }
-
-        let process = function
-            .process
-            .as_deref()
-            .or_else(|| function.filter.then_some(function.body.as_slice()));
+        let process = block.clause(BlockKind::Process).or_else(|| {
+            (filter && block.named_blocks.is_empty()).then_some(block.statements.as_slice())
+        });
         let mut end_input = Vec::new();
         match (process, input) {
             (Some(body), Some(items)) => {
                 for item in items {
+                    let item = item?;
+                    *started = true;
                     begin_input.invalidate();
                     let cursor = self.bind_input(vec![item.clone()]);
                     self.variables.insert("_".into(), item);
-                    let flow = self.run_input_clause(body, out);
-                    cursor.invalidate();
-                    let flow = flow?;
+                    let flow = self.run_input_clause(body, out)?;
                     if !matches!(flow, Flow::Normal) {
                         return Ok(flow);
                     }
+                    cursor.invalidate();
                 }
             }
             (Some(body), None) => {
+                *started = true;
                 self.bind_input(Vec::new());
                 self.variables.insert("_".into(), Value::Null);
                 let flow = self.run_input_clause(body, out)?;
@@ -221,15 +291,19 @@ impl Engine {
                 }
             }
             (None, Some(items)) => {
-                if !items.is_empty() {
+                end_input = items.collect::<std::io::Result<Vec<_>>>()?;
+                if !end_input.is_empty() {
                     begin_input.invalidate();
                 }
-                end_input = items;
             }
             (None, None) => {}
         }
-        self.bind_input(end_input);
-        self.run_input_clause(&function.end, out)
+        if let Some(end) = block.clause(BlockKind::End) {
+            *started = true;
+            self.bind_input(end_input);
+            return self.run_input_clause(end, out);
+        }
+        Ok(Flow::Normal)
     }
 
     // A return completes this clause. A new record or the end clause can still run.
@@ -253,10 +327,10 @@ impl Engine {
         &mut self,
         call: &ScriptCall,
         args: &PreparedArguments<'_>,
-        input: Vec<Value>,
+        input: Option<Vec<Value>>,
     ) -> Result<Vec<Value>, EngineError> {
         let outer = self.capture.replace(Vec::new());
-        let flow = self.call_definition(call, args, Some(input), &mut super::capture_sink());
+        let flow = self.call_definition(call, args, input, &mut super::capture_sink());
         let values = std::mem::replace(&mut self.capture, outer).unwrap_or_default();
         match flow? {
             super::Flow::Normal => Ok(values),
@@ -272,25 +346,23 @@ impl Engine {
         name: Cow<'a, str>,
         operator: InvocationOperator,
     ) -> Result<CallTarget<'a>, EngineError> {
-        if operator == InvocationOperator::Dot || script_name(&name) {
-            let resolved = self.discover_alias(&name);
-            let resolved = resolved.as_deref().unwrap_or(&name);
-            if self.functions.contains_key(&resolved.to_ascii_lowercase()) {
-                return Ok(CallTarget::Block(Box::new(ScriptCall::new(
-                    self.function(resolved)?,
-                    operator,
-                ))));
-            }
-            if script_name(resolved) {
-                let path = self
-                    .script_paths(resolved, false)
-                    .into_iter()
-                    .next()
-                    .ok_or_else(|| super::command_not_found(resolved))?;
-                return Ok(CallTarget::Block(Box::new(ScriptCall::from_file(
-                    path, operator,
-                )?)));
-            }
+        let alias = self.discover_alias(&name);
+        let resolved = alias.as_deref().unwrap_or(&name);
+        if self.functions.contains_key(&resolved.to_ascii_lowercase()) {
+            return Ok(CallTarget::Block(Box::new(ScriptCall::new(
+                self.function(resolved)?,
+                operator,
+            ))));
+        }
+        if script_name(resolved) {
+            let path = self
+                .script_paths(resolved, false)
+                .into_iter()
+                .next()
+                .ok_or_else(|| super::command_not_found(resolved))?;
+            return Ok(CallTarget::Block(Box::new(ScriptCall::from_file(
+                path, operator,
+            )?)));
         }
         Ok(CallTarget::Name(name))
     }
@@ -322,12 +394,12 @@ impl Engine {
                 operator,
             )))
         };
-        if let ExprKind::ScriptBlock { statements, .. } = &target.kind {
-            return Ok(block(statements.clone()));
+        if let ExprKind::ScriptBlock { block: script, .. } = &target.kind {
+            return Ok(block(script.as_ref().clone()));
         }
         let value = self.eval_expression(target)?;
         if let Value::ScriptBlock(source) = &value {
-            return Ok(block(parse(&source.to_string_lossy())?.statements));
+            return Ok(block(parse(&source.to_string_lossy())?));
         }
         let name = match hidden_type(&value).as_deref() {
             Some(super::native::APPLICATION_TYPE | EXTERNAL_SCRIPT) => {
@@ -406,6 +478,7 @@ impl Engine {
         &mut self,
         command: &StageCommand<'_>,
         input: Vec<Value>,
+        has_upstream: bool,
         output: Option<&OutputTarget>,
     ) -> Result<Vec<Value>, EngineError> {
         match command {
@@ -413,13 +486,13 @@ impl Engine {
                 self.eval_pipeline_expression(expr)?,
             )?),
             StageCommand::Call(CallTarget::Name(name), arguments) => {
-                self.run_command(name, arguments, input, output)
+                self.run_command(name, arguments, &input, has_upstream, output)
             }
             StageCommand::Call(CallTarget::Cmdlet(name), arguments) => {
                 self.cmdlet_output(name, arguments, &input)
             }
             StageCommand::Call(CallTarget::Block(function), arguments) => {
-                self.function_output(function, arguments, input)
+                self.function_output(function, arguments, has_upstream.then_some(input))
             }
         }
     }

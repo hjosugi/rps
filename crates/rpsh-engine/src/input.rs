@@ -79,3 +79,64 @@ pub(super) fn method(
         Ok(Value::AutomationNull)
     })
 }
+
+/// A ConsoleHost file invocation reads redirected text one record at a time.
+/// The stdin lock is released before executing user code for that record.
+pub(super) enum Records {
+    Values(std::vec::IntoIter<Value>),
+    Console { after_cr: bool },
+}
+
+impl From<Vec<Value>> for Records {
+    fn from(values: Vec<Value>) -> Self {
+        Self::Values(values.into_iter())
+    }
+}
+
+impl Iterator for Records {
+    type Item = std::io::Result<Value>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Values(values) => values.next().map(Ok),
+            Self::Console { after_cr } => {
+                console_line(&mut std::io::stdin().lock(), after_cr).transpose()
+            }
+        }
+    }
+}
+
+fn console_line(
+    reader: &mut impl std::io::BufRead,
+    after_cr: &mut bool,
+) -> std::io::Result<Option<Value>> {
+    let mut bytes = Vec::new();
+    loop {
+        let chunk = match reader.fill_buf() {
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            result => result?,
+        };
+        if chunk.is_empty() {
+            if bytes.is_empty() {
+                return Ok(None);
+            }
+            break;
+        }
+        if std::mem::take(after_cr) && chunk[0] == b'\n' {
+            reader.consume(1);
+            continue;
+        }
+        if let Some(end) = chunk.iter().position(|&b| matches!(b, b'\r' | b'\n')) {
+            bytes.extend_from_slice(&chunk[..end]);
+            *after_cr = chunk[end] == b'\r';
+            reader.consume(end + 1);
+            break;
+        }
+        bytes.extend_from_slice(chunk);
+        let n = chunk.len();
+        reader.consume(n);
+    }
+    Ok(Some(Value::String(
+        String::from_utf8_lossy(&bytes).as_ref().into(),
+    )))
+}

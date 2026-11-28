@@ -1,0 +1,19 @@
+rpsh-golden-v2
+exit=0
+b(/)p(1/1)p(2/2)e(2/)c(2/)
+b(/)p(/)e(/)c(/)
+b(/)e(/)c(/)
+process=x/4/4
+process=x/5/5
+end=x/5/
+c
+process=y/q/q
+end=y/q/
+c
+p1p2c(2/2)!broken
+empty=c
+started
+seen=1
+seen=2
+caught=record failed
+cleaned

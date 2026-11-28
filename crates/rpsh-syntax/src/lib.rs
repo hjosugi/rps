@@ -21,6 +21,7 @@ mod command_text;
 mod error;
 mod full_token_kind;
 mod full_tokenizer;
+mod input_usage;
 mod number;
 mod parser;
 mod span;
@@ -28,9 +29,10 @@ mod token;
 mod tokenizer;
 
 pub use ast::{
-    ArgumentSeparator, AssignmentValue, BinaryOp, CatchClause, ChainOperator, CommandArgument,
-    Expr, ExprKind, InvocationOperator, MethodDef, Parameter, PipelineChain, PipelineCommand,
-    Redirection, ScriptBlockAst, Statement, Stream, StringPart, SwitchClause, UnaryOp,
+    ArgumentSeparator, AssignmentValue, BinaryOp, BlockKind, CatchClause, ChainOperator,
+    CommandArgument, Expr, ExprKind, InvocationOperator, MethodDef, NamedBlock, Parameter,
+    PipelineChain, PipelineCommand, Redirection, ScriptBlockAst, Statement, Stream, StringPart,
+    SwitchClause, UnaryOp,
 };
 pub use error::ParseError;
 pub use full_token_kind::{FullTokenKind, TOKEN_KINDS, TokenFlags, TokenKindInfo};

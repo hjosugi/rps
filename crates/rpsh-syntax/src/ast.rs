@@ -7,10 +7,51 @@
 use crate::{NumberLiteral, Span};
 
 /// A parsed script. Upstream: `ScriptBlockAst`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ScriptBlockAst {
     pub statements: Vec<Statement>,
+    pub named_blocks: Vec<NamedBlock>,
     pub span: Span,
+}
+
+impl ScriptBlockAst {
+    pub fn single_clause(&self) -> Option<&[Statement]> {
+        match self.named_blocks.as_slice() {
+            [] => Some(&self.statements),
+            [
+                NamedBlock {
+                    kind: BlockKind::Process | BlockKind::End,
+                    statements,
+                    ..
+                },
+            ] => Some(statements),
+            _ => None,
+        }
+    }
+
+    pub fn clause(&self, kind: BlockKind) -> Option<&[Statement]> {
+        self.named_blocks
+            .iter()
+            .find(|block| block.kind == kind)
+            .map(|block| block.statements.as_slice())
+    }
+}
+
+/// A named clause of a script block, including an explicitly empty clause.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedBlock {
+    pub kind: BlockKind,
+    pub statements: Vec<Statement>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockKind {
+    DynamicParam,
+    Begin,
+    Process,
+    End,
+    Clean,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,10 +126,7 @@ pub enum Statement {
     Function {
         name: String,
         parameters: Vec<Parameter>,
-        begin: Vec<Statement>,
-        process: Option<Vec<Statement>>,
-        end: Vec<Statement>,
-        body: Vec<Statement>,
+        block: Box<ScriptBlockAst>,
         filter: bool,
         span: Span,
     },
@@ -454,7 +492,7 @@ pub enum ExprKind {
     CommandArray { elements: Vec<Expr>, text: String },
     /// Upstream: `ScriptBlockExpressionAst`.
     ScriptBlock {
-        statements: Vec<Statement>,
+        block: Box<ScriptBlockAst>,
         source: String,
     },
     /// Upstream: `IndexExpressionAst`.

@@ -92,6 +92,9 @@ lang/pipeline-basic
 lang/psobject
 lang/scopes
 lang/scriptblock
+lang/scriptblock-clean-errors
+lang/scriptblock-file-phases
+lang/scriptblock-phases
 lang/session-aliases
 lang/static-members
 lang/string-escapes

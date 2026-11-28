@@ -256,17 +256,8 @@ struct FunctionDef {
     name: String,
     definition: Option<&'static str>,
     parameters: Vec<Parameter>,
-    begin: Vec<Statement>,
-    process: Option<Vec<Statement>>,
-    end: Vec<Statement>,
-    body: Vec<Statement>,
+    block: std::rc::Rc<ScriptBlockAst>,
     filter: bool,
-}
-
-impl FunctionDef {
-    fn has_blocks(&self) -> bool {
-        !self.begin.is_empty() || self.process.is_some() || !self.end.is_empty()
-    }
 }
 
 fn command_name(name: &str) -> &str {
@@ -415,7 +406,17 @@ impl Engine {
         out: &mut dyn Write,
         command_mode: bool,
     ) -> Result<i32, EngineError> {
-        let flow = self.exec_block(&script.statements, out);
+        let flow = self.exec_block(&script.statements, out).and_then(|flow| {
+            if matches!(flow, Flow::Normal) && !script.named_blocks.is_empty() {
+                let input = (self.console_stdio
+                    && !std::io::IsTerminal::is_terminal(&std::io::stdin())
+                    && script.uses_pipeline_input())
+                .then_some(input::Records::Console { after_cr: false });
+                self.execute_named_blocks(script, false, input, out)
+            } else {
+                Ok(flow)
+            }
+        });
         self.flush_host(out)?;
         self.host_list_started = false;
         if self.host_text {
@@ -762,10 +763,7 @@ impl Engine {
             Statement::Function {
                 name,
                 parameters,
-                begin,
-                process,
-                end,
-                body,
+                block,
                 filter,
                 ..
             } => {
@@ -775,10 +773,7 @@ impl Engine {
                         name: name.clone(),
                         definition: None,
                         parameters: parameters.clone(),
-                        begin: begin.clone(),
-                        process: process.clone(),
-                        end: end.clone(),
-                        body: body.clone(),
+                        block: std::rc::Rc::new(block.as_ref().clone()),
                         filter: *filter,
                     },
                 );
@@ -1366,12 +1361,15 @@ impl Engine {
     }
 
     fn scriptblock_truth(&mut self, expr: &Expr) -> Result<bool, EngineError> {
-        let ExprKind::ScriptBlock { statements, .. } = &expr.kind else {
+        let ExprKind::ScriptBlock { block, .. } = &expr.kind else {
             return Ok(ops::is_true(&self.eval_expression(expr)?));
         };
         let saved = self.capture.take();
         self.capture = Some(Vec::new());
-        let flow = self.exec_block(statements, &mut capture_sink());
+        let flow = self.exec_block(
+            invocation::single_clause(block, "switch")?,
+            &mut capture_sink(),
+        );
         let captured = self.capture.take().unwrap_or_default();
         self.capture = saved;
         flow?;
@@ -1408,15 +1406,11 @@ impl Engine {
                 }
             };
         }
-        let host = self
-            .capture
-            .is_none()
-            .then_some(&mut *out as &mut dyn Write);
-        let outputs = self.collect_pipeline(commands, host)?;
+        let (outputs, flow) = self.collect_pipeline(commands, Some(out))?;
         for value in outputs {
             self.write_value(value, out)?;
         }
-        Ok(Flow::Normal)
+        Ok(flow)
     }
 
     fn exec_chain(
@@ -1463,13 +1457,14 @@ impl Engine {
 
     fn pipeline_output(&mut self, commands: &[PipelineCommand]) -> Result<Vec<Value>, EngineError> {
         self.collect_pipeline(commands, None)
+            .map(|(values, _)| values)
     }
 
     fn collect_pipeline(
         &mut self,
         commands: &[PipelineCommand],
         mut host: Option<&mut dyn Write>,
-    ) -> Result<Vec<Value>, EngineError> {
+    ) -> Result<(Vec<Value>, Flow), EngineError> {
         let stages: Vec<_> = commands
             .iter()
             .map(|command| self.pipeline_stage(command))
@@ -1493,6 +1488,7 @@ impl Engine {
                     commands = remaining;
                 }
                 let destination = if commands.is_empty()
+                    && self.capture.is_none()
                     && let Some(out) = host.take()
                 {
                     self.flush_host(out)?;
@@ -1503,15 +1499,31 @@ impl Engine {
                 input =
                     self.run_native_stages(&stages, has_upstream.then_some(&input), destination)?;
             } else if command.redirections.is_empty() {
-                input = self.run_object_stage(&command.command, input, None)?;
+                // Let the last script write to its caller as each clause executes.
+                // Output already delivered remains visible if a later clause throws.
+                if commands.is_empty()
+                    && let Some(out) = host.as_deref_mut()
+                    && let StageCommand::Call(CallTarget::Block(call), args) = &command.command
+                {
+                    let flow =
+                        self.call_definition(call, args, has_upstream.then_some(input), out)?;
+                    self.last_failed |= failed;
+                    return Ok((Vec::new(), flow));
+                }
+                input = self.run_object_stage(&command.command, input, has_upstream, None)?;
             } else {
-                input = self.run_redirected(&command.command, input, command.redirections)?;
+                input = self.run_redirected(
+                    &command.command,
+                    input,
+                    has_upstream,
+                    command.redirections,
+                )?;
             }
             has_upstream = true;
             failed |= self.last_failed;
         }
         self.last_failed = failed;
-        Ok(input)
+        Ok((input, Flow::Normal))
     }
 
     /// Runs a command for a pipeline stage and collects its output.
@@ -1519,27 +1531,17 @@ impl Engine {
         &mut self,
         name: &str,
         arguments: &PreparedArguments<'_>,
-        input: Vec<Value>,
+        input: &[Value],
+        has_upstream: bool,
         output: Option<&OutputTarget>,
     ) -> Result<Vec<Value>, EngineError> {
         let resolved = self.discover_alias(name);
         let name = resolved.as_deref().unwrap_or(name);
-        if !self.functions.contains_key(&name.to_ascii_lowercase()) {
-            if invocation::script_name(name)
-                && let CallTarget::Block(call) =
-                    self.named_target(name.into(), InvocationOperator::Ampersand)?
-            {
-                return self.function_output(&call, arguments, input);
-            }
-            if let Some(outputs) = self.invoke_builtin(name, arguments, &input)? {
-                return Ok(outputs);
-            }
-            let destination = output.map_or(NativeOutput::Objects, NativeOutput::Redirected);
-            return self.run_native(name, arguments, Some(&input), destination);
+        if let Some(outputs) = self.invoke_builtin(name, arguments, input)? {
+            return Ok(outputs);
         }
-        let function = self.function(name)?;
-        let call = ScriptCall::new(function, InvocationOperator::Ampersand);
-        self.function_output(&call, arguments, input)
+        let destination = output.map_or(NativeOutput::Objects, NativeOutput::Redirected);
+        self.run_native(name, arguments, has_upstream.then_some(input), destination)
     }
 
     fn invoke_builtin(
@@ -1659,14 +1661,14 @@ impl Engine {
                     } if name.eq_ignore_ascii_case("membername") => Some(value.to_string()),
                     _ => None,
                 });
-                let block_for = |wanted: &str| -> Option<Vec<Statement>> {
+                let block_for = |wanted: &str| {
                     arguments.source.iter().find_map(|argument| match argument {
                         CommandArgument::Parameter { name, value, .. }
                             if name.eq_ignore_ascii_case(wanted) =>
                         {
                             value.as_ref().and_then(|expr| match &expr.kind {
-                                ExprKind::ScriptBlock { statements, .. } => {
-                                    Some(statements.clone())
+                                ExprKind::ScriptBlock { block, .. } => {
+                                    Some(invocation::single_clause(block, "ForEach-Object"))
                                 }
                                 _ => None,
                             })
@@ -1674,19 +1676,19 @@ impl Engine {
                         _ => None,
                     })
                 };
-                let begin = block_for("begin");
-                let process = block_for("process");
-                let end = block_for("end");
+                let begin = block_for("begin").transpose()?;
+                let process = block_for("process").transpose()?;
+                let end = block_for("end").transpose()?;
                 if begin.is_some() || process.is_some() || end.is_some() {
                     let saved = self.capture.take();
                     self.capture = Some(Vec::new());
                     if let Some(begin) = begin {
-                        let _ = self.exec_block(&begin, &mut capture_sink())?;
+                        let _ = self.exec_block(begin, &mut capture_sink())?;
                     }
                     if let Some(process) = process {
                         for item in input {
                             let previous = self.variables.insert("_".to_owned(), item.clone());
-                            self.exec_block(&process, &mut capture_sink())?;
+                            self.exec_block(process, &mut capture_sink())?;
                             match previous {
                                 Some(value) => self.variables.insert("_".to_owned(), value),
                                 None => self.variables.remove("_"),
@@ -1694,20 +1696,20 @@ impl Engine {
                         }
                     }
                     if let Some(end) = end {
-                        self.exec_block(&end, &mut capture_sink())?;
+                        self.exec_block(end, &mut capture_sink())?;
                     }
                     let outputs = self.capture.take().unwrap_or_default();
                     self.capture = saved;
                     return Ok(Some(outputs));
                 }
                 if let Some(script) = script_block_argument(arguments.source) {
-                    let script = script.clone();
+                    let script = invocation::single_clause(script, "ForEach-Object")?;
                     let mut outputs = Vec::new();
                     for item in input {
                         let previous = self.variables.insert("_".to_owned(), item.clone());
                         let saved = self.capture.take();
                         self.capture = Some(Vec::new());
-                        let flow = self.exec_block(&script, &mut capture_sink());
+                        let flow = self.exec_block(script, &mut capture_sink());
                         let captured = self.capture.take().unwrap_or_default();
                         self.capture = saved;
                         match previous {
@@ -1779,13 +1781,13 @@ impl Engine {
                     }
                     .into());
                 };
-                let script = script.clone();
+                let script = invocation::single_clause(script, "Where-Object")?;
                 let mut outputs = Vec::new();
                 for item in input {
                     let previous = self.variables.insert("_".to_owned(), item.clone());
                     let saved = self.capture.take();
                     self.capture = Some(Vec::new());
-                    let flow = self.exec_block(&script, &mut capture_sink());
+                    let flow = self.exec_block(script, &mut capture_sink());
                     let captured = self.capture.take().unwrap_or_default();
                     self.capture = saved;
                     match previous {
@@ -5820,7 +5822,7 @@ impl Engine {
                 feature: "command invocation other than a defined function",
             })?;
         if let Some(source) = function.definition {
-            function.body = rpsh_syntax::parse(source)?.statements;
+            function.block = std::rc::Rc::new(rpsh_syntax::parse(source)?);
         }
         Ok(function)
     }
@@ -6602,12 +6604,12 @@ fn index_value(target: &Value, index: &Value) -> Result<Value, RuntimeError> {
     }
 }
 
-fn script_block_argument(arguments: &[CommandArgument]) -> Option<&Vec<Statement>> {
+fn script_block_argument(arguments: &[CommandArgument]) -> Option<&ScriptBlockAst> {
     arguments.iter().find_map(|argument| match argument {
         CommandArgument::Value(Expr {
-            kind: ExprKind::ScriptBlock { statements, .. },
+            kind: ExprKind::ScriptBlock { block, .. },
             ..
-        }) => Some(statements),
+        }) => Some(block.as_ref()),
         _ => None,
     })
 }
