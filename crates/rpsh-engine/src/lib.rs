@@ -1349,7 +1349,7 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
-            "write-output" | "echo" | "write-warning" | "write-information" | "write-error" => {
+            "write-output" | "write-warning" | "write-information" | "write-error" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let no_enumerate = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("noenumerate") && ops::is_true(value)
@@ -1457,7 +1457,7 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
-            "where-object" | "where" => {
+            "where-object" => {
                 if script_block_argument(arguments).is_none() {
                     let (positional, named) = self.evaluate_arguments(arguments)?;
                     let property = named
@@ -2067,7 +2067,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "set-itemproperty" | "sp" => {
+            "set-itemproperty" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let paths: Vec<String> = match named.iter().find(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
@@ -2122,7 +2122,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "get-itemproperty" | "gp" => {
+            "get-itemproperty" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let paths: Vec<String> = match named.iter().find(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
@@ -2453,7 +2453,7 @@ impl Engine {
                     ("FullName".to_owned(), Value::String(path.into())),
                 ])]))
             }
-            "remove-item" | "del" | "rm" => {
+            "remove-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let paths: Vec<String> = match named.iter().find(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
@@ -2578,7 +2578,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "copy-item" | "cp" => {
+            "copy-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let destination_named = named
                     .iter()
@@ -2651,7 +2651,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "move-item" | "mv" => {
+            "move-item" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let destination_named = named
                     .iter()
@@ -2713,7 +2713,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "get-childitem" | "ls" | "dir" => {
+            "get-childitem" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let mut paths: Vec<String> = match named.iter().find(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
@@ -3047,7 +3047,7 @@ impl Engine {
                     format!("{prefix}{}{suffix}", values.join(&separator)).into(),
                 )]))
             }
-            "clear-content" | "clc" => {
+            "clear-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let paths: Vec<String> = match named.iter().find(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
@@ -3086,7 +3086,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "add-content" | "ac" => {
+            "add-content" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path_named = named.iter().any(|(name, _)| {
                     name.eq_ignore_ascii_case("path") || name.eq_ignore_ascii_case("literalpath")
@@ -3817,7 +3817,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "invoke-expression" | "iex" => {
+            "invoke-expression" => {
                 let (positional, _) = self.evaluate_arguments(arguments)?;
                 let Some(source) = positional.first() else {
                     return Err(RuntimeError::NotImplemented {
@@ -4328,7 +4328,7 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
-            "get-member" | "gm" => {
+            "get-member" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
                 let member_type = named
                     .iter()
@@ -4367,7 +4367,7 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
-            "format-table" | "ft" => {
+            "format-table" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
                 let property = expand_property_value(
                     input,
@@ -4381,7 +4381,7 @@ impl Engine {
                 });
                 Ok(Some(mark_format(input, "Table", property, hide_headers)))
             }
-            "format-list" | "fl" => {
+            "format-list" => {
                 let (_, named) = self.evaluate_arguments(arguments)?;
                 let property = expand_property_value(
                     input,
@@ -4392,7 +4392,7 @@ impl Engine {
                 );
                 Ok(Some(mark_format(input, "List", property, false)))
             }
-            "compare-object" | "diff" => {
+            "compare-object" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let include_equal = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("includeequal") && ops::is_true(value)
@@ -4755,7 +4755,7 @@ impl Engine {
             "get-host" => Ok(Some(vec![
                 automatic_variable("Host").unwrap_or(Value::Null),
             ])),
-            "get-module" | "gmo" => {
+            "get-module" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let wanted: Vec<String> = match named
                     .iter()
@@ -4782,7 +4782,7 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
-            "get-alias" | "gal" => {
+            "get-alias" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let wanted: Vec<String> = match named
                     .iter()
@@ -4840,7 +4840,7 @@ impl Engine {
                 outputs.sort_by_key(|value| value.to_string());
                 Ok(Some(outputs))
             }
-            "set-alias" | "sal" => {
+            "set-alias" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let name = named
                     .iter()
@@ -4857,7 +4857,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "get-command" | "gcm" => {
+            "get-command" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 if let Some((_, module)) = named
                     .iter()
@@ -5023,7 +5023,7 @@ impl Engine {
                         .collect(),
                 ))
             }
-            "get-location" | "pwd" => Ok(Some(vec![Value::object(vec![(
+            "get-location" => Ok(Some(vec![Value::object(vec![(
                 "Path".to_owned(),
                 Value::String(
                     std::env::current_dir()
@@ -5031,7 +5031,7 @@ impl Engine {
                         .into(),
                 ),
             )])])),
-            "set-location" | "cd" => {
+            "set-location" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
@@ -5056,7 +5056,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "push-location" | "pushd" => {
+            "push-location" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 let path = named
                     .iter()
@@ -5075,7 +5075,7 @@ impl Engine {
                 }
                 Ok(Some(Vec::new()))
             }
-            "pop-location" | "popd" => {
+            "pop-location" => {
                 if let Some(path) = self.locations.pop() {
                     let _ = std::env::set_current_dir(path);
                 }
@@ -7666,21 +7666,42 @@ fn sort_key(value: &Value, property: &Value) -> String {
 }
 
 const DEFAULT_ALIASES: &[(&str, &str)] = &[
+    #[cfg(windows)]
+    ("ac", "Add-Content"),
     ("cd", "Set-Location"),
     ("chdir", "Set-Location"),
+    ("clc", "Clear-Content"),
+    #[cfg(windows)]
+    ("cp", "Copy-Item"),
     ("del", "Remove-Item"),
+    #[cfg(windows)]
+    ("diff", "Compare-Object"),
     ("dir", "Get-ChildItem"),
     ("echo", "Write-Output"),
     ("erase", "Remove-Item"),
+    ("fl", "Format-List"),
+    ("ft", "Format-Table"),
     ("gal", "Get-Alias"),
     ("gc", "Get-Content"),
     ("gci", "Get-ChildItem"),
     ("gcm", "Get-Command"),
+    ("gm", "Get-Member"),
+    ("gmo", "Get-Module"),
+    ("gp", "Get-ItemProperty"),
     ("iex", "Invoke-Expression"),
+    #[cfg(windows)]
+    ("ls", "Get-ChildItem"),
+    #[cfg(windows)]
+    ("mv", "Move-Item"),
+    ("popd", "Pop-Location"),
+    ("pushd", "Push-Location"),
     ("pwd", "Get-Location"),
     ("rd", "Remove-Item"),
+    #[cfg(windows)]
+    ("rm", "Remove-Item"),
     ("sal", "Set-Alias"),
     ("sl", "Set-Location"),
+    ("sp", "Set-ItemProperty"),
     ("type", "Get-Content"),
     ("where", "Where-Object"),
 ];

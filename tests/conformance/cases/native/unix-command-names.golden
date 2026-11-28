@@ -1,0 +1,9 @@
+rpsh-golden-v2
+exit=0
+.
+0
+0
+local cp
+local mv
+local rm
+local ac

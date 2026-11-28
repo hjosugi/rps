@@ -93,6 +93,7 @@ native/environment
 native/exit-code
 native/glob
 native/pipe
+native/unix-command-names
 ops/comparison
 ops/ternary-coalesce
 pipeline/compare-object
