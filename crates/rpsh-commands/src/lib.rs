@@ -22,6 +22,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod signature;
+
 /// Exports of a built-in PowerShell module, available before it is loaded.
 #[derive(Debug)]
 pub struct BuiltinModule {

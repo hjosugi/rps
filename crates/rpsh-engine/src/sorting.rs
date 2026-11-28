@@ -6,6 +6,7 @@ use super::{
     Engine, EngineError, PreparedArguments, cast_to, convert_int32, datetime_fields,
     datetime_ticks, flatten_value, member, timespan_ticks, visible_entries,
 };
+use rpsh_commands::signature::{ParameterType, SORT_OBJECT};
 use rpsh_runtime::{PsString, RuntimeError, Value, culture, ops, wildcard};
 use rpsh_syntax::{ArgumentSeparator, Statement, parse};
 use std::cell::OnceCell;
@@ -112,18 +113,6 @@ impl Field {
     }
 }
 
-const PARAMETER_NAMES: &[&str] = &[
-    "Stable",
-    "Descending",
-    "Unique",
-    "Top",
-    "Bottom",
-    "Property",
-    "InputObject",
-    "Culture",
-    "CaseSensitive",
-];
-
 fn binding_error(id: &'static str, message: String) -> RuntimeError {
     RuntimeError::Script {
         id,
@@ -143,11 +132,11 @@ fn duplicate_parameter(name: &str) -> RuntimeError {
 // As in the cmdlet binder, a switch followed by whitespace leaves the next
 // value positional. Only a colon binds an explicit boolean to that switch.
 fn sort_parameter(name: &str) -> Result<&str, RuntimeError> {
+    if let Some(exact) = SORT_OBJECT.parameter(name) {
+        return Ok(exact.name);
+    }
     let lower = name.to_ascii_lowercase();
-    let mut matches = PARAMETER_NAMES
-        .iter()
-        .copied()
-        .filter(|key| key.to_ascii_lowercase().starts_with(&lower));
+    let mut matches = SORT_OBJECT.matching(name).map(|p| p.name);
     let Some(first) = matches.next() else {
         // Common parameter names are valid for every cmdlet.
         if crate::functions::common_binding(&lower).is_some() {
@@ -194,22 +183,21 @@ impl Engine {
                     ..
                 } => {
                     let name = sort_parameter(&name)?;
-                    let switch =
-                        matches!(name, "Stable" | "Descending" | "Unique" | "CaseSensitive");
+                    let parameter = SORT_OBJECT.parameter(name);
+                    let switch = parameter.is_some_and(|p| p.ty == ParameterType::Switch)
+                        || matches!(
+                            crate::functions::common_binding(&name.to_ascii_lowercase()),
+                            Some(crate::ArgumentBinding::Switch)
+                        );
                     let bound = match value {
                         Some(value) if switch && separator == ArgumentSeparator::Space => {
                             positional.push(value);
                             Value::Bool(true)
                         }
                         Some(value) => value,
-                        None if switch || !PARAMETER_NAMES.contains(&name) => Value::Bool(true),
+                        None if switch || parameter.is_none() => Value::Bool(true),
                         None => {
-                            let ty = match name {
-                                "Top" | "Bottom" => "System.Int32",
-                                "Culture" => "System.String",
-                                "InputObject" => "System.Management.Automation.PSObject",
-                                _ => "System.Object[]",
-                            };
+                            let ty = parameter.expect("known value parameter").ty.full_name();
                             return Err(binding_error("MissingArgument,Microsoft.PowerShell.Commands.SortObjectCommand",format!("Missing an argument for parameter '{name}'. Specify a parameter of type '{ty}' and try again.")).into());
                         }
                     };
@@ -240,11 +228,7 @@ impl Engine {
         let flag = |name: &str| parameter(name).is_some_and(ops::is_true);
         let top = parameter("Top");
         let bottom = parameter("Bottom");
-        if usize::from(top.is_some())
-            + usize::from(bottom.is_some())
-            + usize::from(parameter("Stable").is_some())
-            > 1
-        {
+        if !SORT_OBJECT.accepts_named(named.keys().map(String::as_str)) {
             return Err(RuntimeError::Script {
                 id: "AmbiguousParameterSet,Microsoft.PowerShell.Commands.SortObjectCommand",
                 category: "InvalidArgument: (:) [Sort-Object], ParameterBindingException".into(),

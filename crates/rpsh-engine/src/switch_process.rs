@@ -4,6 +4,7 @@ use super::{
     ArgumentBinding, Engine, EngineError, PreparedArguments, ScriptException, environment,
     errors::record_with_exception, functions::common_binding,
 };
+use rpsh_commands::signature::SWITCH_PROCESS;
 use rpsh_runtime::{PsString, Value};
 use rpsh_syntax::CommandArgument;
 use std::io::{self, Write};
@@ -11,7 +12,7 @@ use std::io::{self, Write};
 const BINDING: &str = "System.Management.Automation.ParameterBindingException";
 
 fn with_command(name: &str) -> bool {
-    !name.is_empty() && "withcommand".starts_with(&name.to_ascii_lowercase())
+    SWITCH_PROCESS.matching(name).next().is_some()
 }
 
 fn record(id: &str, kind: &str, ty: &str, message: &str, target: Value) -> Value {
@@ -90,13 +91,17 @@ impl Engine {
             if let CommandArgument::Parameter { name, value, .. } = argument
                 && with_command(name)
             {
+                let parameter = &SWITCH_PROCESS.parameters[0];
                 if seen {
-                    return Err(binding_error("ParameterAlreadyBound", &["", "WithCommand"]));
+                    return Err(binding_error(
+                        "ParameterAlreadyBound",
+                        &["", parameter.name],
+                    ));
                 }
                 if value.is_none() {
                     return Err(binding_error(
                         "MissingArgument",
-                        &["", "WithCommand", "System.String[]"],
+                        &["", parameter.name, parameter.ty.full_name()],
                     ));
                 }
                 seen = true;

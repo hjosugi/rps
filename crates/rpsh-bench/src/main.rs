@@ -50,8 +50,10 @@ Usage: cargo harness <command>
       code and timeout. This is separate from scripts/check.sh until rpsh has
       an interactive host.
 
-  inventory
-      Summarize inventory/*.tsv: how much of upstream's surface is done.
+  inventory [--parameters | --check-parameters] [--command NAME] [--platform PLATFORM] [--registered-only]
+      Summarize inventories and compare the binder declarations against pwsh.
+      --parameters prints each cmdlet and its differences; --check-parameters also fails on differences.
+      --registered-only limits comparison to cmdlets with executable parameter declarations.
 
 The reference pwsh is found through --pwsh, $RPSH_PWSH, .cache/pwsh/ (filled by
 scripts/fetch-pwsh.sh), then PATH.";

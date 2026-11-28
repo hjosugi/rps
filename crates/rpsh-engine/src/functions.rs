@@ -337,32 +337,31 @@ pub(super) fn common_binding(lower: &str) -> Option<ArgumentBinding> {
     }
 }
 
-pub(super) fn session_info(name: &str, kind: &str) -> Option<Value> {
-    if !(cfg!(unix) && kind == "Cmdlet" && name == "Switch-Process") {
+pub(super) fn declared_info(name: &str, kind: &str) -> Option<Value> {
+    if kind != "Cmdlet" {
         return None;
     }
+    let signature = rpsh_commands::signature::lookup(name)?;
+    let module = rpsh_commands::MODULES
+        .iter()
+        .find(|m| m.name == signature.module);
     let mut props = command_properties(name, kind, CMDLET);
     props.extend([
+        ("Source".into(), Value::String(signature.module.into())),
+        ("ModuleName".into(), Value::String(signature.module.into())),
         (
-            "Source".into(),
-            Value::String("Microsoft.PowerShell.Core".into()),
+            "Version".into(),
+            super::version_value(module.map_or("7.7.0.500", |m| m.version).into()),
         ),
-        (
-            "ModuleName".into(),
-            Value::String("Microsoft.PowerShell.Core".into()),
-        ),
-        ("Version".into(), super::version_value("7.7.0.500".into())),
         (
             "Definition".into(),
-            Value::String(
-                "\nSwitch-Process [[-WithCommand] <string[]>] [<CommonParameters>]\n".into(),
-            ),
+            Value::String(signature.syntax(name).into()),
         ),
         ("Visibility".into(), Value::String("Public".into())),
         ("Options".into(), Value::String("ReadOnly".into())),
         (
             "RemotingCapability".into(),
-            Value::String("PowerShell".into()),
+            Value::String(signature.remoting_capability.into()),
         ),
     ]);
     Some(Value::object(props))

@@ -3,6 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      strict_parameter_inventory:
+        description: Fail on any difference across the entire upstream parameter inventory
+        type: boolean
+        default: false
   pull_request:
     branches: [main]
 
@@ -35,6 +41,20 @@ jobs:
       # The conformance check compares rpsh with pwsh output recorded in the
       # repository, so it needs no pwsh here.
       - run: scripts/check.sh
+      - name: Audit registered cmdlet parameter declarations
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo harness inventory --check-parameters --registered-only
+      - name: Report all upstream parameter differences
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo harness inventory --parameters > parameter-inventory.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          name: parameter-inventory
+          path: parameter-inventory.txt
+      - name: Enforce the entire upstream parameter inventory
+        if: matrix.os == 'ubuntu-latest' && inputs.strict_parameter_inventory
+        run: cargo harness inventory --check-parameters
 
   dependencies:
     name: cargo deny (advisories, bans, licenses, sources)

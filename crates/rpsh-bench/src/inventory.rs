@@ -5,6 +5,8 @@
 //! accelerators, AST node types and so on. The last two columns are
 //! `platform` and `status`; the status is edited by hand as work lands.
 
+mod parameters;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
@@ -14,8 +16,24 @@ use crate::Args;
 const STATUSES: [&str; 4] = ["done", "partial", "todo", "n/a"];
 
 pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
-    Args::new(args).finish()?;
+    let mut args = Args::new(args);
+    let options = parameters::Options {
+        details: args.flag("--parameters"),
+        check: args.flag("--check-parameters"),
+        registered_only: args.flag("--registered-only"),
+        command: args.value("--command")?,
+        platform: args.value("--platform")?,
+    };
+    args.finish()?;
     let directory = root.join("inventory");
+    if options.details
+        || options.check
+        || options.registered_only
+        || options.command.is_some()
+        || options.platform.is_some()
+    {
+        return parameters::run(&directory, &options);
+    }
     let mut files: Vec<_> = fs::read_dir(&directory)
         .map_err(|error| format!("cannot read {}: {error}", directory.display()))?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
@@ -46,7 +64,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<bool, String> {
             print_row(platform, name, *counts);
         }
     }
-    Ok(true)
+    parameters::run(&directory, &options)
 }
 
 fn print_row(platform: &str, name: &str, counts: [usize; 4]) {

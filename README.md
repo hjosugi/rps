@@ -53,9 +53,19 @@ cargo harness bench --suite profiles # pwsh profile cost by fixture
 cargo harness bench --export-hyperfine hyperfine.json
 cargo bench -p rpsh-research --bench engine_micro
 cargo harness conform check         # differential tests; needs no pwsh
-cargo harness inventory             # how much of upstream is done
+cargo harness inventory             # inventory status and verified parameter counts
+cargo harness inventory --parameters --command Sort-Object
+cargo harness inventory --check-parameters --registered-only
 scripts/check.sh                    # fmt, clippy, tests, conformance
 ```
+
+The parameter audit compares the declarations used for binding and `Get-Command -Syntax`
+with the pinned PowerShell inventory. It reports missing and unexpected names, types,
+parameter sets and aliases per cmdlet. Use `--platform linux-x64` to select an inventory.
+CI publishes the full report and checks registered signatures. The manual CI workflow's
+`strict_parameter_inventory` option runs `cargo harness inventory --check-parameters`
+over every upstream cmdlet, including those that declare zero parameters. Parameter
+metadata coverage is tracked separately from cmdlet behavior.
 
 ## Measurements
 
