@@ -40,6 +40,15 @@ fn main() {
             "(assign Equals (var {name}) (command-expression {}))",
             format_expr(value)
         ),
+        Statement::StaticMemberAssign {
+            type_name,
+            name,
+            value,
+            ..
+        } => format!(
+            "(assign Equals (static {type_name} {name}) (command-expression {}))",
+            format_expr(value)
+        ),
         Statement::AssignPipeline { name, commands, .. } => {
             format!("(assign Equals (var {name}) {})", format_pipeline(commands))
         }

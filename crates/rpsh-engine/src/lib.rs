@@ -12,10 +12,12 @@
 //! on first use.
 
 mod aliases;
+mod encoding;
 mod native;
 mod redirection;
 
 use aliases::Aliases;
+use encoding::Encoding;
 use native::NativeOutput;
 use redirection::{OutputTarget, record_prefix};
 use std::collections::HashMap;
@@ -45,6 +47,9 @@ pub struct Engine {
     trap: Option<Vec<Statement>>,
     /// Objects written to the host, formatted as one table at the end.
     host_objects: Vec<Value>,
+    // ConsoleHost keeps its text writer once the first host value is rendered.
+    // Native stdout bypasses that writer and does not select its encoding.
+    host_encoding: Option<Encoding>,
     /// The generator Get-Random draws from; -SetSeed replaces it.
     random: Option<RandomGenerator>,
     /// `$global:`/`$script:` variables, kept across function calls.
@@ -352,7 +357,7 @@ impl Engine {
         let flow = self.exec_block(&script.statements, out)?;
         self.flush_host(out)?;
         if self.host_text {
-            out.write_all(b"\n")?;
+            self.write_host(out, format_args!("\n"))?;
             self.host_text = false;
         }
         let implicit_exit = i32::from(command_mode && self.last_failed);
@@ -666,7 +671,7 @@ impl Engine {
             }
             Statement::Assign { name, value, .. } => {
                 let value = self.eval_pipeline_expression(value)?;
-                self.assign_variable(name, value);
+                self.assign_variable(name, value)?;
                 Ok(Flow::Normal)
             }
             Statement::MemberAssign {
@@ -682,6 +687,26 @@ impl Engine {
                     value,
                     "member assignment on a value that is not an object",
                 )?;
+                self.last_failed = false;
+                Ok(Flow::Normal)
+            }
+            Statement::StaticMemberAssign {
+                type_name,
+                name,
+                value,
+                ..
+            } => {
+                if normalize_type(type_name) != "console"
+                    || !name.eq_ignore_ascii_case("OutputEncoding")
+                {
+                    return Err(RuntimeError::NotImplemented {
+                        feature: "setting this static property",
+                    }
+                    .into());
+                }
+                let value = self.eval_expression(value)?;
+                self.flush_host(out)?;
+                encoding::set_console(&value)?;
                 self.last_failed = false;
                 Ok(Flow::Normal)
             }
@@ -734,13 +759,13 @@ impl Engine {
             Statement::AssignChain { name, chain, .. } => {
                 let (flow, output) = self.capture_chain(chain)?;
                 if matches!(flow, Flow::Normal) {
-                    self.assign_variable(name, output);
+                    self.assign_variable(name, output)?;
                 }
                 Ok(flow)
             }
             Statement::AssignPipeline { name, commands, .. } => {
                 let outputs = self.pipeline_output(commands)?;
-                self.assign_variable(name, scalar_or_array(outputs.into_iter()));
+                self.assign_variable(name, scalar_or_array(outputs.into_iter()))?;
                 Ok(Flow::Normal)
             }
             Statement::MultiAssign { targets, value, .. } => {
@@ -1041,12 +1066,24 @@ impl Engine {
         )
     }
 
-    fn assign_variable(&mut self, name: &str, value: Value) {
-        let key = strip_scope(name).to_owned();
+    fn assign_variable(&mut self, name: &str, value: Value) -> Result<(), EngineError> {
+        let key = strip_scope(name);
+        let key = if let Some(canonical) = encoding::variable_name(key) {
+            if !value.is_null_like() && Encoding::from_value(&value).is_none() {
+                return Err(RuntimeError::Script {
+                    id: "RuntimeException",
+                    category: "MetadataError: (:) [], ArgumentTransformationMetadataException".into(),
+                    exception_type: "System.Management.Automation.ArgumentTransformationMetadataException",
+                    message: format!("Cannot convert the \"{value}\" value of type \"{}\" to type \"System.Text.Encoding\".", get_type(&value)),
+                }.into());
+            }
+            canonical
+        } else { key }.to_owned();
         if is_global_scope(name) {
             self.globals.insert(key.clone(), value.clone());
         }
         self.variables.insert(key, value);
+        Ok(())
     }
 
     fn assign_property(
@@ -1091,7 +1128,7 @@ impl Engine {
     fn assign_element(&mut self, target: &Expr, value: Value) -> Result<(), EngineError> {
         match &target.kind {
             ExprKind::Variable(name) => {
-                self.assign_variable(name, value);
+                self.assign_variable(name, value)?;
                 Ok(())
             }
             ExprKind::Paren(inner) => self.assign_element(inner, value),
@@ -1171,7 +1208,7 @@ impl Engine {
                 self.flush_host(out)?;
                 NativeOutput::Host(out)
             };
-            for value in self.run_native(name, arguments, &[], destination)? {
+            for value in self.run_native(name, arguments, None, destination)? {
                 self.write_value(value, out)?;
             }
             return Ok(Flow::Normal);
@@ -1425,6 +1462,7 @@ impl Engine {
     ) -> Result<Vec<Value>, EngineError> {
         let mut input = Vec::new();
         let mut failed = false;
+        let mut has_upstream = false;
         while let Some((command, remaining)) = commands.split_first() {
             commands = remaining;
             if let Some(first) = self.native_stage(command) {
@@ -1456,7 +1494,8 @@ impl Engine {
                 } else {
                     NativeOutput::Objects
                 };
-                input = self.run_native_stages(&stages, &input, destination)?;
+                input =
+                    self.run_native_stages(&stages, has_upstream.then_some(&input), destination)?;
             } else {
                 input = match command {
                     PipelineCommand::Expression(expr) => {
@@ -1471,6 +1510,7 @@ impl Engine {
                     } => self.run_redirected(command, input, redirections)?,
                 };
             }
+            has_upstream = true;
             failed |= self.last_failed;
         }
         self.last_failed = failed;
@@ -1492,7 +1532,7 @@ impl Engine {
                 return Ok(outputs);
             }
             let destination = output.map_or(NativeOutput::Objects, NativeOutput::Redirected);
-            return self.run_native(name, arguments, &input, destination);
+            return self.run_native(name, arguments, Some(&input), destination);
         }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -2358,7 +2398,8 @@ impl Engine {
                         self.variables.insert(format!("env:{name}"), value);
                     }
                     "variable" => {
-                        let key = strip_scope(name).to_owned();
+                        let key = strip_scope(name);
+                        let key = encoding::variable_name(key).unwrap_or(key).to_owned();
                         if is_global_scope(name) {
                             self.globals.insert(key.clone(), value.clone());
                         }
@@ -4290,12 +4331,20 @@ impl Engine {
                 });
                 let mut outputs = Vec::new();
                 for name in names {
-                    let key = strip_scope(&name).to_owned();
-                    if is_global_scope(&name) {
-                        self.globals.insert(key.clone(), value.clone());
-                    }
-                    self.variables.insert(key.clone(), value.clone());
+                    self.assign_variable(&name, value.clone()).map_err(|err| match err {
+                        EngineError::Runtime(RuntimeError::Script { id: "RuntimeException", category, exception_type, message }) => {
+                            let id = if lower == "set-variable" {
+                                "RuntimeException,Microsoft.PowerShell.Commands.SetVariableCommand"
+                            } else {
+                                "RuntimeException,Microsoft.PowerShell.Commands.NewVariableCommand"
+                            };
+                            EngineError::Runtime(RuntimeError::Script { id, category, exception_type, message })
+                        }
+                        other => other,
+                    })?;
                     if pass_thru {
+                        let key = strip_scope(&name);
+                        let key = encoding::variable_name(key).unwrap_or(key);
                         outputs.push(Value::object(vec![
                             ("Name".to_owned(), Value::String(key.into())),
                             ("Value".to_owned(), value.clone()),
@@ -6296,13 +6345,18 @@ impl Engine {
         Ok(Flow::Normal)
     }
 
+    fn write_host(&mut self, out: &mut dyn Write, text: fmt::Arguments<'_>) -> io::Result<()> {
+        let encoding = self.host_encoding.get_or_insert_with(encoding::console);
+        encoding::write_host(*encoding, out, text)
+    }
+
     fn flush_host(&mut self, out: &mut dyn Write) -> Result<(), EngineError> {
         if self.host_objects.is_empty() {
             return Ok(());
         }
         let text = format_host_stream(&self.host_objects);
         self.host_objects.clear();
-        out.write_all(text.as_bytes())?;
+        self.write_host(out, format_args!("{text}"))?;
         Ok(())
     }
 
@@ -6322,7 +6376,7 @@ impl Engine {
         if let Value::Object(entries) = &value {
             if let Some(prefix) = record_prefix(&value) {
                 self.flush_host(out)?;
-                writeln!(out, "{prefix}{value}")?;
+                self.write_host(out, format_args!("{prefix}{value}\n"))?;
                 return Ok(());
             }
             let host_text = entries
@@ -6334,7 +6388,7 @@ impl Engine {
                 });
             if let Some(text) = host_text {
                 self.flush_host(out)?;
-                write!(out, "\n{text}\n")?;
+                self.write_host(out, format_args!("\n{text}\n"))?;
                 self.host_text = true;
                 return Ok(());
             }
@@ -6353,7 +6407,7 @@ impl Engine {
                 });
             if let Some(text) = text {
                 self.flush_host(out)?;
-                writeln!(out, "{text}")?;
+                self.write_host(out, format_args!("{text}\n"))?;
                 return Ok(());
             }
             self.host_objects.push(value);
@@ -6370,14 +6424,14 @@ impl Engine {
                 self.flush_host(out)?;
                 for item in items.iter() {
                     if !item.is_null_like() {
-                        writeln!(out, "{item}")?;
+                        self.write_host(out, format_args!("{item}\n"))?;
                     }
                 }
             }
             Value::Null | Value::AutomationNull => {}
             value => {
                 self.flush_host(out)?;
-                writeln!(out, "{value}")?;
+                self.write_host(out, format_args!("{value}\n"))?;
             }
         }
         Ok(())
@@ -8339,14 +8393,11 @@ fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) ->
             .map(|value| Value::String(value.into()));
     }
     let key = strip_scope(name);
+    let key = encoding::variable_name(key).unwrap_or(key);
     if let Some(value) = variables.get(key) {
         return Some(value.clone());
     }
     automatic_variable(key)
-}
-
-fn encoding_value() -> Value {
-    Value::object(vec![("WebName".to_owned(), Value::String("utf-8".into()))])
 }
 
 fn typed_scalar(type_name: &str, text: &str) -> Value {
@@ -8400,7 +8451,8 @@ fn automatic_variable(name: &str) -> Option<Value> {
             Value::String("PlainText".into()),
         )])),
         "ErrorView" => Some(Value::String("ConciseView".into())),
-        "OutputEncoding" => Some(encoding_value()),
+        "OutputEncoding" => Some(encoding::UTF8.value()),
+        "PSApplicationOutputEncoding" => Some(Value::Null),
         "Host" => Some(Value::object(vec![
             ("Name".to_owned(), Value::String("ConsoleHost".into())),
             ("Version".to_owned(), Value::String("7.7.0".into())),
@@ -8962,7 +9014,14 @@ fn static_member(
         ("datetimekind", "unspecified") => Ok(Value::Int32(0)),
         ("console", "isoutputredirected") => Ok(Value::Bool(true)),
         ("console", "windowwidth") => Ok(Value::Int32(0)),
-        ("console", "outputencoding") => Ok(encoding_value()),
+        ("console", "outputencoding") => Ok(encoding::console().value()),
+        ("text.encoding", name) => {
+            Encoding::property(name)
+                .map(Encoding::value)
+                .ok_or(RuntimeError::NotImplemented {
+                    feature: "this Encoding property",
+                })
+        }
         ("double", "maxvalue") => Ok(Value::Double(f64::MAX)),
         ("double", "minvalue") => Ok(Value::Double(f64::MIN)),
         ("double", "epsilon") => Ok(Value::Double(f64::EPSILON)),
@@ -8998,6 +9057,19 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
+        ("text.encoding", "getencoding") if arguments.len() == 1 => {
+            Encoding::by_name(&arguments[0]).map(Encoding::value).ok_or(
+                RuntimeError::NotImplemented {
+                    feature: "this encoding name or code page",
+                },
+            )
+        }
+        ("text.utf8encoding", "new")
+            if arguments.len() <= 2 && !arguments.get(1).is_some_and(ops::is_true) =>
+        {
+            Ok(Encoding::new_utf8(arguments.first().is_some_and(ops::is_true)).value())
+        }
+
         ("datetime", "new") => {
             let number = |index: usize| -> Result<i32, RuntimeError> {
                 arguments.get(index).map_or(Ok(0), convert_int32)
@@ -10129,6 +10201,27 @@ fn object_method(
     name: &str,
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
+    if let Some(encoding) = Encoding::from_entries(entries) {
+        match (name.to_ascii_lowercase().as_str(), arguments) {
+            ("getpreamble", []) => {
+                return Ok(Value::array(
+                    encoding
+                        .preamble()
+                        .iter()
+                        .copied()
+                        .map(Value::Byte)
+                        .collect(),
+                ));
+            }
+            ("getbytes", [Value::String(text)]) => {
+                let mut bytes = Vec::new();
+                encoding.encode(&text.to_string_lossy(), &mut bytes);
+                return Ok(Value::array(bytes.into_iter().map(Value::Byte).collect()));
+            }
+            ("tostring", []) => return Ok(Value::String(encoding.value().to_string().into())),
+            _ => {}
+        }
+    }
     match name.to_ascii_lowercase().as_str() {
         "tostring"
             if entries.iter().any(|(key, value)| {

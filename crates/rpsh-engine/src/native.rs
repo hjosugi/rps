@@ -1,3 +1,5 @@
+use super::encoding::Encoding;
+use super::{encoding, format_out_string, redirection::text_output_width};
 use std::borrow::Cow;
 use std::io::{self, Write};
 use std::process::Command;
@@ -72,7 +74,7 @@ impl Engine {
         &mut self,
         name: &str,
         arguments: &[CommandArgument],
-        input: &[Value],
+        input: Option<&[Value]>,
         destination: NativeOutput<'_>,
     ) -> Result<Vec<Value>, EngineError> {
         let stage = NativeStage {
@@ -86,7 +88,7 @@ impl Engine {
     pub(super) fn run_native_stages(
         &mut self,
         stages: &[NativeStage<'_>],
-        input: &[Value],
+        input: Option<&[Value]>,
         destination: NativeOutput<'_>,
     ) -> Result<Vec<Value>, EngineError> {
         let mut commands = Vec::with_capacity(stages.len());
@@ -105,8 +107,14 @@ impl Engine {
             commands.push(command);
         }
         let mut bytes = Vec::new();
-        for value in input {
-            writeln!(bytes, "{value}")?;
+        if let Some(values) = input {
+            let encoding = self
+                .variables
+                .get("OutputEncoding")
+                .and_then(Encoding::from_value)
+                .unwrap_or(encoding::UTF8);
+            bytes.extend_from_slice(encoding.preamble());
+            encoding.encode(&format_out_string(values, text_output_width()), &mut bytes);
         }
         let mut captured = Vec::new();
         let output = match destination {
@@ -128,8 +136,13 @@ impl Engine {
         self.assign_variable(
             "global:LASTEXITCODE",
             Value::Int32(native_exit_code(status.last)),
-        );
-        Ok(native_lines(&captured))
+        )?;
+        let encoding = self
+            .variables
+            .get("PSApplicationOutputEncoding")
+            .and_then(Encoding::from_value)
+            .unwrap_or_else(encoding::console);
+        Ok(native_lines(&encoding.decode(&captured)))
     }
 
     fn native_arguments(
@@ -170,9 +183,7 @@ impl Engine {
 
 // StreamReader.ReadLine recognizes CR, LF, and CRLF and does not synthesize
 // an empty record for a trailing line terminator.
-fn native_lines(bytes: &[u8]) -> Vec<Value> {
-    let text = String::from_utf8_lossy(bytes);
-    let mut remaining = text.as_ref();
+fn native_lines(mut remaining: &str) -> Vec<Value> {
     let mut values = Vec::new();
     while let Some(index) = remaining.find(['\r', '\n']) {
         values.push(Value::String(remaining[..index].into()));

@@ -86,14 +86,17 @@ impl OutputTarget {
             && !values.is_empty()
         {
             let mut writer = file;
-            let width = if std::env::var_os("TERM").is_some_and(|term| !term.is_empty()) {
-                80
-            } else {
-                i32::MAX as usize
-            };
-            writer.write_all(format_out_string(values, width).as_bytes())?;
+            writer.write_all(format_out_string(values, text_output_width()).as_bytes())?;
         }
         Ok(())
+    }
+}
+
+pub(super) fn text_output_width() -> usize {
+    if std::env::var_os("TERM").is_some_and(|term| !term.is_empty()) {
+        80
+    } else {
+        i32::MAX as usize
     }
 }
 

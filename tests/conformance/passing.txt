@@ -95,11 +95,13 @@ modules/import-many
 modules/utility-alias
 native/byte-pipe
 native/capture
+native/console-encoding
 native/environment
 native/exit-code
 native/glob
 native/output-redirection
 native/pipe
+native/pipe-encoding
 native/pipeline-chain
 native/pipeline-status
 native/unix-command-names

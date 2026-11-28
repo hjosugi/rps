@@ -1,0 +1,18 @@
+rpsh-golden-v2
+exit=0
+RuntimeException
+RuntimeException,Microsoft.PowerShell.Commands.SetVariableCommand
+utf-8=f09f9880c4802dc3a90a
+us-ascii=3f3f3f2d3f0a
+utf-8=efbbbff09f9880c4802dc3a90a
+utf-16=fffe3dd800de00012d00e9000a00
+utf-16BE=feffd83dde000100002d00e9000a
+utf-32=fffe000000f60100000100002d000000e90000000a000000
+iso-8859-1=3f3f412de90a
+empty=fffe
+via-variable=3f0a
+via-provider=e90a
+|CommandType     Name                                               Version    Source|-----------     ----                                               -------    ------|Alias           type -> Get-Content                                           |
+é
+override=é ascii=? wide=Aé|B
+😀

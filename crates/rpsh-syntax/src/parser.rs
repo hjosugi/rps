@@ -244,6 +244,14 @@ impl Parser {
                         value,
                         span,
                     }),
+                    ExprKind::StaticMember { type_name, name } => {
+                        Ok(Statement::StaticMemberAssign {
+                            type_name,
+                            name,
+                            value,
+                            span,
+                        })
+                    }
                     ExprKind::Index { target, index } => Ok(Statement::IndexAssign {
                         target: *target,
                         index: *index,
@@ -2688,6 +2696,12 @@ mod tests {
                 value,
                 ..
             } => format!("{}.{name} = {}", show(target), show(value)),
+            Statement::StaticMemberAssign {
+                type_name,
+                name,
+                value,
+                ..
+            } => format!("[{type_name}]::{name} = {}", show(value)),
             Statement::IndexAssign {
                 target,
                 index,

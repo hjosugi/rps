@@ -67,6 +67,13 @@ pub enum Statement {
         value: Expr,
         span: Span,
     },
+    /// Assigns a static property such as `[Console]::OutputEncoding`.
+    StaticMemberAssign {
+        type_name: String,
+        name: String,
+        value: Expr,
+        span: Span,
+    },
     /// `$object[index] = expression`.
     IndexAssign {
         target: Expr,
