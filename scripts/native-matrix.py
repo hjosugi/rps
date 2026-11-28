@@ -33,7 +33,7 @@ CASES = [
     Scenario('scp', 'Copy between local paths with spaces',
              "scp -q 'input file.txt' 'copy file.txt' && cat 'copy file.txt'", 'alpha\nbeta\n'),
     Scenario('sudo', 'Read the installed version without prompting',
-             'sudo -V | head -n 1', r'Sudo version [^\n]+\n'),
+             'sudo -V | head -n 1', r'(?:Sudo version |sudo-rs )[0-9][^\n]*\n'),
     Scenario('vim', 'Edit and exit on a terminal',
              """vim -Nu NONE -n -i NONE -- 'input file.txt'
 $status=$LASTEXITCODE
