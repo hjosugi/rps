@@ -11,6 +11,9 @@
 //! requires that this stays true as state is added, by building each table
 //! on first use.
 
+mod aliases;
+
+use aliases::{Alias, Aliases};
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
@@ -42,8 +45,8 @@ pub struct Engine {
     globals: HashMap<String, Value>,
     /// User-defined PowerShell classes.
     classes: HashMap<String, ClassDef>,
-    /// `Set-Alias` definitions.
-    aliases: HashMap<String, String>,
+    /// Session aliases shared by command discovery, dispatch, and the provider.
+    aliases: Aliases,
     /// Names of the modules loaded by Import-Module.
     modules: Vec<String>,
     /// Functions introduced by each imported module.
@@ -999,7 +1002,7 @@ impl Engine {
         arguments: &[CommandArgument],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
-        let resolved = self.resolve_alias(name);
+        let resolved = self.aliases.definition(name);
         let name = resolved.as_deref().unwrap_or(name);
         if let Some(outputs) = self.run_builtin(name, arguments, &[])? {
             for value in outputs {
@@ -1235,7 +1238,7 @@ impl Engine {
         arguments: &[CommandArgument],
         input: Vec<Value>,
     ) -> Result<Vec<Value>, EngineError> {
-        let resolved = self.resolve_alias(name);
+        let resolved = self.aliases.definition(name);
         let name = resolved.as_deref().unwrap_or(name);
         if let Some(outputs) = self.run_builtin(name, arguments, &input)? {
             return Ok(outputs);
@@ -2350,12 +2353,18 @@ impl Engine {
                             .map(|(_, value)| value.clone())
                             .unwrap_or(Value::Null);
                         let definition = value.to_string();
-                        self.aliases
-                            .insert(name.to_ascii_lowercase(), definition.clone());
-                        return Ok(Some(vec![Value::object(vec![
-                            ("Name".to_owned(), Value::String(name.into())),
-                            ("Definition".to_owned(), Value::String(definition.into())),
-                        ])]));
+                        if self.aliases.get(name).is_some()
+                            && !named.iter().any(|(key, value)| {
+                                key.eq_ignore_ascii_case("force") && ops::is_true(value)
+                            })
+                        {
+                            return Err(RuntimeError::NotImplemented {
+                                feature: "New-Item on an existing alias without Force",
+                            }
+                            .into());
+                        }
+                        let alias = self.aliases.set(name.to_owned(), definition);
+                        return Ok(Some(vec![alias.value()]));
                     }
                     if !name.is_empty()
                         && (provider.eq_ignore_ascii_case("env")
@@ -2529,18 +2538,34 @@ impl Engine {
                                 continue;
                             }
                             "alias" => {
-                                if wildcard {
-                                    let keys: Vec<String> = self
-                                        .aliases
-                                        .keys()
-                                        .filter(|key| ops::wildcard_match(key, name, false))
-                                        .cloned()
-                                        .collect();
-                                    for key in keys {
-                                        self.aliases.remove(&key);
-                                    }
+                                let force = named.iter().any(|(key, value)| {
+                                    key.eq_ignore_ascii_case("force") && ops::is_true(value)
+                                });
+                                let keys: Vec<String> = if wildcard {
+                                    self.aliases
+                                        .iter()
+                                        .filter(|alias| {
+                                            ops::wildcard_match(alias.name, name, false)
+                                        })
+                                        .map(|alias| alias.name.to_owned())
+                                        .collect()
                                 } else {
-                                    self.aliases.remove(&name.to_ascii_lowercase());
+                                    vec![name.to_owned()]
+                                };
+                                if !force
+                                    && keys.iter().any(|key| {
+                                        self.aliases
+                                            .get(key)
+                                            .is_some_and(|alias| alias.options.read_only())
+                                    })
+                                {
+                                    return Err(RuntimeError::NotImplemented {
+                                        feature: "removing a read-only alias without Force",
+                                    }
+                                    .into());
+                                }
+                                for key in keys {
+                                    self.aliases.remove(&key);
                                 }
                                 continue;
                             }
@@ -4804,41 +4829,22 @@ impl Engine {
                             .collect()
                     })
                     .unwrap_or_default();
-                let mut entries: Vec<(String, String)> = self
+                let mut entries: Vec<_> = self
                     .aliases
                     .iter()
-                    .map(|(name, definition)| (name.clone(), definition.clone()))
+                    .filter(|alias| {
+                        (wanted.is_empty()
+                            || wanted
+                                .iter()
+                                .any(|pattern| ops::wildcard_match(alias.name, pattern, false)))
+                            && (definitions.is_empty()
+                                || definitions.iter().any(|pattern| {
+                                    ops::wildcard_match(alias.definition, pattern, false)
+                                }))
+                    })
                     .collect();
-                for (name, definition) in DEFAULT_ALIASES {
-                    entries.push(((*name).to_owned(), (*definition).to_owned()));
-                }
-                let mut outputs = Vec::new();
-                for (name, definition) in entries {
-                    let matches = wanted.is_empty()
-                        || wanted.iter().any(|wanted| {
-                            if wanted.contains(['*', '?']) {
-                                ops::wildcard_match(&name, wanted, false)
-                            } else {
-                                name.eq_ignore_ascii_case(wanted)
-                            }
-                        });
-                    let definition_matches = definitions.is_empty()
-                        || definitions.iter().any(|wanted| {
-                            if wanted.contains(['*', '?']) {
-                                ops::wildcard_match(&definition, wanted, false)
-                            } else {
-                                definition.eq_ignore_ascii_case(wanted)
-                            }
-                        });
-                    if matches && definition_matches {
-                        outputs.push(Value::object(vec![
-                            ("Name".to_owned(), Value::String(name.clone().into())),
-                            ("Definition".to_owned(), Value::String(definition.into())),
-                        ]));
-                    }
-                }
-                outputs.sort_by_key(|value| value.to_string());
-                Ok(Some(outputs))
+                entries.sort_by_cached_key(aliases::name_sort_key);
+                Ok(Some(entries.into_iter().map(Alias::value).collect()))
             }
             "set-alias" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
@@ -4853,7 +4859,27 @@ impl Engine {
                     .map(|(_, value)| value.to_string())
                     .or_else(|| positional.get(1).map(ToString::to_string));
                 if let (Some(name), Some(value)) = (name, value) {
-                    self.aliases.insert(name.to_ascii_lowercase(), value);
+                    let force = named.iter().any(|(key, value)| {
+                        key.eq_ignore_ascii_case("force") && ops::is_true(value)
+                    });
+                    if named.iter().any(|(key, value)| {
+                        key.eq_ignore_ascii_case("option")
+                            && !value.to_string().eq_ignore_ascii_case("none")
+                    }) {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "setting alias options",
+                        }
+                        .into());
+                    }
+                    if let Some(alias) = self.aliases.get(&name)
+                        && (alias.options.all_scope() || (!force && alias.options.read_only()))
+                    {
+                        return Err(RuntimeError::NotImplemented {
+                            feature: "changing a protected alias",
+                        }
+                        .into());
+                    }
+                    self.aliases.set(name, value);
                 }
                 Ok(Some(Vec::new()))
             }
@@ -4920,12 +4946,11 @@ impl Engine {
                 for builtin in BUILTIN_COMMANDS {
                     names.push(((*builtin).to_owned(), "Cmdlet"));
                 }
-                for (name, _) in DEFAULT_ALIASES {
-                    names.push(((*name).to_owned(), "Alias"));
-                }
-                for name in self.aliases.keys() {
-                    names.push((name.clone(), "Alias"));
-                }
+                names.extend(
+                    self.aliases
+                        .iter()
+                        .map(|alias| (alias.name.to_owned(), "Alias")),
+                );
                 let mut outputs = Vec::new();
                 for (name, kind) in names {
                     let matches = wanted.is_empty()
@@ -5627,26 +5652,19 @@ impl Engine {
                 }
             }
             "alias" => {
-                let mut entries: std::collections::BTreeMap<String, String> = DEFAULT_ALIASES
+                let mut entries: Vec<_> = self
+                    .aliases
                     .iter()
-                    .map(|(name, definition)| ((*name).to_owned(), (*definition).to_owned()))
+                    .filter(|alias| matches(alias.name))
                     .collect();
-                for (name, definition) in &self.aliases {
-                    entries.insert(name.clone(), definition.clone());
-                }
-                for (name, definition) in entries {
-                    if !matches(&name) {
-                        continue;
-                    }
-                    outputs.push(if names_only {
-                        Value::String(name.into())
+                entries.sort_by_cached_key(aliases::name_sort_key);
+                outputs.extend(entries.into_iter().map(|alias| {
+                    if names_only {
+                        Value::String(alias.name.into())
                     } else {
-                        Value::object(vec![
-                            ("Name".to_owned(), Value::String(name.into())),
-                            ("Definition".to_owned(), Value::String(definition.into())),
-                        ])
-                    });
-                }
+                        alias.value()
+                    }
+                }));
             }
             "function" => {
                 let mut functions: Vec<&FunctionDef> = self.functions.values().collect();
@@ -5714,21 +5732,10 @@ impl Engine {
                     },
                 )
             }
-            "alias" => {
-                let lower = name.to_ascii_lowercase();
-                let definition = self
-                    .aliases
-                    .get(&lower)
-                    .cloned()
-                    .or_else(|| default_alias(&lower).map(ToOwned::to_owned));
-                Some(match definition {
-                    Some(definition) => Ok(Value::object(vec![
-                        ("Name".to_owned(), Value::String(name.into())),
-                        ("Definition".to_owned(), Value::String(definition.into())),
-                    ])),
-                    None => missing(path),
-                })
-            }
+            "alias" => Some(match self.aliases.get(name) {
+                Some(alias) => Ok(alias.value()),
+                None => missing(path),
+            }),
             "function" => Some(match self.functions.get(&name.to_ascii_lowercase()) {
                 Some(function) => Ok(Value::object(vec![(
                     "Name".to_owned(),
@@ -5793,25 +5800,13 @@ impl Engine {
             }),
             "alias" => Some(if wildcard {
                 self.aliases
-                    .keys()
-                    .any(|candidate| ops::wildcard_match(candidate, name, false))
-                    || DEFAULT_ALIASES
-                        .iter()
-                        .any(|(candidate, _)| ops::wildcard_match(candidate, name, false))
+                    .iter()
+                    .any(|alias| ops::wildcard_match(alias.name, name, false))
             } else {
-                let lower = name.to_ascii_lowercase();
-                self.aliases.contains_key(&lower) || default_alias(&lower).is_some()
+                self.aliases.get(name).is_some()
             }),
             _ => None,
         }
-    }
-
-    fn resolve_alias(&self, name: &str) -> Option<String> {
-        let lower = name.to_ascii_lowercase();
-        self.aliases
-            .get(&lower)
-            .cloned()
-            .or_else(|| default_alias(&lower).map(ToOwned::to_owned))
     }
 
     fn function(&self, name: &str) -> Result<FunctionDef, EngineError> {
@@ -7663,54 +7658,6 @@ fn sort_key(value: &Value, property: &Value) -> String {
         Ok(value) => value.to_string(),
         Err(_) => String::new(),
     }
-}
-
-const DEFAULT_ALIASES: &[(&str, &str)] = &[
-    #[cfg(windows)]
-    ("ac", "Add-Content"),
-    ("cd", "Set-Location"),
-    ("chdir", "Set-Location"),
-    ("clc", "Clear-Content"),
-    #[cfg(windows)]
-    ("cp", "Copy-Item"),
-    ("del", "Remove-Item"),
-    #[cfg(windows)]
-    ("diff", "Compare-Object"),
-    ("dir", "Get-ChildItem"),
-    ("echo", "Write-Output"),
-    ("erase", "Remove-Item"),
-    ("fl", "Format-List"),
-    ("ft", "Format-Table"),
-    ("gal", "Get-Alias"),
-    ("gc", "Get-Content"),
-    ("gci", "Get-ChildItem"),
-    ("gcm", "Get-Command"),
-    ("gm", "Get-Member"),
-    ("gmo", "Get-Module"),
-    ("gp", "Get-ItemProperty"),
-    ("iex", "Invoke-Expression"),
-    #[cfg(windows)]
-    ("ls", "Get-ChildItem"),
-    #[cfg(windows)]
-    ("mv", "Move-Item"),
-    ("popd", "Pop-Location"),
-    ("pushd", "Push-Location"),
-    ("pwd", "Get-Location"),
-    ("rd", "Remove-Item"),
-    #[cfg(windows)]
-    ("rm", "Remove-Item"),
-    ("sal", "Set-Alias"),
-    ("sl", "Set-Location"),
-    ("sp", "Set-ItemProperty"),
-    ("type", "Get-Content"),
-    ("where", "Where-Object"),
-];
-
-fn default_alias(name: &str) -> Option<&'static str> {
-    DEFAULT_ALIASES
-        .iter()
-        .find(|(alias, _)| *alias == name)
-        .map(|(_, definition)| *definition)
 }
 
 const BUILTIN_COMMANDS: &[&str] = &[
