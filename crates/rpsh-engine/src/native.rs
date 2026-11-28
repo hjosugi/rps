@@ -18,9 +18,12 @@ use std::process::Stdio;
 use rpsh_commands::{CORE_CMDLETS, MODULES};
 use rpsh_native::{Destination, PipelineError, application_command, run_pipeline_with_input};
 use rpsh_runtime::{RuntimeError, Value};
-use rpsh_syntax::{CommandArgument, PipelineCommand, Redirection, Stream};
+use rpsh_syntax::{Redirection, Stream};
 
-use super::{Engine, EngineError, OutputTarget, command_not_found, native_exit_code};
+use super::{
+    CallTarget, Engine, EngineError, OutputTarget, PipelineStage, PreparedArguments, StageCommand,
+    command_not_found, native_exit_code,
+};
 
 pub(super) enum NativeOutput<'a> {
     Objects,
@@ -30,7 +33,7 @@ pub(super) enum NativeOutput<'a> {
 
 pub(super) struct NativeStage<'a> {
     name: Cow<'a, str>,
-    arguments: &'a [CommandArgument],
+    arguments: &'a PreparedArguments<'a>,
     redirections: &'a [Redirection],
 }
 
@@ -90,23 +93,14 @@ impl Engine {
         self.command_paths.find(name, all)
     }
 
-    pub(super) fn native_stage<'a>(&self, stage: &'a PipelineCommand) -> Option<NativeStage<'a>> {
-        let (stage, redirections) = if let PipelineCommand::Redirected {
-            command,
-            redirections,
-        } = stage
-        {
-            (command.as_ref(), redirections.as_slice())
-        } else {
-            (stage, &[][..])
-        };
-        let PipelineCommand::Command { name, arguments } = stage else {
+    pub(super) fn native_stage<'a>(&self, stage: &'a PipelineStage<'_>) -> Option<NativeStage<'a>> {
+        let StageCommand::Call(CallTarget::Name(name), arguments) = &stage.command else {
             return None;
         };
         let resolved = self
             .aliases
             .definition(name)
-            .map_or(Cow::Borrowed(name.as_str()), Cow::Owned);
+            .map_or(Cow::Borrowed(name.as_ref()), Cow::Owned);
         let lower = super::command_name(&resolved).to_ascii_lowercase();
         if self.functions.contains_key(&lower)
             || CORE_CMDLETS.binary_search(&lower.as_str()).is_ok()
@@ -120,7 +114,7 @@ impl Engine {
         Some(NativeStage {
             name: resolved,
             arguments,
-            redirections,
+            redirections: stage.redirections,
         })
     }
 
@@ -162,7 +156,7 @@ impl Engine {
     pub(super) fn run_native(
         &mut self,
         name: &str,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
         input: Option<&[Value]>,
         destination: NativeOutput<'_>,
     ) -> Result<Vec<Value>, EngineError> {
@@ -189,7 +183,7 @@ impl Engine {
                 .into_iter()
                 .next()
                 .ok_or_else(|| command_not_found(&stage.name))?;
-            let args = self.native_arguments(stage.arguments, &path)?;
+            let args = self.native_arguments(stage.arguments, &path);
             let mut command = application_command(
                 &path,
                 &args,

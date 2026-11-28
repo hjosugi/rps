@@ -67,14 +67,20 @@ impl Parser<'_> {
         }
     }
 
+    fn starts_command(&self) -> bool {
+        self.command_name().is_some() || self.peek().kind == TokenKind::Ampersand
+    }
+
     /// At the start of a statement or assignment RHS, configuration introduces
     /// a legacy DSC declaration. After a pipe it can still name a command.
-    fn statement_command_name(&self) -> Result<Option<&str>, ParseError> {
-        let name = self.command_name();
-        if name.is_some_and(|name| name.eq_ignore_ascii_case("configuration")) {
+    fn starts_statement_command(&self) -> Result<bool, ParseError> {
+        if self
+            .command_name()
+            .is_some_and(|name| name.eq_ignore_ascii_case("configuration"))
+        {
             return self.refuse("DSC configuration declarations");
         }
-        Ok(name)
+        Ok(self.starts_command())
     }
 
     fn at_statement_end(&self) -> bool {
@@ -115,7 +121,9 @@ impl Parser<'_> {
             }
             self.nodes = 0;
             statements.push(self.statement()?);
-            if !self.at_statement_end() {
+            if !self.at_statement_end()
+                && !matches!(statements.as_slice(), [Statement::Param { .. }])
+            {
                 return self.refuse(SYNTAX_ERRORS);
             }
         }
@@ -194,8 +202,8 @@ impl Parser<'_> {
             let span = start.to(self.previous_span());
             return Ok(Statement::DotSource { path, span });
         }
-        if let Some(name) = self.statement_command_name()? {
-            let statement = self.command_statement(name.to_owned())?;
+        if self.starts_statement_command()? {
+            let statement = self.command_statement()?;
             return self.pipeline_after(statement);
         }
         match &self.peek().kind {
@@ -269,7 +277,7 @@ impl Parser<'_> {
 
     fn assignment_value(&mut self) -> Result<AssignmentValue, ParseError> {
         self.skip_newlines();
-        let first = if self.statement_command_name()?.is_some() {
+        let first = if self.starts_statement_command()? {
             self.pipeline_element()?
         } else {
             let expr = self.nested_expression()?;
@@ -389,7 +397,7 @@ impl Parser<'_> {
         }
         self.pos += 1;
         self.skip_newlines();
-        if self.command_name().is_some() || self.paren_has_pipe() {
+        if self.starts_command() || self.paren_has_pipe() {
             let statements = self.paren_statements()?;
             let span = self.previous_span();
             return self.expr(ExprKind::Group(statements), span);
@@ -591,14 +599,10 @@ impl Parser<'_> {
     fn pipeline_element(&mut self) -> Result<PipelineCommand, ParseError> {
         // A keyword can name a command after a pipe, including the
         // built-in foreach alias. At statement start it introduces a loop.
-        let name = match self.peek().kind {
-            TokenKind::Foreach => Some("foreach"),
-            _ => self.command_name(),
-        };
-        let Some(name) = name else {
+        if !self.starts_command() && self.peek().kind != TokenKind::Foreach {
             return Ok(PipelineCommand::Expression(self.nested_expression()?));
-        };
-        match self.command_statement(name.to_owned())? {
+        }
+        match self.command_statement()? {
             Statement::Command {
                 name, arguments, ..
             } => Ok(PipelineCommand::Command { name, arguments }),
@@ -610,9 +614,41 @@ impl Parser<'_> {
     }
 
     /// Parses `Name arg -Param value ...` in command mode.
-    fn command_statement(&mut self, name: String) -> Result<Statement, ParseError> {
+    fn command_statement(&mut self) -> Result<Statement, ParseError> {
         let start = self.peek().span;
-        self.pos += 1;
+        let (command, redirections) = if self.peek().kind == TokenKind::Ampersand {
+            self.pos += 1;
+            let target = self.command_element()?;
+            let (arguments, redirections) = self.command_tail()?;
+            (PipelineCommand::Call { target, arguments }, redirections)
+        } else {
+            let name = self.command_name().unwrap_or("foreach").to_owned();
+            self.pos += 1;
+            let (arguments, redirections) = self.command_tail()?;
+            if redirections.is_empty() {
+                return Ok(Statement::Command {
+                    name,
+                    arguments,
+                    span: start.to(self.previous_span()),
+                });
+            }
+            (PipelineCommand::Command { name, arguments }, redirections)
+        };
+        let command = if redirections.is_empty() {
+            command
+        } else {
+            PipelineCommand::Redirected {
+                command: Box::new(command),
+                redirections,
+            }
+        };
+        Ok(Statement::Pipeline {
+            commands: vec![command],
+            span: start.to(self.previous_span()),
+        })
+    }
+
+    fn command_tail(&mut self) -> Result<(Vec<CommandArgument>, Vec<Redirection>), ParseError> {
         let mut redirections = Vec::new();
         let mut arguments = Vec::new();
         let mut end_parameters = false;
@@ -620,6 +656,9 @@ impl Parser<'_> {
             && self.peek().kind != TokenKind::Pipe
             && self.chain_operator().is_none()
         {
+            if self.peek().kind == TokenKind::Ampersand {
+                return self.refuse("background pipelines");
+            }
             if self.peek().kind == TokenKind::Comma {
                 return self.refuse("missing element in a command argument list");
             }
@@ -731,21 +770,7 @@ impl Parser<'_> {
                 _ => CommandArgument::Value(expr),
             });
         }
-        let span = start.to(self.previous_span());
-        if !redirections.is_empty() {
-            return Ok(Statement::Pipeline {
-                commands: vec![PipelineCommand::Redirected {
-                    command: Box::new(PipelineCommand::Command { name, arguments }),
-                    redirections,
-                }],
-                span,
-            });
-        }
-        Ok(Statement::Command {
-            name,
-            arguments,
-            span,
-        })
+        Ok((arguments, redirections))
     }
 
     fn trailing_redirections(
@@ -2140,7 +2165,7 @@ impl Parser<'_> {
                 if self.peek().kind == TokenKind::NewLine {
                     return self.refuse("newlines inside parentheses");
                 }
-                if self.command_name().is_some() || self.paren_has_pipe() {
+                if self.starts_command() || self.paren_has_pipe() {
                     let statements = self.paren_statements()?;
                     return self.expr(ExprKind::Group(statements), span.to(self.previous_span()));
                 }
@@ -2624,6 +2649,17 @@ mod tests {
     fn show_stage(stage: &PipelineCommand, arguments: bool) -> String {
         match stage {
             PipelineCommand::Expression(expr) => show(expr),
+            PipelineCommand::Call {
+                target,
+                arguments: args,
+            } => {
+                let name = format!("& {}", show(target));
+                if arguments {
+                    show_command(&name, args)
+                } else {
+                    name
+                }
+            }
             PipelineCommand::Command {
                 name,
                 arguments: args,

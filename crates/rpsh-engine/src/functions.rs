@@ -45,6 +45,22 @@ impl DerefMut for Functions {
 pub(super) const FUNCTION: &str = "System.Management.Automation.FunctionInfo";
 pub(super) const CMDLET: &str = "System.Management.Automation.CmdletInfo";
 
+pub(super) fn command_info(name: &str, kind: &str) -> Value {
+    let ty = if kind == "Function" { FUNCTION } else { CMDLET };
+    Value::object(vec![
+        ("Name".into(), Value::String(name.into())),
+        ("CommandType".into(), Value::String(kind.into())),
+        ("__Text".into(), Value::String(name.into())),
+        ("__TypeName".into(), Value::String(ty.into())),
+        (
+            "__BaseClasses".into(),
+            Value::array(vec![Value::String(
+                "System.Management.Automation.CommandInfo".into(),
+            )]),
+        ),
+    ])
+}
+
 pub(super) fn common_binding(lower: &str) -> Option<ArgumentBinding> {
     match lower {
         "verbose" | "vb" | "debug" | "db" => Some(ArgumentBinding::Switch),

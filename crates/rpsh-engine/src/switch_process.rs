@@ -1,7 +1,7 @@
 //! Switch-Process has one optional String[] parameter. As a remaining-
 //! arguments parameter it also receives otherwise unbound parameter names.
 use super::{
-    ArgumentBinding, Engine, EngineError, ScriptException, environment,
+    ArgumentBinding, Engine, EngineError, PreparedArguments, ScriptException, environment,
     errors::record_with_exception, functions::common_binding,
 };
 use rpsh_runtime::{PsString, Value};
@@ -82,11 +82,11 @@ fn strings(values: &[Value]) -> Result<Vec<Option<PsString>>, EngineError> {
 impl Engine {
     pub(super) fn switch_process(
         &mut self,
-        args: &[CommandArgument],
+        args: &PreparedArguments<'_>,
         input: &[Value],
     ) -> Result<(), EngineError> {
         let mut seen = false;
-        for argument in args {
+        for argument in args.source {
             if let CommandArgument::Parameter { name, value, .. } = argument
                 && with_command(name)
             {

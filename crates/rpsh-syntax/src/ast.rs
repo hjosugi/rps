@@ -279,6 +279,11 @@ pub enum PipelineCommand {
         name: String,
         arguments: Vec<CommandArgument>,
     },
+    /// The call operator evaluates the command target separately from its arguments.
+    Call {
+        target: Expr,
+        arguments: Vec<CommandArgument>,
+    },
     Redirected {
         command: Box<PipelineCommand>,
         redirections: Vec<Redirection>,

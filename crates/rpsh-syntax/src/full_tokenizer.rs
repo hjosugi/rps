@@ -44,6 +44,8 @@ pub fn tokenize_full(source: &str) -> Result<Vec<FullToken>, ParseError> {
         hashtable_depth: 0,
         brace_depth: 0,
         command_after_paren: Vec::new(),
+        command_after_bracket: Vec::new(),
+        command_after_brace: Vec::new(),
         command_member: false,
     };
     tokenizer.run()?;
@@ -125,6 +127,8 @@ struct Tokenizer<'a> {
     hashtable_depth: usize,
     brace_depth: usize,
     command_after_paren: Vec<bool>,
+    command_after_bracket: Vec<bool>,
+    command_after_brace: Vec<bool>,
     command_member: bool,
 }
 
@@ -385,12 +389,39 @@ impl Tokenizer<'_> {
                 && !self.statement_start
                 && self.tokens.last().is_some_and(|token| {
                     token.span.end < start as u32
-                        || token.kind == FullTokenKind::Comma
+                        || matches!(token.kind, FullTokenKind::Comma | FullTokenKind::Ampersand)
                         || self.after_member()
                         || (token.kind == FullTokenKind::Parameter
                             && token.span.text(self.source).ends_with(':'))
                 });
             self.command_after_paren.push(argument);
+        }
+        if matches!(kind, FullTokenKind::LCurly | FullTokenKind::AtCurly) {
+            self.command_after_brace.push(
+                self.tokens.last().is_some_and(|token| {
+                    token.kind == FullTokenKind::Ampersand && self.command_seen
+                }),
+            );
+        }
+        if matches!(
+            kind,
+            FullTokenKind::LBracket | FullTokenKind::QuestionLBracket
+        ) {
+            self.command_after_bracket
+                .push(self.tokens.last().is_some_and(|token| {
+                    token.span.end as usize == start
+                        && match token.kind {
+                            FullTokenKind::Variable => token.in_command_arguments,
+                            FullTokenKind::Identifier
+                            | FullTokenKind::RBracket
+                            | FullTokenKind::RParen => {
+                                self.mode == Mode::Command
+                                    && self.command_seen
+                                    && !self.statement_start
+                            }
+                            _ => false,
+                        }
+                }));
         }
         self.pos += len;
         self.push(kind, start, self.pos);
@@ -408,10 +439,27 @@ impl Tokenizer<'_> {
             _ => {}
         }
         match kind {
-            FullTokenKind::LCurly | FullTokenKind::RCurly | FullTokenKind::Semi => {
+            FullTokenKind::LCurly | FullTokenKind::Semi => {
                 self.mode = Mode::Command;
                 self.command_seen = false;
                 self.statement_start = true;
+            }
+            FullTokenKind::RCurly => {
+                self.command_seen = self.command_after_brace.pop().unwrap_or(false);
+                self.mode = Mode::Command;
+                self.statement_start = !self.command_seen;
+            }
+            FullTokenKind::RBracket => {
+                if self.command_after_bracket.pop().unwrap_or(false) {
+                    self.command_member = self.bytes.get(self.pos) == Some(&b'.');
+                    self.mode = if self.command_member {
+                        Mode::Expression
+                    } else {
+                        Mode::Command
+                    };
+                    self.command_seen = true;
+                    self.statement_start = false;
+                }
             }
             FullTokenKind::RParen => {
                 // A postfix member or index still belongs to the expression.
@@ -1002,6 +1050,11 @@ impl Tokenizer<'_> {
                     return true;
                 }
                 match kind {
+                    FullTokenKind::Ampersand if self.statement_start => {
+                        self.mode = Mode::Command;
+                        self.command_seen = true;
+                        self.statement_start = false;
+                    }
                     FullTokenKind::Pipe
                     | FullTokenKind::AndAnd
                     | FullTokenKind::OrOr

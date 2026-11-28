@@ -52,6 +52,7 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::Divide => TokenKind::Divide,
             FullTokenKind::Rem => TokenKind::Remainder,
             FullTokenKind::Pipe => TokenKind::Pipe,
+            FullTokenKind::Ampersand => TokenKind::Ampersand,
             FullTokenKind::AndAnd => TokenKind::AndAnd,
             FullTokenKind::OrOr => TokenKind::OrOr,
             FullTokenKind::LParen => TokenKind::LParen,
@@ -264,7 +265,6 @@ fn feature_for(kind: FullTokenKind) -> &'static str {
         K::AtParen | K::AtCurly => "array and hashtable literals, here-strings and splatting",
         K::DollarParen => "subexpressions",
         K::Pipe => "pipelines",
-        K::Ampersand => "call operator and background operator",
         K::Comma => "array construction (comma operator)",
         K::DotDot => "range operator",
         K::Dot | K::ColonColon => "member access, dot-sourcing and real literals",
@@ -424,7 +424,7 @@ mod tests {
                 TokenKind::EndOfInput
             ]
         );
-        assert_eq!(refused("& foo"), "call operator and background operator");
+        assert_eq!(tokenize("& foo").unwrap()[0].kind, TokenKind::Ampersand);
         assert_eq!(
             kinds(
                 "if\nwhile\nfor\nforeach\ndo\ntry\ncatch\nfinally\nthrow\nreturn\nbreak\ncontinue"

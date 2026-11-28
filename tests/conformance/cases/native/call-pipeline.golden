@@ -1,0 +1,11 @@
+rpsh-golden-v2
+exit=0
+argc=4 | 9<-switch:2> | 3<a b> | 0<> | 1<7>
+argc=4 | 8<$literal> | 14<%RPSH_NOT_SET%> | 3<two> | 5<words>
+blue
+3
+argc=1 | 9<from info>
+recovered
+argc=1 | 14<captured value>
+hello
+name1/arg1/name2/arg2/name3

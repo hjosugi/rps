@@ -58,6 +58,7 @@ lang/alias-view
 lang/aliases
 lang/array
 lang/array-list
+lang/call-operator
 lang/class
 lang/comparison-basic
 lang/comparison-filter
@@ -108,6 +109,7 @@ modules/utility-alias
 native/application-path
 native/argument-styles
 native/byte-pipe
+native/call-pipeline
 native/capture
 native/command-quoting
 native/console-encoding

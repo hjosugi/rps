@@ -20,6 +20,7 @@ mod environment;
 mod errors;
 mod functions;
 mod globalization;
+mod invocation;
 mod method_error;
 mod native;
 mod preferences;
@@ -33,10 +34,11 @@ mod variables;
 mod wildcards;
 
 use aliases::Aliases;
-use command_arguments::CallArgument;
+use command_arguments::{CallArgument, PreparedArguments};
 use encoding::Encoding;
 pub use errors::ScriptException;
 use errors::error_record;
+use invocation::{CallTarget, PipelineStage, StageCommand};
 use method_error::{ambiguous_overload, overload_error};
 use native::NativeOutput;
 use redirection::{OutputTarget, record_prefix};
@@ -797,7 +799,10 @@ impl Engine {
             }
             Statement::Command {
                 name, arguments, ..
-            } => self.call_function(name, arguments, out),
+            } => {
+                let args = self.prepare_arguments(arguments)?;
+                self.call_function(name, &args, out)
+            }
             Statement::Pipeline { commands, .. } => self.exec_pipeline(commands, out),
             Statement::PipelineChain { chain, .. } => self.exec_chain(chain, out),
             Statement::AssignChain { name, chain, .. } => {
@@ -1245,7 +1250,7 @@ impl Engine {
     fn call_function(
         &mut self,
         name: &str,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
         let resolved = self.discover_alias(name);
@@ -1275,16 +1280,25 @@ impl Engine {
             return Ok(Flow::Normal);
         }
         let function = self.function(name)?;
-        let (positional, named) = self.function_arguments(arguments, &function)?;
+        self.call_definition(&function, arguments, out)
+    }
+
+    fn call_definition(
+        &mut self,
+        function: &FunctionDef,
+        arguments: &PreparedArguments<'_>,
+        out: &mut dyn Write,
+    ) -> Result<Flow, EngineError> {
+        let (positional, named) = self.function_arguments(arguments, function)?;
         let mut local = self.variables.child();
-        self.bind_parameters(&function, &positional, &named, &mut local)?;
+        self.bind_parameters(function, &positional, &named, &mut local)?;
         if function.filter {
             local.entry("_".to_owned()).or_insert(Value::Null);
         }
         let saved_trap = self.trap.take();
         let saved = std::mem::replace(&mut self.variables, local);
         let flow = if function.has_blocks() {
-            self.exec_named_blocks(&function, None, out)
+            self.exec_named_blocks(function, None, out)
         } else {
             self.exec_block(&function.body, out)
         };
@@ -1467,6 +1481,24 @@ impl Engine {
         commands: &[PipelineCommand],
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
+        if let [PipelineCommand::Call { target, arguments }] = commands {
+            let target = self.call_target(target)?;
+            let args = self.prepare_arguments(arguments)?;
+            return match target {
+                CallTarget::Name(name) => self.call_function(&name, &args, out),
+                CallTarget::Block(function) => self.call_definition(&function, &args, out),
+                CallTarget::Cmdlet(name) => {
+                    if name.eq_ignore_ascii_case("Switch-Process") {
+                        self.flush_host(out)?;
+                        out.flush()?;
+                    }
+                    for value in self.cmdlet_output(&name, &args, &[])? {
+                        self.write_value(value, out)?;
+                    }
+                    Ok(Flow::Normal)
+                }
+            };
+        }
         let host = self
             .capture
             .is_none()
@@ -1506,7 +1538,8 @@ impl Engine {
     ) -> Result<Flow, EngineError> {
         match commands {
             [PipelineCommand::Command { name, arguments }] => {
-                self.call_function(name, arguments, out)
+                let args = self.prepare_arguments(arguments)?;
+                self.call_function(name, &args, out)
             }
             _ => self.exec_pipeline(commands, out),
         }
@@ -1525,9 +1558,14 @@ impl Engine {
 
     fn collect_pipeline(
         &mut self,
-        mut commands: &[PipelineCommand],
+        commands: &[PipelineCommand],
         mut host: Option<&mut dyn Write>,
     ) -> Result<Vec<Value>, EngineError> {
+        let stages: Vec<_> = commands
+            .iter()
+            .map(|command| self.pipeline_stage(command))
+            .collect::<Result<_, _>>()?;
+        let mut commands = stages.as_slice();
         let mut input = Vec::new();
         let mut failed = false;
         let mut has_upstream = false;
@@ -1555,19 +1593,10 @@ impl Engine {
                 };
                 input =
                     self.run_native_stages(&stages, has_upstream.then_some(&input), destination)?;
+            } else if command.redirections.is_empty() {
+                input = self.run_object_stage(&command.command, input, None)?;
             } else {
-                input = match command {
-                    PipelineCommand::Expression(expr) => {
-                        flatten_value(self.eval_pipeline_expression(expr)?)
-                    }
-                    PipelineCommand::Command { name, arguments } => {
-                        self.run_command(name, arguments, input, None)?
-                    }
-                    PipelineCommand::Redirected {
-                        command,
-                        redirections,
-                    } => self.run_redirected(command, input, redirections)?,
-                };
+                input = self.run_redirected(&command.command, input, command.redirections)?;
             }
             has_upstream = true;
             failed |= self.last_failed;
@@ -1580,7 +1609,7 @@ impl Engine {
     fn run_command(
         &mut self,
         name: &str,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
         input: Vec<Value>,
         output: Option<&OutputTarget>,
     ) -> Result<Vec<Value>, EngineError> {
@@ -1594,10 +1623,19 @@ impl Engine {
             return self.run_native(name, arguments, Some(&input), destination);
         }
         let function = self.function(name)?;
-        let (positional, named) = self.function_arguments(arguments, &function)?;
+        self.function_output(&function, arguments, input)
+    }
+
+    fn function_output(
+        &mut self,
+        function: &FunctionDef,
+        arguments: &PreparedArguments<'_>,
+        input: Vec<Value>,
+    ) -> Result<Vec<Value>, EngineError> {
+        let (positional, named) = self.function_arguments(arguments, function)?;
         let saved_trap = self.trap.take();
         let saved_capture = self.capture.take();
-        let result = self.pipeline_function_output(&function, &positional, &named, input);
+        let result = self.pipeline_function_output(function, &positional, &named, input);
         self.capture = saved_capture;
         self.trap = saved_trap;
         if result.is_ok() {
@@ -1672,7 +1710,7 @@ impl Engine {
     fn invoke_builtin(
         &mut self,
         name: &str,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
         input: &[Value],
     ) -> Result<Option<Vec<Value>>, EngineError> {
         let outputs = self.run_builtin(name, arguments, input)?;
@@ -1689,7 +1727,7 @@ impl Engine {
     fn run_builtin(
         &mut self,
         name: &str,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
         input: &[Value],
     ) -> Result<Option<Vec<Value>>, EngineError> {
         let lower = command_name(name).to_ascii_lowercase();
@@ -1776,17 +1814,16 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "foreach-object" => {
-                let mut member_name_named = None;
-                for argument in arguments {
-                    if let CommandArgument::Parameter { name, value, .. } = argument
-                        && name.eq_ignore_ascii_case("membername")
-                        && let Some(expr) = value
-                    {
-                        member_name_named = Some(self.eval_expression(expr)?.to_string());
-                    }
-                }
+                let member_name_named = arguments.expanded.iter().find_map(|(_, arg)| match arg {
+                    CallArgument::Parameter {
+                        name,
+                        value: Some(value),
+                        ..
+                    } if name.eq_ignore_ascii_case("membername") => Some(value.to_string()),
+                    _ => None,
+                });
                 let block_for = |wanted: &str| -> Option<Vec<Statement>> {
-                    arguments.iter().find_map(|argument| match argument {
+                    arguments.source.iter().find_map(|argument| match argument {
                         CommandArgument::Parameter { name, value, .. }
                             if name.eq_ignore_ascii_case(wanted) =>
                         {
@@ -1826,7 +1863,7 @@ impl Engine {
                     self.capture = saved;
                     return Ok(Some(outputs));
                 }
-                if let Some(script) = script_block_argument(arguments) {
+                if let Some(script) = script_block_argument(arguments.source) {
                     let script = script.clone();
                     let mut outputs = Vec::new();
                     for item in input {
@@ -1846,7 +1883,7 @@ impl Engine {
                     return Ok(Some(outputs));
                 }
                 let member_name = member_name_named.or_else(|| {
-                    arguments.iter().find_map(|argument| match argument {
+                    arguments.source.iter().find_map(|argument| match argument {
                         CommandArgument::Bareword(word) => Some(word.clone()),
                         _ => None,
                     })
@@ -1864,7 +1901,7 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "where-object" => {
-                if script_block_argument(arguments).is_none() {
+                if script_block_argument(arguments.source).is_none() {
                     let (positional, named) = self.evaluate_arguments(arguments)?;
                     let property = named
                         .iter()
@@ -1899,7 +1936,7 @@ impl Engine {
                         return Ok(Some(outputs));
                     }
                 }
-                let Some(script) = script_block_argument(arguments) else {
+                let Some(script) = script_block_argument(arguments.source) else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "Where-Object without a script block",
                     }
@@ -5063,13 +5100,7 @@ impl Engine {
                         }
                         for function in functions {
                             if let Some(definition) = self.functions.get(function) {
-                                outputs.push(Value::object(vec![
-                                    (
-                                        "Name".to_owned(),
-                                        Value::String(definition.name.clone().into()),
-                                    ),
-                                    ("CommandType".to_owned(), Value::String("Function".into())),
-                                ]));
+                                outputs.push(functions::command_info(&definition.name, "Function"));
                             }
                         }
                     }
@@ -5165,10 +5196,7 @@ impl Engine {
                         ) {
                             outputs.push(info);
                         } else {
-                            outputs.push(Value::object(vec![
-                                ("Name".to_owned(), Value::String(name.into())),
-                                ("CommandType".to_owned(), Value::String(kind.into())),
-                            ]));
+                            outputs.push(functions::command_info(&name, kind));
                         }
                     }
                 }
@@ -6103,20 +6131,20 @@ impl Engine {
 
     fn evaluate_arguments(
         &mut self,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
     ) -> Result<BoundArguments, EngineError> {
         self.evaluate_arguments_matching(arguments, |_| ArgumentBinding::Named)
     }
 
     fn evaluate_arguments_matching(
         &mut self,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
         binding: impl Fn(&str) -> ArgumentBinding,
     ) -> Result<BoundArguments, EngineError> {
         let mut positional = Vec::new();
         let mut named = Vec::new();
         let mut splatted = Vec::new();
-        let mut args = self.call_arguments(arguments)?.into_iter().peekable();
+        let mut args = arguments.for_binding().peekable();
         while let Some(arg) = args.next() {
             let CallArgument::Parameter {
                 name,

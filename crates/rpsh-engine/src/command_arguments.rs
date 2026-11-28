@@ -7,6 +7,7 @@ use super::{
 use rpsh_runtime::{PsString, Value};
 use rpsh_syntax::{ArgumentSeparator, CommandArgument};
 
+#[derive(Clone)]
 pub(super) enum CallArgument {
     Positional(Value),
     Parameter {
@@ -16,6 +17,24 @@ pub(super) enum CallArgument {
         value: Option<Value>,
         from_hashtable: bool,
     },
+}
+
+/// A pipeline evaluates each command name and its arguments, in source order,
+/// before it runs any of the stages. Native binding also needs the original
+/// quoting, comma spacing and parameter separators.
+pub(super) struct PreparedArguments<'a> {
+    pub source: &'a [CommandArgument],
+    pub expanded: Vec<(Option<&'a CommandArgument>, CallArgument)>,
+}
+
+impl PreparedArguments<'_> {
+    pub(super) fn for_binding(&self) -> impl Iterator<Item = CallArgument> + '_ {
+        self.expanded.iter().filter_map(|(source, value)| {
+            let end =
+                matches!(source, Some(CommandArgument::Parameter { name, .. }) if name == "-");
+            (!end).then(|| value.clone())
+        })
+    }
 }
 
 impl CallArgument {
@@ -79,21 +98,23 @@ impl Engine {
         vec![CallArgument::splatted_item(value)]
     }
 
-    pub(super) fn call_arguments(
+    pub(super) fn prepare_arguments<'a>(
         &mut self,
-        args: &[CommandArgument],
-    ) -> Result<Vec<CallArgument>, EngineError> {
+        args: &'a [CommandArgument],
+    ) -> Result<PreparedArguments<'a>, EngineError> {
         let mut result = Vec::with_capacity(args.len());
         for arg in args {
-            match arg {
-                CommandArgument::Splat(name) => result.extend(self.splat(name)),
-                CommandArgument::Value(expr) => {
-                    result.push(CallArgument::Positional(self.eval_expression(expr)?))
+            let value = match arg {
+                CommandArgument::Splat(name) => {
+                    result.extend(self.splat(name).into_iter().map(|value| (None, value)));
+                    continue;
                 }
-                CommandArgument::Bareword(word) => result.push(CallArgument::Positional(
-                    Value::String(word.as_str().into()),
-                )),
-                CommandArgument::Parameter { name, .. } if name == "-" => {}
+                CommandArgument::Value(expr) => {
+                    CallArgument::Positional(self.eval_expression(expr)?)
+                }
+                CommandArgument::Bareword(word) => {
+                    CallArgument::Positional(Value::String(word.as_str().into()))
+                }
                 CommandArgument::Parameter {
                     name,
                     value,
@@ -104,7 +125,7 @@ impl Engine {
                     } else {
                         ":"
                     };
-                    result.push(CallArgument::Parameter {
+                    CallArgument::Parameter {
                         name: name.clone(),
                         text: format!("-{name}{colon}"),
                         separator: *separator,
@@ -113,11 +134,15 @@ impl Engine {
                             .map(|expr| self.eval_expression(expr))
                             .transpose()?,
                         from_hashtable: false,
-                    });
+                    }
                 }
-            }
+            };
+            result.push((Some(arg), value));
         }
-        Ok(result)
+        Ok(PreparedArguments {
+            source: args,
+            expanded: result,
+        })
     }
 }
 
@@ -126,10 +151,10 @@ impl Engine {
     /// standalone positional arguments can fill unbound declared parameters.
     pub(super) fn function_arguments(
         &mut self,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
         function: &FunctionDef,
     ) -> Result<BoundArguments, EngineError> {
-        let mut args = self.call_arguments(arguments)?;
+        let mut args: Vec<_> = arguments.for_binding().collect();
         args.sort_by_key(|a| {
             matches!(
                 a,

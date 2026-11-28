@@ -3,10 +3,11 @@ use std::io::{self, Write};
 use std::process::Stdio;
 
 use rpsh_runtime::{RuntimeError, Value};
-use rpsh_syntax::{PipelineCommand, Redirection, Stream};
+use rpsh_syntax::{Redirection, Stream};
 
 use super::{
-    Engine, EngineError, error_record, expand_glob, flatten_value, format_out_string, hidden_type,
+    CallTarget, Engine, EngineError, StageCommand, error_record, expand_glob, format_out_string,
+    hidden_type,
 };
 
 /// Native stdout goes directly to the file. PowerShell values use Out-File's
@@ -103,29 +104,24 @@ pub(super) fn text_output_width() -> usize {
 impl Engine {
     pub(super) fn run_redirected(
         &mut self,
-        command: &PipelineCommand,
+        command: &StageCommand<'_>,
         input: Vec<Value>,
         redirections: &[Redirection],
     ) -> Result<Vec<Value>, EngineError> {
         let stream = match command {
-            PipelineCommand::Command { name, .. } => {
+            StageCommand::Call(CallTarget::Name(name), _) => {
                 let resolved = self.discover_alias(name);
                 let name = resolved.as_deref().unwrap_or(name).to_ascii_lowercase();
                 if self.functions.contains_key(&name) {
                     None
                 } else {
-                    match name.as_str() {
-                        "write-error" => Some(Stream::Error),
-                        "write-warning" => Some(Stream::Warning),
-                        "write-verbose" => Some(Stream::Verbose),
-                        "write-debug" => Some(Stream::Debug),
-                        "write-information" => Some(Stream::Information),
-                        _ => None,
-                    }
+                    cmdlet_stream(&name)
                 }
             }
-            PipelineCommand::Expression(_) => None,
-            PipelineCommand::Redirected { .. } => return Err(unsupported_stream().into()),
+            StageCommand::Call(CallTarget::Cmdlet(name), _) => {
+                cmdlet_stream(&name.to_ascii_lowercase())
+            }
+            _ => None,
         };
         let mut file = None;
         let mut merged = None;
@@ -151,15 +147,7 @@ impl Engine {
             Some((path, append)) => Some(OutputTarget::open(self.eval_expression(path)?, append)?),
             None => None,
         };
-        let mut values = match command {
-            PipelineCommand::Expression(expr) => {
-                flatten_value(self.eval_pipeline_expression(expr)?)
-            }
-            PipelineCommand::Command { name, arguments } => {
-                self.run_command(name, arguments, input, output.as_ref())?
-            }
-            PipelineCommand::Redirected { .. } => return Err(unsupported_stream().into()),
-        };
+        let mut values = self.run_object_stage(command, input, output.as_ref())?;
         if let Some(stream) = merged {
             values = values
                 .into_iter()
@@ -172,6 +160,17 @@ impl Engine {
         } else {
             Ok(values)
         }
+    }
+}
+
+fn cmdlet_stream(lowercase: &str) -> Option<Stream> {
+    match lowercase {
+        "write-error" => Some(Stream::Error),
+        "write-warning" => Some(Stream::Warning),
+        "write-verbose" => Some(Stream::Verbose),
+        "write-debug" => Some(Stream::Debug),
+        "write-information" => Some(Stream::Information),
+        _ => None,
     }
 }
 

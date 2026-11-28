@@ -1,0 +1,23 @@
+rpsh-golden-v2
+exit=0
+space in argument
+joined name
+42
+member
+one
+two words
+bound|extra|child
+done
+parent
+input=1 2 3
+7
+tag:function
+tag:alias
+shadow:normal
+original
+BadExpression
+RuntimeException
+BadExpression
+RuntimeException
+BadExpression
+RuntimeException

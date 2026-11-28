@@ -38,7 +38,13 @@ function Format-Expr($e) {
         }
         'UnaryExpressionAst' { return "(unary $($unary[$e.TokenKind.ToString()]) $(Format-Expr $e.Child))" }
         'BinaryExpressionAst' { return "(binary $($binary[$e.Operator.ToString()]) $(Format-Expr $e.Left) $(Format-Expr $e.Right))" }
-        'ParenExpressionAst' { return "(paren $(Format-Expr $e.Pipeline.PipelineElements[0].Expression))" }
+        'ParenExpressionAst' {
+            if ($e.Pipeline.PipelineElements.Count -eq 1 -and
+                $e.Pipeline.PipelineElements[0] -is [System.Management.Automation.Language.CommandExpressionAst]) {
+                return "(paren $(Format-Expr $e.Pipeline.PipelineElements[0].Expression))"
+            }
+            return "(paren $(Format-Pipeline $e.Pipeline))"
+        }
         'MemberExpressionAst' {
             if ($e.Static) { return "(static $($e.Expression.TypeName.FullName) $($e.Member.Value))" }
             return "(member $(Format-Expr $e.Expression) $($e.Member.Value))"
@@ -78,7 +84,8 @@ function Format-Pipeline($pipeline) {
                     Format-Expr $element
                 }
             }
-            $text = "(command $($elements -join ' '))"
+            $operator = if ($stage.InvocationOperator -ne 'Unknown') { "$($stage.InvocationOperator) " }
+            $text = "(command $operator$($elements -join ' '))"
         }
         if ($stage.Redirections.Count) {
             $redirects = foreach ($r in $stage.Redirections) {

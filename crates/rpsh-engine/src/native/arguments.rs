@@ -1,9 +1,11 @@
 //! NativeCommandParameterBinder supplies either an argv vector or a legacy
 //! argument string. In the latter case .NET parses the complete string once,
 //! so an unmatched quote can span PowerShell argument boundaries.
-use super::{Engine, EngineError, glob};
+use super::{Engine, glob};
 use crate::preferences::{self, ArgumentStyle};
-use crate::{command_arguments::CallArgument, environment, variables::Variables};
+use crate::{
+    PreparedArguments, command_arguments::CallArgument, environment, variables::Variables,
+};
 use rpsh_runtime::Value;
 use rpsh_syntax::{ArgumentSeparator, CommandArgument, Expr, ExprKind};
 use std::path::Path;
@@ -171,92 +173,49 @@ impl Arguments {
 
 impl Engine {
     pub(super) fn native_arguments(
-        &mut self,
-        args: &[CommandArgument],
+        &self,
+        args: &PreparedArguments<'_>,
         path: &Path,
-    ) -> Result<Vec<String>, EngineError> {
+    ) -> Vec<String> {
         let mut output = Arguments::new(preferences::argument_style(&self.variables), path);
         let mut verbatim = false;
-        for arg in args {
-            let (p, value) = match arg {
-                CommandArgument::Splat(name) => {
-                    for item in self.splat(name) {
-                        let (p, value) = match item {
-                            CallArgument::Positional(value) => (None, Some(value)),
-                            CallArgument::Parameter { text, value, .. } => (
-                                Some(Parameter {
-                                    text,
-                                    space_after: false,
-                                }),
-                                value,
-                            ),
-                        };
-                        output.begin(p.as_ref());
-                        if let Some(value) = value {
-                            self.append_native_value(
-                                &value,
-                                None,
-                                p.as_ref(),
-                                &mut output,
-                                &mut verbatim,
-                            );
-                        }
-                    }
-                    continue;
-                }
-                CommandArgument::Bareword(word) => {
-                    output.begin(None);
-                    if word == "--%" {
-                        verbatim = true;
-                    } else {
-                        output.word(
-                            word.clone(),
-                            false,
-                            None,
-                            "",
-                            verbatim.then_some(&self.variables),
-                        );
-                    }
-                    continue;
-                }
-                CommandArgument::Value(expr) => (None, Some(expr)),
-                CommandArgument::Parameter {
-                    name,
-                    value,
-                    separator,
-                } => {
-                    let colon = if *separator == ArgumentSeparator::Space {
-                        ""
-                    } else {
-                        ":"
-                    };
-                    (
-                        Some(Parameter {
-                            text: format!("-{name}{colon}"),
-                            space_after: value.is_some() && *separator != ArgumentSeparator::Colon,
-                        }),
-                        value.as_ref(),
-                    )
-                }
+        for (source, argument) in &args.expanded {
+            let expr = match source {
+                Some(
+                    CommandArgument::Value(expr)
+                    | CommandArgument::Parameter {
+                        value: Some(expr), ..
+                    },
+                ) => Some(expr),
+                _ => None,
             };
-            output.begin(p.as_ref());
-            if let Some(expr) = value {
-                self.native_argument_value(expr, p.as_ref(), &mut output, &mut verbatim)?;
+            let (parameter, value) = match argument {
+                CallArgument::Positional(value) => (None, Some(value)),
+                CallArgument::Parameter {
+                    text,
+                    separator,
+                    value,
+                    ..
+                } => (
+                    Some(Parameter {
+                        text: text.clone(),
+                        space_after: expr.is_some() && *separator != ArgumentSeparator::Colon,
+                    }),
+                    value.as_ref(),
+                ),
+            };
+            output.begin(parameter.as_ref());
+            if let Some(value) = value {
+                self.append_native_value(
+                    value,
+                    expr,
+                    parameter.as_ref(),
+                    &mut output,
+                    &mut verbatim,
+                );
             }
         }
-        Ok(output.finish())
-    }
-
-    fn native_argument_value(
-        &mut self,
-        expr: &Expr,
-        p: Option<&Parameter>,
-        out: &mut Arguments,
-        verbatim: &mut bool,
-    ) -> Result<(), EngineError> {
-        let value = self.eval_expression(expr)?;
-        self.append_native_value(&value, Some(expr), p, out, verbatim);
-        Ok(())
+        output.finish()
     }
 
     fn append_native_value(

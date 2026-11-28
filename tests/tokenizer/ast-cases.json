@@ -49,5 +49,11 @@
   {"name":"embedded-subexpressions","source":"cmd a$(1+2)b a$(Write-Output 'x')z @x\"b d\"c"},
   {"name":"generic-punctuation","source":"cmd a=b=c word#x 9foo x>out x<y - a$()z"},
   {"name":"command-literal-arrays","source":"cmd 1,2 one , two $x,foo (1+2),z"},
-  {"name":"parameter-literal-arrays","source":"cmd -n:1,2 -k: a, b x,y -z sub,/path"}
+  {"name":"parameter-literal-arrays","source":"cmd -n:1,2 -k: a, b x,y -z sub,/path"},
+  {"name":"call-variable","source":"& $command -Name:1 @tail"},
+  {"name":"call-index-and-member","source":"& $commands[0] hello | & $entry.Name -Flag"},
+  {"name":"call-parenthesized-command","source":"& (Get-Command Write-Output) -InputObject (1 + 2)"},
+  {"name":"call-block","source":"$value = & {param($x) $x} -x:4"},
+  {"name":"call-native-chain","source":"& \"program\" @items 2>&1 && & other --% -literal $x"},
+  {"name":"call-target-expression","source":"& ('Write-' + 'Output') ( & $name )"}
 ]

@@ -14,7 +14,11 @@ fn main() {
         .read_to_string(&mut source)
         .expect("ast-dump: stdin is not UTF-8");
     let ast = parse(&source).expect("ast-dump: parse");
-    let text = match &ast.statements[0] {
+    println!("{}", format_statement(&ast.statements[0]));
+}
+
+fn format_statement(statement: &Statement) -> String {
+    match statement {
         Statement::Expression(expr) => format_expr(expr),
         Statement::Command {
             name, arguments, ..
@@ -56,8 +60,7 @@ fn main() {
             format!("(assign Equals (var {name}) {})", format_pipeline(commands))
         }
         _ => panic!("ast-dump: unsupported statement"),
-    };
-    println!("{text}");
+    }
 }
 
 fn format_pipeline(commands: &[PipelineCommand]) -> String {
@@ -90,11 +93,18 @@ fn format_stage(command: &PipelineCommand) -> String {
             format!("(command-expression {})", format_expr(expr))
         }
         PipelineCommand::Command { name, arguments } => format_command(name, arguments),
+        PipelineCommand::Call { target, arguments } => {
+            format_command_elements(format!("Ampersand {}", format_expr(target)), arguments)
+        }
     }
 }
 
 fn format_command(name: &str, arguments: &[CommandArgument]) -> String {
-    let mut elements = vec![format!("(str {})", json(name))];
+    format_command_elements(format!("(str {})", json(name)), arguments)
+}
+
+fn format_command_elements(target: String, arguments: &[CommandArgument]) -> String {
+    let mut elements = vec![target];
     for arg in arguments {
         match arg {
             CommandArgument::Splat(name) => elements.push(format!("(splat {name})")),
@@ -170,7 +180,14 @@ fn format_expr(expr: &Expr) -> String {
             format_expr(when_false)
         ),
         ExprKind::Subexpression(_) => "(subexpr)".to_owned(),
-        ExprKind::Group(_) => "(group)".to_owned(),
+        ExprKind::Group(statements) => format!(
+            "(paren {})",
+            statements
+                .iter()
+                .map(format_statement)
+                .collect::<Vec<_>>()
+                .join(" ")
+        ),
         ExprKind::Cast {
             type_name: cast,
             value,

@@ -3,11 +3,11 @@
 mod indices;
 
 use super::{
-    Engine, EngineError, cast_to, convert_int32, datetime_fields, datetime_ticks, flatten_value,
-    member, timespan_ticks, visible_entries,
+    Engine, EngineError, PreparedArguments, cast_to, convert_int32, datetime_fields,
+    datetime_ticks, flatten_value, member, timespan_ticks, visible_entries,
 };
 use rpsh_runtime::{PsString, RuntimeError, Value, culture, ops, wildcard};
-use rpsh_syntax::{ArgumentSeparator, CommandArgument, Statement, parse};
+use rpsh_syntax::{ArgumentSeparator, Statement, parse};
 use std::cell::OnceCell;
 use std::cmp::Ordering;
 
@@ -178,12 +178,12 @@ fn sort_parameter(name: &str) -> Result<&str, RuntimeError> {
 impl Engine {
     fn bind_sort_arguments(
         &mut self,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
     ) -> Result<(Vec<Value>, std::collections::HashMap<String, Value>), EngineError> {
         let mut positional = Vec::new();
         let mut named = std::collections::HashMap::new();
         let mut splatted = Vec::new();
-        for argument in self.call_arguments(arguments)? {
+        for argument in arguments.for_binding() {
             match argument {
                 super::CallArgument::Positional(value) => positional.push(value),
                 super::CallArgument::Parameter {
@@ -232,7 +232,7 @@ impl Engine {
 
     pub(super) fn sort_objects(
         &mut self,
-        arguments: &[CommandArgument],
+        arguments: &PreparedArguments<'_>,
         input: &[Value],
     ) -> Result<Vec<Value>, EngineError> {
         let (positional, named) = self.bind_sort_arguments(arguments)?;
