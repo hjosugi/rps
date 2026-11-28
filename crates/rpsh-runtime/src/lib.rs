@@ -16,6 +16,7 @@ mod collection;
 pub mod culture;
 pub mod ops;
 pub mod regex;
+mod script_block;
 mod string;
 pub mod wildcard;
 
@@ -23,6 +24,7 @@ use std::fmt;
 use std::rc::Rc;
 
 pub use collection::{ArrayList, CollectionType, InputEnumerator, Sequence, TypedCollection};
+pub use script_block::ScriptBlock;
 pub use string::PsString;
 
 /// A PowerShell value.
@@ -68,7 +70,7 @@ pub enum Value {
     /// A command-mode numeric PSObject with its original TokenText.
     NumberWithText(Rc<(Value, PsString)>),
     /// A script block literal.
-    ScriptBlock(PsString),
+    ScriptBlock(ScriptBlock),
     /// A PowerShell array. The `Rc` keeps `Value` 16 bytes.
     Array(Rc<Vec<Value>>),
     /// A covariant System.String[] containing strings and null references.
@@ -189,7 +191,8 @@ impl Value {
     /// PowerShell string conversion preserves UTF-16 until the host writes output.
     pub fn to_ps_string(&self) -> PsString {
         match self {
-            Self::String(text) | Self::ScriptBlock(text) => text.clone(),
+            Self::String(text) => text.clone(),
+            Self::ScriptBlock(block) => block.source().clone(),
             Self::NumberWithText(number) => number.1.clone(),
             Self::Char(unit) => PsString::from_units(vec![*unit]),
             Self::Array(_)

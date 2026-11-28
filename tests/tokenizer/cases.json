@@ -258,5 +258,13 @@
   {
     "name": "parameters-after-command-hashtable",
     "source": "Write-Output -- @{x=5} -No 1 -No:0"
+  },
+  {
+    "name": "members-after-braced-values",
+    "source": "{1}.Invoke(); $v = @{a=2}.a; Write-Output {3}.Invoke()[0]"
+  },
+  {
+    "name": "command-after-statement-body",
+    "source": "if ($true) {}.script arg; function f {}.abc"
   }
 ]

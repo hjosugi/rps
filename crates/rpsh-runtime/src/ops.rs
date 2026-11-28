@@ -448,6 +448,12 @@ fn compare_scalar(
     op: Comparison,
     case_sensitive: bool,
 ) -> Result<bool, RuntimeError> {
+    if let Value::ScriptBlock(block) = left
+        && matches!(op, Comparison::Eq | Comparison::Ne)
+    {
+        let same = matches!(right, Value::ScriptBlock(other) if block == other);
+        return Ok(same == matches!(op, Comparison::Eq));
+    }
     let (left, right) = (left.base_value(), right.base_value());
     if let (Some(left), Some(right)) = (typed_text(left), typed_text(right)) {
         return compare_scalar(

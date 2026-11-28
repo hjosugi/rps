@@ -34,6 +34,7 @@ mod native;
 mod preferences;
 mod proxy_command;
 mod redirection;
+mod script_methods;
 mod sorting;
 pub mod startup;
 mod string_compare;
@@ -73,6 +74,8 @@ use rpsh_syntax::{
 #[derive(Debug, Default)]
 pub struct Engine {
     variables: Variables,
+    statement_span: Option<rpsh_syntax::Span>,
+    source_file: Option<PsString>,
     help_topics: Option<Box<help::topics::Cache>>,
     functions: functions::Functions,
     last_failed: bool,
@@ -271,6 +274,7 @@ enum ArgumentBinding {
 struct FunctionDef {
     name: String,
     source: std::rc::Rc<str>,
+    file: Option<PsString>,
     live_source: std::cell::OnceCell<rpsh_runtime::ArrayList>,
     parameters: Vec<Parameter>,
     block: std::rc::Rc<std::cell::OnceCell<ScriptBlockAst>>,
@@ -301,7 +305,14 @@ pub enum EngineError {
     Script(ScriptException),
     /// Writing to the output stream failed.
     Io(io::Error),
+    #[doc(hidden)]
+    Control(ScriptControl),
 }
+
+/// Nonlocal script control during evaluation of a method or expression.
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct ScriptControl(Flow);
 
 impl EngineError {
     /// The label of the missing feature, when that is why the script failed.
@@ -309,7 +320,7 @@ impl EngineError {
         match self {
             Self::Parse(error) => Some(error.feature()),
             Self::Runtime(error) => Some(error.feature()),
-            Self::Io(_) | Self::Script(_) => None,
+            Self::Io(_) | Self::Script(_) | Self::Control(_) => None,
         }
     }
 }
@@ -321,6 +332,7 @@ impl fmt::Display for EngineError {
             Self::Runtime(error) => error.fmt(f),
             Self::Script(error) => error.fmt(f),
             Self::Io(error) => error.fmt(f),
+            Self::Control(signal) => write!(f, "script control flow: {:?}", signal.0),
         }
     }
 }
@@ -397,8 +409,12 @@ impl Engine {
         Stage::Parse.enter();
         let script = parse(source)?;
         let path = script_path.map(|path| path.canonicalize().unwrap_or_else(|_| path.to_owned()));
+        let file = path.as_ref().map(|p| p.to_string_lossy().as_ref().into());
         self.variables.set_invocation(args, path);
-        self.run_ast(&script, out)
+        let caller = std::mem::replace(&mut self.source_file, file);
+        let result = self.run_ast(&script, out);
+        self.source_file = caller;
+        result
     }
 
     /// Runs an already parsed script. For a caller that keeps the AST, this
@@ -628,11 +644,14 @@ impl Engine {
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
         for statement in statements {
+            let caller_span = self.statement_span.replace(statement.span());
             let result = self
                 .exec_statement(statement, out)
                 .map_err(|err| self.record_exception(err, statement.span()));
+            self.statement_span = caller_span;
             match result {
                 Ok(Flow::Normal) => {}
+                Err(EngineError::Control(signal)) => return Ok(signal.0),
                 Err(EngineError::Script(error)) if self.trap.is_some() => {
                     let trap = self.trap.take().expect("active trap");
                     let flow = self.handle_exception(&error, &trap, out);
@@ -786,6 +805,7 @@ impl Engine {
                 self.functions.insert(FunctionDef {
                     name: name.clone(),
                     source: definition.as_str().into(),
+                    file: self.source_file.clone(),
                     live_source: Default::default(),
                     parameters: parameters.clone(),
                     block: std::rc::Rc::new(block.as_ref().clone().into()),
@@ -1716,14 +1736,6 @@ impl Engine {
                 Ok(Some(outputs))
             }
             "foreach-object" => {
-                let member_name_named = arguments.expanded.iter().find_map(|(_, arg)| match arg {
-                    CallArgument::Parameter {
-                        name,
-                        value: Some(value),
-                        ..
-                    } if name.eq_ignore_ascii_case("membername") => Some(value.to_string()),
-                    _ => None,
-                });
                 let block_for = |wanted: &str| {
                     arguments.source.iter().find_map(|argument| match argument {
                         CommandArgument::Parameter { name, value, .. }
@@ -1743,62 +1755,57 @@ impl Engine {
                 let process = block_for("process").transpose()?;
                 let end = block_for("end").transpose()?;
                 if begin.is_some() || process.is_some() || end.is_some() {
-                    let saved = self.capture.take();
-                    self.capture = Some(Vec::new());
-                    if let Some(begin) = begin {
-                        let _ = self.exec_block(begin, &mut capture_sink())?;
-                    }
-                    if let Some(process) = process {
-                        for item in input {
-                            let previous = self.variables.insert("_".to_owned(), item.clone());
-                            self.exec_block(process, &mut capture_sink())?;
-                            match previous {
-                                Some(value) => self.variables.insert("_".to_owned(), value),
-                                None => self.variables.remove("_"),
-                            };
-                        }
-                    }
-                    if let Some(end) = end {
-                        self.exec_block(end, &mut capture_sink())?;
-                    }
-                    let outputs = self.capture.take().unwrap_or_default();
-                    self.capture = saved;
-                    return Ok(Some(outputs));
+                    return self.foreach_blocks(begin, process, end, pipeline).map(Some);
                 }
                 if let Some(script) = script_block_argument(arguments.source) {
                     let script = invocation::single_clause(script, "ForEach-Object")?;
-                    let mut outputs = Vec::new();
-                    for item in input {
-                        let previous = self.variables.insert("_".to_owned(), item.clone());
-                        let saved = self.capture.take();
-                        self.capture = Some(Vec::new());
-                        let flow = self.exec_block(script, &mut capture_sink());
-                        let captured = self.capture.take().unwrap_or_default();
-                        self.capture = saved;
-                        match previous {
-                            Some(value) => self.variables.insert("_".to_owned(), value),
-                            None => self.variables.remove("_"),
-                        };
-                        outputs.extend(captured);
-                        flow?;
-                    }
-                    return Ok(Some(outputs));
+                    return self
+                        .foreach_blocks(None, Some(script), None, pipeline)
+                        .map(Some);
                 }
-                let member_name = member_name_named.or_else(|| {
-                    arguments.source.iter().find_map(|argument| match argument {
-                        CommandArgument::Bareword(word) => Some(word.clone()),
-                        _ => None,
-                    })
-                });
-                let Some(member_name) = member_name else {
+                let (positional, named) = self.evaluate_arguments(arguments)?;
+                let mut positional = positional.into_iter();
+                let named_value = |key: &str| {
+                    named
+                        .iter()
+                        .find(|(k, _)| k.eq_ignore_ascii_case(key))
+                        .map(|(_, v)| v)
+                };
+                let Some(member_name) = named_value("MemberName")
+                    .cloned()
+                    .or_else(|| positional.next())
+                else {
                     return Err(RuntimeError::NotImplemented {
                         feature: "ForEach-Object without a script block or member name",
                     }
                     .into());
                 };
+                let member_name = member_name.to_string();
+                let args = named_value("ArgumentList").map_or_else(
+                    || positional.collect(),
+                    |v| v.sequence().map_or_else(|| vec![v.clone()], |s| s.to_vec()),
+                );
                 let mut outputs = Vec::new();
                 for item in input {
-                    outputs.push(member(item, &member_name)?);
+                    if let Value::ScriptBlock(block) = item
+                        && let Some(result) = self.script_method(
+                            block,
+                            &member_name,
+                            &args,
+                            self.statement_span.unwrap_or_default(),
+                        )
+                    {
+                        let value = result?;
+                        if !matches!(value, Value::AutomationNull) {
+                            if let Some(items) = value.sequence() {
+                                outputs.extend(items.iter().cloned());
+                            } else {
+                                outputs.push(value);
+                            }
+                        }
+                    } else {
+                        outputs.push(member(item, &member_name)?);
+                    }
                 }
                 Ok(Some(outputs))
             }
@@ -5752,11 +5759,11 @@ impl Engine {
     /// Install supplied parameters and evaluate defaults in declaration order.
     fn bind_parameters(
         &mut self,
-        function: &FunctionDef,
+        parameters: &[Parameter],
         unbound: &[Value],
         named: &[(String, Value)],
     ) -> Result<(), EngineError> {
-        for parameter in &function.parameters {
+        for parameter in parameters {
             let value = if let Some((_, value)) = named
                 .iter()
                 .find(|(name, _)| name.eq_ignore_ascii_case(&parameter.name))
@@ -7897,6 +7904,9 @@ fn type_full_name(name: &str) -> String {
     }
     match name.to_ascii_lowercase().as_str() {
         "object" => "System.Object".to_owned(),
+        "scriptblock" | "system.management.automation.scriptblock" => {
+            script_methods::TYPE.to_owned()
+        }
         "array" => "System.Array".to_owned(),
         "int" | "int32" => "System.Int32".to_owned(),
         "long" | "int64" => "System.Int64".to_owned(),
@@ -8527,6 +8537,11 @@ fn invoke_static(
         }
         ("object", "referenceequals") if let [Value::Object(a), Value::Object(b)] = arguments => {
             Ok(Value::Bool(std::rc::Rc::ptr_eq(a, b)))
+        }
+        ("object", "referenceequals")
+            if let [Value::ScriptBlock(a), Value::ScriptBlock(b)] = arguments =>
+        {
+            Ok(Value::Bool(a == b))
         }
         ("object", "referenceequals")
             if let [Value::Collection(a), Value::Collection(b)] = arguments =>
@@ -9166,6 +9181,7 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
             preferences::argument_cast(&value)
         }
         "collections.arraylist" | "system.collections.arraylist" => array_list::cast(value),
+        "scriptblock" | "system.management.automation.scriptblock" => script_methods::cast(value),
         kind if array_list::is_object_list_type(kind) => Ok(array_list::cast_object_list(value)),
         "cultureinfo" | "globalization.cultureinfo" | "system.globalization.cultureinfo" => {
             globalization::cast_culture(&value)
@@ -9594,6 +9610,14 @@ fn psobject_view(value: &Value, entries: &[(String, Value)]) -> Value {
 
 fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Value, RuntimeError> {
     let target = target.base_value();
+    if target.is_null_like() {
+        return Err(RuntimeError::Script {
+            id: "InvokeMethodOnNull",
+            category: "InvalidOperation: (:) [], RuntimeException".to_owned(),
+            exception_type: "System.Management.Automation.RuntimeException",
+            message: "You cannot call a method on a null-valued expression.".to_owned(),
+        });
+    }
     if name.eq_ignore_ascii_case("ToString")
         && arguments.is_empty()
         && let Value::Double(value) = target
@@ -9628,14 +9652,6 @@ fn invoke_member(target: &Value, name: &str, arguments: &[Value]) -> Result<Valu
             }
             None => Ok(Value::String(target.to_string().into())),
         };
-    }
-    if target.is_null_like() {
-        return Err(RuntimeError::Script {
-            id: "InvokeMethodOnNull",
-            category: "InvalidOperation: (:) [], RuntimeException".to_owned(),
-            exception_type: "System.Management.Automation.RuntimeException",
-            message: "You cannot call a method on a null-valued expression.".to_owned(),
-        });
     }
     match target {
         Value::String(text) => string_method(text, name, arguments),
@@ -10085,6 +10101,20 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
 }
 
 fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
+    if name.eq_ignore_ascii_case("Value")
+        && hidden_type(value).as_deref()
+            == Some("System.Management.Automation.PSParameterizedProperty")
+    {
+        return Ok(value.clone());
+    }
+    if let Value::ScriptBlock(block) = value
+        && name.eq_ignore_ascii_case("File")
+    {
+        return Ok(block.file().cloned().map_or(Value::Null, Value::String));
+    }
+    if let Some(location) = script_methods::location(value, name) {
+        return Ok(location);
+    }
     let value = value.base_value();
     if let Some(view) = metadata::dictionary_view(value, name) {
         return Ok(view);
@@ -10101,7 +10131,7 @@ fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
         && let Some(Value::ScriptBlock(text)) = source.items().first()
     {
         return Ok(if name.eq_ignore_ascii_case("Definition") {
-            Value::String(text.clone())
+            Value::String(text.source().clone())
         } else {
             Value::ScriptBlock(text.clone())
         });

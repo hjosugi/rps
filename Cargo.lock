@@ -81,6 +81,9 @@ dependencies = [
 [[package]]
 name = "rpsh-runtime"
 version = "0.0.354"
+dependencies = [
+ "rpsh-syntax",
+]
 
 [[package]]
 name = "rpsh-syntax"

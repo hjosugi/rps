@@ -60,6 +60,7 @@ impl ScriptCall {
                 feature: "script files that are not UTF-8",
             })?;
         let mut function = FunctionDef::from_script_block(parse(text)?);
+        function.file = Some(path.to_string_lossy().as_ref().into());
         function.name = path
             .file_name()
             .unwrap_or_default()
@@ -126,6 +127,7 @@ impl FunctionDef {
         Self {
             name: String::new(),
             source: "".into(),
+            file: None,
             live_source: Default::default(),
             private: false,
             parameters,
@@ -170,9 +172,11 @@ impl Engine {
             self.functions.enter_scope(call.path.is_some());
             self.aliases.clone()
         });
+        let caller_file = std::mem::replace(&mut self.source_file, function.file.clone());
         let flow = self
-            .bind_parameters(function, &positional, &named)
+            .bind_parameters(&function.parameters, &positional, &named)
             .and_then(|()| self.execute_definition_body(function, input, out));
+        self.source_file = caller_file;
         if let Some(aliases) = aliases {
             self.aliases = aliases;
             self.functions.leave_scope();
@@ -327,6 +331,53 @@ impl Engine {
         }
     }
 
+    pub(super) fn foreach_blocks(
+        &mut self,
+        begin: Option<&[Statement]>,
+        process: Option<&[Statement]>,
+        end: Option<&[Statement]>,
+        input: Option<&[Value]>,
+    ) -> Result<Vec<Value>, EngineError> {
+        let outer = self.capture.replace(Vec::new());
+        let result = (|| {
+            if let Some(body) = begin {
+                self.foreach_clause(body, None)?;
+            }
+            if let Some(body) = process {
+                for item in input.unwrap_or(&[Value::AutomationNull]) {
+                    self.foreach_clause(body, Some(item))?;
+                }
+            }
+            if let Some(body) = end {
+                self.foreach_clause(body, None)?;
+            }
+            Ok(())
+        })();
+        let output = std::mem::replace(&mut self.capture, outer).unwrap_or_default();
+        result.map(|()| output)
+    }
+
+    fn foreach_clause(
+        &mut self,
+        body: &[Statement],
+        item: Option<&Value>,
+    ) -> Result<(), EngineError> {
+        let previous_item = item
+            .filter(|v| !matches!(v, Value::AutomationNull))
+            .map(|v| self.variables.insert("_".into(), v.clone()));
+        let input = Value::array(item.into_iter().cloned().collect());
+        let previous_input = self.variables.insert("input".into(), input);
+        let flow = self.run_input_clause(body, &mut super::capture_sink());
+        self.variables.restore_local("input", previous_input);
+        if let Some(previous) = previous_item {
+            self.variables.restore_local("_", previous);
+        }
+        match flow? {
+            Flow::Normal => Ok(()),
+            flow => Err(EngineError::Control(super::ScriptControl(flow))),
+        }
+    }
+
     pub(super) fn function_output(
         &mut self,
         call: &ScriptCall,
@@ -392,18 +443,21 @@ impl Engine {
         target: &Expr,
         operator: InvocationOperator,
     ) -> Result<CallTarget<'static>, EngineError> {
+        let file = self.source_file.clone();
         let block = |statements| {
-            CallTarget::Block(Box::new(ScriptCall::new(
-                FunctionDef::from_script_block(statements),
-                operator,
-            )))
+            let mut function = FunctionDef::from_script_block(statements);
+            function.file = file;
+            CallTarget::Block(Box::new(ScriptCall::new(function, operator)))
         };
         if let ExprKind::ScriptBlock { block: script, .. } = &target.kind {
             return Ok(block(script.as_ref().clone()));
         }
         let value = self.eval_expression(target)?;
         if let Value::ScriptBlock(source) = &value {
-            return Ok(block(parse(&source.to_string_lossy())?));
+            return Ok(CallTarget::Block(Box::new(ScriptCall::new(
+                FunctionDef::from_block_value(source)?,
+                operator,
+            ))));
         }
         let name = match hidden_type(&value).as_deref() {
             Some(super::native::APPLICATION_TYPE | EXTERNAL_SCRIPT) => {

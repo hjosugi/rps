@@ -129,7 +129,7 @@ struct Tokenizer<'a> {
     brace_depth: usize,
     command_after_paren: Vec<bool>,
     command_after_bracket: Vec<bool>,
-    command_after_brace: Vec<bool>,
+    command_after_brace: Vec<(usize, bool)>,
     command_member: bool,
 }
 
@@ -407,8 +407,10 @@ impl Tokenizer<'_> {
             let table_argument = kind == FullTokenKind::AtCurly
                 && self.mode == Mode::Command
                 && !self.statement_start;
-            self.command_after_brace
-                .push(self.command_seen && (invoked_block || table_argument));
+            self.command_after_brace.push((
+                self.tokens.len(),
+                self.command_seen && (invoked_block || table_argument),
+            ));
         }
         if matches!(
             kind,
@@ -455,9 +457,17 @@ impl Tokenizer<'_> {
                 self.statement_start = true;
             }
             FullTokenKind::RCurly => {
-                self.command_seen = self.command_after_brace.pop().unwrap_or(false);
-                self.mode = Mode::Command;
-                self.statement_start = !self.command_seen;
+                let (open, command) = self.command_after_brace.pop().unwrap_or((0, false));
+                let postfix = matches!(self.bytes.get(self.pos), Some(b'.' | b'[' | b'?'))
+                    && !self.brace_is_statement_body(open);
+                self.command_member = command && postfix;
+                self.command_seen = command && !postfix;
+                self.mode = if postfix {
+                    Mode::Expression
+                } else {
+                    Mode::Command
+                };
+                self.statement_start = !command && !postfix;
             }
             FullTokenKind::RBracket => {
                 if self.command_after_bracket.pop().unwrap_or(false) {
@@ -900,6 +910,52 @@ impl Tokenizer<'_> {
             _ => Mode::Command,
         };
         true
+    }
+
+    /// A closing script-block literal accepts postfix members. A statement
+    /// body such as `if (...) {}` instead starts a new command at the next dot.
+    fn brace_is_statement_body(&self, open: usize) -> bool {
+        use FullTokenKind as K;
+        if self.tokens.get(open).is_some_and(|t| t.kind == K::AtCurly) {
+            return false;
+        }
+        let mut depth = 0usize;
+        for token in self.tokens[..open]
+            .iter()
+            .rev()
+            .skip_while(|t| matches!(t.kind, K::NewLine | K::Comment | K::LineContinuation))
+        {
+            match token.kind {
+                K::RParen | K::RBracket => depth += 1,
+                K::LParen | K::AtParen | K::DollarParen | K::LBracket if depth > 0 => depth -= 1,
+                _ if depth > 0 => (),
+                K::If
+                | K::Else
+                | K::ElseIf
+                | K::While
+                | K::Do
+                | K::For
+                | K::Foreach
+                | K::Switch
+                | K::Try
+                | K::Catch
+                | K::Finally
+                | K::Trap
+                | K::Function
+                | K::Filter
+                | K::Class
+                | K::Enum
+                | K::Begin
+                | K::Process
+                | K::End
+                | K::Clean
+                | K::Dynamicparam
+                | K::Data => return true,
+                K::Identifier | K::Generic | K::Parameter | K::Comment | K::LineContinuation => (),
+                _ => break,
+            }
+        }
+        false
     }
 
     /// True when the cursor follows `.$name`, the target of `$o.name = value`.

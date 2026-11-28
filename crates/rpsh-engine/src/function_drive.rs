@@ -406,9 +406,8 @@ impl Engine {
             return Ok(None);
         }
         let mut function = match value {
-            Value::String(source) | Value::ScriptBlock(source) => {
-                FunctionDef::from_source(&source.to_string_lossy())?
-            }
+            Value::ScriptBlock(block) => FunctionDef::from_block_value(block)?,
+            Value::String(source) => FunctionDef::from_source(&source.to_string_lossy())?,
             value => FunctionDef::from_info(value)?.ok_or_else(|| op.argument("value"))?,
         };
         function.name = name.into();

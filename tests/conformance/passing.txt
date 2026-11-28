@@ -107,6 +107,7 @@ lang/scopes
 lang/scriptblock
 lang/scriptblock-clean-errors
 lang/scriptblock-file-phases
+lang/scriptblock-invoke
 lang/scriptblock-phases
 lang/session-aliases
 lang/startup-bindings

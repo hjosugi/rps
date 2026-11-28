@@ -63,7 +63,9 @@ impl Engine {
                 };
                 Value::Type(ty.into())
             }
-            ExprKind::ScriptBlock { source, .. } => Value::ScriptBlock(source.as_str().into()),
+            ExprKind::ScriptBlock { source, .. } => Value::ScriptBlock(
+                rpsh_runtime::ScriptBlock::new(source.as_str().into(), self.source_file.clone()),
+            ),
             ExprKind::Coalesce { left, right } => {
                 let value = self.eval_expression(left)?;
                 if value.is_null_like() {
@@ -114,6 +116,19 @@ impl Engine {
                 arguments,
             } => {
                 let values = self.eval_operands(arguments)?;
+                if name.eq_ignore_ascii_case("Create")
+                    && (type_name.eq_ignore_ascii_case("scriptblock")
+                        || type_name.eq_ignore_ascii_case(super::script_methods::TYPE))
+                {
+                    let [source] = values.as_slice() else {
+                        return Err(
+                            super::method_error::overload_error("Create", values.len()).into()
+                        );
+                    };
+                    let block = rpsh_runtime::ScriptBlock::new(source.to_ps_string(), None);
+                    block.syntax()?;
+                    return Ok(Value::ScriptBlock(block));
+                }
                 if name.eq_ignore_ascii_case("new")
                     && self.classes.contains_key(&type_name.to_ascii_lowercase())
                 {
@@ -128,8 +143,16 @@ impl Engine {
             } => {
                 let target = self.eval_expression(target)?;
                 let values = self.eval_operands(arguments)?;
-                if name.eq_ignore_ascii_case("GetType") && values.is_empty() {
+                if name.eq_ignore_ascii_case("GetType")
+                    && values.is_empty()
+                    && !target.is_null_like()
+                {
                     return Ok(get_type(&target));
+                }
+                if let Value::ScriptBlock(block) = &target
+                    && let Some(result) = self.script_method(block, name, &values, expr.span)
+                {
+                    return result;
                 }
                 if let Value::Object(fields) = &target
                     && let Some(class) = object_class(fields)

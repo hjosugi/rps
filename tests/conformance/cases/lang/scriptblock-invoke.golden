@@ -1,0 +1,36 @@
+rpsh-golden-v2
+exit=0
+Collection`1|0||<null>|0|
+Collection`1|1||<null>|1|
+Collection`1|1|7|System.Int32|1|7
+Collection`1|2|1,2|System.Object[]|2|1,2
+Collection`1|1|System.Object[]|System.Object[]|2|3,4
+Collection`1|1|8|System.Int32|1|8
+Collection`1|1|p|System.String|1|p
+Collection`1|1|e|System.String|1|e
+[default][3][][]
+[default][3][][]
+[-b][5][6][a,b]
+[1][2][3][a,b]
+[1 2 3][3][][a]
+[a][2 3][][a,b]
+2|Int32|List`1|System.Collections.ObjectModel.Collection`1[System.Management.Automation.PSObject]
+1/Object[]/1
+2/Object[]/2
+True
+True|True|Internal
+True
+[][]
+True|True|True|42
+False
+True|False|True
+ConvertToFinalInvalidCastException
+Cannot convert the "7" value of type "System.String" to type "System.Management.Automation.ScriptBlock".
+5
+[4][5][][a,b]
+PSParameterizedProperty|psobject Item(int index) {get;set;}|7|True
+RuntimeException|MethodInvocationException|RuntimeException|Exception calling "InvokeReturnAsIs" with "1" argument(s): "bad"
+PSInvalidOperationException|MethodInvocationException|PSInvalidOperationException|Exception calling "InvokeReturnAsIs" with "1" argument(s): "The script block cannot be invoked because it contains more than one clause. The Invoke() method can only be used on script blocks that contain a single clause."
+PSInvalidOperationException|MethodInvocationException|PSInvalidOperationException|Exception calling "InvokeReturnAsIs" with "1" argument(s): "The script block cannot be invoked because it contains more than one clause. The Invoke() method can only be used on script blocks that contain a single clause."
+RuntimeException|MethodInvocationException|RuntimeException|Exception calling "InvokeReturnAsIs" with "1" argument(s): "You cannot call a method on a null-valued expression."
+1

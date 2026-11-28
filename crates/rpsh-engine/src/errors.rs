@@ -120,10 +120,14 @@ const CATEGORIES: &[&str] = &[
 
 pub(super) fn enum_value(ty: &str, name: &str, names: &[&str]) -> Value {
     let number = names.iter().position(|entry| *entry == name).unwrap_or(0);
+    enum_number(ty, name, number as i32)
+}
+
+pub(super) fn enum_number(ty: &str, name: &str, number: i32) -> Value {
     Value::object(vec![
         ("__TypeName".into(), Value::String(ty.into())),
         ("__Text".into(), Value::String(name.into())),
-        ("__EnumValue".into(), Value::Int32(number as i32)),
+        ("__EnumValue".into(), Value::Int32(number)),
     ])
 }
 

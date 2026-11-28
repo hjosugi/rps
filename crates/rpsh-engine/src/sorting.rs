@@ -8,7 +8,7 @@ use super::{
 };
 use rpsh_commands::signature::{ParameterType, SORT_OBJECT};
 use rpsh_runtime::{PsString, RuntimeError, Value, culture, ops, wildcard};
-use rpsh_syntax::{ArgumentSeparator, Statement, parse};
+use rpsh_syntax::{ArgumentSeparator, Statement};
 use std::cell::OnceCell;
 use std::cmp::Ordering;
 
@@ -409,7 +409,7 @@ fn sort_columns(
     }
     let columns = match expression {
         Value::ScriptBlock(source) => vec![Column {
-            expression: Expression::Script(parse(&source.to_string_lossy())?.statements),
+            expression: Expression::Script(source.syntax()?.statements.clone()),
             descending,
         }],
         value => {

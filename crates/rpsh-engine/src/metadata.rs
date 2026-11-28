@@ -41,6 +41,29 @@ static ATTRIBUTES: CollectionType = collection!(
     Some(&ATTRIBUTE_LIST)
 );
 
+macro_rules! psobject_collection {
+    ($class:literal, $backing:expr) => {
+        CollectionType {
+            full_name: concat!(
+                $class,
+                "`1[[",
+                sma!("System.Management.Automation.PSObject"),
+                "]]"
+            ),
+            display_name: concat!($class, "`1[System.Management.Automation.PSObject]"),
+            element: "System.Management.Automation.PSObject",
+            read_only: false,
+            backing: $backing,
+        }
+    };
+}
+static PSOBJECT_LIST: CollectionType =
+    psobject_collection!("System.Collections.Generic.List", None);
+pub(super) static PSOBJECTS: CollectionType = psobject_collection!(
+    "System.Collections.ObjectModel.Collection",
+    Some(&PSOBJECT_LIST)
+);
+
 macro_rules! view_type {
     ($class:literal,$value:literal,$element:literal) => {
         CollectionType {
@@ -493,6 +516,32 @@ pub(super) fn collection_property(
 ) -> Result<Value, RuntimeError> {
     match name.to_ascii_lowercase().as_str() {
         "count" => Ok(Value::Int32(c.items.items().len() as i32)),
+        "item" if c.ty.element == PSOBJECTS.element => {
+            let signature = "psobject Item(int index) {get;set;}";
+            Ok(object(
+                "System.Management.Automation.PSParameterizedProperty",
+                signature,
+                vec![
+                    ("Name".into(), string("Item")),
+                    ("IsGettable".into(), Value::Bool(true)),
+                    ("IsSettable".into(), Value::Bool(true)),
+                    ("TypeNameOfValue".into(), string(c.ty.element)),
+                    (
+                        "MemberType".into(),
+                        super::errors::enum_number(
+                            "System.Management.Automation.PSMemberTypes",
+                            "ParameterizedProperty",
+                            512,
+                        ),
+                    ),
+                    ("IsInstance".into(), Value::Bool(true)),
+                    (
+                        "OverloadDefinitions".into(),
+                        Value::collection(&STRINGS, vec![string(signature)]),
+                    ),
+                ],
+            ))
+        }
         "isreadonly" => Ok(Value::Bool(c.ty.read_only)),
         "isfixedsize" if c.sync_root.is_none() => Ok(Value::Bool(false)),
         "isfixedsize" => Ok(Value::Null),
@@ -532,6 +581,9 @@ pub(super) fn collection_method(
     name: &str,
     args: &[Value],
 ) -> Result<Value, RuntimeError> {
+    if name.eq_ignore_ascii_case("Item") && c.ty.element == PSOBJECTS.element {
+        return array_list::method(array_list::Kind::ObjectList, &c.items, "get_Item", args);
+    }
     let lower = name.to_ascii_lowercase();
     if c.sync_root.is_some() {
         let keys = c.ty.full_name.contains("+KeyCollection");

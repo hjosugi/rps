@@ -152,6 +152,14 @@ impl Variables {
         self.entries.remove(key)
     }
 
+    pub(super) fn restore_local(&mut self, key: &str, previous: Option<Value>) {
+        if let Some(value) = previous {
+            self.insert(key.to_owned(), value);
+        } else {
+            self.remove(key);
+        }
+    }
+
     pub(super) fn remove_scoped(&mut self, name: &str, key: &str) -> Option<Value> {
         let i = self.scope(name).unwrap_or(self.parents.len());
         self.parents

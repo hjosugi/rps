@@ -22,6 +22,7 @@ fn initial_functions() -> HashMap<String, FunctionDef> {
         let function = FunctionDef {
             name: "exec".into(),
             source: "\nSwitch-Process -WithCommand $args\n".into(),
+            file: None,
             parameters: Vec::new(),
             block: Default::default(),
             filter: false,
@@ -250,7 +251,7 @@ impl FunctionDef {
         let Value::ScriptBlock(source) = super::member(info, "ScriptBlock")? else {
             return Ok(None);
         };
-        let mut function = Self::from_source(&source.to_string_lossy())?;
+        let mut function = Self::from_block_value(&source)?;
         function.name = super::member(info, "Name")?.to_string();
         function.filter = kind == FILTER;
         function.private = super::member(info, "Options")?
@@ -273,14 +274,31 @@ impl FunctionDef {
     }
 
     pub(super) fn script_block(&self) -> Value {
-        Value::ScriptBlock(self.source.as_ref().into())
+        self.source_reference().items()[0].clone()
+    }
+
+    fn source_reference(&self) -> &rpsh_runtime::ArrayList {
+        self.live_source.get_or_init(|| {
+            let block =
+                rpsh_runtime::ScriptBlock::new(self.source.as_ref().into(), self.file.clone());
+            rpsh_runtime::ArrayList::from_values(vec![Value::ScriptBlock(block)])
+        })
+    }
+
+    pub(super) fn from_block_value(
+        block: &rpsh_runtime::ScriptBlock,
+    ) -> Result<Self, rpsh_syntax::ParseError> {
+        let mut function = Self::from_script_block(block.syntax()?.clone());
+        function.source = block.source().to_string_lossy().into();
+        function.file = block.file().cloned();
+        function.live_source =
+            rpsh_runtime::ArrayList::from_values(vec![Value::ScriptBlock(block.clone())]).into();
+        Ok(function)
     }
 
     pub(super) fn info(&self) -> Value {
         let script = self.script_block();
-        let reference = self
-            .live_source
-            .get_or_init(|| rpsh_runtime::ArrayList::from_values(vec![script.clone()]));
+        let reference = self.source_reference();
         let ty = if self.filter { FILTER } else { FUNCTION };
         let mut props = command_properties(&self.name, self.kind(), ty);
         props.extend([
