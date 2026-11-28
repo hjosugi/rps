@@ -15,3 +15,10 @@ During the current overnight session the user has asked for continuous work:
 
 This rule is session-specific and overrides the usual "ask before continuing"
 habit.
+
+## Compact local test output
+
+Use `.cache/tools/rtk cargo test` for a compact test summary during development.
+`scripts/fetch-rtk.sh` installs the optional RTK OSS binary for this checkout.
+Set `XDG_DATA_HOME="$PWD/.cache/tools/rtk-data"` on RTK invocations to keep
+the savings counters here. Run the release gate and GitHub writes directly.
