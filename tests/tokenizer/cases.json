@@ -158,5 +158,21 @@
   {
     "name": "command-parameter-colon",
     "source": "1, 2 | Sort-Object -Descending:$false -Top: 2"
+  },
+  {
+    "name": "native-stop-parsing",
+    "source": "cmd --% $x %RPS% \"a|b\" ; # literal | cat"
+  },
+  {
+    "name": "native-empty-stop-parsing",
+    "source": "cmd --%"
+  },
+  {
+    "name": "native-quoted-stop-marker",
+    "source": "cmd '--%' $x"
+  },
+  {
+    "name": "native-end-parameters",
+    "source": "cmd -x 1 -- -w:3 -p y -- -v"
   }
 ]

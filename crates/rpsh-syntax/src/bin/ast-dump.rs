@@ -16,6 +16,9 @@ fn main() {
     let ast = parse(&source).expect("ast-dump: parse");
     let text = match &ast.statements[0] {
         Statement::Expression(expr) => format_expr(expr),
+        Statement::Command {
+            name, arguments, ..
+        } => format!("(pipeline {})", format_command(name, arguments)),
         Statement::Pipeline { commands, .. } => format_pipeline(commands),
         Statement::PipelineChain { chain, .. } => format_chain(chain),
         Statement::AssignChain { name, chain, .. } => {
@@ -86,23 +89,25 @@ fn format_stage(command: &PipelineCommand) -> String {
         PipelineCommand::Expression(expr) => {
             format!("(command-expression {})", format_expr(expr))
         }
-        PipelineCommand::Command { name, arguments } => {
-            let mut elements = vec![format!("(str {name:?})")];
-            for arg in arguments {
-                match arg {
-                    CommandArgument::Value(expr) => elements.push(format_expr(expr)),
-                    CommandArgument::Bareword(word) => elements.push(format!("(str {word:?})")),
-                    CommandArgument::Parameter { name, value, .. } => {
-                        elements.push(format!("(parameter {name})"));
-                        if let Some(expr) = value {
-                            elements.push(format_expr(expr));
-                        }
-                    }
+        PipelineCommand::Command { name, arguments } => format_command(name, arguments),
+    }
+}
+
+fn format_command(name: &str, arguments: &[CommandArgument]) -> String {
+    let mut elements = vec![format!("(str {})", json(name))];
+    for arg in arguments {
+        match arg {
+            CommandArgument::Value(expr) => elements.push(format_expr(expr)),
+            CommandArgument::Bareword(word) => elements.push(format!("(str {})", json(word))),
+            CommandArgument::Parameter { name, value, .. } => {
+                elements.push(format!("(parameter {name})"));
+                if let Some(expr) = value {
+                    elements.push(format_expr(expr));
                 }
             }
-            format!("(command {})", elements.join(" "))
         }
     }
+    format!("(command {})", elements.join(" "))
 }
 
 fn format_chain(chain: &PipelineChain) -> String {

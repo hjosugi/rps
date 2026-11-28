@@ -25,6 +25,8 @@ pub struct FullToken {
     pub end_line: u32,
     pub end_column: u32,
     pub flags: TokenFlags,
+    /// The same token kind can represent an operator or command argument.
+    pub(crate) in_command_arguments: bool,
 }
 
 /// Tokenizes `source` into the full token surface.
@@ -199,6 +201,9 @@ impl Tokenizer<'_> {
                 continue;
             }
             if self.here_string()? {
+                continue;
+            }
+            if self.verbatim_argument() {
                 continue;
             }
             if self.generic_argument() {
@@ -772,12 +777,6 @@ impl Tokenizer<'_> {
         }
         let start = self.pos;
         let mut at = self.pos + 1;
-        if self.bytes.get(at) == Some(&b'-') && self.bytes.get(at + 1) == Some(&b'%') {
-            at += 2;
-            self.pos = at;
-            self.push(FullTokenKind::Parameter, start, at);
-            return true;
-        }
         let Some(ch) = self.source[at..].chars().next() else {
             return false;
         };
@@ -1050,6 +1049,48 @@ impl Tokenizer<'_> {
         false
     }
 
+    /// PowerShell emits a bare marker and a single literal token for the
+    /// remainder of the line, up to an unquoted pipe or pipeline chain.
+    fn verbatim_argument(&mut self) -> bool {
+        let start = self.pos;
+        if self.mode != Mode::Command
+            || !self.command_seen
+            || self.statement_start
+            || !self.source[start..].starts_with("--%")
+        {
+            return false;
+        }
+        let end = start + 3;
+        if self.source[end..].chars().next().is_some_and(|c| {
+            !c.is_whitespace() && !matches!(c, ';' | ',' | '|' | '&' | ')' | '}' | '<' | '>')
+        }) {
+            return false;
+        }
+        let parameter_value = self.tokens.last().is_some_and(|token| {
+            token.kind == FullTokenKind::Parameter && token.span.text(self.source).ends_with(':')
+        });
+        self.pos = end;
+        self.push(FullTokenKind::Generic, start, end);
+        if !parameter_value {
+            self.skip_space_and_continuation();
+            let raw = self.pos;
+            let mut quoted = false;
+            while let Some(ch) = self.char() {
+                if matches!(ch, '\r' | '\n')
+                    || !quoted && (ch == '|' || ch == '&' && self.peek(1) == Some(b'&'))
+                {
+                    break;
+                }
+                if matches!(ch, '"' | '\u{201c}'..='\u{201e}') {
+                    quoted = !quoted;
+                }
+                self.pos += ch.len_utf8();
+            }
+            self.push(FullTokenKind::Generic, raw, self.pos);
+        }
+        true
+    }
+
     /// Command arguments can start with a bracket, or combine a variable or
     /// backtick escape with literal text in one Generic token.
     fn generic_argument(&mut self) -> bool {
@@ -1175,7 +1216,9 @@ impl Tokenizer<'_> {
             && KEYWORDS
                 .iter()
                 .any(|(_, keyword)| word.eq_ignore_ascii_case(keyword));
-        let kind = if command_mode && self.statement_start && word == "%" {
+        let kind = if command_mode && self.command_seen && word == "--" {
+            FullTokenKind::MinusMinus
+        } else if command_mode && self.statement_start && word == "%" {
             FullTokenKind::Rem
         } else if has_command_punctuation || contextual_keyword {
             FullTokenKind::Generic
@@ -1218,6 +1261,7 @@ impl Tokenizer<'_> {
             end_line: 0,
             end_column: 0,
             flags: kind.flags(),
+            in_command_arguments: self.mode == Mode::Command && self.command_seen,
         });
     }
 }

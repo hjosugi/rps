@@ -1,0 +1,52 @@
+rpsh-golden-v2
+exit=0
+Standard
+argc=7 | 2<$x> | 3<two> | 5<words> | 2<"a> | 2<b"> | 2<'c> | 2<d'>
+argc=7 | 6<prefix> | 11<%RPSH_STOP%> | 4<%two> | 5<words> | 13<%RPSH_NONEtwo> | 5<words> | 11<%rpsh_stop%>
+argc=9 | 4<foo;> | 8<#comment> | 6<2>file> | 3<$()> | 2<()> | 6<@array> | 6<${var}> | 1<&> | 1<&>
+pipe=argc=3 | 14<"within|quote"> | 3<and> | 4<"&&">
+argc=1 | 5<first>
+argc=1 | 5<after>
+argc=1 | 5<first>
+argc=1 | 0<>
+argc=1 | 24<starting	inside	one	last>
+argc=3 | 11<"trailing\"> | 6<quote"> | 5<extra>
+argc=6 | 8<expanded> | 3<one> | 3<two> | 3<two> | 5<words> | 5<*.txt>
+argc=2 | 3<two> | 5<words>
+argc=3 | 3<--%> | 11<%RPSH_STOP%> | 3<end>
+argc=3 | 8<expanded> | 3<two> | 5<words>
+argc=2 | 4<--%x> | 8<ordinary>
+Legacy
+argc=6 | 2<$x> | 3<two> | 5<words> | 3<a b> | 2<'c> | 2<d'>
+argc=7 | 6<prefix> | 11<%RPSH_STOP%> | 4<%two> | 5<words> | 13<%RPSH_NONEtwo> | 5<words> | 11<%rpsh_stop%>
+argc=9 | 4<foo;> | 8<#comment> | 6<2>file> | 3<$()> | 2<()> | 6<@array> | 6<${var}> | 1<&> | 1<&>
+pipe=argc=3 | 12<within|quote> | 3<and> | 2<&&>
+argc=1 | 5<first>
+argc=1 | 5<after>
+argc=1 | 5<first>
+argc=0
+argc=4 | 8<starting> | 6<inside> | 3<one> | 4<last>
+argc=2 | 15<trailing" quote> | 5<extra>
+argc=6 | 8<expanded> | 3<one> | 3<two> | 3<two> | 5<words> | 5<*.txt>
+argc=2 | 3<two> | 5<words>
+argc=3 | 3<--%> | 11<%RPSH_STOP%> | 3<end>
+argc=4 | 3<-p:> | 8<expanded> | 3<two> | 5<words>
+argc=2 | 4<--%x> | 8<ordinary>
+Windows
+argc=7 | 2<$x> | 3<two> | 5<words> | 2<"a> | 2<b"> | 2<'c> | 2<d'>
+argc=7 | 6<prefix> | 11<%RPSH_STOP%> | 4<%two> | 5<words> | 13<%RPSH_NONEtwo> | 5<words> | 11<%rpsh_stop%>
+argc=9 | 4<foo;> | 8<#comment> | 6<2>file> | 3<$()> | 2<()> | 6<@array> | 6<${var}> | 1<&> | 1<&>
+pipe=argc=3 | 14<"within|quote"> | 3<and> | 4<"&&">
+argc=1 | 5<first>
+argc=1 | 5<after>
+argc=1 | 5<first>
+argc=1 | 0<>
+argc=1 | 24<starting	inside	one	last>
+argc=3 | 11<"trailing\"> | 6<quote"> | 5<extra>
+argc=6 | 8<expanded> | 3<one> | 3<two> | 3<two> | 5<words> | 5<*.txt>
+argc=2 | 3<two> | 5<words>
+argc=3 | 3<--%> | 11<%RPSH_STOP%> | 3<end>
+argc=3 | 8<expanded> | 3<two> | 5<words>
+argc=2 | 4<--%x> | 8<ordinary>
+[--%]
+[$x %RPSH_STOP% "a b" #literal]

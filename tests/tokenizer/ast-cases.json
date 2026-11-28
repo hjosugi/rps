@@ -37,5 +37,9 @@
   {"name":"redirect-merge","source":"cmd 2>&1 && cmd *>>out"},
   {"name":"static-property-assignment","source":"[Console]::OutputEncoding = [Text.Encoding]::Unicode"},
   {"name":"native-glob-arguments","source":"$out = cmd [aB]*.txt aDir/`*.txt $dir/*.txt ${dir}/sub/?.txt ('*.txt') -flag aDir/*.txt"},
-  {"name":"command-parameter-colon","source":"1, 2 | Sort-Object -Descending:$false -Top: 2"}
+  {"name":"command-parameter-colon","source":"1, 2 | Sort-Object -Descending:$false -Top: 2"},
+  {"name":"native-stop-parsing","source":"cmd --% $x %RPS% \"a|b\" ; # literal | cat"},
+  {"name":"native-empty-stop-parsing","source":"cmd --%"},
+  {"name":"native-quoted-stop-marker","source":"cmd '--%' $x"},
+  {"name":"native-end-parameters","source":"cmd -x 1 -- -w:3 -p y -- -v"}
 ]

@@ -127,6 +127,7 @@ native/pipe-encoding
 native/pipeline-chain
 native/pipeline-status
 native/stderr-redirection
+native/stop-parsing
 native/switch-errors
 native/switch-process
 native/unix-command-names

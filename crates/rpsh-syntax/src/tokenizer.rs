@@ -121,6 +121,9 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             FullTokenKind::IsNot => TokenKind::IsNot,
             FullTokenKind::As => TokenKind::As,
             FullTokenKind::PlusPlus | FullTokenKind::PostfixPlusPlus => TokenKind::PlusPlus,
+            FullTokenKind::MinusMinus if token.in_command_arguments => {
+                TokenKind::Bareword("--".into())
+            }
             FullTokenKind::MinusMinus | FullTokenKind::PostfixMinusMinus => TokenKind::MinusMinus,
             FullTokenKind::QuestionMark => TokenKind::QuestionMark,
             FullTokenKind::Colon => TokenKind::Colon,

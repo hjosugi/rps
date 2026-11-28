@@ -627,6 +627,15 @@ impl Parser<'_> {
                 self.read_redirection(&mut redirections)?;
                 continue;
             }
+            if matches!(&self.peek().kind, TokenKind::Bareword(word) if word == "--%") {
+                arguments.push(CommandArgument::Bareword("--%".into()));
+                self.pos += 1;
+                if let TokenKind::Bareword(raw) = &self.peek().kind {
+                    arguments.push(CommandArgument::Bareword(raw.clone()));
+                    self.pos += 1;
+                }
+                continue;
+            }
             if self.peek().span.text(self.source) == "--" {
                 self.pos += 1;
                 if end_parameters {
@@ -684,6 +693,11 @@ impl Parser<'_> {
                 };
                 let value = match &self.peek().kind {
                     _ if self.peek().span.text(self.source) == "--" => None,
+                    TokenKind::Bareword(w)
+                        if w == "--%" && separator == crate::ArgumentSeparator::Space =>
+                    {
+                        None
+                    }
                     TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
                         let word = word.clone();
                         let span = self.peek().span;

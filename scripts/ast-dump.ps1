@@ -97,7 +97,8 @@ $statement = $ast.EndBlock.Statements[0]
 if ($statement -is [System.Management.Automation.Language.PipelineChainAst]) {
     Format-Pipeline $statement
 } elseif ($statement -is [System.Management.Automation.Language.PipelineAst] -and
-    ($statement.PipelineElements.Count -gt 1 -or $statement.PipelineElements[0].Redirections.Count)) {
+    ($statement.PipelineElements.Count -gt 1 -or $statement.PipelineElements[0].Redirections.Count -or
+        $statement.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst])) {
     Format-Pipeline $statement
 } elseif ($statement -is [System.Management.Automation.Language.AssignmentStatementAst]) {
     $right = $statement.Right
