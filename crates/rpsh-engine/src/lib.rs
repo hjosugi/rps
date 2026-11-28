@@ -15,6 +15,7 @@ mod aliases;
 mod array_list;
 mod encoding;
 mod environment;
+mod errors;
 mod globalization;
 mod method_error;
 mod native;
@@ -22,10 +23,13 @@ mod redirection;
 mod sorting;
 mod string_compare;
 mod string_search;
+mod variables;
 mod wildcards;
 
 use aliases::Aliases;
 use encoding::Encoding;
+pub use errors::ScriptException;
+use errors::error_record;
 use method_error::{ambiguous_overload, overload_error};
 use native::NativeOutput;
 use redirection::{OutputTarget, record_prefix};
@@ -33,6 +37,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
 use std::path::Path;
+use variables::Variables;
 
 use rpsh_commands::{BuiltinModule, MODULES};
 use rpsh_format::{CommandTableItem, command_table};
@@ -46,7 +51,7 @@ use rpsh_syntax::{
 /// Runs scripts.
 #[derive(Debug, Default)]
 pub struct Engine {
-    variables: HashMap<String, Value>,
+    variables: Variables,
     functions: HashMap<String, FunctionDef>,
     last_failed: bool,
     /// The console host can hand its actual descriptors to native children.
@@ -58,6 +63,8 @@ pub struct Engine {
     capture: Option<Vec<Value>>,
     /// The active `trap` block of the function being run.
     trap: Option<Vec<Statement>>,
+    /// The active catch or trap for a bare rethrow.
+    current_exception: Option<ScriptException>,
     /// Objects written to the host, formatted as one table at the end.
     host_objects: Vec<Value>,
     // ConsoleHost keeps its text writer once the first host value is rendered.
@@ -248,6 +255,8 @@ pub enum EngineError {
     Parse(ParseError),
     /// The script stopped part-way. Output written so far stays written.
     Runtime(RuntimeError),
+    /// A PowerShell error that terminated the enclosing block.
+    Script(ScriptException),
     /// Writing to the output stream failed.
     Io(io::Error),
 }
@@ -258,7 +267,7 @@ impl EngineError {
         match self {
             Self::Parse(error) => Some(error.feature()),
             Self::Runtime(error) => Some(error.feature()),
-            Self::Io(_) => None,
+            Self::Io(_) | Self::Script(_) => None,
         }
     }
 }
@@ -268,6 +277,7 @@ impl fmt::Display for EngineError {
         match self {
             Self::Parse(error) => error.fmt(f),
             Self::Runtime(error) => error.fmt(f),
+            Self::Script(error) => error.fmt(f),
             Self::Io(error) => error.fmt(f),
         }
     }
@@ -375,14 +385,14 @@ impl Engine {
         out: &mut dyn Write,
         command_mode: bool,
     ) -> Result<i32, EngineError> {
-        let flow = self.exec_block(&script.statements, out)?;
+        let flow = self.exec_block(&script.statements, out);
         self.flush_host(out)?;
         if self.host_text {
             self.write_host(out, format_args!("\n"))?;
             self.host_text = false;
         }
         let implicit_exit = i32::from(command_mode && self.last_failed);
-        match flow {
+        match flow? {
             Flow::Normal => Ok(implicit_exit),
             Flow::Exit(code) => Ok(code),
             Flow::Return(value) => {
@@ -391,10 +401,6 @@ impl Engine {
                 }
                 Ok(implicit_exit)
             }
-            Flow::Throw(_) => Err(RuntimeError::NotImplemented {
-                feature: "uncaught throw",
-            }
-            .into()),
             // `break` and `continue` outside a loop end the script quietly, as
             // upstream's top-level script block does.
             Flow::Break(_) | Flow::Continue(_) => Ok(0),
@@ -476,7 +482,7 @@ impl Engine {
                 .cloned()
             {
                 let saved = std::mem::take(&mut self.variables);
-                let mut local = saved.clone();
+                let mut local = saved.child();
                 local.insert("this".to_owned(), object.clone());
                 self.variables = local;
                 let flow = self.exec_block(&constructor.body, &mut capture_sink());
@@ -496,7 +502,7 @@ impl Engine {
             .cloned()
         {
             let saved = std::mem::take(&mut self.variables);
-            let mut local = saved.clone();
+            let mut local = saved.child();
             for (parameter, value) in constructor.parameters.iter().zip(arguments) {
                 let value = match &parameter.type_name {
                     Some(type_name) => cast_to(type_name, value.clone())?,
@@ -541,7 +547,7 @@ impl Engine {
             return Ok(Value::Null);
         };
         let saved = std::mem::take(&mut self.variables);
-        let mut local = saved.clone();
+        let mut local = saved.child();
         for (parameter, value) in definition.parameters.iter().zip(arguments) {
             let value = match &parameter.type_name {
                 Some(type_name) => cast_to(type_name, value.clone())?,
@@ -568,12 +574,8 @@ impl Engine {
         }
     }
 
-    fn restore_variables(&mut self, mut saved: HashMap<String, Value>) {
-        saved.extend(
-            self.variables
-                .drain()
-                .filter(|(key, _)| key.starts_with("env:")),
-        );
+    fn restore_variables(&mut self, mut saved: Variables) {
+        saved.restore_session(&mut self.variables);
         self.variables = saved;
         for (key, value) in &self.globals {
             self.variables.insert(key.clone(), value.clone());
@@ -586,42 +588,24 @@ impl Engine {
         out: &mut dyn Write,
     ) -> Result<Flow, EngineError> {
         for statement in statements {
-            match self.exec_statement(statement, out) {
+            let result = self
+                .exec_statement(statement, out)
+                .map_err(|err| self.record_exception(err, statement.span()));
+            match result {
                 Ok(Flow::Normal) => {}
-                Ok(Flow::Throw(value)) if self.trap.is_some() => {
-                    self.variables.insert("_".to_owned(), throw_record(&value));
-                    if self.run_trap(out)? {
+                Err(EngineError::Script(error)) if self.trap.is_some() => {
+                    let trap = self.trap.take().expect("active trap");
+                    let flow = self.handle_exception(&error, &trap, out);
+                    self.trap = Some(trap);
+                    if matches!(flow?, Flow::Continue(_)) {
                         continue;
                     }
                     return Ok(Flow::Normal);
                 }
-                Ok(flow) => return Ok(flow),
-                Err(EngineError::Runtime(error))
-                    if self.trap.is_some() && catchable(&error).is_some() =>
-                {
-                    let record = catchable(&error).unwrap_or(Value::Null);
-                    self.variables.insert("_".to_owned(), record);
-                    if self.run_trap(out)? {
-                        continue;
-                    }
-                    return Ok(Flow::Normal);
-                }
-                Err(error) => return Err(error),
+                result => return result,
             }
         }
         Ok(Flow::Normal)
-    }
-
-    /// Runs the active `trap`; returns true when `continue` asks the caller to
-    /// resume with the next statement.
-    fn run_trap(&mut self, out: &mut dyn Write) -> Result<bool, EngineError> {
-        let trap = self.trap.clone().unwrap_or_default();
-        match self.exec_block(&trap, out)? {
-            Flow::Continue(_) => Ok(true),
-            Flow::Break(_) => Ok(false),
-            Flow::Normal => Ok(false),
-            _ => Ok(false),
-        }
     }
 
     fn exec_statement(
@@ -647,26 +631,19 @@ impl Engine {
                 Ok(Flow::Normal)
             }
             Statement::CoalesceAssign { name, value, .. } => {
-                let key = strip_scope(name);
-                if matches!(self.variables.get(key), None | Some(Value::Null)) {
+                if lookup(name, &self.variables, !self.last_failed).is_none_or(|v| v.is_null_like())
+                {
                     let value = self.eval_expression(value)?;
-                    if is_global_scope(name) {
-                        self.globals.insert(key.to_owned(), value.clone());
-                    }
-                    self.variables.insert(key.to_owned(), value);
+                    self.assign_variable(name, value)?;
                 }
                 self.last_failed = false;
                 Ok(Flow::Normal)
             }
             Statement::AppendAssign { name, value, .. } => {
                 let value = self.eval_expression(value)?;
-                let key = strip_scope(name);
-                let old = self.variables.get(key).cloned().unwrap_or(Value::Null);
+                let old = lookup(name, &self.variables, !self.last_failed).unwrap_or(Value::Null);
                 let updated = ops::add(&old, &value)?;
-                if is_global_scope(name) {
-                    self.globals.insert(key.to_owned(), updated.clone());
-                }
-                self.variables.insert(key.to_owned(), updated);
+                self.assign_variable(name, updated)?;
                 self.last_failed = false;
                 Ok(Flow::Normal)
             }
@@ -674,8 +651,7 @@ impl Engine {
                 name, op, value, ..
             } => {
                 let value = self.eval_expression(value)?;
-                let key = strip_scope(name);
-                let old = self.variables.get(key).cloned().unwrap_or(Value::Null);
+                let old = lookup(name, &self.variables, !self.last_failed).unwrap_or(Value::Null);
                 let updated = match op {
                     BinaryOp::Subtract => ops::subtract(&old, &value)?,
                     BinaryOp::Multiply => ops::multiply(&old, &value)?,
@@ -688,10 +664,7 @@ impl Engine {
                         .into());
                     }
                 };
-                if is_global_scope(name) {
-                    self.globals.insert(key.to_owned(), updated.clone());
-                }
-                self.variables.insert(key.to_owned(), updated);
+                self.assign_variable(name, updated)?;
                 self.last_failed = false;
                 Ok(Flow::Normal)
             }
@@ -936,52 +909,25 @@ impl Engine {
                 finally,
                 ..
             } => {
-                let thrown = match self.exec_block(body, out) {
-                    Ok(Flow::Throw(value)) => Some((value, true)),
-                    Ok(flow) => {
-                        let mut result = flow;
-                        if let Some(finally) = finally {
-                            let finally = self.exec_block(finally, out)?;
-                            if !matches!(finally, Flow::Normal) {
-                                result = finally;
-                            }
+                let result = match self.exec_block(body, out) {
+                    Err(EngineError::Script(error)) => {
+                        match catches.iter().find(|clause| {
+                            clause.types.is_empty()
+                                || clause.types.iter().any(|kind| error.matches(kind))
+                        }) {
+                            Some(clause) => self.handle_exception(&error, &clause.body, out),
+                            None => Err(EngineError::Script(error)),
                         }
-                        return Ok(result);
                     }
-                    Err(EngineError::Runtime(error)) => match catchable(&error) {
-                        Some(record) => Some((record, false)),
-                        None => return Err(EngineError::Runtime(error)),
-                    },
-                    Err(error) => return Err(error),
+                    other => other,
                 };
-                let mut flow = Flow::Throw(
-                    thrown
-                        .as_ref()
-                        .map_or(Value::Null, |(value, _)| value.clone()),
-                );
-                if let Some((value, from_throw)) = thrown {
-                    for clause in catches {
-                        if clause.types.is_empty()
-                            || clause.types.iter().any(|kind| catch_matches(kind))
-                        {
-                            let record = if from_throw {
-                                throw_record(&value)
-                            } else {
-                                value
-                            };
-                            self.variables.insert("_".to_owned(), record);
-                            flow = self.exec_block(&clause.body, out)?;
-                            break;
-                        }
-                    }
-                }
                 if let Some(finally) = finally {
-                    let finally = self.exec_block(finally, out)?;
-                    if !matches!(finally, Flow::Normal) {
-                        flow = finally;
+                    let flow = self.exec_block(finally, out)?;
+                    if !matches!(flow, Flow::Normal) {
+                        return Ok(flow);
                     }
                 }
-                Ok(flow)
+                result
             }
             Statement::Class {
                 name,
@@ -1062,8 +1008,18 @@ impl Engine {
                 Ok(Flow::Normal)
             }
             Statement::Throw { value, .. } => {
-                let value = self.eval_expression(value)?;
-                Ok(Flow::Throw(value))
+                let error = match value {
+                    None if let Some(current) = &self.current_exception => current.rethrow(),
+                    _ => {
+                        let value = value
+                            .as_ref()
+                            .map(|expr| self.eval_expression(expr))
+                            .transpose()?
+                            .unwrap_or(Value::Null);
+                        errors::thrown(value)
+                    }
+                };
+                Err(EngineError::Script(error))
             }
             Statement::Return { value, .. } => {
                 let value = match value {
@@ -1099,6 +1055,13 @@ impl Engine {
             return Ok(());
         }
         let key = strip_scope(name);
+        if key.eq_ignore_ascii_case("Error") {
+            if !self.variables.nested || is_global_scope(name) {
+                return Err(errors::constant_error(false).into());
+            }
+            self.variables.insert("Error".into(), value);
+            return Ok(());
+        }
         let key = if let Some(canonical) = encoding::variable_name(key) {
             if !value.is_null_like() && Encoding::from_value(&value).is_none() {
                 return Err(RuntimeError::Script {
@@ -1262,7 +1225,7 @@ impl Engine {
         }
         let function = self.function(name)?;
         let (positional, named) = self.evaluate_arguments(arguments)?;
-        let mut local = self.variables.clone();
+        let mut local = self.variables.child();
         let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
         local.insert(
             "args".to_owned(),
@@ -1615,7 +1578,7 @@ impl Engine {
         let mut outputs = Vec::new();
         if function.filter {
             for item in input {
-                let mut local = self.variables.clone();
+                let mut local = self.variables.child();
                 let bound = self.bind_parameters(function, positional, named, &mut local)?;
                 local.insert(
                     "args".to_owned(),
@@ -1642,7 +1605,7 @@ impl Engine {
             }
         } else {
             let has_blocks = function.has_blocks();
-            let mut local = self.variables.clone();
+            let mut local = self.variables.child();
             let bound = self.bind_parameters(function, positional, named, &mut local)?;
             local.insert(
                 "args".to_owned(),
@@ -4210,55 +4173,65 @@ impl Engine {
                 let value_only = named.iter().any(|(name, value)| {
                     name.eq_ignore_ascii_case("valueonly") && ops::is_true(value)
                 });
-                let make = |key: &str, value: Value, value_only: bool| {
+                let get = |name: &str| {
+                    let key = strip_scope(name);
+                    if key.eq_ignore_ascii_case("Error") {
+                        let global = is_global_scope(name);
+                        let value = self.variables.error_value(global);
+                        if value_only {
+                            return value;
+                        }
+                        let options = if global || !self.variables.contains_key("Error") {
+                            "Constant"
+                        } else {
+                            "None"
+                        };
+                        return Value::object(vec![
+                            ("Name".into(), Value::String("Error".into())),
+                            ("Value".into(), value),
+                            (
+                                "Options".into(),
+                                typed_scalar(
+                                    "System.Management.Automation.ScopedItemOptions",
+                                    options,
+                                ),
+                            ),
+                            ("Visibility".into(), Value::String("Public".into())),
+                            ("Description".into(), Value::String("".into())),
+                        ]);
+                    }
+                    let value =
+                        lookup(name, &self.variables, !self.last_failed).unwrap_or(Value::Null);
                     if value_only {
                         value
                     } else {
                         Value::object(vec![
-                            ("Name".to_owned(), Value::String(key.into())),
-                            ("Value".to_owned(), value),
+                            ("Name".into(), Value::String(key.into())),
+                            ("Value".into(), value),
                         ])
                     }
                 };
                 if wanted.is_empty() {
-                    let mut names: Vec<&String> = self.variables.keys().collect();
-                    names.sort();
                     return Ok(Some(
-                        names
+                        self.variables
+                            .visible_names()
                             .into_iter()
-                            .map(|key| {
-                                make(
-                                    key,
-                                    self.variables.get(key).cloned().unwrap_or(Value::Null),
-                                    value_only,
-                                )
-                            })
+                            .map(get)
                             .collect(),
                     ));
                 }
                 let mut outputs = Vec::new();
                 for name in wanted {
                     if name.contains(['*', '?']) {
-                        let mut keys: Vec<&String> = self
-                            .variables
-                            .keys()
-                            .filter(|key| ops::wildcard_match(key, &name, false))
-                            .collect();
-                        keys.sort();
-                        for key in keys {
-                            outputs.push(make(
-                                key,
-                                self.variables.get(key).cloned().unwrap_or(Value::Null),
-                                value_only,
-                            ));
-                        }
+                        outputs.extend(
+                            self.variables
+                                .visible_names()
+                                .into_iter()
+                                .filter(|key| ops::wildcard_match(key, &name, false))
+                                .map(get),
+                        );
                     } else {
-                        let key = strip_scope(&name);
-                        outputs.push(make(
-                            key,
-                            self.variables.get(key).cloned().unwrap_or(Value::Null),
-                            value_only,
-                        ));
+                        outputs.push(get(&name));
                     }
                 }
                 Ok(Some(outputs))
@@ -4299,6 +4272,8 @@ impl Engine {
                 });
                 let mut outputs = Vec::new();
                 for name in names {
+                    self.check_error_variable(&lower, &name, &named)?;
+
                     self.assign_variable(&name, value.clone()).map_err(|err| match err {
                         EngineError::Runtime(RuntimeError::Script { id: "RuntimeException", category, exception_type, message }) => {
                             let id = if lower == "set-variable" {
@@ -4340,6 +4315,8 @@ impl Engine {
                     .into());
                 }
                 for name in names {
+                    self.check_error_variable(&lower, &name, &named)?;
+
                     if name.contains(['*', '?']) {
                         let keys: Vec<String> = self
                             .variables
@@ -4370,6 +4347,8 @@ impl Engine {
                     None => positional.iter().map(ToString::to_string).collect(),
                 };
                 for name in names {
+                    self.check_error_variable(&lower, &name, &named)?;
+
                     if name.contains(['*', '?']) {
                         let keys: Vec<String> = self
                             .variables
@@ -5913,20 +5892,19 @@ impl Engine {
                 }
             }
             "variable" => {
-                let mut names: Vec<&String> = self.variables.keys().collect();
-                names.sort();
-                for name in names {
+                for name in self.variables.visible_names() {
                     if !matches(name) {
                         continue;
                     }
                     outputs.push(if names_only {
-                        Value::String(name.clone().into())
+                        Value::String(name.into())
                     } else {
                         Value::object(vec![
-                            ("Name".to_owned(), Value::String(name.clone().into())),
+                            ("Name".into(), Value::String(name.into())),
                             (
-                                "Value".to_owned(),
-                                self.variables.get(name).cloned().unwrap_or(Value::Null),
+                                "Value".into(),
+                                lookup(name, &self.variables, !self.last_failed)
+                                    .unwrap_or(Value::Null),
                             ),
                         ])
                     });
@@ -6268,7 +6246,7 @@ impl Engine {
         function: &FunctionDef,
         positional: &[Value],
         named: &[(String, Value)],
-        local: &mut HashMap<String, Value>,
+        local: &mut Variables,
     ) -> Result<usize, EngineError> {
         let mut bound = 0;
         for parameter in &function.parameters {
@@ -6429,24 +6407,12 @@ enum Flow {
     Break(Option<String>),
     Continue(Option<String>),
     Return(Option<Value>),
-    Throw(Value),
     Exit(i32),
-}
-
-/// A `catch` clause with one of these types takes a value thrown by `throw`.
-fn catch_matches(kind: &str) -> bool {
-    matches!(
-        kind.to_ascii_lowercase().as_str(),
-        "system.management.automation.runtimeexception"
-            | "runtimeexception"
-            | "system.exception"
-            | "exception"
-    )
 }
 
 fn evaluate(
     expr: &Expr,
-    variables: &mut HashMap<String, Value>,
+    variables: &mut Variables,
     last_success: bool,
 ) -> Result<Value, RuntimeError> {
     match &expr.kind {
@@ -6649,7 +6615,7 @@ fn evaluate(
 /// the update, a prefix form the value after it.
 fn increment(
     operand: &Expr,
-    variables: &mut HashMap<String, Value>,
+    variables: &mut Variables,
     last_success: bool,
     op: UnaryOp,
 ) -> Result<Value, RuntimeError> {
@@ -7114,43 +7080,6 @@ fn expand_glob(pattern: &str) -> Vec<String> {
     matches
 }
 
-/// A script error that `try/catch` or `trap` can catch, from the refusal
-/// features that are real PowerShell exceptions rather than missing support.
-fn error_record(
-    id: &str,
-    category: &str,
-    exception_type: &str,
-    message: &str,
-    text: &str,
-) -> Value {
-    let exception = Value::object(vec![
-        (
-            "__TypeName".to_owned(),
-            Value::String(exception_type.to_owned().into()),
-        ),
-        (
-            "Message".to_owned(),
-            Value::String(message.to_owned().into()),
-        ),
-    ]);
-    Value::object(vec![
-        ("__Text".to_owned(), Value::String(text.to_owned().into())),
-        (
-            "__TypeName".to_owned(),
-            Value::String("System.Management.Automation.ErrorRecord".into()),
-        ),
-        (
-            "FullyQualifiedErrorId".to_owned(),
-            Value::String(id.to_owned().into()),
-        ),
-        (
-            "CategoryInfo".to_owned(),
-            Value::String(category.to_owned().into()),
-        ),
-        ("Exception".to_owned(), exception),
-    ])
-}
-
 fn command_not_found(name: &str) -> RuntimeError {
     RuntimeError::Script {
         id: "CommandNotFoundException",
@@ -7160,47 +7089,6 @@ fn command_not_found(name: &str) -> RuntimeError {
             "The term '{name}' is not recognized as a name of a cmdlet, function, script file, or executable program.\nCheck the spelling of the name, or if a path was included, verify that the path is correct and try again."
         ),
     }
-}
-
-fn throw_record(value: &Value) -> Value {
-    let text = value.to_string();
-    error_record(
-        &text,
-        &format!("OperationStopped: ({text}:String) [], RuntimeException"),
-        "System.Management.Automation.RuntimeException",
-        &text,
-        &text,
-    )
-}
-
-fn catchable(error: &RuntimeError) -> Option<Value> {
-    if let Some(script) = error.script() {
-        return Some(error_record(
-            script.id,
-            script.category,
-            script.exception_type,
-            script.message,
-            script.message,
-        ));
-    }
-    let feature = match error {
-        RuntimeError::NotImplemented { feature } => feature,
-        RuntimeError::Script { .. } => return None,
-    };
-    let (id, message) = match *feature {
-        "cannot convert a string to a double" => (
-            "InvalidCastFromStringToDouble",
-            "Cannot convert value to type \"System.Double\".",
-        ),
-        _ => return None,
-    };
-    Some(error_record(
-        id,
-        "NotSpecified: (:) [], RuntimeException",
-        "System.Management.Automation.RuntimeException",
-        message,
-        message,
-    ))
 }
 
 /// `.GetType()` reports a hidden type name when an object carries one.
@@ -8328,7 +8216,7 @@ fn strip_scope(name: &str) -> &str {
     name
 }
 
-fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) -> Option<Value> {
+fn lookup(name: &str, variables: &Variables, last_success: bool) -> Option<Value> {
     match name {
         "null" => return Some(Value::Null),
         "true" => return Some(Value::Bool(true)),
@@ -8342,6 +8230,9 @@ fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) ->
         return Some(environment::get(variables, rest).unwrap_or(Value::Null));
     }
     let key = strip_scope(name);
+    if key.eq_ignore_ascii_case("Error") {
+        return Some(variables.error_value(is_global_scope(name)));
+    }
     let key = encoding::variable_name(key).unwrap_or(key);
     if let Some(value) = variables.get(key) {
         return Some(value.clone());
@@ -8932,7 +8823,7 @@ fn parse_timespan_text(text: &str) -> Option<i64> {
 fn static_member(
     type_name: &str,
     name: &str,
-    variables: &HashMap<String, Value>,
+    variables: &Variables,
 ) -> Result<Value, RuntimeError> {
     let enum_key = format!("__enum::{type_name}::{name}");
     if let Some(value) = variables.get(&enum_key) {
@@ -9060,7 +8951,7 @@ fn invoke_static(
     type_name: &str,
     name: &str,
     arguments: &[Value],
-    variables: &mut HashMap<String, Value>,
+    variables: &mut Variables,
 ) -> Result<Value, RuntimeError> {
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
@@ -9927,7 +9818,7 @@ fn regex_match(
     right: &Value,
     case_sensitive: bool,
     negate: bool,
-    variables: &mut HashMap<String, Value>,
+    variables: &mut Variables,
 ) -> Result<Value, RuntimeError> {
     let regex = rpsh_runtime::regex::Regex::new(&right.to_string(), case_sensitive)
         .map_err(|feature| RuntimeError::NotImplemented { feature })?;
@@ -10187,10 +10078,15 @@ fn object_method(
     name: &str,
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
-    if arguments.is_empty() && name.eq_ignore_ascii_case("ToString")
-        && entries.iter().any(|(k, v)| k == "__TypeName" && matches!(v, Value::String(t) if matches!(t.as_ascii(),Some(globalization::CULTURE_TYPE | globalization::FORM_TYPE | globalization::COMPARISON_TYPE))))
-        && let Some((_,text))=entries.iter().find(|(key,_)|key=="__Text") {
-        return Ok(text.clone());
+    if arguments.is_empty() && name.eq_ignore_ascii_case("ToString") {
+        let text_type = entries.iter().any(|(key,value)| key == "__TypeName" && matches!(value, Value::String(ty) if matches!(ty.as_ascii(), Some(
+            globalization::CULTURE_TYPE | globalization::FORM_TYPE | globalization::COMPARISON_TYPE
+            | "System.Management.Automation.ErrorRecord" | "System.Management.Automation.ErrorCategoryInfo"
+            | "System.Management.Automation.ErrorCategory" | "System.Management.Automation.ScopedItemOptions"
+        ))));
+        if text_type && let Some((_, text)) = entries.iter().find(|(key, _)| key == "__Text") {
+            return Ok(text.clone());
+        }
     }
     if let Some(table) = environment::table_entries(entries)
         && let [key] = arguments

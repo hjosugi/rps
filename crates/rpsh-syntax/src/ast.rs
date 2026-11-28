@@ -195,9 +195,9 @@ pub enum Statement {
         body: Vec<Statement>,
         span: Span,
     },
-    /// `throw expression`. Upstream: `ThrowStatementAst`.
+    /// `throw [expression]`. Upstream: `ThrowStatementAst`.
     Throw {
-        value: Expr,
+        value: Option<Expr>,
         span: Span,
     },
     /// `return` with an optional value. Upstream: `ReturnStatementAst`.
@@ -220,6 +220,45 @@ pub enum Statement {
         code: Option<Expr>,
         span: Span,
     },
+}
+
+impl Statement {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Expression(expr) => expr.span,
+            Self::Assign { span, .. }
+            | Self::AppendAssign { span, .. }
+            | Self::CoalesceAssign { span, .. }
+            | Self::CompoundAssign { span, .. }
+            | Self::AssignPipeline { span, .. }
+            | Self::AssignChain { span, .. }
+            | Self::MultiAssign { span, .. }
+            | Self::MemberAssign { span, .. }
+            | Self::StaticMemberAssign { span, .. }
+            | Self::IndexAssign { span, .. }
+            | Self::Function { span, .. }
+            | Self::Command { span, .. }
+            | Self::Pipeline { span, .. }
+            | Self::PipelineChain { span, .. }
+            | Self::Switch { span, .. }
+            | Self::If { span, .. }
+            | Self::While { span, .. }
+            | Self::For { span, .. }
+            | Self::Foreach { span, .. }
+            | Self::Do { span, .. }
+            | Self::Try { span, .. }
+            | Self::Class { span, .. }
+            | Self::Enum { span, .. }
+            | Self::DotSource { span, .. }
+            | Self::Param { span, .. }
+            | Self::Trap { span, .. }
+            | Self::Throw { span, .. }
+            | Self::Return { span, .. }
+            | Self::Break { span, .. }
+            | Self::Continue { span, .. }
+            | Self::Exit { span, .. } => *span,
+        }
+    }
 }
 
 /// One label and body of a `switch` statement.

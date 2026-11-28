@@ -66,6 +66,7 @@ lang/dotnet-random
 lang/double-format
 lang/dsc-boundary
 lang/enum
+lang/error-history
 lang/format-operator
 lang/function
 lang/function-basic
@@ -96,6 +97,7 @@ lang/ternary
 lang/try-catch
 lang/type-conversion
 lang/type-ops
+lang/uncaught-throw
 lang/variable-paths
 lang/variables
 lang/wildcard

@@ -1,0 +1,4 @@
+rpsh-golden-v2
+exit=1
+before
+cleanup

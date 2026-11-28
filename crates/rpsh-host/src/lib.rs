@@ -128,6 +128,10 @@ fn run_source_with(source: &str, args: &[String], path: Option<&Path>) -> i32 {
             eprintln!("rpsh: cannot write output: {error}");
             1
         }
+        (Err(EngineError::Script(error)), _) => {
+            eprintln!("{}", error.diagnostic(source, path));
+            1
+        }
         (Err(error), _) => {
             eprintln!("{NOT_IMPLEMENTED_MARKER}{error}");
             EXIT_NOT_IMPLEMENTED

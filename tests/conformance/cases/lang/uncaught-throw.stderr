@@ -1,0 +1,6 @@
+Exception: <case>/uncaught-throw.ps1:4
+Line |
+   4 |      throw 'sample failure'
+     |      ~~~~~~~~~~~~~~~~~~~~~~
+     | sample failure
+

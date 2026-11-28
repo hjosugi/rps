@@ -1495,11 +1495,12 @@ impl Parser<'_> {
     fn throw_statement(&mut self) -> Result<Statement, ParseError> {
         let start = self.peek().span;
         self.pos += 1;
-        if self.at_statement_end() {
-            return self.refuse("throw without an expression");
-        }
-        let value = self.nested_expression()?;
-        let span = start.to(value.span);
+        let value = if self.at_statement_end() {
+            None
+        } else {
+            Some(self.nested_expression()?)
+        };
+        let span = value.as_ref().map_or(start, |expr| start.to(expr.span));
         Ok(Statement::Throw { value, span })
     }
 
@@ -2765,7 +2766,9 @@ mod tests {
                     .join(",")
             ),
             Statement::Trap { body, .. } => format!("trap {{ {} }}", show_block(body)),
-            Statement::Throw { value, .. } => format!("throw {}", show(value)),
+            Statement::Throw { value, .. } => value
+                .as_ref()
+                .map_or_else(|| "throw".into(), |expr| format!("throw {}", show(expr))),
             Statement::Return { value, .. } => match value {
                 Some(value) => format!("return {}", show(value)),
                 None => "return".to_owned(),

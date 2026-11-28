@@ -1,0 +1,35 @@
+rpsh-golden-v2
+exit=0
+child|False|1|from child
+System.Collections.ArrayList
+Constant
+True
+outer|False|outer|1
+outer
+System.Management.Automation.ErrorCategoryInfo
+OperationStopped
+RuntimeException
+outer
+String
+inner|False|inner|2
+restored|outer
+again|False|outer|3
+same|False|outer|3
+after|
+entry|outer
+entry|inner
+entry|outer
+False|VariableNotWritable|System.Management.Automation.SessionStateUnauthorizedAccessException|4
+8|4
+8|5
+256|error260|error5
+finally
+halt|False|ScriptHalted|1
+VariableNotWritable,Microsoft.PowerShell.Commands.SetVariableCommand
+WriteError: (Error:String) [Set-Variable], SessionStateUnauthorizedAccessException
+VariableNotWritable,Microsoft.PowerShell.Commands.ClearVariableCommand
+WriteError: (Error:String) [Clear-Variable], SessionStateUnauthorizedAccessException
+VariableNotRemovable,Microsoft.PowerShell.Commands.RemoveVariableCommand
+WriteError: (Error:String) [Remove-Variable], SessionStateUnauthorizedAccessException
+VariableAlreadyExists,Microsoft.PowerShell.Commands.NewVariableCommand
+ResourceExists: (Error:String) [New-Variable], SessionStateException
