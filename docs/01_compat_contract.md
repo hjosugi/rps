@@ -72,6 +72,8 @@ level with `# rpsh-conformance: level=c1|c2`. For a case that needs a specific
 culture, add the locale on the same line, for example
 `# rpsh-conformance: level=c2 LANG=tr_TR.UTF-8`. Recording and checking
 start each engine with that value for both `LANG` and `LC_ALL`.
+A sibling `<case>.stdin` supplies the same input bytes to each engine.
+Open it separately for each run so the first read always starts at byte zero.
 
 A golden v2 is `rpsh-golden-v2`, a `exit=<code>` line, then stdout byte for
 byte. Stderr, when non-empty, is a `<name>.stderr` companion next to it. The

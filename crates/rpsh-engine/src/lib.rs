@@ -46,6 +46,9 @@ pub struct Engine {
     variables: HashMap<String, Value>,
     functions: HashMap<String, FunctionDef>,
     last_failed: bool,
+    /// The console host can hand its actual descriptors to native children.
+    /// Embedded engines continue to use the caller's Write implementation.
+    console_stdio: bool,
     /// While running a pipeline stage, output is collected here instead of
     /// being written to the host.
     capture: Option<Vec<Value>>,
@@ -289,6 +292,14 @@ impl From<io::Error> for EngineError {
 impl Engine {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Use the process's standard streams for native commands that inherit them.
+    pub fn for_console() -> Self {
+        Self {
+            console_stdio: true,
+            ..Self::default()
+        }
     }
 
     /// Parses `source` in full, then runs it, writing what reaches the end of

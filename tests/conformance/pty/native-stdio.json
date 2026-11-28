@@ -1,0 +1,13 @@
+{
+  "program": "{engine}",
+  "args": [
+    "-NoLogo",
+    "-NoProfile",
+    "-NonInteractive",
+    "-Command",
+    "sh -c 'for fd in 0 1 2; do if test -t \"$fd\"; then printf \"terminal %s\\n\" \"$fd\"; else printf \"pipe %s\\n\" \"$fd\"; fi; done'"
+  ],
+  "timeout_ms": 5000,
+  "cols": 48,
+  "rows": 8
+}

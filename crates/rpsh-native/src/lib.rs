@@ -26,4 +26,4 @@
 
 mod pipe;
 
-pub use pipe::{Destination, PipelineError, PipelineStatus, run_pipeline};
+pub use pipe::{Destination, PipelineError, PipelineStatus, run_pipeline, run_pipeline_with_input};

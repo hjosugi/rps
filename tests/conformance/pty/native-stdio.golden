@@ -1,0 +1,5 @@
+{
+  "exit_code": 0,
+  "screen": "terminal 0\nterminal 1\nterminal 2",
+  "timed_out": false
+}

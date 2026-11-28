@@ -1,0 +1,7 @@
+rpsh-golden-v2
+exit=0
+object input
+first=<parent line one>
+parent line two
+parent line three
+after native output

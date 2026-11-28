@@ -57,6 +57,14 @@ impl Engine {
     /// working directory.
     pub(crate) fn run_file(&self, script: &Path, locale: Option<&str>) -> Result<Run, String> {
         let mut command = self.file_command(script);
+        let path = script.with_extension("stdin");
+        match fs::File::open(&path) {
+            Ok(file) => {
+                command.stdin(file);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("cannot read {}: {error}", path.display())),
+        }
         if let Some(locale) = locale {
             command.env("LC_ALL", locale).env("LANG", locale);
         }

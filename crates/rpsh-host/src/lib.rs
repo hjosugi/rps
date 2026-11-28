@@ -115,7 +115,7 @@ fn run_source(source: &str) -> i32 {
 
 fn run_source_with(source: &str, args: &[String], path: Option<&Path>) -> i32 {
     let mut out = BufWriter::new(io::stdout().lock());
-    let mut engine = Engine::new();
+    let mut engine = Engine::for_console();
     let result = if let Some(path) = path {
         engine.run_script_with(source, args, Some(path), &mut out)
     } else {

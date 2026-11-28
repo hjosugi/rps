@@ -72,6 +72,16 @@ pub fn run_pipeline<W: Write>(
     input: &[u8],
     destination: Destination<W>,
 ) -> Result<PipelineStatus, PipelineError> {
+    run_pipeline_with_input(commands, Some(input), destination)
+}
+
+/// None preserves the process's stdin. An empty object pipeline supplies
+/// EOF and a nonempty one is pumped while the last child's output drains.
+pub fn run_pipeline_with_input<W: Write>(
+    commands: Vec<Command>,
+    input: Option<&[u8]>,
+    destination: Destination<W>,
+) -> Result<PipelineStatus, PipelineError> {
     let count = commands.len();
     let (mut last_stdout, mut writer) = match destination {
         Destination::Writer(writer) => (Some(Stdio::piped()), Some(writer)),
@@ -83,8 +93,11 @@ pub fn run_pipeline<W: Write>(
     for (index, mut command) in commands.into_iter().enumerate() {
         let stdin = match reader.take() {
             Some(pipe) => Stdio::from(pipe),
-            None if !input.is_empty() => Stdio::piped(),
-            None => Stdio::null(),
+            None => match input {
+                None => Stdio::inherit(),
+                Some([]) => Stdio::null(),
+                Some(_) => Stdio::piped(),
+            },
         };
         let stdout = if index + 1 == count {
             last_stdout.take().expect("the last stage owns its stdout")
@@ -108,7 +121,9 @@ pub fn run_pipeline<W: Write>(
 
     std::thread::scope(|scope| {
         // A child may fill its stdout before accepting the rest of its stdin.
-        let feeder = first_stdin.map(|mut sink| scope.spawn(move || sink.write_all(input)));
+        let feeder = first_stdin
+            .zip(input)
+            .map(|(mut sink, bytes)| scope.spawn(move || sink.write_all(bytes)));
         let result = (|| {
             if let (Some(mut source), Some(writer)) = (reader, writer.as_mut()) {
                 io::copy(&mut source, writer)?;

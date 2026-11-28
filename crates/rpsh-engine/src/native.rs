@@ -4,10 +4,10 @@ use super::encoding::Encoding;
 use super::{encoding, format_out_string, redirection::text_output_width};
 use std::borrow::Cow;
 use std::io::{self, Write};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use rpsh_commands::{CORE_CMDLETS, MODULES};
-use rpsh_native::{Destination, PipelineError, run_pipeline};
+use rpsh_native::{Destination, PipelineError, run_pipeline_with_input};
 use rpsh_runtime::{RuntimeError, Value};
 use rpsh_syntax::{
     ArgumentSeparator, CommandArgument, Expr, ExprKind, PipelineCommand, Redirection, Stream,
@@ -113,24 +113,35 @@ impl Engine {
         let mut captured = Vec::new();
         let output = match destination {
             NativeOutput::Objects => Destination::Writer(&mut captured as &mut dyn Write),
+            NativeOutput::Host(writer) if self.console_stdio => {
+                writer.flush()?;
+                Destination::Device(Stdio::inherit())
+            }
             NativeOutput::Host(writer) => Destination::Writer(writer),
             NativeOutput::Redirected(target) => Destination::Device(target.stdio()?),
         };
-        let status = run_pipeline(commands, &bytes, output).map_err(|error| match error {
-            PipelineError::Spawn { program, error } if error.kind() == io::ErrorKind::NotFound => {
-                EngineError::from(command_not_found(&program.to_string_lossy()))
-            }
-            PipelineError::Spawn { .. } => RuntimeError::NotImplemented {
-                feature: "starting a native command",
-            }
-            .into(),
-            PipelineError::Io(error) => EngineError::Io(error),
-        })?;
+        let stdin = (input.is_some() || !self.console_stdio).then_some(bytes.as_slice());
+        let status =
+            run_pipeline_with_input(commands, stdin, output).map_err(|error| match error {
+                PipelineError::Spawn { program, error }
+                    if error.kind() == io::ErrorKind::NotFound =>
+                {
+                    EngineError::from(command_not_found(&program.to_string_lossy()))
+                }
+                PipelineError::Spawn { .. } => RuntimeError::NotImplemented {
+                    feature: "starting a native command",
+                }
+                .into(),
+                PipelineError::Io(error) => EngineError::Io(error),
+            })?;
         self.last_failed = !status.all_succeeded;
         self.assign_variable(
             "global:LASTEXITCODE",
             Value::Int32(native_exit_code(status.last)),
         )?;
+        if captured.is_empty() {
+            return Ok(Vec::new());
+        }
         let encoding = self
             .variables
             .get("PSApplicationOutputEncoding")

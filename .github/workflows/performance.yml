@@ -36,6 +36,8 @@ jobs:
           python3 scripts/token-diff.py
           python3 scripts/token-diff.py --cases tests/tokenizer/kinds.json
           python3 scripts/ast-diff.py
+      - name: Native children inherit the console terminal
+        run: cargo harness conform pty check --filter native-stdio
       - run: cargo harness bench --filter startup --budget-scale 2 --out startup-result.json | tee -a "$GITHUB_STEP_SUMMARY"
 
   benchmark:
