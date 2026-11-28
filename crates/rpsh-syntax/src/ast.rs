@@ -350,6 +350,8 @@ pub struct Parameter {
 /// One argument of a command invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandArgument {
+    /// A variable expanded into positional or named arguments at invocation.
+    Splat(String),
     /// An expression, `Add (1 + 2)` or `Add $x`.
     Value(Expr),
     /// `-Name value`, or `-Switch` with no value.

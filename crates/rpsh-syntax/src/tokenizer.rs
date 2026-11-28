@@ -135,6 +135,9 @@ pub fn tokenize(source: &str) -> Result<Vec<Token>, ParseError> {
             }
             FullTokenKind::RCurly => TokenKind::RCurly,
             FullTokenKind::DollarParen => TokenKind::DollarParen,
+            FullTokenKind::SplattedVariable => {
+                TokenKind::SplattedVariable(span.text(source)[1..].to_owned())
+            }
             FullTokenKind::Variable => {
                 let text = span.text(source);
                 let name = text
@@ -252,7 +255,6 @@ fn feature_for(kind: FullTokenKind) -> &'static str {
     use FullTokenKind as K;
     match kind {
         K::Variable => "variables",
-        K::SplattedVariable => "array and hashtable literals, here-strings and splatting",
         K::Parameter => "dash-prefixed operators and parameters (-eq, -not, -Name)",
         K::Generic | K::Identifier | K::Label | K::Unknown => "command invocation",
         K::StringExpandable => "expandable (double-quoted) strings",

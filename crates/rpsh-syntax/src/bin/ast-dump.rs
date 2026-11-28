@@ -97,6 +97,7 @@ fn format_command(name: &str, arguments: &[CommandArgument]) -> String {
     let mut elements = vec![format!("(str {})", json(name))];
     for arg in arguments {
         match arg {
+            CommandArgument::Splat(name) => elements.push(format!("(splat {name})")),
             CommandArgument::Value(expr) => elements.push(format_expr(expr)),
             CommandArgument::Bareword(word) => elements.push(format!("(str {})", json(word))),
             CommandArgument::Parameter { name, value, .. } => {

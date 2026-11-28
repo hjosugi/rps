@@ -13,6 +13,7 @@
 
 mod aliases;
 mod array_list;
+mod command_arguments;
 mod encoding;
 mod enum_table;
 mod environment;
@@ -32,6 +33,7 @@ mod variables;
 mod wildcards;
 
 use aliases::Aliases;
+use command_arguments::CallArgument;
 use encoding::Encoding;
 pub use errors::ScriptException;
 use errors::error_record;
@@ -1275,11 +1277,7 @@ impl Engine {
         let function = self.function(name)?;
         let (positional, named) = self.function_arguments(arguments, &function)?;
         let mut local = self.variables.child();
-        let bound = self.bind_parameters(&function, &positional, &named, &mut local)?;
-        local.insert(
-            "args".to_owned(),
-            Value::array(positional[bound..].to_vec()),
-        );
+        self.bind_parameters(&function, &positional, &named, &mut local)?;
         if function.filter {
             local.entry("_".to_owned()).or_insert(Value::Null);
         }
@@ -1619,11 +1617,7 @@ impl Engine {
         if function.filter {
             for item in input {
                 let mut local = self.variables.child();
-                let bound = self.bind_parameters(function, positional, named, &mut local)?;
-                local.insert(
-                    "args".to_owned(),
-                    Value::array(positional[bound..].to_vec()),
-                );
+                self.bind_parameters(function, positional, named, &mut local)?;
                 local.insert("_".to_owned(), item);
                 let saved = std::mem::replace(&mut self.variables, local);
                 self.capture = Some(Vec::new());
@@ -1646,11 +1640,7 @@ impl Engine {
         } else {
             let has_blocks = function.has_blocks();
             let mut local = self.variables.child();
-            let bound = self.bind_parameters(function, positional, named, &mut local)?;
-            local.insert(
-                "args".to_owned(),
-                Value::array(positional[bound..].to_vec()),
-            );
+            self.bind_parameters(function, positional, named, &mut local)?;
             if !has_blocks {
                 local.insert("input".to_owned(), Value::array(input.clone()));
             }
@@ -6291,20 +6281,6 @@ impl Engine {
         self.evaluate_arguments_matching(arguments, |_| ArgumentBinding::Named)
     }
 
-    fn function_arguments(
-        &mut self,
-        arguments: &[CommandArgument],
-        function: &FunctionDef,
-    ) -> Result<BoundArguments, EngineError> {
-        self.evaluate_arguments_matching(arguments, |_| {
-            if function.parameters.is_empty() {
-                ArgumentBinding::Unbound
-            } else {
-                ArgumentBinding::Named
-            }
-        })
-    }
-
     fn evaluate_arguments_matching(
         &mut self,
         arguments: &[CommandArgument],
@@ -6312,65 +6288,63 @@ impl Engine {
     ) -> Result<BoundArguments, EngineError> {
         let mut positional = Vec::new();
         let mut named = Vec::new();
-        for argument in arguments {
-            match argument {
-                CommandArgument::Value(expr) => {
-                    positional.push(self.eval_expression(expr)?);
+        let mut splatted = Vec::new();
+        let mut args = self.call_arguments(arguments)?.into_iter().peekable();
+        while let Some(arg) = args.next() {
+            let CallArgument::Parameter {
+                name,
+                text,
+                mut value,
+                separator,
+                from_hashtable,
+            } = arg
+            else {
+                if let CallArgument::Positional(value) = arg {
+                    positional.push(value);
                 }
-                CommandArgument::Bareword(word) => {
-                    positional.push(Value::String(word.clone().into()));
-                }
-                CommandArgument::Parameter { name, .. } if name == "-" => {}
-                CommandArgument::Parameter {
-                    name,
-                    value,
-                    separator,
-                } => {
-                    let binding = binding(name);
-                    let spaced = *separator == rpsh_syntax::ArgumentSeparator::Space;
-                    if binding == ArgumentBinding::Unbound
-                        || binding == ArgumentBinding::Switch && spaced
-                    {
-                        if binding == ArgumentBinding::Unbound {
-                            let colon = if spaced { "" } else { ":" };
-                            positional.push(Value::String(format!("-{name}{colon}").into()));
-                        } else {
-                            named.push((name.clone(), Value::Bool(true)));
-                        }
-                        if let Some(expr) = value {
-                            positional.push(self.eval_expression(expr)?);
-                        }
-                        continue;
-                    }
-                    let value = match value {
-                        Some(expr) => self.eval_expression(expr)?,
-                        None => Value::Bool(true),
-                    };
-                    named.push((name.clone(), value));
-                }
+                continue;
+            };
+            let binding = binding(&name);
+            if binding == ArgumentBinding::Unbound {
+                positional.push(Value::String(PsString::command_parameter(&text, &name)));
+                positional.extend(value);
+                continue;
+            }
+            if binding == ArgumentBinding::Switch
+                && separator == rpsh_syntax::ArgumentSeparator::Space
+            {
+                positional.extend(value.take());
+            } else if value.is_none()
+                && matches!(args.peek(), Some(CallArgument::Positional(_)))
+                && let Some(CallArgument::Positional(next)) = args.next()
+            {
+                value = Some(next);
+            }
+            let value = value.unwrap_or(Value::Bool(true));
+            if from_hashtable {
+                splatted.push((name, value));
+            } else {
+                named.push((name, value));
             }
         }
+        splatted.retain(|(key, _)| !named.iter().any(|(name, _)| name.eq_ignore_ascii_case(key)));
+        named.extend(splatted);
         Ok((positional, named))
     }
 
-    /// Binds declared parameters into `local`; returns how many positional
-    /// arguments it consumed.
+    /// Install supplied parameters and evaluate defaults in declaration order.
     fn bind_parameters(
         &mut self,
         function: &FunctionDef,
-        positional: &[Value],
+        unbound: &[Value],
         named: &[(String, Value)],
         local: &mut Variables,
-    ) -> Result<usize, EngineError> {
-        let mut bound = 0;
+    ) -> Result<(), EngineError> {
         for parameter in &function.parameters {
             let value = if let Some((_, value)) = named
                 .iter()
                 .find(|(name, _)| name.eq_ignore_ascii_case(&parameter.name))
             {
-                value.clone()
-            } else if let Some(value) = positional.get(bound) {
-                bound += 1;
                 value.clone()
             } else if let Some(default) = &parameter.default {
                 evaluate(default, local, !self.last_failed)?
@@ -6383,7 +6357,8 @@ impl Engine {
             };
             local.insert(parameter.name.clone(), value);
         }
-        Ok(bound)
+        local.insert("args".to_owned(), Value::array(unbound.to_vec()));
+        Ok(())
     }
 
     fn exec_loop(
@@ -6632,16 +6607,18 @@ fn evaluate(
             index_value(&target, &index)
         }
         ExprKind::Object(entries) => {
-            let mut object = Vec::with_capacity(entries.len());
-            for (name, value) in entries {
-                object.push((name.clone(), evaluate(value, variables, last_success)?));
-            }
-            if !object.is_empty() && object.iter().all(|(key, _)| key.parse::<i64>().is_ok()) {
-                object = order_hashtable(object);
-            }
-            Ok(Value::object(object))
+            evaluate_hashtable(entries, "hashtable", variables, last_success)
         }
         ExprKind::Cast { type_name, value } => {
+            if let ExprKind::Object(entries) = &value.kind {
+                let ty = type_name.to_ascii_lowercase();
+                if matches!(
+                    ty.as_str(),
+                    "ordered" | "pscustomobject" | "system.management.automation.pscustomobject"
+                ) {
+                    return evaluate_hashtable(entries, &ty, variables, last_success);
+                }
+            }
             let value = evaluate(value, variables, last_success)?;
             cast_to(type_name, value)
         }
@@ -9665,9 +9642,38 @@ fn invoke_static(
     }
 }
 
+fn evaluate_hashtable(
+    entries: &[(String, Expr)],
+    target: &str,
+    variables: &mut Variables,
+    last_success: bool,
+) -> Result<Value, RuntimeError> {
+    let mut object = Vec::with_capacity(entries.len());
+    for (key, expr) in entries {
+        object.push((key.clone(), evaluate(expr, variables, last_success)?));
+    }
+    match target {
+        "hashtable" => {
+            if !object.is_empty() && object.iter().all(|(key, _)| key.parse::<i64>().is_ok()) {
+                object = order_hashtable(object);
+            }
+            Ok(mark_hashtable(
+                Value::object(object),
+                "System.Collections.Hashtable",
+            ))
+        }
+        "ordered" => Ok(mark_hashtable(
+            Value::object(object),
+            "System.Collections.Specialized.OrderedDictionary",
+        )),
+        _ => Ok(Value::object(object)),
+    }
+}
+
 fn mark_hashtable(value: Value, type_name: &str) -> Value {
     if let Value::Object(entries) = value {
         let mut entries = entries.as_ref().clone();
+        entries.retain(|(key, _)| key != "__TypeName");
         entries.push((
             "__TypeName".to_owned(),
             Value::String(type_name.to_owned().into()),
@@ -9751,7 +9757,21 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         "text.normalizationform" | "system.text.normalizationform" => {
             globalization::cast_form(&value)
         }
-        "pscustomobject" | "system.management.automation.pscustomobject" => Ok(value),
+        "pscustomobject" | "system.management.automation.pscustomobject" => {
+            if let Value::Object(entries) = &value
+                && hidden_type(&value)
+                    .is_some_and(|ty| ty.contains("Hashtable") || ty.contains("Dictionary"))
+            {
+                return Ok(Value::object(
+                    entries
+                        .iter()
+                        .filter(|(k, _)| !is_hidden(k))
+                        .cloned()
+                        .collect(),
+                ));
+            }
+            Ok(value)
+        }
         "ordered" | "ordereddictionary" | "system.collections.specialized.ordereddictionary" => Ok(
             mark_hashtable(value, "System.Collections.Specialized.OrderedDictionary"),
         ),

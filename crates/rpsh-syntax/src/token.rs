@@ -99,6 +99,7 @@ pub enum TokenKind {
     Redirection(String),
     DollarParen,
     Variable(String),
+    SplattedVariable(String),
     ExpandableString(String),
     HereString {
         text: String,

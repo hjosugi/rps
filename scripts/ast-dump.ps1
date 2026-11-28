@@ -32,7 +32,10 @@ function Format-Expr($e) {
         }
         'StringConstantExpressionAst' { return "(str $(ConvertTo-Json $e.Value -Compress))" }
         'ExpandableStringExpressionAst' { return "(expand $($e.NestedExpressions.Count))" }
-        'VariableExpressionAst' { return "(var $($e.VariablePath.UserPath))" }
+        'VariableExpressionAst' {
+            if ($e.Splatted) { return "(splat $($e.VariablePath.UserPath))" }
+            return "(var $($e.VariablePath.UserPath))"
+        }
         'UnaryExpressionAst' { return "(unary $($unary[$e.TokenKind.ToString()]) $(Format-Expr $e.Child))" }
         'BinaryExpressionAst' { return "(binary $($binary[$e.Operator.ToString()]) $(Format-Expr $e.Left) $(Format-Expr $e.Right))" }
         'ParenExpressionAst' { return "(paren $(Format-Expr $e.Pipeline.PipelineElements[0].Expression))" }

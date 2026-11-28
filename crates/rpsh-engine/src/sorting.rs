@@ -133,6 +133,13 @@ fn binding_error(id: &'static str, message: String) -> RuntimeError {
     }
 }
 
+fn duplicate_parameter(name: &str) -> RuntimeError {
+    binding_error(
+        "ParameterAlreadyBound,Microsoft.PowerShell.Commands.SortObjectCommand",
+        rpsh_messages::format("ParameterBinderStrings/ParameterAlreadyBound", &["", name]),
+    )
+}
+
 // As in the cmdlet binder, a switch followed by whitespace leaves the next
 // value positional. Only a colon binds an explicit boolean to that switch.
 fn sort_parameter(name: &str) -> Result<&str, RuntimeError> {
@@ -169,32 +176,32 @@ fn sort_parameter(name: &str) -> Result<&str, RuntimeError> {
 }
 
 impl Engine {
-    fn bind_sort_arguments<'a>(
+    fn bind_sort_arguments(
         &mut self,
-        arguments: &'a [CommandArgument],
-    ) -> Result<(Vec<Value>, std::collections::HashMap<&'a str, Value>), EngineError> {
+        arguments: &[CommandArgument],
+    ) -> Result<(Vec<Value>, std::collections::HashMap<String, Value>), EngineError> {
         let mut positional = Vec::new();
         let mut named = std::collections::HashMap::new();
-        for argument in arguments {
+        let mut splatted = Vec::new();
+        for argument in self.call_arguments(arguments)? {
             match argument {
-                CommandArgument::Value(expr) => positional.push(self.eval_expression(expr)?),
-                CommandArgument::Bareword(name) => {
-                    positional.push(Value::String(name.as_str().into()))
-                }
-                CommandArgument::Parameter {
+                super::CallArgument::Positional(value) => positional.push(value),
+                super::CallArgument::Parameter {
                     name,
                     value,
                     separator,
+                    from_hashtable,
+                    ..
                 } => {
-                    let name = sort_parameter(name)?;
+                    let name = sort_parameter(&name)?;
                     let switch =
                         matches!(name, "Stable" | "Descending" | "Unique" | "CaseSensitive");
                     let bound = match value {
-                        Some(value) if switch && *separator == ArgumentSeparator::Space => {
-                            positional.push(self.eval_expression(value)?);
+                        Some(value) if switch && separator == ArgumentSeparator::Space => {
+                            positional.push(value);
                             Value::Bool(true)
                         }
-                        Some(value) => self.eval_expression(value)?,
+                        Some(value) => value,
                         None if switch || !PARAMETER_NAMES.contains(&name) => Value::Bool(true),
                         None => {
                             let ty = match name {
@@ -206,10 +213,18 @@ impl Engine {
                             return Err(binding_error("MissingArgument,Microsoft.PowerShell.Commands.SortObjectCommand",format!("Missing an argument for parameter '{name}'. Specify a parameter of type '{ty}' and try again.")).into());
                         }
                     };
-                    if named.insert(name, bound).is_some() {
-                        return Err(binding_error("ParameterAlreadyBound,Microsoft.PowerShell.Commands.SortObjectCommand",format!("Cannot bind parameter because parameter '{name}' is specified more than once. To provide multiple values to parameters that can accept multiple values, use the array syntax. For example, \"-parameter value1,value2,value3\".")).into());
+                    if from_hashtable {
+                        splatted.push((name.to_owned(), bound));
+                    } else if named.insert(name.to_owned(), bound).is_some() {
+                        return Err(duplicate_parameter(name).into());
                     }
                 }
+            }
+        }
+        splatted.retain(|(name, _)| !named.contains_key(name));
+        for (name, value) in splatted {
+            if named.insert(name.clone(), value).is_some() {
+                return Err(duplicate_parameter(&name).into());
             }
         }
         Ok((positional, named))

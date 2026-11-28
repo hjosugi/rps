@@ -536,7 +536,7 @@ impl Tokenizer<'_> {
         }
         let mut saw = false;
         while let Some(ch) = self.source[self.pos..].chars().next() {
-            if ch.is_alphanumeric() || ch == '_' || ch == ':' {
+            if ch.is_alphanumeric() || matches!(ch, '_' | ':' | '?') {
                 saw = true;
                 self.pos += ch.len_utf8();
             } else {
@@ -545,7 +545,9 @@ impl Tokenizer<'_> {
         }
         if saw {
             self.push(FullTokenKind::SplattedVariable, start, self.pos);
-            self.mode = Mode::Expression;
+            if matches!(self.bytes.get(self.pos), Some(b'.' | b'[')) {
+                self.mode = Mode::Expression;
+            }
             self.statement_start = false;
             Ok(true)
         } else {
@@ -1105,13 +1107,31 @@ impl Tokenizer<'_> {
             return false;
         }
         let first = self.bytes[start];
-        if matches!(first, b'#' | b'@' | b'\'' | b'"')
+        if matches!(first, b'#' | b'\'' | b'"')
             || first == b'-' && self.bytes.get(start + 1) != Some(&b'-')
         {
             return false;
         }
         let mut at = start;
         let mut generic = first == b'[';
+        if first == b'@' {
+            let tail = self.source[start + 1..].trim_start_matches(|ch: char| {
+                ch.is_alphanumeric() || matches!(ch, '_' | ':' | '?')
+            });
+            let Some(next) = tail.chars().next() else {
+                return false;
+            };
+            if tail.len() == self.source.len() - start - 1
+                || next.is_whitespace()
+                || matches!(
+                    next,
+                    '.' | '[' | '=' | ',' | ';' | ')' | '}' | '|' | '&' | '<' | '>'
+                )
+            {
+                return false;
+            }
+            generic = true;
+        }
         let mut leading_variable_end = None;
         while let Some(ch) = self.source[at..].chars().next() {
             if ch.is_whitespace()

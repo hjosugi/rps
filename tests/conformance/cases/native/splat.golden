@@ -1,0 +1,50 @@
+rpsh-golden-v2
+exit=0
+Standard
+argc=7 | 6<-A:a b> | 10<-Flag:True> | 7<-Empty:> | 9<-Items:aa> | 9<-Items:bb> | 7<-name:2> | 12<---literal:v>
+argc=7 | 6<-first> | 3<x y> | 0<> | 1<a> | 1<b> | 7<no*.txt> | 5<-last>
+argc=4 | 4<True> | 9<something> | 3<--p> | 1<z>
+argc=4 | 3<a"b> | 5<-flag> | 1<2> | 2<z">
+argc=4 | 5<@x/aa> | 4<@xhi> | 4<@x-1> | 4<@x#q>
+argc=5 | 6<before> | 1<a> | 1< > | 1<b> | 5<after>
+argc=2 | 6<before> | 5<after>
+argc=3 | 6<before> | 1<1> | 5<after>
+argc=4 | 3<pre> | 1<a> | 1<b> | 4<post>
+argc=1 | 10<@{Hello=2}>
+argc=3 | 28<System.Collections.Hashtable> | 8<@{ans=3}> | 48<System.Collections.Specialized.OrderedDictionary>
+argc=3 | 6<-ans:3> | 8<@{ans=3}> | 6<-ans:3>
+argc=2 | 2<aa> | 2<bb>
+argc=2 | 2<-p> | 10<-flag:True>
+argc=6 | 6<-d e:q> | 7<-  x:  > | 1<r> | 4<-z:h> | 7<--foo:c> | 4<-1:2>
+Legacy
+argc=8 | 6<-A:a b> | 10<-Flag:True> | 7<-Empty:> | 6<-Null:> | 9<-Items:aa> | 2<bb> | 7<-name:2> | 12<---literal:v>
+argc=6 | 6<-first> | 3<x y> | 1<a> | 1<b> | 7<no*.txt> | 5<-last>
+argc=6 | 6<-flag:> | 4<True> | 3<-x:> | 9<something> | 3<--p> | 1<z>
+argc=1 | 20<ab -flag -other: 2 z>
+argc=4 | 5<@x/aa> | 4<@xhi> | 4<@x-1> | 4<@x#q>
+argc=5 | 6<before> | 1<a> | 1< > | 1<b> | 5<after>
+argc=2 | 6<before> | 5<after>
+argc=3 | 6<before> | 1<1> | 5<after>
+argc=4 | 3<pre> | 1<a> | 1<b> | 4<post>
+argc=1 | 10<@{Hello=2}>
+argc=3 | 28<System.Collections.Hashtable> | 8<@{ans=3}> | 48<System.Collections.Specialized.OrderedDictionary>
+argc=3 | 6<-ans:3> | 8<@{ans=3}> | 6<-ans:3>
+argc=2 | 2<aa> | 2<bb>
+argc=2 | 2<-p> | 10<-flag:True>
+argc=8 | 2<-d> | 3<e:q> | 1<-> | 2<x:> | 1<r> | 4<-z:h> | 7<--foo:c> | 4<-1:2>
+Windows
+argc=7 | 6<-A:a b> | 10<-Flag:True> | 7<-Empty:> | 9<-Items:aa> | 9<-Items:bb> | 7<-name:2> | 12<---literal:v>
+argc=7 | 6<-first> | 3<x y> | 0<> | 1<a> | 1<b> | 7<no*.txt> | 5<-last>
+argc=4 | 4<True> | 9<something> | 3<--p> | 1<z>
+argc=4 | 3<a"b> | 5<-flag> | 1<2> | 2<z">
+argc=4 | 5<@x/aa> | 4<@xhi> | 4<@x-1> | 4<@x#q>
+argc=5 | 6<before> | 1<a> | 1< > | 1<b> | 5<after>
+argc=2 | 6<before> | 5<after>
+argc=3 | 6<before> | 1<1> | 5<after>
+argc=4 | 3<pre> | 1<a> | 1<b> | 4<post>
+argc=1 | 10<@{Hello=2}>
+argc=3 | 28<System.Collections.Hashtable> | 8<@{ans=3}> | 48<System.Collections.Specialized.OrderedDictionary>
+argc=3 | 6<-ans:3> | 8<@{ans=3}> | 6<-ans:3>
+argc=2 | 2<aa> | 2<bb>
+argc=2 | 2<-p> | 10<-flag:True>
+argc=6 | 6<-d e:q> | 7<-  x:  > | 1<r> | 4<-z:h> | 7<--foo:c> | 4<-1:2>

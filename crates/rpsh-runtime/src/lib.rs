@@ -194,6 +194,19 @@ impl fmt::Display for Value {
                 {
                     return fmt::Display::fmt(text, f);
                 }
+                if let Some((_, Value::String(ty))) =
+                    entries.iter().find(|(key, _)| key == "__TypeName")
+                    && matches!(
+                        ty.as_ascii(),
+                        Some(
+                            "System.Collections.Hashtable"
+                                | "System.Collections.Specialized.OrderedDictionary"
+                                | "System.Management.Automation.OrderedHashtable"
+                        )
+                    )
+                {
+                    return fmt::Display::fmt(ty, f);
+                }
                 f.write_str("@{")?;
                 for (index, (name, value)) in entries.iter().enumerate() {
                     if index > 0 {

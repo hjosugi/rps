@@ -3,7 +3,7 @@
 //! so an unmatched quote can span PowerShell argument boundaries.
 use super::{Engine, EngineError, glob};
 use crate::preferences::{self, ArgumentStyle};
-use crate::{environment, variables::Variables};
+use crate::{command_arguments::CallArgument, environment, variables::Variables};
 use rpsh_runtime::Value;
 use rpsh_syntax::{ArgumentSeparator, CommandArgument, Expr, ExprKind};
 use std::path::Path;
@@ -15,7 +15,7 @@ enum Arguments {
 
 struct Parameter {
     text: String,
-    separator: ArgumentSeparator,
+    space_after: bool,
 }
 
 impl Arguments {
@@ -41,7 +41,7 @@ impl Arguments {
         match self {
             Self::List(out) => {
                 if let Some(p) = parameter
-                    && p.separator == ArgumentSeparator::Space
+                    && !p.text.ends_with(':')
                 {
                     out.push(p.text.clone());
                 }
@@ -52,7 +52,7 @@ impl Arguments {
                 }
                 if let Some(p) = parameter {
                     line.push_str(&p.text);
-                    if p.separator != ArgumentSeparator::Colon {
+                    if p.space_after {
                         line.push(' ');
                     }
                 }
@@ -86,12 +86,12 @@ impl Arguments {
         match self {
             Self::List(out) => glob::expand(word, quoted, |word, _| {
                 if let Some(p) = p
-                    && p.separator != ArgumentSeparator::Space
+                    && p.text.ends_with(':')
                 {
                     if word == p.text {
                         return;
                     }
-                    if p.separator == ArgumentSeparator::Colon {
+                    if !p.space_after {
                         out.push(format!("{}{word}", p.text));
                         return;
                     }
@@ -149,6 +149,31 @@ impl Engine {
         let mut verbatim = false;
         for arg in args {
             let (p, value) = match arg {
+                CommandArgument::Splat(name) => {
+                    for item in self.splat(name) {
+                        let (p, value) = match item {
+                            CallArgument::Positional(value) => (None, Some(value)),
+                            CallArgument::Parameter { text, value, .. } => (
+                                Some(Parameter {
+                                    text,
+                                    space_after: false,
+                                }),
+                                value,
+                            ),
+                        };
+                        output.begin(p.as_ref());
+                        if let Some(value) = value {
+                            self.append_native_value(
+                                &value,
+                                false,
+                                p.as_ref(),
+                                &mut output,
+                                &mut verbatim,
+                            );
+                        }
+                    }
+                    continue;
+                }
                 CommandArgument::Bareword(word) => {
                     output.begin(None);
                     if word == "--%" {
@@ -178,7 +203,7 @@ impl Engine {
                     (
                         Some(Parameter {
                             text: format!("-{name}{colon}"),
-                            separator: *separator,
+                            space_after: value.is_some() && *separator != ArgumentSeparator::Colon,
                         }),
                         value.as_ref(),
                     )
@@ -204,14 +229,26 @@ impl Engine {
             ExprKind::String(_) | ExprKind::ExpandableString(_)
         );
         let value = self.eval_expression(expr)?;
-        if matches!(&value, Value::String(s) if s.as_ascii() == Some("--%")) {
+        self.append_native_value(&value, quoted, p, out, verbatim);
+        Ok(())
+    }
+
+    fn append_native_value(
+        &self,
+        value: &Value,
+        quoted: bool,
+        p: Option<&Parameter>,
+        out: &mut Arguments,
+        verbatim: &mut bool,
+    ) {
+        if matches!(value, Value::String(s) if s.as_ascii() == Some("--%")) {
             *verbatim = true;
-            return Ok(());
+            return;
         }
         let sequence = value.sequence();
         let items = sequence
             .as_deref()
-            .unwrap_or_else(|| std::slice::from_ref(&value));
+            .unwrap_or_else(|| std::slice::from_ref(value));
         for (index, item) in items.iter().enumerate() {
             if !item.is_null_like() {
                 out.word(
@@ -223,7 +260,6 @@ impl Engine {
                 );
             }
         }
-        Ok(())
     }
 }
 

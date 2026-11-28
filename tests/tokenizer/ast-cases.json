@@ -41,5 +41,7 @@
   {"name":"native-stop-parsing","source":"cmd --% $x %RPS% \"a|b\" ; # literal | cat"},
   {"name":"native-empty-stop-parsing","source":"cmd --%"},
   {"name":"native-quoted-stop-marker","source":"cmd '--%' $x"},
-  {"name":"native-end-parameters","source":"cmd -x 1 -- -w:3 -p y -- -v"}
+  {"name":"native-end-parameters","source":"cmd -x 1 -- -w:3 -p y -- -v"},
+  {"name":"command-variable-splat","source":"cmd -p @items @global:keywords -- @rest"},
+  {"name":"pipeline-variable-splat","source":"cmd @args | more @env:flags"}
 ]

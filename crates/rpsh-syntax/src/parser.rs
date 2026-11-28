@@ -623,6 +623,22 @@ impl Parser<'_> {
                 self.pos += 1;
                 continue;
             }
+            if let TokenKind::SplattedVariable(name) = &self.peek().kind {
+                let next = &self.tokens[self.pos + 1];
+                if self.tokens[self.pos - 1].kind == TokenKind::Comma
+                    || next.kind == TokenKind::Comma
+                {
+                    return self.refuse("splatting in a comma-separated argument list");
+                }
+                if next.span.start == self.peek().span.end
+                    && matches!(next.kind, TokenKind::Dot | TokenKind::LBracket)
+                {
+                    return self.refuse("splatting in a member or index expression");
+                }
+                arguments.push(CommandArgument::Splat(name.clone()));
+                self.pos += 1;
+                continue;
+            }
             if matches!(self.peek().kind, TokenKind::Redirection(_)) {
                 self.read_redirection(&mut redirections)?;
                 continue;
@@ -692,6 +708,11 @@ impl Parser<'_> {
                     (parameter, crate::ArgumentSeparator::Space)
                 };
                 let value = match &self.peek().kind {
+                    TokenKind::SplattedVariable(_)
+                        if separator != crate::ArgumentSeparator::Space =>
+                    {
+                        return self.refuse("splatting as the value of a command parameter");
+                    }
                     _ if self.peek().span.text(self.source) == "--" => None,
                     TokenKind::Bareword(w)
                         if w == "--%" && separator == crate::ArgumentSeparator::Space =>
@@ -2538,6 +2559,7 @@ mod tests {
         let mut text = name.to_owned();
         for argument in arguments {
             match argument {
+                CommandArgument::Splat(name) => text.push_str(&format!(" @{name}")),
                 CommandArgument::Value(value) => {
                     text.push(' ');
                     text.push_str(&show(value));
@@ -2869,6 +2891,25 @@ mod tests {
     fn exit_takes_an_optional_expression() {
         assert_eq!(shown("exit"), ["exit"]);
         assert_eq!(shown("exit 1 + 2; 9"), ["exit (1 + 2)", "9"]);
+    }
+
+    #[test]
+    fn splatting_requires_a_whole_command_argument() {
+        for source in ["cmd @x,1", "cmd word,@x"] {
+            assert_eq!(
+                refused(source),
+                "splatting in a comma-separated argument list"
+            );
+        }
+        for source in ["cmd @x.member", "cmd @x[0]"] {
+            assert_eq!(refused(source), "splatting in a member or index expression");
+        }
+        for source in ["cmd -x:@args", "cmd -x: @args"] {
+            assert_eq!(
+                refused(source),
+                "splatting as the value of a command parameter"
+            );
+        }
     }
 
     #[test]
