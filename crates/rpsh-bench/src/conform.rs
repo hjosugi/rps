@@ -69,29 +69,48 @@ enum Level {
     C2,
 }
 
-/// Reads the case's `# rpsh-conformance: level=...` directive.
-fn level_of(source: &str, id: &str) -> Result<Level, String> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CaseSettings<'a> {
+    level: Level,
+    locale: Option<&'a str>,
+}
+
+/// Language selection belongs to each engine process, just like the home and
+/// working directory. The harness process keeps its own locale.
+fn case_settings<'a>(source: &'a str, id: &str) -> Result<CaseSettings<'a>, String> {
     let mut level = None;
+    let mut locale = None;
     for line in source.lines() {
         let Some(rest) = line.trim().strip_prefix("# rpsh-conformance:") else {
             continue;
         };
         for setting in rest.split_whitespace() {
-            let Some(value) = setting.strip_prefix("level=") else {
+            let Some((key, value)) = setting.split_once('=') else {
                 continue;
             };
-            level = Some(match value {
-                "c1" => Level::C1,
-                "c2" => Level::C2,
-                other => {
-                    return Err(format!(
-                        "{id}: unknown conformance level '{other}' (c1 | c2)"
-                    ));
+            match key {
+                "level" => {
+                    level = Some(match value {
+                        "c1" => Level::C1,
+                        "c2" => Level::C2,
+                        other => {
+                            return Err(format!(
+                                "{id}: unknown conformance level '{other}' (c1 | c2)"
+                            ));
+                        }
+                    })
                 }
-            });
+                "LANG" | "lang" if value.is_empty() => {
+                    return Err(format!("{id}: LANG requires a locale name"));
+                }
+                "LANG" | "lang" => locale = Some(value),
+                _ => {}
+            }
         }
     }
-    level.ok_or_else(|| format!("{id}: add `# rpsh-conformance: level=c2` (or c1) to the case"))
+    let level = level
+        .ok_or_else(|| format!("{id}: add `# rpsh-conformance: level=c2` (or c1) to the case"))?;
+    Ok(CaseSettings { level, locale })
 }
 
 /// A golden v2 is a header line, `exit=<code>`, then stdout byte for byte.
@@ -150,11 +169,11 @@ fn record(root: &Path, mut args: Args) -> Result<bool, String> {
     for case in &cases {
         let source = fs::read_to_string(&case.path)
             .map_err(|error| format!("cannot read {}: {error}", case.path.display()))?;
-        let level = level_of(&source, &case.id)?;
+        let CaseSettings { level, locale } = case_settings(&source, &case.id)?;
         let directory = case.path.parent().unwrap_or(Path::new("."));
         let mut answers = Vec::with_capacity(repeat);
         for _ in 0..repeat {
-            let run = pwsh.run_file(&case.path)?;
+            let run = pwsh.run_file(&case.path, locale)?;
             let Some(exit_code) = run.exit_code else {
                 return Err(format!("{}: pwsh was killed by a signal", case.id));
             };
@@ -279,7 +298,7 @@ fn check(root: &Path, mut args: Args) -> Result<bool, String> {
     for case in &cases {
         let source = fs::read_to_string(&case.path)
             .map_err(|error| format!("cannot read {}: {error}", case.path.display()))?;
-        let level = level_of(&source, &case.id)?;
+        let CaseSettings { level, locale } = case_settings(&source, &case.id)?;
         let path = golden_path(case);
         let golden = fs::read(&path).map_err(|_| {
             format!(
@@ -297,7 +316,7 @@ fn check(root: &Path, mut args: Args) -> Result<bool, String> {
             reference.stderr = Some(fs::read(stderr_path(case)).unwrap_or_default());
         }
 
-        let run = rpsh.run_file(&case.path)?;
+        let run = rpsh.run_file(&case.path, locale)?;
         let directory = case.path.parent().unwrap_or(Path::new("."));
         let run = Run {
             stdout: normalize(&run.stdout, directory),
@@ -459,14 +478,32 @@ mod tests {
     #[test]
     fn reads_the_conformance_level_directive() {
         assert_eq!(
-            level_of("# rpsh-conformance: level=c2\n", "x").unwrap(),
+            case_settings("# rpsh-conformance: level=c2\n", "x")
+                .unwrap()
+                .level,
             Level::C2
         );
         assert_eq!(
-            level_of("# rpsh-conformance: level=c1\n", "x").unwrap(),
+            case_settings("# rpsh-conformance: level=c1\n", "x")
+                .unwrap()
+                .level,
             Level::C1
         );
-        assert!(level_of("# nothing\n", "x").is_err());
-        assert!(level_of("# rpsh-conformance: level=c9\n", "x").is_err());
+        assert_eq!(
+            case_settings("# rpsh-conformance: LANG=tr_TR.UTF-8 level=c2", "x").unwrap(),
+            CaseSettings {
+                level: Level::C2,
+                locale: Some("tr_TR.UTF-8")
+            }
+        );
+        assert_eq!(
+            case_settings("# rpsh-conformance: level=c1", "x")
+                .unwrap()
+                .locale,
+            None
+        );
+        assert!(case_settings("# rpsh-conformance: level=c2 LANG=", "x").is_err());
+        assert!(case_settings("# nothing\n", "x").is_err());
+        assert!(case_settings("# rpsh-conformance: level=c9\n", "x").is_err());
     }
 }

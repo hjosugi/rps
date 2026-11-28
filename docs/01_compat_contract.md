@@ -24,7 +24,7 @@ environment first):
 |---|---|---|
 | `HOME` | `<checkout>/.cache/home` | pwsh reads modules (`~/.local/share/powershell/Modules`), `powershell.config.json` and its startup JIT profile from below `$HOME`; a user's own must not leak in |
 | `PATH` | `/usr/local/bin:/usr/bin:/bin` | a case names the same programs on every machine |
-| `LANG`, `LC_ALL` | `en_US.UTF-8` | culture and encoding |
+| `LANG`, `LC_ALL` | `en_US.UTF-8` by default | a conformance case can set both with its `LANG=` directive |
 | `TZ` | `UTC` | local time |
 | `NO_COLOR` | `1` | `$PSStyle.OutputRendering` is `PlainText` |
 | `POWERSHELL_TELEMETRY_OPTOUT`, `POWERSHELL_UPDATECHECK` | `1`, `Off` | no network traffic during a run |
@@ -68,7 +68,10 @@ streams to stdout as text. Measured with output redirected: `Write-Host`,
 only error records and `[Console]::Error` go to stderr. C2 adds the error
 view, whose text includes the script's absolute path
 (`Exception: /…/throw.ps1:2`), hence the placeholder. Every case declares its
-level with `# rpsh-conformance: level=c1|c2`.
+level with `# rpsh-conformance: level=c1|c2`. For a case that needs a specific
+culture, add the locale on the same line, for example
+`# rpsh-conformance: level=c2 LANG=tr_TR.UTF-8`. Recording and checking
+start each engine with that value for both `LANG` and `LC_ALL`.
 
 A golden v2 is `rpsh-golden-v2`, a `exit=<code>` line, then stdout byte for
 byte. Stderr, when non-empty, is a `<name>.stderr` companion next to it. The
@@ -235,8 +238,8 @@ The rules:
 * Where pwsh is culture-invariant, so is rpsh: `"$moment"` prints
   `01/02/2026 15:04:05` and `"$(1.5)"` prints `1.5` under any culture,
   while `'{0:C}' -f 12.5` and `.ToString('N2')` use the current one.
-* en-US is the default. A matrix of other cultures (ja-JP, de-DE, the C
-  locale) runs with a per-case `LANG` directive added by #14; #115 owns it.
+* en-US is the default. The collation cases under `contract/` also run with
+  Turkish, Swedish, Japanese and C locales selected in their directives.
 
 `contract/culture` holds the en-US facts.
 

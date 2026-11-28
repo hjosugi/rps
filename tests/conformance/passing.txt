@@ -31,6 +31,10 @@ contract/collection-order
 contract/console
 contract/culture
 contract/error-records
+contract/locale-c
+contract/locale-japanese
+contract/locale-swedish
+contract/locale-turkish
 contract/seeded-random
 contract/streams
 contract/version-table

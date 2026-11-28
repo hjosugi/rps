@@ -43,8 +43,11 @@ impl Engine {
     /// Runs `script` the same way under either engine: no profile, no
     /// prompts, the reference environment, the script's directory as the
     /// working directory.
-    pub(crate) fn run_file(&self, script: &Path) -> Result<Run, String> {
-        let command = self.file_command(script);
+    pub(crate) fn run_file(&self, script: &Path, locale: Option<&str>) -> Result<Run, String> {
+        let mut command = self.file_command(script);
+        if let Some(locale) = locale {
+            command.env("LC_ALL", locale).env("LANG", locale);
+        }
         self.run(command)
     }
 
