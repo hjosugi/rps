@@ -1,0 +1,223 @@
+{
+  "schema": "rpsh-bench-v2",
+  "generated_at_unix_s": 1795847548,
+  "rpsh": {
+    "version": "0.0.322",
+    "commit": "8709273",
+    "dirty": false,
+    "executable": "target/release/rpsh",
+    "size_bytes": 2737032
+  },
+  "pwsh": {
+    "version": "7.7.0",
+    "target_version": "7.7.0",
+    "policy": "latest stable",
+    "executable": ".cache/pwsh/7.7.0/pwsh"
+  },
+  "environment": {
+    "os": "linux",
+    "arch": "x86_64",
+    "kernel": "7.3.4-1-cachyos",
+    "cpu_model": "AMD Ryzen 5 PRO 4650U with Radeon Graphics",
+    "cpu_count": 12,
+    "cpu_governor": "schedutil",
+    "load_average_before": [
+      4.02,
+      4.85,
+      5.99
+    ],
+    "load_average_after": [
+      4.39,
+      4.89,
+      5.98
+    ],
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "rusage": "wait4 via scripts/spawn-measure.c"
+  },
+  "warnings": [],
+  "settings": {
+    "runs": 7,
+    "warmup": 2,
+    "budget_scale": 1
+  },
+  "summary": {
+    "cases": 2,
+    "over_budget": 0,
+    "verified": 2,
+    "not_implemented": 0,
+    "mismatch": 0,
+    "geometric_mean_speedup": 21.311157388616177
+  },
+  "cases": [
+    {
+      "id": "native/spawn",
+      "status": "verified",
+      "detail": null,
+      "speedup": 12.449285830266929,
+      "rpsh_budget_ms": null,
+      "within_budget": null,
+      "pwsh": {
+        "median_ms": 793.54051,
+        "median_ci95_ms": [
+          779.379791,
+          811.720898
+        ],
+        "outliers_ms": [
+          907.672819
+        ],
+        "min_ms": 757.117258,
+        "max_ms": 907.672819,
+        "mean_ms": 806.5480131428573,
+        "stddev_ms": 48.01609280767561,
+        "mean_user_ms": 521.3050000000001,
+        "mean_system_ms": 480.4834285714286,
+        "max_rss_kib": 102228,
+        "samples_ms": [
+          791.483752,
+          793.54051,
+          804.921064,
+          907.672819,
+          811.720898,
+          779.379791,
+          757.117258
+        ]
+      },
+      "rpsh": {
+        "median_ms": 63.74185,
+        "median_ci95_ms": [
+          50.605151,
+          72.176228
+        ],
+        "outliers_ms": [],
+        "min_ms": 50.560477,
+        "max_ms": 86.33857,
+        "mean_ms": 63.13678757142857,
+        "stddev_ms": 13.175118383870421,
+        "mean_user_ms": 30.438714285714287,
+        "mean_system_ms": 32.842,
+        "max_rss_kib": 4368,
+        "samples_ms": [
+          50.560477,
+          50.605151,
+          72.176228,
+          65.430237,
+          86.33857,
+          63.74185,
+          53.105
+        ]
+      },
+      "bash": {
+        "median_ms": 83.72022,
+        "median_ci95_ms": [
+          78.81872700000001,
+          98.954783
+        ],
+        "outliers_ms": [
+          113.181475
+        ],
+        "min_ms": 77.62783400000001,
+        "max_ms": 113.181475,
+        "mean_ms": 88.4111292857143,
+        "stddev_ms": 12.971640370001369,
+        "mean_user_ms": 30.177142857142854,
+        "mean_system_ms": 61.15657142857143,
+        "max_rss_kib": 4496,
+        "samples_ms": [
+          77.62783400000001,
+          83.72022,
+          82.277664,
+          98.954783,
+          78.81872700000001,
+          84.297202,
+          113.181475
+        ]
+      }
+    },
+    {
+      "id": "native/spawn-small",
+      "status": "verified",
+      "detail": null,
+      "speedup": 36.481243617862354,
+      "rpsh_budget_ms": null,
+      "within_budget": null,
+      "pwsh": {
+        "median_ms": 269.659284,
+        "median_ci95_ms": [
+          262.02937399999996,
+          288.400484
+        ],
+        "outliers_ms": [],
+        "min_ms": 261.18102300000004,
+        "max_ms": 291.13855,
+        "mean_ms": 273.2738378571429,
+        "stddev_ms": 12.195229595265435,
+        "mean_user_ms": 255.60385714285715,
+        "mean_system_ms": 152.50142857142856,
+        "max_rss_kib": 97564,
+        "samples_ms": [
+          274.748589,
+          265.75956099999996,
+          291.13855,
+          261.18102300000004,
+          262.02937399999996,
+          269.659284,
+          288.400484
+        ]
+      },
+      "rpsh": {
+        "median_ms": 7.391724,
+        "median_ci95_ms": [
+          6.797188,
+          8.6105
+        ],
+        "outliers_ms": [
+          12.319426
+        ],
+        "min_ms": 6.626829,
+        "max_ms": 12.319426,
+        "mean_ms": 8.15269942857143,
+        "stddev_ms": 1.9965986350783222,
+        "mean_user_ms": 3.7038571428571427,
+        "mean_system_ms": 4.292714285714285,
+        "max_rss_kib": 4340,
+        "samples_ms": [
+          6.626829,
+          6.797188,
+          8.6105,
+          12.319426,
+          7.391724,
+          8.409993,
+          6.9132359999999995
+        ]
+      },
+      "bash": {
+        "median_ms": 9.695004,
+        "median_ci95_ms": [
+          7.935974,
+          11.979368000000001
+        ],
+        "outliers_ms": [],
+        "min_ms": 7.574606999999999,
+        "max_ms": 12.103038999999999,
+        "mean_ms": 9.718222714285714,
+        "stddev_ms": 1.870989196821271,
+        "mean_user_ms": 3.2459999999999996,
+        "mean_system_ms": 6.546571428571427,
+        "max_rss_kib": 4536,
+        "samples_ms": [
+          7.935974,
+          8.323691,
+          12.103038999999999,
+          9.695004,
+          11.979368000000001,
+          10.415875999999999,
+          7.574606999999999
+        ]
+      }
+    }
+  ],
+  "bash": {
+    "executable": "bash",
+    "version": "GNU bash, version 5.3.20(1)-release (x86_64-pc-linux-gnu)"
+  }
+}
