@@ -40,6 +40,7 @@ pub fn tokenize_full(source: &str) -> Result<Vec<FullToken>, ParseError> {
         ternary_depth: 0,
         hashtable_depth: 0,
         brace_depth: 0,
+        command_after_paren: Vec::new(),
     };
     tokenizer.run()?;
     let lines = Lines::new(source);
@@ -119,6 +120,7 @@ struct Tokenizer<'a> {
     ternary_depth: usize,
     hashtable_depth: usize,
     brace_depth: usize,
+    command_after_paren: Vec<bool>,
 }
 
 impl Tokenizer<'_> {
@@ -197,6 +199,9 @@ impl Tokenizer<'_> {
                 continue;
             }
             if self.here_string()? {
+                continue;
+            }
+            if self.generic_argument() {
                 continue;
             }
             if self.structural()? {
@@ -366,6 +371,19 @@ impl Tokenizer<'_> {
                 _ => return Ok(false),
             },
         };
+        if matches!(
+            kind,
+            FullTokenKind::LParen | FullTokenKind::AtParen | FullTokenKind::DollarParen
+        ) {
+            let argument = self.mode == Mode::Command
+                && self.command_seen
+                && !self.statement_start
+                && self
+                    .tokens
+                    .last()
+                    .is_some_and(|token| token.span.end < start as u32);
+            self.command_after_paren.push(argument);
+        }
         self.pos += len;
         self.push(kind, start, self.pos);
         match kind {
@@ -388,9 +406,15 @@ impl Tokenizer<'_> {
                 self.statement_start = true;
             }
             FullTokenKind::RParen => {
-                self.mode = Mode::Expression;
+                // A postfix member or index still belongs to the expression.
+                self.command_seen = self.command_after_paren.pop().unwrap_or(false)
+                    && !matches!(self.bytes.get(self.pos), Some(b'.' | b'[' | b'?'));
+                self.mode = if self.command_seen {
+                    Mode::Command
+                } else {
+                    Mode::Expression
+                };
                 self.statement_start = false;
-                self.command_seen = false;
             }
             FullTokenKind::LParen => {
                 let call = self.tokens.len() >= 2
@@ -1017,6 +1041,81 @@ impl Tokenizer<'_> {
             }
         }
         false
+    }
+
+    /// Command arguments can start with a bracket, or combine a variable or
+    /// backtick escape with literal text in one Generic token.
+    fn generic_argument(&mut self) -> bool {
+        let start = self.pos;
+        if self.mode != Mode::Command
+            || !self.command_seen
+            || self.statement_start
+            || self.tokens.last().is_some_and(|token| {
+                token.span.end as usize == start || token.kind == FullTokenKind::Catch
+            })
+        {
+            return false;
+        }
+        let first = self.bytes[start];
+        if matches!(first, b'-' | b'#' | b'@' | b'\'' | b'"') {
+            return false;
+        }
+        let mut at = start;
+        let mut generic = first == b'[';
+        let mut leading_variable_end = None;
+        while let Some(ch) = self.source[at..].chars().next() {
+            if ch.is_whitespace()
+                || matches!(
+                    ch,
+                    ';' | ',' | '(' | ')' | '{' | '}' | '|' | '&' | '\'' | '"' | '<' | '>'
+                )
+            {
+                break;
+            }
+            if ch == '`' {
+                generic = true;
+                at += 1;
+                if let Some(escaped) = self.source[at..].chars().next() {
+                    at += escaped.len_utf8();
+                }
+            } else if ch == '$' {
+                let variable_start = at;
+                at += 1;
+                if self.bytes.get(at) == Some(&b'{') {
+                    let Some(end) = self.source[at + 1..].find('}') else {
+                        return false;
+                    };
+                    at += end + 2;
+                } else {
+                    while let Some(next) = self.source[at..].chars().next() {
+                        if !(next.is_alphanumeric() || matches!(next, '_' | ':' | '?')) {
+                            break;
+                        }
+                        at += next.len_utf8();
+                    }
+                }
+                if at == variable_start + 1 {
+                    return false;
+                }
+                if variable_start == start {
+                    leading_variable_end = Some(at);
+                    if matches!(self.bytes.get(at), Some(b'.' | b'[')) {
+                        return false;
+                    }
+                }
+                generic = true;
+            } else {
+                at += ch.len_utf8();
+            }
+        }
+        if !generic || at == start || leading_variable_end == Some(at) {
+            return false;
+        }
+        self.pos = at;
+        self.push(FullTokenKind::Generic, start, at);
+        self.mode = Mode::Command;
+        self.statement_start = false;
+        true
     }
 
     fn bareword(&mut self) -> bool {

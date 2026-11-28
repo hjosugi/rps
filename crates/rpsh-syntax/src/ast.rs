@@ -350,6 +350,8 @@ pub enum ExprKind {
     Number(NumberLiteral),
     /// Upstream: `StringConstantExpressionAst` (single-quoted).
     String(String),
+    /// An unquoted StringConstantExpressionAst used as a command parameter value.
+    Bareword(String),
     /// Upstream: `UnaryExpressionAst`.
     Unary { op: UnaryOp, operand: Box<Expr> },
     /// Upstream: `BinaryExpressionAst`.
@@ -364,6 +366,8 @@ pub enum ExprKind {
     Variable(String),
     /// Upstream: `ExpandableStringExpressionAst`.
     ExpandableString(Vec<StringPart>),
+    /// ExpandableStringExpressionAst with StringConstantType.BareWord.
+    ExpandableBareword(Vec<StringPart>),
     /// Upstream: `SubExpressionAst`.
     Subexpression(Box<Expr>),
     /// `(command ...)`: a parenthesized statement list that yields its output.

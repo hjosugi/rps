@@ -99,6 +99,7 @@ native/console-encoding
 native/environment
 native/exit-code
 native/glob
+native/glob-arguments
 native/output-redirection
 native/pipe
 native/pipe-encoding

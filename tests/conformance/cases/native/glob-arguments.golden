@@ -1,0 +1,64 @@
+rpsh-golden-v2
+exit=0
+<aDir>
+<Bdir>
+<space dir>
+<_.txt>
+<1.txt>
+<alpha.txt>
+<B.TXT>
+<É.txt>
+<space file.txt>
+<alpha.txt>
+<B.TXT>
+<B.TXT>
+<aDir/sub/x.txt>
+<Bdir/sub/z.txt>
+<aDir/sub>
+<Bdir/sub>
+<_.txt>
+<1.txt>
+<alpha.txt>
+<B.TXT>
+<É.txt>
+<space file.txt>
+<missingDir/*.txt>
+<.*>
+<.hidden/visible.txt>
+<*/.*>
+<none-[0-9]?.zzz>
+<*.txt>
+<*.txt>
+<_.txt>
+<1.txt>
+<alpha.txt>
+<B.TXT>
+<É.txt>
+<space file.txt>
+<aDir/First.txt>
+<aDir/y.txt>
+<aDir/*.txt>
+<-flag>
+<aDir/First.txt>
+<aDir/y.txt>
+<-flag>
+<*.txt>
+<-flag>
+<aDir/First.txt>
+<aDir/y.txt>
+<aDir/First.txt>
+<aDir/y.txt>
+<aDir/sub/x.txt>
+<aDir/First.txt>
+<aDir/y.txt>
+<aDir/First.txt>
+<aDir/y.txt>
+<aDir/a`*x*>
+<aDir/a[*]x*>
+<aDir/a*xyz>
+<B.TXT>
+<no-*.txt>
+<space dir/*.txt>
+*.txt
+tilde
+tilde-wildcard

@@ -6174,7 +6174,8 @@ impl Engine {
         if let ExprKind::Group(statements) = &expr.kind {
             return self.eval_group(statements);
         }
-        if let ExprKind::ExpandableString(parts) = &expr.kind {
+        if let ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) = &expr.kind
+        {
             let mut text = String::new();
             for part in parts {
                 match part {
@@ -6480,13 +6481,15 @@ fn evaluate(
     match &expr.kind {
         ExprKind::Int32(value) => Ok(Value::Int32(*value)),
         ExprKind::Number(value) => Ok(number_value(value)),
-        ExprKind::String(value) => Ok(Value::String(value.clone().into())),
+        ExprKind::String(value) | ExprKind::Bareword(value) => {
+            Ok(Value::String(value.clone().into()))
+        }
         ExprKind::Paren(inner) => evaluate(inner, variables, last_success),
         // An undefined variable reads as `$null` outside strict mode.
         ExprKind::Variable(name) => {
             Ok(lookup(name, variables, last_success).unwrap_or(Value::Null))
         }
-        ExprKind::ExpandableString(parts) => {
+        ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) => {
             let mut text = String::new();
             for part in parts {
                 match part {
@@ -7096,8 +7099,7 @@ impl JsonParser {
     }
 }
 
-/// Expands `dir/pattern*` against the working directory, sorted. The caller
-/// keeps the literal pattern when nothing matches, as pwsh does.
+/// The filesystem provider's home directory for `~` and `~/path`.
 fn expand_home(path: &str) -> String {
     if path == "~"
         && let Ok(home) = std::env::var("HOME")

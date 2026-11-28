@@ -50,6 +50,7 @@ type OpenRules =
 type OpenElements = unsafe extern "C" fn(*const c_void, *const u16, i32, *mut i32) -> *mut c_void;
 type Next = unsafe extern "C" fn(*mut c_void, *mut i32) -> i32;
 type Strength = unsafe extern "C" fn(*const c_void) -> i32;
+type SortKey = unsafe extern "C" fn(*const c_void, *const u16, i32, *mut u8, i32) -> i32;
 type DefaultLocale = unsafe extern "C" fn() -> *const c_char;
 
 struct Api {
@@ -63,6 +64,7 @@ struct Api {
     next: Next,
     previous: Next,
     strength: Strength,
+    sort_key: SortKey,
     default_locale: DefaultLocale,
     _library: Library,
 }
@@ -105,6 +107,7 @@ impl Api {
             next: bind!("ucol_next", Next),
             previous: bind!("ucol_previous", Next),
             strength: bind!("ucol_getStrength", Strength),
+            sort_key: bind!("ucol_getSortKey", SortKey),
             default_locale: bind!("uloc_getDefault", DefaultLocale),
             _library: library,
         })
@@ -230,6 +233,31 @@ impl Collator {
         Some(order.cmp(&0))
     }
 
+    fn sort_key(&self, text: &[u16]) -> Option<Vec<u8>> {
+        let len = i32::try_from(text.len()).ok()?;
+        let mut key = vec![0; text.len().saturating_add(16)];
+        loop {
+            let capacity = i32::try_from(key.len()).ok()?;
+            // SAFETY: the UTF-16 slice and mutable output contain the stated
+            // lengths. ICU reports the required size, including the terminator.
+            let written = unsafe {
+                (self.api.sort_key)(
+                    self.handle.as_ptr(),
+                    text.as_ptr(),
+                    len,
+                    key.as_mut_ptr(),
+                    capacity,
+                )
+            };
+            let needed = usize::try_from(written).ok().filter(|length| *length > 0)?;
+            if needed <= key.len() {
+                key.truncate(needed);
+                return Some(key);
+            }
+            key.resize(needed, 0);
+        }
+    }
+
     fn has_affix(&self, text: &[u16], pattern: &[u16], prefix: bool) -> Option<bool> {
         let mut pattern = Elements::new(self, pattern)?;
         let mut text = Elements::new(self, text)?;
@@ -325,6 +353,10 @@ pub(super) fn compare(
     with_collator(locale, case_sensitive, |collator| {
         collator.compare(left, right)
     })
+}
+
+pub(super) fn sort_key(text: &[u16], locale: &str, case_sensitive: bool) -> Option<Vec<u8>> {
+    with_collator(locale, case_sensitive, |collator| collator.sort_key(text))
 }
 
 pub(super) fn has_affix(

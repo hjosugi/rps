@@ -117,7 +117,7 @@ fn format_expr(expr: &Expr) -> String {
     match &expr.kind {
         ExprKind::Int32(value) => format!("(int {value})"),
         ExprKind::Number(value) => format!("(int {value})"),
-        ExprKind::String(value) => format!("(str {})", json(value)),
+        ExprKind::String(value) | ExprKind::Bareword(value) => format!("(str {})", json(value)),
         ExprKind::Variable(name) => format!("(var {name})"),
         ExprKind::Unary { op, operand } => {
             format!("(unary {} {})", unary(*op), format_expr(operand))
@@ -176,7 +176,7 @@ fn format_expr(expr: &Expr) -> String {
                 .join(" ")
         ),
         ExprKind::ScriptBlock(_) => "(scriptblock)".to_owned(),
-        ExprKind::ExpandableString(parts) => format!(
+        ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) => format!(
             "(expand {})",
             parts
                 .iter()

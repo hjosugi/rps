@@ -146,5 +146,9 @@
   {
     "name": "redirection-streams",
     "source": "echo 2>&1; echo *>all; echo 1>>out; echo 2 >file; 1>file; echo foo>bar; echo 1 foo>bar; echo 12>name; echo *>&1; echo 3>>&1"
+  },
+  {
+    "name": "native-glob-arguments",
+    "source": "cmd [aB]*.txt aDir/`*.txt $dir/*.txt ${dir}/sub/?.txt ('*.txt') -flag aDir/*.txt"
   }
 ]

@@ -653,10 +653,7 @@ impl Parser {
                         let word = word.clone();
                         let span = self.peek().span;
                         self.pos += 1;
-                        Some(Expr {
-                            kind: ExprKind::String(word),
-                            span,
-                        })
+                        Some(bareword_expr(word, span)?)
                     }
                     _ if self.argument_starts() => Some(self.unary()?),
                     _ => None,
@@ -673,10 +670,7 @@ impl Parser {
                                         let word = word.clone();
                                         let span = self.peek().span;
                                         self.pos += 1;
-                                        Expr {
-                                            kind: ExprKind::String(word),
-                                            span,
-                                        }
+                                        bareword_expr(word, span)?
                                     }
                                     _ => self.unary()?,
                                 };
@@ -701,8 +695,14 @@ impl Parser {
             match &self.peek().kind {
                 TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
                     let word = word.clone();
+                    let span = self.peek().span;
                     self.pos += 1;
-                    arguments.push(CommandArgument::Bareword(word));
+                    let expr = bareword_expr(word, span)?;
+                    let arg = match expr.kind {
+                        ExprKind::Bareword(word) => CommandArgument::Bareword(word),
+                        _ => CommandArgument::Value(expr),
+                    };
+                    arguments.push(arg);
                 }
                 _ => arguments.push(CommandArgument::Value(self.argument_value()?)),
             }
@@ -2145,6 +2145,27 @@ fn here_string_content(text: &str) -> &str {
     content
 }
 
+fn bareword_expr(word: String, span: Span) -> Result<Expr, ParseError> {
+    let kind = if word.contains(['`', '$']) {
+        let mut parts = parse_expandable_body(&word, span)?;
+        if parts
+            .iter()
+            .all(|part| matches!(part, StringPart::Literal(_)))
+        {
+            let text = match parts.pop() {
+                Some(StringPart::Literal(text)) => text,
+                _ => String::new(),
+            };
+            ExprKind::Bareword(text)
+        } else {
+            ExprKind::ExpandableBareword(parts)
+        }
+    } else {
+        ExprKind::Bareword(word)
+    };
+    Ok(Expr { kind, span })
+}
+
 fn parse_expandable(text: &str, span: Span) -> Result<Vec<StringPart>, ParseError> {
     let mut chars = text.chars();
     let Some(first) = chars.next() else {
@@ -2304,6 +2325,7 @@ mod tests {
             ExprKind::Int32(value) => value.to_string(),
             ExprKind::Number(value) => value.to_string(),
             ExprKind::String(value) => format!("'{value}'"),
+            ExprKind::Bareword(value) => value.clone(),
             ExprKind::Unary { op, operand } => match op {
                 UnaryOp::Negate => format!("(-{})", show(operand)),
                 UnaryOp::Join => format!("(-join {})", show(operand)),
@@ -2372,7 +2394,7 @@ mod tests {
             }
             ExprKind::Paren(inner) => show(inner),
             ExprKind::Variable(name) => format!("${name}"),
-            ExprKind::ExpandableString(parts) => format!(
+            ExprKind::ExpandableString(parts) | ExprKind::ExpandableBareword(parts) => format!(
                 "\"{}\"",
                 parts
                     .iter()

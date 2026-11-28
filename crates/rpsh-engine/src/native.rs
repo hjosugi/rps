@@ -1,3 +1,5 @@
+mod glob;
+
 use super::encoding::Encoding;
 use super::{encoding, format_out_string, redirection::text_output_width};
 use std::borrow::Cow;
@@ -7,11 +9,9 @@ use std::process::Command;
 use rpsh_commands::{CORE_CMDLETS, MODULES};
 use rpsh_native::{Destination, PipelineError, run_pipeline};
 use rpsh_runtime::{RuntimeError, Value};
-use rpsh_syntax::{CommandArgument, Expr, PipelineCommand, Redirection, Stream};
+use rpsh_syntax::{CommandArgument, Expr, ExprKind, PipelineCommand, Redirection, Stream};
 
-use super::{
-    Engine, EngineError, OutputTarget, command_not_found, evaluate, expand_glob, native_exit_code,
-};
+use super::{Engine, EngineError, OutputTarget, command_not_found, native_exit_code};
 
 pub(super) enum NativeOutput<'a> {
     Objects,
@@ -152,32 +152,37 @@ impl Engine {
         let mut out = Vec::new();
         for argument in arguments {
             match argument {
-                CommandArgument::Bareword(word) => {
-                    if word.contains(['*', '?']) {
-                        let matches = expand_glob(word);
-                        if matches.is_empty() {
-                            out.push(word.clone());
-                        } else {
-                            out.extend(matches);
-                        }
-                    } else {
-                        out.push(word.clone());
-                    }
-                }
-                CommandArgument::Value(expr) => {
-                    let value = evaluate(expr, &mut self.variables, !self.last_failed)?;
-                    out.push(value.to_string());
-                }
+                CommandArgument::Bareword(word) => glob::append(&mut out, word.clone(), false),
+                CommandArgument::Value(expr) => self.native_argument_value(expr, &mut out)?,
                 CommandArgument::Parameter { name, value } => {
-                    out.push(format!("-{name}"));
+                    glob::append(&mut out, format!("-{name}"), false);
                     if let Some(expr) = value {
-                        let value = evaluate(expr, &mut self.variables, !self.last_failed)?;
-                        out.push(value.to_string());
+                        self.native_argument_value(expr, &mut out)?;
                     }
                 }
             }
         }
         Ok(out)
+    }
+
+    fn native_argument_value(
+        &mut self,
+        expr: &Expr,
+        out: &mut Vec<String>,
+    ) -> Result<(), EngineError> {
+        let quoted = matches!(
+            expr.kind,
+            ExprKind::String(_) | ExprKind::ExpandableString(_)
+        );
+        let value = self.eval_expression(expr)?;
+        let items = match &value {
+            Value::Array(items) => items.as_slice(),
+            value => std::slice::from_ref(value),
+        };
+        for item in items.iter().filter(|item| !item.is_null_like()) {
+            glob::append(out, item.to_string(), quoted);
+        }
+        Ok(())
     }
 }
 

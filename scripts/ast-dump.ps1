@@ -31,6 +31,7 @@ function Format-Expr($e) {
             return "(int $($e.Value))"
         }
         'StringConstantExpressionAst' { return "(str $(ConvertTo-Json $e.Value -Compress))" }
+        'ExpandableStringExpressionAst' { return "(expand $($e.NestedExpressions.Count))" }
         'VariableExpressionAst' { return "(var $($e.VariablePath.UserPath))" }
         'UnaryExpressionAst' { return "(unary $($unary[$e.TokenKind.ToString()]) $(Format-Expr $e.Child))" }
         'BinaryExpressionAst' { return "(binary $($binary[$e.Operator.ToString()]) $(Format-Expr $e.Left) $(Format-Expr $e.Right))" }

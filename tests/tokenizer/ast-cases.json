@@ -35,5 +35,6 @@
   {"name":"redirect-arguments","source":"Write-Output 2 >file tail"},
   {"name":"redirect-streams","source":"cmd 2>err.txt 1>>out.txt | Write-Output"},
   {"name":"redirect-merge","source":"cmd 2>&1 && cmd *>>out"},
-  {"name":"static-property-assignment","source":"[Console]::OutputEncoding = [Text.Encoding]::Unicode"}
+  {"name":"static-property-assignment","source":"[Console]::OutputEncoding = [Text.Encoding]::Unicode"},
+  {"name":"native-glob-arguments","source":"$out = cmd [aB]*.txt aDir/`*.txt $dir/*.txt ${dir}/sub/?.txt ('*.txt') -flag aDir/*.txt"}
 ]

@@ -156,6 +156,30 @@ pub fn compare_to(left: &PsString, right: &PsString) -> Result<i32, RuntimeError
     Ok(compare(left, right, &current_locale(), true)? as i32)
 }
 
+/// A key for repeated comparisons with the same locale and case option.
+pub fn sort_key(
+    text: &PsString,
+    locale: &str,
+    case_sensitive: bool,
+) -> Result<Vec<u8>, RuntimeError> {
+    let units = text.as_utf16();
+    if invariant_mode() {
+        let units = if case_sensitive {
+            units
+        } else {
+            ordinal_upper(&units).into()
+        };
+        return Ok(units.iter().flat_map(|unit| unit.to_be_bytes()).collect());
+    }
+    #[cfg(unix)]
+    if let Some(key) = icu::sort_key(&units, locale, case_sensitive) {
+        return Ok(key);
+    }
+    Err(RuntimeError::NotImplemented {
+        feature: "system ICU string collation",
+    })
+}
+
 /// `locale = ""` selects the invariant *culture*, which still uses ICU.
 /// The separately configured globalization-invariant mode uses ordinal rules.
 pub fn compare(
