@@ -1,5 +1,6 @@
 //! Prints the same normalized S-expression as scripts/ast-dump.ps1.
 
+use rpsh_syntax::Redirection;
 use std::io::Read;
 
 use rpsh_syntax::{
@@ -15,6 +16,7 @@ fn main() {
     let ast = parse(&source).expect("ast-dump: parse");
     let text = match &ast.statements[0] {
         Statement::Expression(expr) => format_expr(expr),
+        Statement::Pipeline { commands, .. } => format_pipeline(commands),
         Statement::PipelineChain { chain, .. } => format_chain(chain),
         Statement::AssignChain { name, chain, .. } => {
             format!("(assign Equals (var {name}) {})", format_chain(chain))
@@ -49,30 +51,49 @@ fn main() {
 fn format_pipeline(commands: &[PipelineCommand]) -> String {
     let stages = commands
         .iter()
-        .map(|command| match command {
-            PipelineCommand::Expression(expr) => {
-                format!("(command-expression {})", format_expr(expr))
-            }
-            PipelineCommand::Command { name, arguments } => {
-                let mut elements = vec![format!("(str {name:?})")];
-                for arg in arguments {
-                    match arg {
-                        CommandArgument::Value(expr) => elements.push(format_expr(expr)),
-                        CommandArgument::Bareword(word) => elements.push(format!("(str {word:?})")),
-                        CommandArgument::Parameter { name, value } => {
-                            elements.push(format!("(parameter {name})"));
-                            if let Some(expr) = value {
-                                elements.push(format_expr(expr));
-                            }
-                        }
-                    }
-                }
-                format!("(command {})", elements.join(" "))
-            }
-        })
+        .map(format_stage)
         .collect::<Vec<_>>()
         .join(" ");
     format!("(pipeline {stages})")
+}
+
+fn format_stage(command: &PipelineCommand) -> String {
+    match command {
+        PipelineCommand::Redirected {
+            command,
+            redirections,
+        } => {
+            let mut parts = vec![format_stage(command)];
+            for redirect in redirections {
+                parts.push(match redirect {
+                    Redirection::File { from, append, path } => {
+                        format!("(file {from:?} {append} {})", format_expr(path))
+                    }
+                    Redirection::MergeOutput { from } => format!("(merge {from:?} Output)"),
+                });
+            }
+            format!("(redirect {})", parts.join(" "))
+        }
+        PipelineCommand::Expression(expr) => {
+            format!("(command-expression {})", format_expr(expr))
+        }
+        PipelineCommand::Command { name, arguments } => {
+            let mut elements = vec![format!("(str {name:?})")];
+            for arg in arguments {
+                match arg {
+                    CommandArgument::Value(expr) => elements.push(format_expr(expr)),
+                    CommandArgument::Bareword(word) => elements.push(format!("(str {word:?})")),
+                    CommandArgument::Parameter { name, value } => {
+                        elements.push(format!("(parameter {name})"));
+                        if let Some(expr) = value {
+                            elements.push(format_expr(expr));
+                        }
+                    }
+                }
+            }
+            format!("(command {})", elements.join(" "))
+        }
+    }
 }
 
 fn format_chain(chain: &PipelineChain) -> String {

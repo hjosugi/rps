@@ -28,8 +28,8 @@ mod tokenizer;
 
 pub use ast::{
     AssignmentValue, BinaryOp, CatchClause, ChainOperator, CommandArgument, Expr, ExprKind,
-    MethodDef, Parameter, PipelineChain, PipelineCommand, ScriptBlockAst, Statement, StringPart,
-    SwitchClause, UnaryOp,
+    MethodDef, Parameter, PipelineChain, PipelineCommand, Redirection, ScriptBlockAst, Statement,
+    Stream, StringPart, SwitchClause, UnaryOp,
 };
 pub use error::ParseError;
 pub use full_token_kind::{FullTokenKind, TOKEN_KINDS, TokenFlags, TokenKindInfo};

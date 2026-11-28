@@ -177,8 +177,7 @@ impl Tokenizer<'_> {
                 self.block_comment();
                 continue;
             }
-            if byte == b'>' {
-                self.redirection();
+            if self.redirection() {
                 continue;
             }
             if byte == b':'
@@ -299,23 +298,25 @@ impl Tokenizer<'_> {
         self.statement_start = true;
     }
 
-    fn redirection(&mut self) {
+    fn redirection(&mut self) -> bool {
         let start = self.pos;
-        self.pos += 1;
+        let first = self.bytes[start];
+        let prefixed = self.peek(1) == Some(b'>')
+            && (first == b'*' || (!self.statement_start && matches!(first, b'1'..=b'6')));
+        if !prefixed && first != b'>' {
+            return false;
+        }
+        self.pos += if prefixed { 2 } else { 1 };
         if self.bytes.get(self.pos) == Some(&b'>') {
             self.pos += 1;
-        }
-        if self.bytes.get(self.pos) == Some(&b'&') {
-            self.pos += 1;
-            while self
-                .bytes
-                .get(self.pos)
-                .is_some_and(|byte| byte.is_ascii_digit())
-            {
-                self.pos += 1;
-            }
+        } else if prefixed
+            && self.peek(0) == Some(b'&')
+            && (self.peek(1) == Some(b'1') || (first != b'*' && self.peek(1) == Some(b'2')))
+        {
+            self.pos += 2;
         }
         self.push(FullTokenKind::Redirection, start, self.pos);
+        true
     }
 
     fn line_comment(&mut self) {
@@ -592,11 +593,15 @@ impl Tokenizer<'_> {
         while self.char().is_some_and(|c| c.is_ascii_alphabetic()) {
             self.pos += 1;
         }
+        if self.mode == Mode::Command && self.command_seen && self.char() == Some('>') {
+            self.pos = start;
+            return Ok(false);
+        }
         let text = &self.source[start..self.pos];
         match parse_number_literal(text, Span::new(start, self.pos)) {
             Some(Ok(_)) => {
                 self.push(FullTokenKind::Number, start, self.pos);
-                if self.mode == Mode::Command {
+                if !self.command_seen {
                     self.mode = Mode::Expression;
                 }
                 self.statement_start = false;
@@ -816,6 +821,7 @@ impl Tokenizer<'_> {
             FullTokenKind::Return
             | FullTokenKind::Throw
             | FullTokenKind::If
+            | FullTokenKind::In
             | FullTokenKind::While
             | FullTokenKind::Until
             | FullTokenKind::For
@@ -1034,6 +1040,7 @@ impl Tokenizer<'_> {
                         '_' | '-' | '.' | '/' | '\\' | ':' | '+' | '~' | '@' | '%' | '?' | '*'
                     )
                     || (self.command_seen && (ch == '[' || ch == ']'))
+                    || (at > start && ch == '>')
             } else if after_dot {
                 ch.is_alphanumeric() || ch == '_'
             } else {

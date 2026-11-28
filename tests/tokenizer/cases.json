@@ -142,5 +142,9 @@
   {
     "name": "pipeline-chain",
     "source": "Write-Output hi && Get-Item . ||\n$false"
+  },
+  {
+    "name": "redirection-streams",
+    "source": "echo 2>&1; echo *>all; echo 1>>out; echo 2 >file; 1>file; echo foo>bar; echo 1 foo>bar; echo 12>name; echo *>&1; echo 3>>&1"
   }
 ]

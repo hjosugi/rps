@@ -233,6 +233,42 @@ pub enum PipelineCommand {
         name: String,
         arguments: Vec<CommandArgument>,
     },
+    Redirected {
+        command: Box<PipelineCommand>,
+        redirections: Vec<Redirection>,
+    },
+}
+
+/// Stream slots in the order exposed by PowerShell's CommandBaseAst.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Stream {
+    All,
+    Output,
+    Error,
+    Warning,
+    Verbose,
+    Debug,
+    Information,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Redirection {
+    File {
+        from: Stream,
+        append: bool,
+        path: Expr,
+    },
+    MergeOutput {
+        from: Stream,
+    },
+}
+
+impl Redirection {
+    pub fn from_stream(&self) -> Stream {
+        match self {
+            Self::File { from, .. } | Self::MergeOutput { from } => *from,
+        }
+    }
 }
 
 /// A simple assignment evaluates an expression directly or collects the

@@ -1,7 +1,7 @@
 use crate::{
     AssignmentValue, BinaryOp, CatchClause, ChainOperator, CommandArgument, Expr, ExprKind,
-    MethodDef, Parameter, ParseError, PipelineChain, PipelineCommand, ScriptBlockAst, Span,
-    Statement, StringPart, SwitchClause, Token, TokenKind, UnaryOp, tokenize,
+    MethodDef, Parameter, ParseError, PipelineChain, PipelineCommand, Redirection, ScriptBlockAst,
+    Span, Statement, Stream, StringPart, SwitchClause, Token, TokenKind, UnaryOp, tokenize,
 };
 
 const SYNTAX_ERRORS: &str = "syntax error reporting";
@@ -521,15 +521,19 @@ impl Parser {
 
     /// Wraps the first stage in a pipeline when a `|` follows.
     fn pipeline_after(&mut self, first: Statement) -> Result<Statement, ParseError> {
-        if self.peek().kind != TokenKind::Pipe && self.chain_operator().is_none() {
+        if self.peek().kind != TokenKind::Pipe
+            && self.chain_operator().is_none()
+            && !matches!(self.peek().kind, TokenKind::Redirection(_))
+        {
             return Ok(first);
         }
         let start = match &first {
             Statement::Expression(expr) => expr.span,
-            Statement::Command { span, .. } => *span,
+            Statement::Command { span, .. } | Statement::Pipeline { span, .. } => *span,
             _ => return Ok(first),
         };
         let first = match first {
+            Statement::Pipeline { mut commands, .. } if commands.len() == 1 => commands.remove(0),
             Statement::Expression(expr) => PipelineCommand::Expression(expr),
             Statement::Command {
                 name, arguments, ..
@@ -552,11 +556,12 @@ impl Parser {
         &mut self,
         first: PipelineCommand,
     ) -> Result<Vec<PipelineCommand>, ParseError> {
-        let mut commands = vec![first];
+        let mut commands = vec![self.trailing_redirections(first)?];
         while self.peek().kind == TokenKind::Pipe {
             self.pos += 1;
             self.skip_newlines();
-            commands.push(self.pipeline_element()?);
+            let stage = self.pipeline_element()?;
+            commands.push(self.trailing_redirections(stage)?);
         }
         Ok(commands)
     }
@@ -586,6 +591,9 @@ impl Parser {
             Statement::Command {
                 name, arguments, ..
             } => Ok(PipelineCommand::Command { name, arguments }),
+            Statement::Pipeline { mut commands, .. } if commands.len() == 1 => {
+                Ok(commands.remove(0))
+            }
             _ => self.refuse(SYNTAX_ERRORS),
         }
     }
@@ -594,6 +602,7 @@ impl Parser {
     fn command_statement(&mut self, name: String) -> Result<Statement, ParseError> {
         let start = self.peek().span;
         self.pos += 1;
+        let mut redirections = Vec::new();
         let mut arguments = Vec::new();
         while (!self.at_statement_end() || self.peek().kind == TokenKind::Comma)
             && self.peek().kind != TokenKind::Pipe
@@ -604,18 +613,7 @@ impl Parser {
                 continue;
             }
             if matches!(self.peek().kind, TokenKind::Redirection(_)) {
-                self.pos += 1;
-                continue;
-            }
-            if matches!(
-                self.peek().kind,
-                TokenKind::Int32(_) | TokenKind::Numeric(_)
-            ) && self
-                .tokens
-                .get(self.pos + 1)
-                .is_some_and(|token| matches!(token.kind, TokenKind::Redirection(_)))
-            {
-                self.pos += 2;
+                self.read_redirection(&mut redirections)?;
                 continue;
             }
             let parameter = match &self.peek().kind {
@@ -702,11 +700,83 @@ impl Parser {
             }
         }
         let span = start.to(self.previous_span());
+        if !redirections.is_empty() {
+            return Ok(Statement::Pipeline {
+                commands: vec![PipelineCommand::Redirected {
+                    command: Box::new(PipelineCommand::Command { name, arguments }),
+                    redirections,
+                }],
+                span,
+            });
+        }
         Ok(Statement::Command {
             name,
             arguments,
             span,
         })
+    }
+
+    fn trailing_redirections(
+        &mut self,
+        stage: PipelineCommand,
+    ) -> Result<PipelineCommand, ParseError> {
+        let mut redirections = Vec::new();
+        while matches!(self.peek().kind, TokenKind::Redirection(_)) {
+            self.read_redirection(&mut redirections)?;
+        }
+        if redirections.is_empty() {
+            Ok(stage)
+        } else {
+            Ok(PipelineCommand::Redirected {
+                command: Box::new(stage),
+                redirections,
+            })
+        }
+    }
+
+    fn read_redirection(&mut self, redirections: &mut Vec<Redirection>) -> Result<(), ParseError> {
+        let TokenKind::Redirection(text) = &self.peek().kind else {
+            return self.refuse(SYNTAX_ERRORS);
+        };
+        let Some((prefix, suffix)) = text.split_once('>') else {
+            return self.refuse("input redirection");
+        };
+        let from = match prefix {
+            "" | "1" => Stream::Output,
+            "2" => Stream::Error,
+            "3" => Stream::Warning,
+            "4" => Stream::Verbose,
+            "5" => Stream::Debug,
+            "6" => Stream::Information,
+            "*" => Stream::All,
+            _ => return self.refuse("unknown redirection stream"),
+        };
+        let Err(slot) = redirections.binary_search_by_key(&from, Redirection::from_stream) else {
+            return self.refuse("a stream redirected more than once");
+        };
+        if suffix == "&1" && from != Stream::Output {
+            self.pos += 1;
+            redirections.insert(slot, Redirection::MergeOutput { from });
+            return Ok(());
+        }
+        if !matches!(suffix, "" | ">") {
+            return self.refuse("this stream merge");
+        }
+        let append = suffix == ">";
+        self.pos += 1;
+        let path = match &self.peek().kind {
+            TokenKind::Identifier(word) | TokenKind::Bareword(word) => {
+                let expr = Expr {
+                    kind: ExprKind::String(word.clone()),
+                    span: self.peek().span,
+                };
+                self.pos += 1;
+                expr
+            }
+            _ => self.primary()?,
+        };
+        redirections.insert(slot, Redirection::File { from, append, path });
+        Ok(())
     }
 
     /// A single command argument. A bracketed value stops at its closing
@@ -2380,6 +2450,70 @@ mod tests {
             .unwrap_or_default()
     }
 
+    fn show_command(name: &str, arguments: &[CommandArgument]) -> String {
+        let mut text = name.to_owned();
+        for argument in arguments {
+            match argument {
+                CommandArgument::Value(value) => {
+                    text.push(' ');
+                    text.push_str(&show(value));
+                }
+                CommandArgument::Bareword(word) => {
+                    text.push(' ');
+                    text.push_str(word);
+                }
+                CommandArgument::Parameter { name, value } => {
+                    text.push_str(&format!(" -{name}"));
+                    if let Some(value) = value {
+                        text.push(' ');
+                        text.push_str(&show(value));
+                    }
+                }
+            }
+        }
+        text
+    }
+
+    fn show_stage(stage: &PipelineCommand, arguments: bool) -> String {
+        match stage {
+            PipelineCommand::Expression(expr) => show(expr),
+            PipelineCommand::Command {
+                name,
+                arguments: args,
+            } if arguments => show_command(name, args),
+            PipelineCommand::Command { name, .. } => name.clone(),
+            PipelineCommand::Redirected {
+                command,
+                redirections,
+            } => {
+                let mut text = show_stage(command, arguments);
+                for redirect in redirections {
+                    let from = match redirect.from_stream() {
+                        Stream::All => "*".to_owned(),
+                        Stream::Output => String::new(),
+                        stream => (stream as u8).to_string(),
+                    };
+                    match redirect {
+                        Redirection::File { append, path, .. } => {
+                            let operator = if *append { ">>" } else { ">" };
+                            text.push_str(&format!(" {from}{operator} {}", show(path)));
+                        }
+                        Redirection::MergeOutput { .. } => text.push_str(&format!(" {from}>&1")),
+                    }
+                }
+                text
+            }
+        }
+    }
+
+    fn show_pipeline(commands: &[PipelineCommand], arguments: bool) -> String {
+        commands
+            .iter()
+            .map(|stage| show_stage(stage, arguments))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    }
+
     fn show_statement(statement: &Statement) -> String {
         match statement {
             Statement::Expression(expr) => show(expr),
@@ -2393,14 +2527,7 @@ mod tests {
                 let value = match value {
                     AssignmentValue::Expression(expr) => show(expr),
                     AssignmentValue::Chain(chain) => show_chain(chain),
-                    AssignmentValue::Pipeline(commands) => commands
-                        .iter()
-                        .map(|command| match command {
-                            PipelineCommand::Expression(expr) => show(expr),
-                            PipelineCommand::Command { name, .. } => name.clone(),
-                        })
-                        .collect::<Vec<_>>()
-                        .join(" | "),
+                    AssignmentValue::Pipeline(commands) => show_pipeline(commands, false),
                 };
                 format!("{targets} = {value}")
             }
@@ -2548,72 +2675,13 @@ mod tests {
                 text.push_str(" }");
                 text
             }
-            Statement::Pipeline { commands, .. } => commands
-                .iter()
-                .map(|command| match command {
-                    PipelineCommand::Expression(expr) => show(expr),
-                    PipelineCommand::Command { name, arguments } => {
-                        let mut text = name.clone();
-                        for argument in arguments {
-                            match argument {
-                                CommandArgument::Value(value) => {
-                                    text.push(' ');
-                                    text.push_str(&show(value));
-                                }
-                                CommandArgument::Bareword(word) => {
-                                    text.push(' ');
-                                    text.push_str(word);
-                                }
-                                CommandArgument::Parameter { name, value } => {
-                                    text.push_str(&format!(" -{name}"));
-                                    if let Some(value) = value {
-                                        text.push(' ');
-                                        text.push_str(&show(value));
-                                    }
-                                }
-                            }
-                        }
-                        text
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" | "),
+            Statement::Pipeline { commands, .. } => show_pipeline(commands, true),
             Statement::Command {
                 name, arguments, ..
-            } => {
-                let mut text = name.clone();
-                for argument in arguments {
-                    match argument {
-                        CommandArgument::Value(value) => {
-                            text.push(' ');
-                            text.push_str(&show(value));
-                        }
-                        CommandArgument::Bareword(word) => {
-                            text.push(' ');
-                            text.push_str(word);
-                        }
-                        CommandArgument::Parameter { name, value } => {
-                            text.push_str(&format!(" -{name}"));
-                            if let Some(value) = value {
-                                text.push(' ');
-                                text.push_str(&show(value));
-                            }
-                        }
-                    }
-                }
-                text
+            } => show_command(name, arguments),
+            Statement::AssignPipeline { name, commands, .. } => {
+                format!("${name} = {}", show_pipeline(commands, false))
             }
-            Statement::AssignPipeline { name, commands, .. } => format!(
-                "${name} = {}",
-                commands
-                    .iter()
-                    .map(|command| match command {
-                        PipelineCommand::Expression(expr) => show(expr),
-                        PipelineCommand::Command { name, .. } => name.clone(),
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" | ")
-            ),
             Statement::MemberAssign {
                 target,
                 name,
@@ -2670,23 +2738,13 @@ mod tests {
     }
 
     fn show_chain(chain: &PipelineChain) -> String {
-        fn stage(commands: &[PipelineCommand]) -> String {
-            commands
-                .iter()
-                .map(|command| match command {
-                    PipelineCommand::Expression(expr) => show(expr),
-                    PipelineCommand::Command { name, .. } => name.clone(),
-                })
-                .collect::<Vec<_>>()
-                .join(" | ")
-        }
-        let mut result = stage(&chain.first);
+        let mut result = show_pipeline(&chain.first, false);
         for (op, commands) in &chain.rest {
             result.push_str(match op {
                 ChainOperator::AndAnd => " && ",
                 ChainOperator::OrOr => " || ",
             });
-            result.push_str(&stage(commands));
+            result.push_str(&show_pipeline(commands, false));
         }
         result
     }
@@ -2723,6 +2781,10 @@ mod tests {
 
     #[test]
     fn refuses_what_it_does_not_cover() {
+        assert_eq!(
+            refused("Write-Output x >one 1>>two"),
+            "a stream redirected more than once"
+        );
         assert_eq!(refused("1 2"), SYNTAX_ERRORS);
         assert_eq!(refused("(1"), SYNTAX_ERRORS);
         assert_eq!(refused("()"), SYNTAX_ERRORS);

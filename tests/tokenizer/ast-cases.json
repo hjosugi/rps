@@ -30,5 +30,9 @@
   {"name":"chain-precedence","source":"1 || 2 && 3"},
   {"name":"chain-pipelines","source":"1 | Write-Output && Write-Output 2 | Write-Output"},
   {"name":"assign-chain","source":"$a = Write-Output x || 2"},
-  {"name":"assign-multiple-chain","source":"$a,$b = Write-Output x && 2"}
+  {"name":"assign-multiple-chain","source":"$a,$b = Write-Output x && 2"},
+  {"name":"redirect-expression","source":"'hello' > $path"},
+  {"name":"redirect-arguments","source":"Write-Output 2 >file tail"},
+  {"name":"redirect-streams","source":"cmd 2>err.txt 1>>out.txt | Write-Output"},
+  {"name":"redirect-merge","source":"cmd 2>&1 && cmd *>>out"}
 ]

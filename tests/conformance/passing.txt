@@ -97,6 +97,7 @@ native/capture
 native/environment
 native/exit-code
 native/glob
+native/output-redirection
 native/pipe
 native/pipeline-chain
 native/pipeline-status
@@ -126,4 +127,5 @@ stmt/exit-code
 stmt/exit-default
 stmt/exit-negative
 stmt/multiple-assignment
+stmt/redirection-tokens
 stmt/separators

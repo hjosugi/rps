@@ -1,0 +1,12 @@
+rpsh-golden-v2
+exit=0
+abc>def
+1
+abc>def
+7>name
+12>name
+2>&1
+*>
+WARNING: merged
+System.Management.Automation.WarningRecord
+captured

@@ -1,0 +1,15 @@
+rpsh-golden-v2
+exit=0
+first|second|third
+abc|def
+2
+warn
+2,4,6
+
+CommandType     Name                                               Version    Source
+-----------     ----                                               -------    ------
+Alias           type -> Get-Content                                           
+
+ff78007a01False|4
+True
+nothing

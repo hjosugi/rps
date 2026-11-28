@@ -12,8 +12,10 @@
 //! on first use.
 
 mod aliases;
+mod redirection;
 
 use aliases::Aliases;
+use redirection::{NativeOutput, OutputTarget, record_prefix};
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
@@ -1162,7 +1164,13 @@ impl Engine {
                 }
                 return Ok(Flow::Normal);
             }
-            if let Some(outputs) = self.run_native(name, arguments, &[])? {
+            let destination = if self.capture.is_some() {
+                NativeOutput::Objects
+            } else {
+                self.flush_host(out)?;
+                NativeOutput::Host(out)
+            };
+            if let Some(outputs) = self.run_native(name, arguments, &[], destination)? {
                 for value in outputs {
                     self.write_value(value, out)?;
                 }
@@ -1414,8 +1422,12 @@ impl Engine {
                     flatten_value(value)
                 }
                 PipelineCommand::Command { name, arguments } => {
-                    self.run_command(name, arguments, input)?
+                    self.run_command(name, arguments, input, None)?
                 }
+                PipelineCommand::Redirected {
+                    command,
+                    redirections,
+                } => self.run_redirected(command, input, redirections)?,
             };
             failed |= self.last_failed;
         }
@@ -1429,6 +1441,7 @@ impl Engine {
         name: &str,
         arguments: &[CommandArgument],
         input: Vec<Value>,
+        output: Option<&OutputTarget>,
     ) -> Result<Vec<Value>, EngineError> {
         let resolved = self.discover_alias(name);
         let name = resolved.as_deref().unwrap_or(name);
@@ -1436,7 +1449,8 @@ impl Engine {
             if let Some(outputs) = self.invoke_builtin(name, arguments, &input)? {
                 return Ok(outputs);
             }
-            if let Some(outputs) = self.run_native(name, arguments, &input)? {
+            let destination = output.map_or(NativeOutput::Objects, NativeOutput::Redirected);
+            if let Some(outputs) = self.run_native(name, arguments, &input, destination)? {
                 return Ok(outputs);
             }
             return Err(command_not_found(name).into());
@@ -5780,13 +5794,17 @@ impl Engine {
         name: &str,
         arguments: &[CommandArgument],
         input: &[Value],
+        destination: NativeOutput<'_>,
     ) -> Result<Option<Vec<Value>>, EngineError> {
         let arguments = self.native_arguments(arguments)?;
         let mut command = std::process::Command::new(name);
         command
             .args(&arguments)
             .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
+            .stdout(match &destination {
+                NativeOutput::Redirected(target) => target.stdio()?,
+                NativeOutput::Host(_) | NativeOutput::Objects => Stdio::piped(),
+            })
             .stderr(Stdio::inherit());
         for (key, value) in &self.variables {
             if let Some(env_name) = key.strip_prefix("env:") {
@@ -5831,17 +5849,14 @@ impl Engine {
         let code = native_exit_code(output.status);
         self.last_failed = !output.status.success();
         self.assign_variable("global:LASTEXITCODE", Value::Int32(code));
-        let text = String::from_utf8_lossy(&output.stdout);
-        let mut lines = Vec::new();
-        let mut rest = text.as_ref();
-        if rest.ends_with('\n') {
-            rest = &rest[..rest.len() - 1];
+        if let NativeOutput::Host(writer) = destination {
+            writer.write_all(&output.stdout)?;
+            return Ok(Some(Vec::new()));
         }
-        if !rest.is_empty() {
-            for line in rest.split('\n') {
-                lines.push(Value::String(line.trim_end_matches('\r').into()));
-            }
-        }
+        let lines = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|line| Value::String(line.into()))
+            .collect();
         Ok(Some(lines))
     }
 
@@ -6374,6 +6389,11 @@ impl Engine {
             return Ok(());
         }
         if let Value::Object(entries) = &value {
+            if let Some(prefix) = record_prefix(&value) {
+                self.flush_host(out)?;
+                writeln!(out, "{prefix}{value}")?;
+                return Ok(());
+            }
             let host_text = entries
                 .iter()
                 .find(|(key, _)| key == "__HostText")
@@ -7149,6 +7169,10 @@ fn error_record(
     Value::object(vec![
         ("__Text".to_owned(), Value::String(text.to_owned().into())),
         (
+            "__TypeName".to_owned(),
+            Value::String("System.Management.Automation.ErrorRecord".into()),
+        ),
+        (
             "FullyQualifiedErrorId".to_owned(),
             Value::String(id.to_owned().into()),
         ),
@@ -7410,6 +7434,9 @@ fn format_out_string(input: &[Value], width: usize) -> String {
     };
     if uses_command_table(first) {
         return format_command_table(first, input, width);
+    }
+    if record_prefix(first).is_some() {
+        return input.iter().map(|value| format!("{value}\n")).collect();
     }
     let Value::Object(entries) = first else {
         let mut text = String::new();

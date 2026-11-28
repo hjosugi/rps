@@ -61,7 +61,7 @@ function Format-Pipeline($pipeline) {
     }
     $stages = foreach ($stage in $pipeline.PipelineElements) {
         if ($stage -is [System.Management.Automation.Language.CommandExpressionAst]) {
-            "(command-expression $(Format-Expr $stage.Expression))"
+            $text = "(command-expression $(Format-Expr $stage.Expression))"
         } else {
             $elements = foreach ($element in $stage.CommandElements) {
                 if ($element -is [System.Management.Automation.Language.CommandParameterAst]) {
@@ -71,7 +71,19 @@ function Format-Pipeline($pipeline) {
                     Format-Expr $element
                 }
             }
-            "(command $($elements -join ' '))"
+            $text = "(command $($elements -join ' '))"
+        }
+        if ($stage.Redirections.Count) {
+            $redirects = foreach ($r in $stage.Redirections) {
+                if ($r -is [System.Management.Automation.Language.FileRedirectionAst]) {
+                    "(file $($r.FromStream) $($r.Append.ToString().ToLowerInvariant()) $(Format-Expr $r.Location))"
+                } else {
+                    "(merge $($r.FromStream) $($r.ToStream))"
+                }
+            }
+            "(redirect $text $($redirects -join ' '))"
+        } else {
+            $text
         }
     }
     "(pipeline $($stages -join ' '))"
@@ -79,6 +91,9 @@ function Format-Pipeline($pipeline) {
 
 $statement = $ast.EndBlock.Statements[0]
 if ($statement -is [System.Management.Automation.Language.PipelineChainAst]) {
+    Format-Pipeline $statement
+} elseif ($statement -is [System.Management.Automation.Language.PipelineAst] -and
+    ($statement.PipelineElements.Count -gt 1 -or $statement.PipelineElements[0].Redirections.Count)) {
     Format-Pipeline $statement
 } elseif ($statement -is [System.Management.Automation.Language.AssignmentStatementAst]) {
     $right = $statement.Right

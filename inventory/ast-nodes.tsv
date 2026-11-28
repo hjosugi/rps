@@ -29,7 +29,7 @@ ErrorStatementAst	PipelineBaseAst	open	linux-x64	todo
 ExitStatementAst	StatementAst	open	linux-x64	todo
 ExpandableStringExpressionAst	ExpressionAst	open	linux-x64	todo
 ExpressionAst	CommandElementAst	abstract	linux-x64	todo
-FileRedirectionAst	RedirectionAst	open	linux-x64	todo
+FileRedirectionAst	RedirectionAst	open	linux-x64	partial
 ForEachStatementAst	LoopStatementAst	open	linux-x64	todo
 ForStatementAst	LoopStatementAst	open	linux-x64	todo
 FunctionDefinitionAst	StatementAst	open	linux-x64	todo
@@ -42,7 +42,7 @@ LabeledStatementAst	StatementAst	abstract	linux-x64	todo
 LoopStatementAst	LabeledStatementAst	abstract	linux-x64	todo
 MemberAst	Ast	abstract	linux-x64	todo
 MemberExpressionAst	ExpressionAst	open	linux-x64	todo
-MergingRedirectionAst	RedirectionAst	open	linux-x64	todo
+MergingRedirectionAst	RedirectionAst	open	linux-x64	partial
 NamedAttributeArgumentAst	Ast	open	linux-x64	todo
 NamedBlockAst	Ast	open	linux-x64	todo
 ParamBlockAst	Ast	open	linux-x64	todo
