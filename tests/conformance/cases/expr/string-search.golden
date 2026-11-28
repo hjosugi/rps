@@ -1,0 +1,56 @@
+rpsh-golden-v2
+exit=0
+6
+55357
+56832
+56832
+2
+2
+-1
+5
+5
+False
+True
+True
+True
+True
+3
+0
+3
+6
+1
+0
+3
+2
+3
+1
+6
+0
+-1
+0
+True
+2
+0
+0
+2
+0
+True
+OrdinalIgnoreCase
+ArgumentOutOfRangeException
+Exception calling "IndexOf" with "2" argument(s): "Index was out of range. Must be non-negative and less than or equal to the size of the collection. (Parameter 'startIndex')"
+ArgumentOutOfRangeException
+Exception calling "LastIndexOf" with "3" argument(s): "Count must be positive and count must refer to a location within the string/array/collection. (Parameter 'count')"
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "startIndex", with value: "Ordinal", for "IndexOf" to type "System.Int32": "Cannot convert value "Ordinal" to type "System.Int32". Error: "The input string 'Ordinal' was not in a correct format.""
+ArgumentNullException
+Exception calling "Contains" with "1" argument(s): "Value cannot be null. (Parameter 'value')"
+ArgumentOutOfRangeException
+Exception calling "Substring" with "1" argument(s): "startIndex ('-1') must be a non-negative value. (Parameter 'startIndex')
+Actual value was -1."
+ArgumentOutOfRangeException
+Exception calling "Substring" with "2" argument(s): "Index and length must refer to a location within the string. (Parameter 'length')"
+-1
+Exception calling "IndexOf" with "4" argument(s): "startIndex ('-1') must be a non-negative value. (Parameter 'startIndex')
+Actual value was -1."
+Exception calling "LastIndexOf" with "4" argument(s): "startSearchAt ('-1') must be a non-negative value. (Parameter 'startSearchAt')
+Actual value was -1."

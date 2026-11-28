@@ -18,6 +18,7 @@ mod globalization;
 mod native;
 mod redirection;
 mod sorting;
+mod string_search;
 mod wildcards;
 
 use aliases::Aliases;
@@ -8410,6 +8411,7 @@ fn type_full_name(name: &str) -> String {
         "biginteger" => "System.Numerics.BigInteger".to_owned(),
         "cultureinfo" | "globalization.cultureinfo" => globalization::CULTURE_TYPE.to_owned(),
         "text.normalizationform" => globalization::FORM_TYPE.to_owned(),
+        "stringcomparison" => globalization::COMPARISON_TYPE.to_owned(),
         "pscustomobject" => "System.Management.Automation.PSCustomObject".to_owned(),
         _ => name.to_owned(),
     }
@@ -8909,6 +8911,9 @@ fn static_member(
         }
         ("cultureinfo" | "globalization.cultureinfo", "invariantculture") => {
             Ok(globalization::invariant_culture())
+        }
+        ("stringcomparison", mode) => {
+            Ok(globalization::comparison_member(mode).unwrap_or(Value::Null))
         }
         ("text.normalizationform", form) => {
             Ok(globalization::form_member(form).unwrap_or(Value::Null))
@@ -9562,6 +9567,7 @@ fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
         "cultureinfo" | "globalization.cultureinfo" | "system.globalization.cultureinfo" => {
             globalization::cast_culture(&value)
         }
+        "stringcomparison" | "system.stringcomparison" => globalization::cast_comparison(&value),
         "text.normalizationform" | "system.text.normalizationform" => {
             globalization::cast_form(&value)
         }
@@ -9979,43 +9985,10 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
                 }),
             }
         }
-        "substring" => {
-            let out_of_range = || RuntimeError::Script {
-                id: "ArgumentOutOfRangeException",
-                category: "NotSpecified: (:) [], MethodInvocationException".to_owned(),
-                exception_type: "System.Management.Automation.MethodInvocationException",
-                message: if arguments.len() > 1 {
-                    "Exception calling \"Substring\" with \"2\" argument(s): \"Length cannot be less than zero. (Parameter 'length')\"".to_owned()
-                } else {
-                    "Exception calling \"Substring\" with \"1\" argument(s): \"startIndex cannot be larger than length of string. (Parameter 'startIndex')\"".to_owned()
-                },
-            };
-            let start = int_argument(arguments.first())?;
-            let start = usize::try_from(start).map_err(|_| out_of_range())?;
-            let length = match arguments.get(1) {
-                Some(value) => {
-                    usize::try_from(int_argument(Some(value))?).map_err(|_| out_of_range())?
-                }
-                None => units.len().saturating_sub(start),
-            };
-            let end = start
-                .checked_add(length)
-                .filter(|end| *end <= units.len())
-                .ok_or_else(out_of_range)?;
-            Ok(Value::String(PsString::from_units(
-                units[start..end].to_vec(),
-            )))
-        }
-        "indexof" => {
-            let needle = needle_units(arguments.first())?;
-            Ok(Value::Int32(
-                find_units(&units, &needle).map_or(-1, |at| at as i32),
-            ))
-        }
-        "contains" => {
-            let needle = needle_units(arguments.first())?;
-            Ok(Value::Bool(find_units(&units, &needle).is_some()))
-        }
+        "substring" => string_search::substring(text,arguments),
+        "indexof" => string_search::index(text,arguments,false),
+        "lastindexof" => string_search::index(text,arguments,true),
+        "contains" => string_search::contains(text,arguments),
         "toupper" => globalization::case_method(text,"ToUpper",arguments),
         "toupperinvariant" => globalization::case_method(text,"ToUpperInvariant",arguments),
         "tolower" => globalization::case_method(text,"ToLower",arguments),
@@ -10037,18 +10010,8 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
             }
             Ok(Value::array(parts.into_iter().map(Value::String).collect()))
         }
-        "startswith" | "endswith" => {
-            if let [Value::String(pattern)] = arguments {
-                return rpsh_runtime::culture::has_affix(text, pattern, &rpsh_runtime::culture::current_locale(), true, name.eq_ignore_ascii_case("startswith")).map(Value::Bool);
-            }
-            let needle = needle_units(arguments.first())?;
-            let found = if name.eq_ignore_ascii_case("startswith") {
-                units.starts_with(&needle)
-            } else {
-                units.ends_with(&needle)
-            };
-            Ok(Value::Bool(found))
-        }
+        "startswith" => string_search::affix(text,arguments,true),
+        "endswith" => string_search::affix(text,arguments,false),
         "trim" | "trimstart" | "trimend" => {
             let mut start = 0;
             let mut end = units.len();
@@ -10103,18 +10066,6 @@ fn string_method(text: &PsString, name: &str, arguments: &[Value]) -> Result<Val
             }
             Ok(Value::String(PsString::from_units(result)))
         }
-        "lastindexof" => {
-            let needle = needle_units(arguments.first())?;
-            let mut last = None;
-            if !needle.is_empty() && needle.len() <= units.len() {
-                for at in 0..=units.len() - needle.len() {
-                    if units[at..at + needle.len()] == needle {
-                        last = Some(at);
-                    }
-                }
-            }
-            Ok(Value::Int32(last.map_or(-1, |at| at as i32)))
-        }
         "insert" => {
             let at = arguments.first().map_or(Ok(0), convert_int32)? as usize;
             let insert = needle_units(arguments.get(1))?;
@@ -10155,7 +10106,7 @@ fn object_method(
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
     if arguments.is_empty() && name.eq_ignore_ascii_case("ToString")
-        && entries.iter().any(|(k, v)| k == "__TypeName" && matches!(v, Value::String(t) if matches!(t.as_ascii(),Some(globalization::CULTURE_TYPE | globalization::FORM_TYPE))))
+        && entries.iter().any(|(k, v)| k == "__TypeName" && matches!(v, Value::String(t) if matches!(t.as_ascii(),Some(globalization::CULTURE_TYPE | globalization::FORM_TYPE | globalization::COMPARISON_TYPE))))
         && let Some((_,text))=entries.iter().find(|(key,_)|key=="__Text") {
         return Ok(text.clone());
     }

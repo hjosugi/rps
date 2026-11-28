@@ -48,6 +48,7 @@ expr/string-casing
 expr/string-literals
 expr/string-methods
 expr/string-normalization
+expr/string-search
 expr/timespan
 expr/version-type
 lang/alias-filters

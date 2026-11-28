@@ -1,20 +1,36 @@
 //! CultureInfo and normalization arguments for System.String.
 use super::{hidden_type, overload_error};
-use culture::{NormalizationError, NormalizationForm};
+use culture::{NormalizationError, NormalizationForm, StringComparison};
 use rpsh_runtime::{PsString, RuntimeError, Value, culture};
 
 pub(super) const CULTURE_TYPE: &str = "System.Globalization.CultureInfo";
 pub(super) const FORM_TYPE: &str = "System.Text.NormalizationForm";
-type FormEntry = (&'static str, i32, NormalizationForm);
-type FormError = (&'static str, String);
-const FORMS: &[FormEntry] = &[
-    ("FormC", 1, NormalizationForm::C),
-    ("FormD", 2, NormalizationForm::D),
-    ("FormKC", 5, NormalizationForm::Kc),
-    ("FormKD", 6, NormalizationForm::Kd),
-];
+pub(super) const COMPARISON_TYPE: &str = "System.StringComparison";
+type EnumEntry<T> = (&'static str, i32, T);
+struct EnumTable<T: 'static> {
+    ty: &'static str,
+    entries: &'static [EnumEntry<T>],
+}
+const FORMS: EnumTable<NormalizationForm> = EnumTable {
+    ty: FORM_TYPE,
+    entries: &[
+        ("FormC", 1, NormalizationForm::C),
+        ("FormD", 2, NormalizationForm::D),
+        ("FormKC", 5, NormalizationForm::Kc),
+        ("FormKD", 6, NormalizationForm::Kd),
+    ],
+};
+const COMPARISONS: EnumTable<StringComparison> = EnumTable {
+    ty: COMPARISON_TYPE,
+    entries: StringComparison::ENTRIES,
+};
 
-fn invocation(id: &'static str, method: &str, count: usize, detail: &str) -> RuntimeError {
+pub(super) fn invocation(
+    id: &'static str,
+    method: &str,
+    count: usize,
+    detail: &str,
+) -> RuntimeError {
     RuntimeError::Script {
         id,
         category: "NotSpecified: (:) [], MethodInvocationException".into(),
@@ -25,7 +41,7 @@ fn invocation(id: &'static str, method: &str, count: usize, detail: &str) -> Run
     }
 }
 
-fn argument_error(
+pub(super) fn argument_error(
     method: &str,
     parameter: &str,
     ty: &str,
@@ -170,6 +186,26 @@ pub(super) fn culture_method(name: &str, args: &[Value]) -> Result<Value, Runtim
         .map_err(|why| invocation("CultureNotFoundException", method, args.len(), &why))
 }
 
+pub(super) fn method_locale(method: &str, value: &Value) -> Result<String, RuntimeError> {
+    if value.is_null_like() {
+        return Ok(culture::current_locale());
+    }
+    if hidden_type(value).as_deref() == Some("System.Management.Automation.Language.NullString") {
+        let detail = format!(
+            "Cannot convert the \"\" value of type \"System.Management.Automation.Language.NullString\" to type \"{CULTURE_TYPE}\"."
+        );
+        return Err(argument_error(method, "culture", CULTURE_TYPE, "", &detail));
+    }
+    details(value)
+        .map_err(|why| {
+            let detail = format!(
+                "Cannot convert value \"{value}\" to type \"{CULTURE_TYPE}\". Error: \"{why}\""
+            );
+            argument_error(method, "culture", CULTURE_TYPE, &value.to_string(), &detail)
+        })
+        .map(|(name, _)| name)
+}
+
 pub(super) fn case_method(
     text: &PsString,
     method: &str,
@@ -180,124 +216,150 @@ pub(super) fn case_method(
         (true, []) => String::new(),
         (false, []) => culture::current_locale(),
         (false, [value]) if value.is_null_like() => culture::current_locale(),
-        (false, [value]) => {
-            if hidden_type(value).as_deref()
-                == Some("System.Management.Automation.Language.NullString")
-            {
-                let detail = format!(
-                    "Cannot convert the \"\" value of type \"System.Management.Automation.Language.NullString\" to type \"{CULTURE_TYPE}\"."
-                );
-                return Err(argument_error(method, "culture", CULTURE_TYPE, "", &detail));
-            }
-            details(value).map_err(|why|{
-                let detail=format!("Cannot convert value \"{value}\" to type \"{CULTURE_TYPE}\". Error: \"{why}\"");
-                argument_error(method,"culture",CULTURE_TYPE,&value.to_string(),&detail)
-            })?.0
-        }
+        (false, [value]) => method_locale(method, value)?,
         _ => return Err(overload_error(method, args.len())),
     };
     culture::change_case(text, &locale, upper).map(Value::String)
 }
 
-fn form_entry(text: &str) -> Option<&'static FormEntry> {
-    FORMS
-        .iter()
-        .find(|(name, _, _)| name.eq_ignore_ascii_case(text))
-}
+impl<T> EnumTable<T> {
+    fn entry(&self, text: &str) -> Option<&'static EnumEntry<T>> {
+        self.entries
+            .iter()
+            .find(|(name, _, _)| name.eq_ignore_ascii_case(text))
+    }
+    fn value(&self, entry: &EnumEntry<T>) -> Value {
+        let (name, number, _) = entry;
+        Value::object(vec![
+            ("__TypeName".into(), Value::String(self.ty.into())),
+            ("__Text".into(), Value::String((*name).into())),
+            ("__EnumValue".into(), Value::Int32(*number)),
+            ("value__".into(), Value::Int32(*number)),
+        ])
+    }
+    fn parse(&self, value: &Value) -> Result<&'static EnumEntry<T>, (&'static str, String)> {
+        let ty = self.ty;
+        let names = |separator: &str| {
+            self.entries
+                .iter()
+                .map(|(name, _, _)| *name)
+                .collect::<Vec<_>>()
+                .join(separator)
+        };
+        let text = value.to_string();
+        let named_error = |reason: String| {
+            (
+                "SubstringDisambiguationEnumParseThrewAnException",
+                format!("Cannot convert value \"{text}\" to type \"{ty}\". Error: \"{reason}\""),
+            )
+        };
+        let no_match = || {
+            named_error(format!(
+                "Unable to match the identifier name {text} to a valid enumerator name. Specify one of the following enumerator names and try again:\n{}",
+                names(", ")
+            ))
+        };
+        let invalid = |id, source: String| {
+            (
+                id,
+                format!(
+                    "Cannot convert {source} to type \"{ty}\" due to enumeration values that are not valid. Specify one of the following enumeration values and try again. The possible enumeration values are \"{}\".",
+                    names(",")
+                ),
+            )
+        };
+        if value.is_null_like() {
+            return Err(invalid("nullToEnumInvalidCast", "null".into()));
+        }
+        if matches!(value, Value::Bool(_)) {
+            return Err((
+                "InvalidCastIConvertible",
+                format!(
+                    "Cannot convert value \"{text}\" to type \"{ty}\". Error: \"Invalid cast from 'System.Boolean' to '{ty}'.\""
+                ),
+            ));
+        }
+        let trimmed = text.trim();
+        if let Some(entry) = self.entry(trimmed) {
+            return Ok(entry);
+        }
+        let number = if let Ok(num) = trimmed.parse::<i32>() {
+            num
+        } else if trimmed.contains(',') {
+            let mut result = 0;
+            for word in trimmed.split(',') {
+                result |= self.entry(word.trim()).ok_or_else(no_match)?.1;
+            }
+            result
+        } else {
+            let prefix = trimmed.to_ascii_lowercase();
+            let matches: Vec<_> = self
+                .entries
+                .iter()
+                .filter(|(name, _, _)| name.to_ascii_lowercase().starts_with(&prefix))
+                .collect();
+            match matches.as_slice() {
+                [entry] => return Ok(entry),
+                [] => return Err(no_match()),
+                _ => {
+                    let names = matches
+                        .iter()
+                        .map(|(name, _, _)| *name)
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    return Err(named_error(format!(
+                        "The identifier name {text} cannot be processed because it is either too similar or identical to the following enumerator names: {names}. Use a more specific identifier name."
+                    )));
+                }
+            }
+        };
+        self.entries
+            .iter()
+            .find(|(_, n, _)| *n == number)
+            .ok_or_else(|| {
+                invalid(
+                    if matches!(value, Value::String(_)) {
+                        "EnumParseUndefined"
+                    } else {
+                        "UndefinedIntegerToEnum"
+                    },
+                    format!("value \"{text}\""),
+                )
+            })
+    }
 
-fn enum_value(entry: &FormEntry) -> Value {
-    let (name, number, _) = entry;
-    Value::object(vec![
-        ("__TypeName".into(), Value::String(FORM_TYPE.into())),
-        ("__Text".into(), Value::String((*name).into())),
-        ("__EnumValue".into(), Value::Int32(*number)),
-        ("value__".into(), Value::Int32(*number)),
-    ])
+    fn cast(&self, value: &Value) -> Result<Value, RuntimeError> {
+        self.parse(value)
+            .map(|entry| self.value(entry))
+            .map_err(|(id, message)| cast_error(id, message))
+    }
 }
 
 pub(super) fn form_member(name: &str) -> Option<Value> {
-    form_entry(name).map(enum_value)
+    FORMS.entry(name).map(|e| FORMS.value(e))
 }
-
-fn parse_form(value: &Value) -> Result<&'static FormEntry, FormError> {
-    const NAMES: &str = "FormC, FormD, FormKC, FormKD";
-    let text = value.to_string();
-    let named_error = |reason: String| {
-        (
-            "SubstringDisambiguationEnumParseThrewAnException",
-            format!("Cannot convert value \"{text}\" to type \"{FORM_TYPE}\". Error: \"{reason}\""),
-        )
-    };
-    let no_match = || {
-        named_error(format!(
-            "Unable to match the identifier name {text} to a valid enumerator name. Specify one of the following enumerator names and try again:\n{NAMES}"
-        ))
-    };
-    let invalid = |id, source: String| {
-        (
-            id,
-            format!(
-                "Cannot convert {source} to type \"{FORM_TYPE}\" due to enumeration values that are not valid. Specify one of the following enumeration values and try again. The possible enumeration values are \"FormC,FormD,FormKC,FormKD\"."
-            ),
-        )
-    };
-    if value.is_null_like() {
-        return Err(invalid("nullToEnumInvalidCast", "null".into()));
-    }
-    if matches!(value, Value::Bool(_)) {
-        return Err((
-            "InvalidCastIConvertible",
-            format!(
-                "Cannot convert value \"{text}\" to type \"{FORM_TYPE}\". Error: \"Invalid cast from 'System.Boolean' to '{FORM_TYPE}'.\""
-            ),
-        ));
-    }
-    let trimmed = text.trim();
-    let number = if let Ok(num) = trimmed.parse::<i32>() {
-        num
-    } else if trimmed.contains(',') {
-        let mut result = 0;
-        for word in trimmed.split(',') {
-            result |= form_entry(word.trim()).ok_or_else(no_match)?.1;
-        }
-        result
-    } else {
-        let prefix = trimmed.to_ascii_lowercase();
-        let matches: Vec<_> = FORMS
-            .iter()
-            .filter(|(name, _, _)| name.to_ascii_lowercase().starts_with(&prefix))
-            .collect();
-        match matches.as_slice() {
-            [entry] => return Ok(entry),
-            [] => return Err(no_match()),
-            _ => {
-                let names = matches
-                    .iter()
-                    .map(|(name, _, _)| *name)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                return Err(named_error(format!(
-                    "The identifier name {text} cannot be processed because it is either too similar or identical to the following enumerator names: {names}. Use a more specific identifier name."
-                )));
-            }
-        }
-    };
-    FORMS.iter().find(|(_, n, _)| *n == number).ok_or_else(|| {
-        invalid(
-            if matches!(value, Value::String(_)) {
-                "EnumParseUndefined"
-            } else {
-                "UndefinedIntegerToEnum"
-            },
-            format!("value \"{text}\""),
-        )
-    })
-}
-
 pub(super) fn cast_form(value: &Value) -> Result<Value, RuntimeError> {
-    parse_form(value)
-        .map(enum_value)
-        .map_err(|(id, message)| cast_error(id, message))
+    FORMS.cast(value)
+}
+pub(super) fn comparison_member(name: &str) -> Option<Value> {
+    COMPARISONS.entry(name).map(|e| COMPARISONS.value(e))
+}
+pub(super) fn cast_comparison(value: &Value) -> Result<Value, RuntimeError> {
+    COMPARISONS.cast(value)
+}
+pub(super) fn comparison(method: &str, value: &Value) -> Result<StringComparison, RuntimeError> {
+    COMPARISONS
+        .parse(value)
+        .map(|entry| entry.2)
+        .map_err(|(_, detail)| {
+            argument_error(
+                method,
+                "comparisonType",
+                COMPARISON_TYPE,
+                &value.to_string(),
+                &detail,
+            )
+        })
 }
 
 pub(super) fn normalization(
@@ -308,7 +370,8 @@ pub(super) fn normalization(
     let form = match args {
         [] => NormalizationForm::C,
         [value] if !value.is_null_like() => {
-            parse_form(value)
+            FORMS
+                .parse(value)
                 .map(|entry| entry.2)
                 .map_err(|(_, detail)| {
                     argument_error(

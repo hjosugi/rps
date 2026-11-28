@@ -7,7 +7,7 @@
 
 use super::{Casing, NormalizationForm, text::map_units};
 use crate::PsString;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::cmp::Ordering;
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::ptr::{self, NonNull};
@@ -77,6 +77,32 @@ type OpenDateFormat = unsafe extern "C" fn(
 ) -> *mut c_void;
 type DatePattern = unsafe extern "C" fn(*const c_void, i8, *mut u16, i32, *mut i32) -> i32;
 
+type BreakRules =
+    unsafe extern "C" fn(*const u16, i32, *const u16, i32, *mut c_void, *mut i32) -> *mut c_void;
+type CloneBreak = unsafe extern "C" fn(*const c_void, *mut i32) -> *mut c_void;
+type OpenSearch = unsafe extern "C" fn(
+    *const u16,
+    i32,
+    *const u16,
+    i32,
+    *const c_void,
+    *mut c_void,
+    *mut i32,
+) -> *mut c_void;
+type MatchedLength = unsafe extern "C" fn(*const c_void) -> i32;
+
+struct BreakIterator {
+    handle: NonNull<c_void>,
+    close: Close,
+}
+impl Drop for BreakIterator {
+    fn drop(&mut self) {
+        // SAFETY: only owned handles are stored here. The Api's library is
+        // its last field and outlives both the template and local clones.
+        unsafe { (self.close)(self.handle.as_ptr()) };
+    }
+}
+
 struct Api {
     open: Open,
     close: Close,
@@ -101,6 +127,15 @@ struct Api {
     normalizers: [GetNormalizer; 4],
     normalize: Normalize,
     is_normalized: IsNormalized,
+    break_rules: BreakRules,
+    clone_break: Option<CloneBreak>,
+    close_break: Close,
+    open_search: OpenSearch,
+    close_search: Close,
+    first_search: Next,
+    last_search: Next,
+    matched_length: MatchedLength,
+    break_template: OnceCell<Option<BreakIterator>>,
     _library: Library,
 }
 
@@ -160,6 +195,20 @@ impl Api {
             ],
             normalize: bind!("unorm2_normalize", Normalize),
             is_normalized: bind!("unorm2_isNormalized", IsNormalized),
+            break_rules: bind!("ubrk_openRules", BreakRules),
+            close_break: bind!("ubrk_close", Close),
+            // ICU 69 introduced the clone API. Older libraries can open a
+            // fresh iterator from the same rules for each search.
+            clone_break: library.symbol(&format!("ubrk_clone{suffix}")).map(|p| {
+                // SAFETY: the ICU ubrk_clone declaration has the CloneBreak ABI.
+                unsafe { std::mem::transmute::<*mut c_void, CloneBreak>(p.as_ptr()) }
+            }),
+            open_search: bind!("usearch_openFromCollator", OpenSearch),
+            close_search: bind!("usearch_close", Close),
+            first_search: bind!("usearch_first", Next),
+            last_search: bind!("usearch_last", Next),
+            matched_length: bind!("usearch_getMatchedLength", MatchedLength),
+            break_template: OnceCell::new(),
             _library: library,
         })
     }
@@ -584,5 +633,106 @@ pub(super) fn time_pattern(locale: &str, short: bool) -> Option<String> {
             return None;
         }
         String::from_utf16(pattern.get(..usize::try_from(len).ok()?)?).ok()
+    })
+}
+
+impl Api {
+    fn new_break_iterator(&self) -> Option<BreakIterator> {
+        static EMPTY: [u16; 1] = [0];
+        for rules in [
+            include_str!("search-new.rules"),
+            include_str!("search-old.rules"),
+        ] {
+            let rules: Vec<_> = rules.encode_utf16().collect();
+            let mut status = 0;
+            // SAFETY: ICU copies the rules and starts with a static empty text.
+            let raw = unsafe {
+                (self.break_rules)(
+                    rules.as_ptr(),
+                    rules.len() as i32,
+                    EMPTY.as_ptr(),
+                    0,
+                    ptr::null_mut(),
+                    &mut status,
+                )
+            };
+            if let Some(handle) = NonNull::new(raw) {
+                let handle = BreakIterator {
+                    handle,
+                    close: self.close_break,
+                };
+                if status <= 0 {
+                    return Some(handle);
+                }
+            }
+        }
+        None
+    }
+    fn break_iterator(&self) -> Option<BreakIterator> {
+        let Some(clone) = self.clone_break else {
+            return self.new_break_iterator();
+        };
+        let base = self
+            .break_template
+            .get_or_init(|| self.new_break_iterator())
+            .as_ref()?;
+        let mut status = 0;
+        // SAFETY: the untouched template remains alive while its clone is created.
+        let handle = NonNull::new(unsafe { clone(base.handle.as_ptr(), &mut status) })?;
+        let iterator = BreakIterator {
+            handle,
+            close: self.close_break,
+        };
+        (status <= 0).then_some(iterator)
+    }
+}
+
+pub(super) fn search(
+    text: &[u16],
+    needle: &[u16],
+    locale: &str,
+    sensitive: bool,
+    reverse: bool,
+) -> Option<i32> {
+    with_collator(locale, sensitive, |collator| {
+        if text.is_empty() {
+            return collator
+                .compare(text, needle)
+                .map(|o| if o.is_eq() { 0 } else { -1 });
+        }
+        let source_len = i32::try_from(text.len()).ok()?;
+        let pattern_len = i32::try_from(needle.len()).ok()?;
+        let api = &collator.api;
+        let breaker = api.break_iterator()?;
+        let mut status = 0;
+        // SAFETY: search borrows the collator, breaker and both UTF-16 slices
+        // through the final usearch_close below. All lengths are nonnegative.
+        let raw = unsafe {
+            (api.open_search)(
+                needle.as_ptr(),
+                pattern_len,
+                text.as_ptr(),
+                source_len,
+                collator.handle.as_ptr(),
+                breaker.handle.as_ptr(),
+                &mut status,
+            )
+        };
+        let search = NonNull::new(raw)?;
+        let step = if reverse {
+            api.last_search
+        } else {
+            api.first_search
+        };
+        let mut at = unsafe { step(search.as_ptr(), &mut status) };
+        if reverse
+            && at >= 0
+            && at >= source_len - 2
+            && unsafe { (api.matched_length)(search.as_ptr()) } == 0
+        {
+            at = source_len;
+        }
+        unsafe { (api.close_search)(search.as_ptr()) };
+        (status <= 0).then_some(at)
     })
 }

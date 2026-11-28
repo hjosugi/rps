@@ -3,6 +3,8 @@
 use crate::{PsString, RuntimeError};
 use std::cmp::Ordering;
 
+mod search;
+pub use search::StringComparison;
 mod text;
 use text::ordinal_upper;
 pub use text::{NormalizationError, NormalizationForm, change_case};
