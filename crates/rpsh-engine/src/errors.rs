@@ -1,6 +1,6 @@
 //! PowerShell exceptions, the active handler, and the session's error history.
 use super::{Engine, EngineError, Flow, hidden_type, member};
-use rpsh_runtime::{RuntimeError, Value};
+use rpsh_runtime::{PsString, RuntimeError, Value};
 use rpsh_syntax::{Span, Statement};
 use std::fmt;
 use std::io::Write;
@@ -132,12 +132,34 @@ fn category_info(text: &str) -> Value {
     let (target, rest) = rest.rsplit_once(") [").unwrap_or(("", ""));
     let (name, ty) = target.rsplit_once(':').unwrap_or(("", ""));
     let (activity, reason) = rest.split_once("], ").unwrap_or(("", ""));
+    let abbreviated = |s: &str| {
+        let units: Vec<u16> = s.encode_utf16().collect();
+        if units.len() > 40 {
+            let mut result = units[..19].to_vec();
+            result.push('…' as u16);
+            result.extend_from_slice(&units[units.len() - 19..]);
+            PsString::from_units(result)
+        } else {
+            PsString::from(s)
+        }
+    };
+    let display = if [name, ty, activity].iter().any(|s| s.len() > 40) {
+        PsString::from(format!("{kind}: ("))
+            .concat(&abbreviated(name))
+            .concat(&":".into())
+            .concat(&abbreviated(ty))
+            .concat(&") [".into())
+            .concat(&abbreviated(activity))
+            .concat(&format!("], {reason}").into())
+    } else {
+        text.into()
+    };
     Value::object(vec![
         (
             "__TypeName".into(),
             Value::String("System.Management.Automation.ErrorCategoryInfo".into()),
         ),
-        ("__Text".into(), Value::String(text.into())),
+        ("__Text".into(), Value::String(display)),
         (
             "Category".into(),
             enum_value(

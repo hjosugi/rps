@@ -1502,7 +1502,7 @@ impl Engine {
             commands = remaining;
             if let Some(first) = self.native_stage(command) {
                 let mut stages = vec![first];
-                while stages.last().is_some_and(|stage| stage.file.is_none()) {
+                while stages.last().is_some_and(native::NativeStage::pipes_bytes) {
                     let Some((next, remaining)) = commands.split_first() else {
                         break;
                     };
@@ -1512,16 +1512,7 @@ impl Engine {
                     stages.push(next);
                     commands = remaining;
                 }
-                let file = stages.last().and_then(|stage| stage.file);
-                let target = match file {
-                    Some((path, append)) => {
-                        Some(OutputTarget::open(self.eval_expression(path)?, append)?)
-                    }
-                    None => None,
-                };
-                let destination = if let Some(target) = &target {
-                    NativeOutput::Redirected(target)
-                } else if commands.is_empty()
+                let destination = if commands.is_empty()
                     && let Some(out) = host.take()
                 {
                     self.flush_host(out)?;
@@ -6346,6 +6337,23 @@ impl Engine {
             }
             return Ok(());
         }
+        if let Some(prefix) = native::error_prefix(&value) {
+            self.flush_host(out)?;
+            if prefix.is_empty() {
+                self.write_host(out, format_args!("{value}\n"))?;
+            } else {
+                self.write_host(&mut io::stderr().lock(), format_args!("{prefix}{value}\n"))?;
+            }
+            return Ok(());
+        }
+        if let Value::Array(items) = &value
+            && items.iter().any(|v| native::error_prefix(v).is_some())
+        {
+            for item in items.iter().cloned() {
+                self.write_value(item, out)?;
+            }
+            return Ok(());
+        }
         if self.host_objects.first().is_some_and(uses_command_table) {
             self.host_objects.extend(flatten_value(value));
             return Ok(());
@@ -7305,6 +7313,25 @@ fn format_command_table(first: &Value, input: &[Value], width: usize) -> String 
 }
 
 fn format_out_string(input: &[Value], width: usize) -> String {
+    let mut first = 0;
+    let mut text = String::new();
+    for (index, value) in input.iter().enumerate() {
+        if let Some(prefix) = native::error_prefix(value) {
+            text.push_str(&format_value_group(&input[first..index], width));
+            text.push_str(prefix);
+            text.push_str(&value.to_string());
+            text.push('\n');
+            first = index + 1;
+        }
+    }
+    if first == 0 {
+        return format_value_group(input, width);
+    }
+    text.push_str(&format_value_group(&input[first..], width));
+    text
+}
+
+fn format_value_group(input: &[Value], width: usize) -> String {
     let Some(first) = input.first() else {
         return String::new();
     };

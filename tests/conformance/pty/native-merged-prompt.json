@@ -1,0 +1,8 @@
+{
+  "program": "{engine}",
+  "args": ["-NoLogo", "-NoProfile", "-Command", "sh -c 'echo waiting >&2; read answer; printf \"got=%s\\n\" \"$answer\"' 2>&1"],
+  "input": [{"after_ms": 1100, "send": "proceed\r"}],
+  "timeout_ms": 6000,
+  "cols": 48,
+  "rows": 8
+}

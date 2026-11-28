@@ -41,8 +41,10 @@ impl Engine {
         status: PipelineStatus,
         policy: Option<(Action, Vec<PathBuf>)>,
         error_files: &ErrorFiles,
-    ) -> Result<(), EngineError> {
+        merged_stage: Option<usize>,
+    ) -> Result<Option<Value>, EngineError> {
         self.last_failed = !status.all_succeeded;
+        let mut merged_record = None;
         if let Some((action, paths)) = policy {
             for stage in &status.failures {
                 self.assign_variable(
@@ -61,6 +63,10 @@ impl Engine {
                 }
                 self.remember_error(&error);
                 if action != Action::Silent {
+                    if merged_stage == Some(stage.index) {
+                        merged_record = Some(error);
+                        continue;
+                    }
                     match error_files.target(stage.index) {
                         Some(OutputTarget::Discard) => {}
                         Some(OutputTarget::File(file)) => {
@@ -76,7 +82,8 @@ impl Engine {
         self.assign_variable(
             "global:LASTEXITCODE",
             Value::Int32(native_exit_code(status.last)),
-        )
+        )?;
+        Ok(merged_record)
     }
 
     fn inquire_native(&self, path: &Path, record: &Value) -> Result<(), EngineError> {

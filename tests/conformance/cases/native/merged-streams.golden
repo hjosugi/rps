@@ -1,0 +1,49 @@
+rpsh-golden-v2
+exit=0
+True|0|0|5
+System.String|out
+System.Management.Automation.ErrorRecord|one
+NativeCommandError|System.Management.Automation.RemoteException|one
+NotSpecified: (one:String) [], RemoteException|one|False
+System.Management.Automation.ErrorRecord|two
+NativeCommandErrorMessage|System.Management.Automation.RemoteException|two
+NotSpecified: (:) [], RemoteException||True
+System.Management.Automation.ErrorRecord|
+NativeCommandErrorMessage|System.Management.Automation.RemoteException|
+NotSpecified: (:) [], RemoteException||True
+System.Management.Automation.ErrorRecord|three
+NativeCommandErrorMessage|System.Management.Automation.RemoteException|three
+NotSpecified: (:) [], RemoteException||True
+NotSpecified: (1234567890123456789…2345678901234567890:String) [], RemoteException|12345678901234567890123456789012345678901234567890
+626164efbfbd0a
+error|input
+discard|True|0
+efbfbd410a65efbfbd0a7a0a0a
+65efbfbd0a6fefbfbd0a
+6fefbfbd0a
+65efbfbd0a
+65efbfbd0a
+6fff0a
+one
+two
+
+x
+y
+8000 8000 0
+A|B
+Continue|False|7|1|2
+NativeCommandError|ordinary
+ProgramExitedWithNonZeroCode|Program "sh" ended with non-zero exit code: 7 (0x07).
+SilentlyContinue|False|7|1|1
+NativeCommandError|ordinary
+Ignore|False|7|0|1
+NativeCommandError|ordinary
+catch|Stop|False|7|1|ProgramExitedWithNonZeroCode
+err
+NativeCommandExitException: Program "sh" ended with non-zero exit code: 3 (0x03).
+
+err
+NativeCommandExitException: Program "sh" ended with non-zero exit code: 3 (0x03).
+err
+line
+NativeCommandExitException: Program "sh" ended with non-zero exit code: 3 (0x03).

@@ -2,7 +2,9 @@ mod error_files;
 mod exit_error;
 mod glob;
 mod path;
+mod text_output;
 pub(super) use path::LookupPaths;
+pub(super) use text_output::error_prefix;
 
 use super::encoding::Encoding;
 use super::{encoding, format_out_string, redirection::text_output_width};
@@ -30,8 +32,31 @@ pub(super) enum NativeOutput<'a> {
 pub(super) struct NativeStage<'a> {
     name: Cow<'a, str>,
     arguments: &'a [CommandArgument],
-    pub(super) file: Option<(&'a Expr, bool)>,
-    error_file: Option<(&'a Expr, bool)>,
+    redirections: &'a [Redirection],
+}
+
+impl NativeStage<'_> {
+    pub(super) fn pipes_bytes(&self) -> bool {
+        !self.redirections.iter().any(|r| {
+            matches!(
+                r,
+                Redirection::File {
+                    from: Stream::All | Stream::Output,
+                    ..
+                } | Redirection::MergeOutput {
+                    from: Stream::Error | Stream::All
+                }
+            )
+        })
+    }
+}
+
+#[derive(Default)]
+struct NativeRedirection {
+    output: Option<OutputTarget>,
+    error: Option<OutputTarget>,
+    merge_error: bool,
+    text_output: bool,
 }
 
 pub(super) const APPLICATION_TYPE: &str = "System.Management.Automation.ApplicationInfo";
@@ -67,31 +92,14 @@ impl Engine {
     }
 
     pub(super) fn native_stage<'a>(&self, stage: &'a PipelineCommand) -> Option<NativeStage<'a>> {
-        let mut file = None;
-        let mut error_file = None;
-        let stage = if let PipelineCommand::Redirected {
+        let (stage, redirections) = if let PipelineCommand::Redirected {
             command,
             redirections,
         } = stage
         {
-            for redirect in redirections {
-                match redirect {
-                    Redirection::File {
-                        from: Stream::Output,
-                        append,
-                        path,
-                    } => file = Some((path, *append)),
-                    Redirection::File {
-                        from: Stream::Error,
-                        append,
-                        path,
-                    } => error_file = Some((path, *append)),
-                    _ => return None,
-                }
-            }
-            command.as_ref()
+            (command.as_ref(), redirections.as_slice())
         } else {
-            stage
+            (stage, &[][..])
         };
         let PipelineCommand::Command { name, arguments } = stage else {
             return None;
@@ -113,9 +121,43 @@ impl Engine {
         Some(NativeStage {
             name: resolved,
             arguments,
-            file,
-            error_file,
+            redirections,
         })
+    }
+
+    fn native_redirection(
+        &mut self,
+        redirects: &[Redirection],
+    ) -> Result<NativeRedirection, EngineError> {
+        let mut result = NativeRedirection::default();
+        let mut all = None;
+        for redirect in redirects {
+            match redirect {
+                Redirection::File { from, path, append } => {
+                    let target = OutputTarget::open(self.eval_expression(path)?, *append)?;
+                    match from {
+                        Stream::All => all = Some(target),
+                        Stream::Output => result.output = Some(target),
+                        Stream::Error => result.error = Some(target),
+                        _ => {} // Native processes do not write PowerShell's other streams.
+                    }
+                }
+                Redirection::MergeOutput {
+                    from: Stream::All | Stream::Error,
+                } => result.merge_error = true,
+                Redirection::MergeOutput { .. } => {}
+            }
+        }
+        if let Some(all) = all {
+            if result.output.is_none() {
+                result.output = Some(all);
+                result.text_output = true;
+                result.merge_error |= result.error.is_none();
+            } else if result.error.is_none() && !result.merge_error {
+                result.error = Some(all);
+            }
+        }
+        Ok(result)
     }
 
     pub(super) fn run_native(
@@ -128,8 +170,7 @@ impl Engine {
         let stage = NativeStage {
             name: Cow::Borrowed(name),
             arguments,
-            file: None,
-            error_file: None,
+            redirections: &[],
         };
         self.run_native_stages(&[stage], input, destination)
     }
@@ -142,6 +183,7 @@ impl Engine {
     ) -> Result<Vec<Value>, EngineError> {
         let mut commands = Vec::with_capacity(stages.len());
         let mut error_files = ErrorFiles::default();
+        let mut last_redirection = NativeRedirection::default();
         for (index, stage) in stages.iter().enumerate() {
             let path = self
                 .application_paths(&stage.name, false)
@@ -155,10 +197,13 @@ impl Engine {
                 super::environment::child_overrides(&self.variables),
             )
             .map_err(|err| spawn_failure(&path, err))?;
-            if let Some((expr, append)) = stage.error_file {
-                let target = OutputTarget::open(self.eval_expression(expr)?, append)?;
+            let mut redirection = self.native_redirection(stage.redirections)?;
+            if !redirection.merge_error
+                && let Some(target) = redirection.error.take()
+            {
                 error_files.attach(&mut command, index, target)?;
             }
+            last_redirection = redirection;
             commands.push(command);
         }
         let mut bytes = Vec::new();
@@ -171,15 +216,12 @@ impl Engine {
             bytes.extend_from_slice(encoding.preamble());
             encoding.encode(&format_out_string(values, text_output_width()), &mut bytes);
         }
-        let mut captured = Vec::new();
-        let output = match destination {
-            NativeOutput::Objects => Destination::Writer(&mut captured as &mut dyn Write),
-            NativeOutput::Host(writer) if self.console_stdio => {
-                writer.flush()?;
-                Destination::Device(Stdio::inherit())
+        let destination = match (&last_redirection.output, destination) {
+            (Some(target), _) | (None, NativeOutput::Redirected(target)) => {
+                NativeOutput::Redirected(target)
             }
-            NativeOutput::Host(writer) => Destination::Writer(writer),
-            NativeOutput::Redirected(target) => Destination::Device(target.stdio()?),
+            (None, NativeOutput::Host(writer)) => NativeOutput::Host(writer),
+            (None, NativeOutput::Objects) => NativeOutput::Objects,
         };
         let stdin = (input.is_some() || !self.console_stdio).then_some(bytes.as_slice());
         let policy = crate::preferences::native_action(&self.variables)
@@ -193,16 +235,41 @@ impl Engine {
                         .collect(),
                 )
             });
-        let run = || {
-            run_pipeline_with_input(commands, stdin, output).map_err(|error| match error {
-                PipelineError::Spawn { program, error } => {
-                    spawn_failure(Path::new(&program), error)
-                }
-                PipelineError::Io(error) => EngineError::Io(error),
-            })
+        if last_redirection.merge_error || last_redirection.text_output {
+            let encoding = self.native_output_encoding();
+            let mut sink = text_output::TextOutput::new(destination);
+            let merged_stage = last_redirection.merge_error.then_some(stages.len() - 1);
+            let run = || {
+                text_output::run(
+                    commands,
+                    stdin,
+                    encoding,
+                    merged_stage.is_some(),
+                    |is_error, line| sink.line(self, is_error, line),
+                )
+            };
+            let status = error_files.run(run, || encoding)?;
+            sink.flush()?;
+            if let Some(error) =
+                self.native_exit_status(status, policy, &error_files, merged_stage)?
+            {
+                sink.exit_error(self, error)?;
+            }
+            return sink.finish();
+        }
+        let mut captured = Vec::new();
+        let output = match destination {
+            NativeOutput::Objects => Destination::Writer(&mut captured as &mut dyn Write),
+            NativeOutput::Host(writer) if self.console_stdio => {
+                writer.flush()?;
+                Destination::Device(Stdio::inherit())
+            }
+            NativeOutput::Host(writer) => Destination::Writer(writer),
+            NativeOutput::Redirected(target) => Destination::Device(target.stdio()?),
         };
+        let run = || run_pipeline_with_input(commands, stdin, output).map_err(pipeline_error);
         let status = error_files.run(run, || self.native_output_encoding())?;
-        self.native_exit_status(status, policy, &error_files)?;
+        self.native_exit_status(status, policy, &error_files, None)?;
         if captured.is_empty() {
             return Ok(Vec::new());
         }
@@ -275,6 +342,13 @@ impl Engine {
             glob::append(out, item.to_string(), quoted);
         }
         Ok(())
+    }
+}
+
+fn pipeline_error(error: PipelineError) -> EngineError {
+    match error {
+        PipelineError::Spawn { program, error } => spawn_failure(Path::new(&program), error),
+        PipelineError::Io(error) => EngineError::Io(error),
     }
 }
 

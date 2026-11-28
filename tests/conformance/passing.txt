@@ -116,6 +116,7 @@ native/exit-errors
 native/glob
 native/glob-arguments
 native/inherited-stdin
+native/merged-streams
 native/output-redirection
 native/parameter-colon
 native/path-precedence
