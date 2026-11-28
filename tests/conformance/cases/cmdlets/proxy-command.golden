@@ -1,0 +1,258 @@
+rpsh-golden-v2
+exit=0
+[CmdletBinding(HelpUri='https://go.microsoft.com/fwlink/?LinkID=2097117', RemotingCapability='None')]
+param(
+    [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true, ValueFromRemainingArguments=$true)]
+    [AllowNull()]
+    [AllowEmptyCollection()]
+    [psobject]
+    ${InputObject},
+
+    [switch]
+    ${NoEnumerate})
+
+begin
+{
+    try {
+        $outBuffer = $null
+        if ($PSBoundParameters.TryGetValue('OutBuffer', [ref]$outBuffer))
+        {
+            $PSBoundParameters['OutBuffer'] = 1
+        }
+
+        $wrappedCmd = $ExecutionContext.InvokeCommand.GetCommand('Microsoft.PowerShell.Utility\Write-Output', [System.Management.Automation.CommandTypes]::Cmdlet)
+        $scriptCmd = {& $wrappedCmd @PSBoundParameters }
+
+        $steppablePipeline = $scriptCmd.GetSteppablePipeline($myInvocation.CommandOrigin)
+        $steppablePipeline.Begin($PSCmdlet)
+    } catch {
+        throw
+    }
+}
+
+process
+{
+    try {
+        $steppablePipeline.Process($_)
+    } catch {
+        throw
+    }
+}
+
+end
+{
+    try {
+        $steppablePipeline.End()
+    } catch {
+        throw
+    }
+}
+
+clean
+{
+    if ($null -ne $steppablePipeline) {
+        $steppablePipeline.Clean()
+    }
+}
+<#
+
+.ForwardHelpTargetName Microsoft.PowerShell.Utility\Write-Output
+.ForwardHelpCategory Cmdlet
+
+#>
+
+[CmdletBinding(DefaultParameterSetName='Default', HelpUri='https://go.microsoft.com/fwlink/?LinkID=2097038', RemotingCapability='None')]
+
+    [Parameter(ParameterSetName='Default')]
+    [switch]
+    ${Stable},
+
+    [switch]
+    ${Descending},
+
+    [switch]
+    ${Unique},
+
+    [Parameter(ParameterSetName='Top', Mandatory=$true)]
+    [ValidateRange(1, 2147483647)]
+    [int]
+    ${Top},
+
+    [Parameter(ParameterSetName='Bottom', Mandatory=$true)]
+    [ValidateRange(1, 2147483647)]
+    [int]
+    ${Bottom},
+
+    [Parameter(ValueFromPipeline=$true)]
+    [psobject]
+    ${InputObject},
+
+    [Parameter(Position=0)]
+    [System.Object[]]
+    ${Property},
+
+    [string]
+    ${Culture},
+
+    [switch]
+    ${CaseSensitive}
+
+    try {
+        $targetCmd = $ExecutionContext.InvokeCommand.GetCommand('Microsoft.PowerShell.Utility\Sort-Object', [System.Management.Automation.CommandTypes]::Cmdlet, $PSBoundParameters)
+        $dynamicParams = @($targetCmd.Parameters.GetEnumerator() | Microsoft.PowerShell.Core\Where-Object { $_.Value.IsDynamic })
+        if ($dynamicParams.Length -gt 0)
+        {
+            $paramDictionary = [Management.Automation.RuntimeDefinedParameterDictionary]::new()
+            foreach ($param in $dynamicParams)
+            {
+                $param = $param.Value
+
+                if(-not $MyInvocation.MyCommand.Parameters.ContainsKey($param.Name))
+                {
+                    $dynParam = [Management.Automation.RuntimeDefinedParameter]::new($param.Name, $param.ParameterType, $param.Attributes)
+                    $paramDictionary.Add($param.Name, $dynParam)
+                }
+            }
+
+            return $paramDictionary
+        }
+    } catch {
+        throw
+    }
+
+[CmdletBinding(HelpUri='https://go.microsoft.com/fwlink/?linkid=2181448')]
+
+    [Parameter(Position=0, ValueFromRemainingArguments=$true)]
+    [string[]]
+    ${WithCommand}
+
+    try {
+        $targetCmd = $ExecutionContext.InvokeCommand.GetCommand('Microsoft.PowerShell.Core\Switch-Process', [System.Management.Automation.CommandTypes]::Cmdlet, $PSBoundParameters)
+        $dynamicParams = @($targetCmd.Parameters.GetEnumerator() | Microsoft.PowerShell.Core\Where-Object { $_.Value.IsDynamic })
+        if ($dynamicParams.Length -gt 0)
+        {
+            $paramDictionary = [Management.Automation.RuntimeDefinedParameterDictionary]::new()
+            foreach ($param in $dynamicParams)
+            {
+                $param = $param.Value
+
+                if(-not $MyInvocation.MyCommand.Parameters.ContainsKey($param.Name))
+                {
+                    $dynParam = [Management.Automation.RuntimeDefinedParameter]::new($param.Name, $param.ParameterType, $param.Attributes)
+                    $paramDictionary.Add($param.Name, $dynParam)
+                }
+            }
+
+            return $paramDictionary
+        }
+    } catch {
+        throw
+    }
+
+[CmdletBinding(DefaultParameterSetName='user''s set', SupportsShouldProcess=$true, ConfirmImpact='High', PositionalBinding=$false, HelpUri='a''url', RemotingCapability='None')]
+param(
+    [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true, ValueFromRemainingArguments=$true)]
+    [psobject]
+    ${InputObject},
+
+    [Alias('one''alias','two')]
+    [switch]
+    ${NoEnumerate})
+
+begin
+{
+    try {
+        $outBuffer = $null
+        if ($PSBoundParameters.TryGetValue('OutBuffer', [ref]$outBuffer))
+        {
+            $PSBoundParameters['OutBuffer'] = 1
+        }
+
+        $wrappedCmd = $ExecutionContext.InvokeCommand.GetCommand('Microsoft.PowerShell.Utility\Write-Output', [System.Management.Automation.CommandTypes]::Cmdlet)
+        $scriptCmd = {& $wrappedCmd @PSBoundParameters }
+
+        $steppablePipeline = $scriptCmd.GetSteppablePipeline($myInvocation.CommandOrigin)
+        $steppablePipeline.Begin($PSCmdlet)
+    } catch {
+        throw
+    }
+}
+
+process
+{
+    try {
+        $steppablePipeline.Process($_)
+    } catch {
+        throw
+    }
+}
+
+end
+{
+    try {
+        $steppablePipeline.End()
+    } catch {
+        throw
+    }
+}
+
+clean
+{
+    if ($null -ne $steppablePipeline) {
+        $steppablePipeline.Clean()
+    }
+}
+<#
+custom <`# nested #`> help
+#>
+
+
+    try {
+        $outBuffer = $null
+        if ($PSBoundParameters.TryGetValue('OutBuffer', [ref]$outBuffer))
+        {
+            $PSBoundParameters['OutBuffer'] = 1
+        }
+
+        $wrappedCmd = $ExecutionContext.InvokeCommand.GetCommand('Write-Output', [System.Management.Automation.CommandTypes]::Cmdlet)
+        $scriptCmd = {& $wrappedCmd @PSBoundParameters }
+
+        $steppablePipeline = $scriptCmd.GetSteppablePipeline($myInvocation.CommandOrigin)
+        $steppablePipeline.Begin($PSCmdlet)
+    } catch {
+        throw
+    }
+
+
+    try {
+        $steppablePipeline.Process($_)
+    } catch {
+        throw
+    }
+
+
+    try {
+        $steppablePipeline.End()
+    } catch {
+        throw
+    }
+
+
+    if ($null -ne $steppablePipeline) {
+        $steppablePipeline.Clean()
+    }
+
+PSArgumentNullException
+Exception calling "GetBegin" with "1" argument(s): "Cannot process argument because the value of argument "commandMetaData" is null. Change the value of argument "commandMetaData" to a non-null value."
+MethodCountCouldNotFindBest
+Cannot find an overload for "Create" and the argument count: "0".
+[CmdletBinding(DefaultParameterSetName='user''s set', SupportsShouldProcess=$true, ConfirmImpact='High')]
+True
+[CmdletBinding(DefaultParameterSetName='__AllParameterSets')]
+0
+InvalidOperationException
+Exception calling "Create" with "1" argument(s): "The proxy command cannot be generated because the CommandMetadata has no name."
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "commandMetadata", with value: "False", for "GetEnd" to type "System.Management.Automation.CommandMetadata": "Cannot convert value "False" to type "System.Management.Automation.CommandMetadata". Error: "Invalid cast from 'System.Boolean' to 'System.Management.Automation.CommandMetadata'.""
+MethodArgumentConversionInvalidCastArgument
+Cannot convert argument "commandMetadata", with value: "System.Object[]", for "GetParamBlock" to type "System.Management.Automation.CommandMetadata": "Cannot convert the "System.Object[]" value of type "System.Object[]" to type "System.Management.Automation.CommandMetadata"."

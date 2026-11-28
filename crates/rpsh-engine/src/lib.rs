@@ -30,6 +30,7 @@ mod metadata;
 mod method_error;
 mod native;
 mod preferences;
+mod proxy_command;
 mod redirection;
 mod sorting;
 pub mod startup;
@@ -8874,6 +8875,7 @@ fn invoke_static(
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
         ("management.automation.commandmetadata", "new") => metadata::construct(arguments),
+        ("management.automation.proxycommand", _) => proxy_command::invoke(&name, arguments),
         ("object", "referenceequals")
             if let [a, b] = arguments
                 && (a.is_null_like() || b.is_null_like()) =>

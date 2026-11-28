@@ -4,7 +4,7 @@ use rpsh_commands::signature::{self, COMMON_PARAMETERS, Parameter, ParameterType
 use rpsh_runtime::{CollectionType, RuntimeError, TypedCollection, Value, ops};
 use std::path::Path;
 
-const COMMAND_METADATA: &str = "System.Management.Automation.CommandMetadata";
+pub(super) const COMMAND_METADATA: &str = "System.Management.Automation.CommandMetadata";
 const PARAMETER_METADATA: &str = "System.Management.Automation.ParameterMetadata";
 const SET_METADATA: &str = "System.Management.Automation.ParameterSetMetadata";
 const ALL: &[&str] = &["__AllParameterSets"];
@@ -112,6 +112,14 @@ fn dictionary(ty: &'static str, mut props: Vec<(String, Value)>) -> Value {
     object(&full, &display, props)
 }
 
+pub(super) fn dictionary_entries(
+    props: &[(String, Value)],
+) -> impl Iterator<Item = &(String, Value)> {
+    props
+        .iter()
+        .filter(|(k, _)| !matches!(k.as_str(), "__MetadataValueType" | "__TypeName" | "__Text"))
+}
+
 /// Metadata dictionaries can contain real keys beginning with two underscores,
 /// including the upstream __AllParameterSets sentinel.
 pub(super) fn dictionary_view(value: &Value, name: &str) -> Option<Value> {
@@ -124,9 +132,7 @@ pub(super) fn dictionary_view(value: &Value, name: &str) -> Option<Value> {
     };
     let (_, kind) = props.iter().find(|(k, _)| k == "__MetadataValueType")?;
     let set = kind.to_string() == SET_METADATA;
-    let entries = props
-        .iter()
-        .filter(|(k, _)| !matches!(k.as_str(), "__MetadataValueType" | "__TypeName" | "__Text"));
+    let entries = dictionary_entries(props);
     if name.eq_ignore_ascii_case("Count") {
         return Some(Value::Int32(entries.count() as i32));
     }
@@ -285,39 +291,65 @@ pub(super) fn command_parameters(info: &Value) -> Option<Value> {
     Some(result)
 }
 
-fn metadata(sig: &Signature, common: bool) -> Value {
+fn remoting(capability: &str) -> Value {
+    enumeration(
+        "System.Management.Automation.RemotingCapability",
+        capability,
+        i32::from(capability == "PowerShell"),
+    )
+}
+
+fn metadata(ty: &str, signature: Option<&Signature>, common: bool, qualified: bool) -> Value {
+    let wrapped = signature.map_or(Value::Null, |sig| {
+        if qualified {
+            string(&format!("{}\\{}", sig.module, sig.name))
+        } else {
+            string(sig.name)
+        }
+    });
+    let default_set = signature.map_or(Some("__AllParameterSets"), |s| s.default_set);
+    let (impact, number) = if signature.is_some() {
+        ("None", 0)
+    } else {
+        ("Medium", 2)
+    };
     object(
         COMMAND_METADATA,
         COMMAND_METADATA,
         vec![
-            ("Name".into(), string(sig.name)),
-            ("CommandType".into(), Value::Type(sig.implementation.into())),
+            (
+                "Name".into(),
+                signature.map_or(Value::Null, |s| string(s.name)),
+            ),
+            ("__WrappedCommand".into(), wrapped),
+            ("CommandType".into(), Value::Type(ty.into())),
             (
                 "DefaultParameterSetName".into(),
-                sig.default_set.map_or(Value::Null, string),
+                default_set.map_or(Value::Null, string),
             ),
             ("SupportsShouldProcess".into(), Value::Bool(false)),
             ("SupportsPaging".into(), Value::Bool(false)),
             ("PositionalBinding".into(), Value::Bool(true)),
             ("SupportsTransactions".into(), Value::Bool(false)),
-            ("HelpUri".into(), string(sig.help_uri)),
+            (
+                "HelpUri".into(),
+                string(signature.map_or("", |s| s.help_uri)),
+            ),
             (
                 "RemotingCapability".into(),
-                enumeration(
-                    "System.Management.Automation.RemotingCapability",
-                    sig.remoting_capability,
-                    if sig.remoting_capability == "PowerShell" {
-                        1
-                    } else {
-                        0
-                    },
-                ),
+                remoting(signature.map_or("PowerShell", |s| s.remoting_capability)),
             ),
             (
                 "ConfirmImpact".into(),
-                enumeration("System.Management.Automation.ConfirmImpact", "None", 0),
+                enumeration("System.Management.Automation.ConfirmImpact", impact, number),
             ),
-            ("Parameters".into(), parameters(sig, common)),
+            (
+                "Parameters".into(),
+                signature.map_or_else(
+                    || dictionary(PARAMETER_METADATA, vec![]),
+                    |s| parameters(s, common),
+                ),
+            ),
         ],
     )
 }
@@ -325,9 +357,23 @@ fn metadata(sig: &Signature, common: bool) -> Value {
 fn copy(value: &Value) -> Value {
     match value {
         Value::Object(fields) => {
-            Value::object(fields.iter().map(|(k, v)| (k.clone(), copy(v))).collect())
+            let command = hidden_type(value).as_deref() == Some(COMMAND_METADATA);
+            let fields = fields
+                .iter()
+                .map(|(name, field)| {
+                    let copied = match name.as_str() {
+                        "RemotingCapability" if command => remoting("PowerShell"),
+                        "HelpUri" if command => string(""),
+                        "PositionalBinding" if command => Value::Bool(true),
+                        _ => copy(field),
+                    };
+                    (name.clone(), copied)
+                })
+                .collect();
+            Value::object(fields)
         }
-        Value::Collection(c) => Value::collection(c.ty, c.items.items().iter().map(copy).collect()),
+        // Each copy owns its alias and attribute collections. Attribute instances are shared.
+        Value::Collection(c) => Value::collection(c.ty, c.items.items().to_vec()),
         other => other.clone(),
     }
 }
@@ -338,12 +384,17 @@ pub(super) fn construct(args: &[Value]) -> Result<Value, RuntimeError> {
         [source, common] => (source, ops::is_true(common)),
         _ => return Err(overload_error("new", args.len())),
     };
-    if source.is_null_like() && args.len() == 1 {
+    if source.is_null_like() {
+        let parameter = if args.len() == 1 {
+            "other"
+        } else {
+            "commandInfo"
+        };
         return Err(method_error::invocation(
             "PSArgumentNullException",
             ".ctor",
-            1,
-            &rpsh_messages::format("AutomationExceptions/ArgumentNull", &["other"]),
+            args.len(),
+            &rpsh_messages::format("AutomationExceptions/ArgumentNull", &[parameter]),
         ));
     }
     if let Value::String(path) = source
@@ -373,7 +424,27 @@ pub(super) fn construct(args: &[Value]) -> Result<Value, RuntimeError> {
             .iter()
             .find(|s| s.implementation.eq_ignore_ascii_case(&name))
         {
-            return Ok(metadata(sig, false));
+            return Ok(metadata(sig.implementation, Some(sig), false, false));
+        }
+        if matches!(
+            name.as_str(),
+            "System.Object"
+                | "System.String"
+                | "System.Boolean"
+                | "System.Char"
+                | "System.Int16"
+                | "System.Int32"
+                | "System.Int64"
+                | "System.UInt16"
+                | "System.UInt32"
+                | "System.UInt64"
+                | "System.Byte"
+                | "System.SByte"
+                | "System.Decimal"
+                | "System.Double"
+                | "System.Array"
+        ) {
+            return Ok(metadata(&name, None, false, false));
         }
         return Err(RuntimeError::NotImplemented {
             feature: "CommandMetadata for this CLR type",
@@ -391,7 +462,7 @@ pub(super) fn construct(args: &[Value]) -> Result<Value, RuntimeError> {
         _ => return Err(overload_error("new", args.len())),
     };
     signature::lookup(&name)
-        .map(|s| metadata(s, common))
+        .map(|s| metadata(s.implementation, Some(s), common, true))
         .ok_or(RuntimeError::NotImplemented {
             feature: "CommandMetadata for a command without a parameter declaration",
         })
