@@ -10,6 +10,7 @@ pub enum ParameterType {
     StringArray,
     ObjectArray,
     PsObject,
+    ActionPreference,
 }
 
 impl ParameterType {
@@ -21,6 +22,7 @@ impl ParameterType {
             Self::StringArray => "System.String[]",
             Self::ObjectArray => "System.Object[]",
             Self::PsObject => "System.Management.Automation.PSObject",
+            Self::ActionPreference => "System.Management.Automation.ActionPreference",
         }
     }
 
@@ -32,6 +34,7 @@ impl ParameterType {
             Self::StringArray => "string[]",
             Self::ObjectArray => "Object[]",
             Self::PsObject => "psobject",
+            Self::ActionPreference => "ActionPreference",
         }
     }
 }
@@ -43,8 +46,10 @@ pub struct Parameter {
     /// An empty slice means the declaration applies to every set.
     pub sets: &'static [&'static str],
     pub aliases: &'static [&'static str],
-    position: Option<u16>,
-    mandatory: bool,
+    pub position: Option<u16>,
+    pub mandatory: bool,
+    pub from_pipeline: bool,
+    pub remaining: bool,
 }
 
 impl Parameter {
@@ -56,6 +61,8 @@ impl Parameter {
             aliases: &[],
             position: None,
             mandatory: false,
+            from_pipeline: false,
+            remaining: false,
         }
     }
 
@@ -70,6 +77,30 @@ impl Parameter {
     const fn mandatory(mut self) -> Self {
         self.mandatory = true;
         self
+    }
+
+    const fn pipeline(mut self) -> Self {
+        self.from_pipeline = true;
+        self
+    }
+    const fn remaining(mut self) -> Self {
+        self.remaining = true;
+        self
+    }
+    const fn aliases(mut self, names: &'static [&'static str]) -> Self {
+        self.aliases = names;
+        self
+    }
+
+    pub fn is_named(&self, name: &str) -> bool {
+        self.names().any(|n| n.eq_ignore_ascii_case(name))
+    }
+    pub fn matches_prefix(&self, name: &str) -> bool {
+        !name.is_empty()
+            && self.names().any(|n| {
+                n.get(..name.len())
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(name))
+            })
     }
 
     fn names(&self) -> impl Iterator<Item = &'static str> {
@@ -113,19 +144,13 @@ impl Signature {
     }
 
     pub fn parameter(&self, name: &str) -> Option<&'static Parameter> {
-        self.parameters
-            .iter()
-            .find(|p| p.names().any(|n| n.eq_ignore_ascii_case(name)))
+        self.parameters.iter().find(|p| p.is_named(name))
     }
 
     pub fn matching<'a>(&self, name: &'a str) -> impl Iterator<Item = &'static Parameter> + 'a {
-        self.parameters.iter().filter(move |p| {
-            !name.is_empty()
-                && p.names().any(|n| {
-                    n.get(..name.len())
-                        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(name))
-                })
-        })
+        self.parameters
+            .iter()
+            .filter(move |p| p.matches_prefix(name))
     }
 
     /// Common parameters are valid in all sets. Known command parameters must
@@ -187,7 +212,7 @@ pub static SORT_OBJECT: Signature = Signature {
             .in_sets(&["Bottom"])
             .mandatory(),
         Parameter::new("Property", ObjectArray).positional(0),
-        Parameter::new("InputObject", PsObject),
+        Parameter::new("InputObject", PsObject).pipeline(),
         Parameter::new("Culture", Text),
         Parameter::new("CaseSensitive", Switch),
     ],
@@ -199,10 +224,43 @@ pub static SWITCH_PROCESS: Signature = Signature {
     remoting_capability: "PowerShell",
     sets: &["__AllParameterSets"],
     unix_only: true,
-    parameters: &[Parameter::new("WithCommand", StringArray).positional(0)],
+    parameters: &[Parameter::new("WithCommand", StringArray)
+        .positional(0)
+        .remaining()],
 };
 
-pub static SIGNATURES: &[&Signature] = &[&SORT_OBJECT, &SWITCH_PROCESS];
+pub static WRITE_OUTPUT: Signature = Signature {
+    name: "Write-Output",
+    module: "Microsoft.PowerShell.Utility",
+    remoting_capability: "None",
+    sets: &["__AllParameterSets"],
+    unix_only: false,
+    parameters: &[
+        Parameter::new("InputObject", PsObject)
+            .positional(0)
+            .mandatory()
+            .pipeline()
+            .remaining(),
+        Parameter::new("NoEnumerate", Switch),
+    ],
+};
+
+pub static COMMON_PARAMETERS: &[Parameter] = &[
+    Parameter::new("Verbose", Switch).aliases(&["vb"]),
+    Parameter::new("Debug", Switch).aliases(&["db"]),
+    Parameter::new("ErrorAction", ParameterType::ActionPreference).aliases(&["ea"]),
+    Parameter::new("WarningAction", ParameterType::ActionPreference).aliases(&["wa"]),
+    Parameter::new("InformationAction", ParameterType::ActionPreference).aliases(&["infa"]),
+    Parameter::new("ProgressAction", ParameterType::ActionPreference).aliases(&["proga"]),
+    Parameter::new("ErrorVariable", Text).aliases(&["ev"]),
+    Parameter::new("WarningVariable", Text).aliases(&["wv"]),
+    Parameter::new("InformationVariable", Text).aliases(&["iv"]),
+    Parameter::new("OutVariable", Text).aliases(&["ov"]),
+    Parameter::new("OutBuffer", Int32).aliases(&["ob"]),
+    Parameter::new("PipelineVariable", Text).aliases(&["pv"]),
+];
+
+pub static SIGNATURES: &[&Signature] = &[&SORT_OBJECT, &SWITCH_PROCESS, &WRITE_OUTPUT];
 
 pub fn lookup(name: &str) -> Option<&'static Signature> {
     SIGNATURES

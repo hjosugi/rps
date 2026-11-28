@@ -13,6 +13,7 @@
 
 mod aliases;
 mod array_list;
+mod cmdlet;
 mod command_arguments;
 mod content;
 mod encoding;
@@ -1269,7 +1270,7 @@ impl Engine {
             {
                 return self.call_definition(&call, arguments, None, out);
             }
-            if let Some(outputs) = self.invoke_builtin(name, arguments, &[])? {
+            if let Some(outputs) = self.invoke_builtin(name, arguments, None)? {
                 for value in outputs {
                     self.write_record(value, out)?;
                 }
@@ -1448,7 +1449,7 @@ impl Engine {
                         self.flush_host(out)?;
                         out.flush()?;
                     }
-                    for value in self.cmdlet_output(&name, &args, &[])? {
+                    for value in self.cmdlet_output(&name, &args, None)? {
                         self.write_record(value, out)?;
                     }
                     Ok(Flow::Normal)
@@ -1586,7 +1587,9 @@ impl Engine {
     ) -> Result<Vec<Value>, EngineError> {
         let resolved = self.discover_alias(name);
         let name = resolved.as_deref().unwrap_or(name);
-        if let Some(outputs) = self.invoke_builtin(name, arguments, input)? {
+        if let Some(outputs) =
+            self.invoke_builtin(name, arguments, has_upstream.then_some(input))?
+        {
             return Ok(outputs);
         }
         let destination = output.map_or(NativeOutput::Objects, NativeOutput::Redirected);
@@ -1597,10 +1600,10 @@ impl Engine {
         &mut self,
         name: &str,
         arguments: &PreparedArguments<'_>,
-        input: &[Value],
+        pipeline: Option<&[Value]>,
     ) -> Result<Option<Vec<Value>>, EngineError> {
         let outer_errors = std::mem::take(&mut self.cmdlet_has_errors);
-        let result = self.run_builtin(name, arguments, input);
+        let result = self.run_builtin(name, arguments, pipeline);
         let had_errors = std::mem::replace(&mut self.cmdlet_has_errors, outer_errors);
         let outputs = result?;
         if outputs.is_some() {
@@ -1615,7 +1618,7 @@ impl Engine {
         &mut self,
         name: &str,
         arguments: &PreparedArguments<'_>,
-        input: &[Value],
+        pipeline: Option<&[Value]>,
     ) -> Result<Option<Vec<Value>>, EngineError> {
         Stage::Cmdlets.enter();
         let lower = command_name(name).to_ascii_lowercase();
@@ -1628,6 +1631,10 @@ impl Engine {
             }
             self.import_builtin(module);
         }
+        if let Some(entry) = rpsh_commands::framework::Registration::lookup(&lower) {
+            return self.run_registered(entry, arguments, pipeline).map(Some);
+        }
+        let input = pipeline.unwrap_or_default();
         match lower.as_str() {
             #[cfg(unix)]
             "switch-process" => {
@@ -1658,7 +1665,7 @@ impl Engine {
                 }
                 Ok(Some(outputs))
             }
-            "write-output" | "write-warning" | "write-information" | "write-error" => {
+            "write-warning" | "write-information" | "write-error" => {
                 let (positional, named) = self.evaluate_arguments(arguments)?;
                 if lower == "write-error" {
                     let action = named
@@ -1688,15 +1695,10 @@ impl Engine {
                         .filter(|(name, _)| name.eq_ignore_ascii_case("inputobject"))
                         .map(|(_, value)| value.clone()),
                 );
-                if values.is_empty() && lower == "write-output" {
-                    values.extend_from_slice(input);
-                }
                 let mut outputs = Vec::new();
                 for value in values {
                     if no_enumerate {
                         outputs.push(value);
-                    } else if lower == "write-output" {
-                        outputs.extend(input::pipeline_values(value)?);
                     } else {
                         outputs.extend(flatten_value(value));
                     }
@@ -2301,7 +2303,7 @@ impl Engine {
                                 let result = self
                                     .set_drive_function(&name, value, op, &named)
                                     .map(|f| f.filter(|_| passthru).map(FunctionDef::info));
-                                output.extend(self.provider_result(result, &named)?.flatten());
+                                output.extend(self.cmdlet_result(result, &named)?.flatten());
                             }
                         }
                         continue;
@@ -2351,7 +2353,7 @@ impl Engine {
                     };
                     for name in self.function_names(name, literal) {
                         let result = self.clear_drive_function(&name, op, &named);
-                        self.provider_result(result, &named)?;
+                        self.cmdlet_result(result, &named)?;
                     }
                 }
                 Ok(Some(Vec::new()))
@@ -2628,7 +2630,7 @@ impl Engine {
                         let result = self
                             .set_drive_function(name, value, op, &named)
                             .map(|f| f.map(FunctionDef::info));
-                        output.extend(self.provider_result(result, &named)?.flatten());
+                        output.extend(self.cmdlet_result(result, &named)?.flatten());
                     }
                     return Ok(Some(output));
                 }
@@ -2860,7 +2862,7 @@ impl Engine {
                                         ProviderCommand::RemoveItem,
                                         &named,
                                     );
-                                    self.provider_result(result, &named)?;
+                                    self.cmdlet_result(result, &named)?;
                                 }
                                 continue;
                             }
@@ -3358,7 +3360,7 @@ impl Engine {
                         let literal = function_drive::option(&named, &["LiteralPath"]).is_some();
                         for name in self.function_names(name, literal) {
                             let result = self.clear_drive_function(&name, op, &named);
-                            self.provider_result(result, &named)?;
+                            self.cmdlet_result(result, &named)?;
                         }
                         continue;
                     }
@@ -3446,7 +3448,7 @@ impl Engine {
                                 continue;
                             }
                             let result = Err::<(), _>(op.unsupported_content());
-                            self.provider_result(result, &named)?;
+                            self.cmdlet_result(result, &named)?;
                         }
                         continue;
                     }
@@ -3544,7 +3546,7 @@ impl Engine {
                             self.function_names(function_drive::name(path).unwrap(), literal)
                         {
                             let result = self.read_drive_function(&name, &named);
-                            output.extend(self.provider_result(result, &named)?.flatten());
+                            output.extend(self.cmdlet_result(result, &named)?.flatten());
                         }
                     }
                 }
@@ -3816,7 +3818,7 @@ impl Engine {
                         for name in &names {
                             let result =
                                 self.set_drive_function(name, value, op, &named).map(|_| ());
-                            if self.provider_result(result, &named)?.is_some() && passthru {
+                            if self.cmdlet_result(result, &named)?.is_some() && passthru {
                                 output.push(Value::array(values.to_vec()));
                             }
                         }

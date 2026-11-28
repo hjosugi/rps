@@ -20,6 +20,9 @@ dependencies = [
 [[package]]
 name = "rpsh-commands"
 version = "0.0.347"
+dependencies = [
+ "rpsh-runtime",
+]
 
 [[package]]
 name = "rpsh-dotnet"

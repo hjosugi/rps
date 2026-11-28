@@ -28,6 +28,7 @@ cmdlets/providers
 cmdlets/remove-glob
 cmdlets/write-input
 cmdlets/write-output
+cmdlets/write-output-binding
 contract/collection-order
 contract/console
 contract/culture

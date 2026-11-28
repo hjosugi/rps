@@ -248,7 +248,7 @@ Microsoft.PowerShell.Utility	Write-Debug	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Write-Error	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Write-Host	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Write-Information	Cmdlet	linux-x64	todo
-Microsoft.PowerShell.Utility	Write-Output	Cmdlet	linux-x64	todo
+Microsoft.PowerShell.Utility	Write-Output	Cmdlet	linux-x64	partial
 Microsoft.PowerShell.Utility	Write-Progress	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Write-Verbose	Cmdlet	linux-x64	todo
 Microsoft.PowerShell.Utility	Write-Warning	Cmdlet	linux-x64	todo

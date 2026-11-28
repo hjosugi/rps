@@ -495,7 +495,7 @@ impl Engine {
                 self.run_command(name, arguments, &input, has_upstream, output)
             }
             StageCommand::Call(CallTarget::Cmdlet(name), arguments) => {
-                self.cmdlet_output(name, arguments, &input)
+                self.cmdlet_output(name, arguments, has_upstream.then_some(input.as_slice()))
             }
             StageCommand::Call(CallTarget::Block(function), arguments) => {
                 self.function_output(function, arguments, has_upstream.then_some(input))
@@ -507,7 +507,7 @@ impl Engine {
         &mut self,
         name: &str,
         arguments: &PreparedArguments<'_>,
-        input: &[Value],
+        input: Option<&[Value]>,
     ) -> Result<Vec<Value>, EngineError> {
         self.invoke_builtin(name, arguments, input)?.ok_or_else(|| {
             RuntimeError::NotImplemented {

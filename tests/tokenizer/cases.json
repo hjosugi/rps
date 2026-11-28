@@ -254,5 +254,9 @@
   {
     "name": "array-subexpression-command-parameters",
     "source": "@(Get-Content Function:Get-Value -TotalCount 0).Count"
+  },
+  {
+    "name": "parameters-after-command-hashtable",
+    "source": "Write-Output -- @{x=5} -No 1 -No:0"
   }
 ]

@@ -401,11 +401,14 @@ impl Tokenizer<'_> {
             self.command_after_paren.push(argument);
         }
         if matches!(kind, FullTokenKind::LCurly | FullTokenKind::AtCurly) {
+            let invoked_block = self.tokens.last().is_some_and(|token| {
+                matches!(token.kind, FullTokenKind::Ampersand | FullTokenKind::Dot)
+            });
+            let table_argument = kind == FullTokenKind::AtCurly
+                && self.mode == Mode::Command
+                && !self.statement_start;
             self.command_after_brace
-                .push(self.tokens.last().is_some_and(|token| {
-                    matches!(token.kind, FullTokenKind::Ampersand | FullTokenKind::Dot)
-                        && self.command_seen
-                }));
+                .push(self.command_seen && (invoked_block || table_argument));
         }
         if matches!(
             kind,

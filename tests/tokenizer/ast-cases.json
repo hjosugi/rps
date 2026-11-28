@@ -74,5 +74,6 @@
   {"name":"end-as-command","source":"{begin { end 1 }}"},
   {"name":"global-function-definition","source":"function global:Show-Name($Name) { $Name }"},
   {"name":"private-filter-definition","source":"filter private:Keep-Value { $_ }"},
-  {"name":"mixedcase-script-function","source":"function sCrIpT:Get-Value { end {42} }"}
+  {"name":"mixedcase-script-function","source":"function sCrIpT:Get-Value { end {42} }"},
+  {"name":"parameters-after-command-hashtable","source":"Write-Output -- @{x=5} -No 1 -No:0"}
 ]

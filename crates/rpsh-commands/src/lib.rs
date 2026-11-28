@@ -22,6 +22,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod framework;
 pub mod signature;
 
 /// Exports of a built-in PowerShell module, available before it is loaded.

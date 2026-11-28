@@ -311,30 +311,17 @@ impl FunctionDef {
 }
 
 pub(super) fn common_binding(lower: &str) -> Option<ArgumentBinding> {
-    match lower {
-        "verbose" | "vb" | "debug" | "db" => Some(ArgumentBinding::Switch),
-        "erroraction"
-        | "ea"
-        | "errorvariable"
-        | "ev"
-        | "warningaction"
-        | "wa"
-        | "warningvariable"
-        | "wv"
-        | "informationaction"
-        | "infa"
-        | "informationvariable"
-        | "iv"
-        | "progressaction"
-        | "proga"
-        | "outvariable"
-        | "ov"
-        | "outbuffer"
-        | "ob"
-        | "pipelinevariable"
-        | "pv" => Some(ArgumentBinding::Named),
-        _ => None,
-    }
+    use rpsh_commands::signature::{COMMON_PARAMETERS, ParameterType};
+    COMMON_PARAMETERS
+        .iter()
+        .find(|p| p.is_named(lower))
+        .map(|p| {
+            if p.ty == ParameterType::Switch {
+                ArgumentBinding::Switch
+            } else {
+                ArgumentBinding::Named
+            }
+        })
 }
 
 pub(super) fn declared_info(name: &str, kind: &str) -> Option<Value> {

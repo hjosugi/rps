@@ -1,0 +1,72 @@
+rpsh-golden-v2
+exit=0
+
+Write-Output [-InputObject] <psobject> [-NoEnumerate] [<CommonParameters>]
+
+echo (alias) -> Write-Output
+
+echo [-InputObject] <psobject> [-NoEnumerate] [<CommonParameters>]
+
+List`1:4:1:7
+List`1:8:7,8,9,10,11
+Int32
+True
+System.Object[] 2
+Object[] [1,2]
+Object[] [3,4]
+null record True
+List`1:1:True
+null switch List`1
+Int32 1
+Int32 2
+Int32 3
+0
+1
+0
+7
+8
+-No
+-Odd:,9
+MissingArgument,Microsoft.PowerShell.Commands.WriteOutputCommand
+Missing an argument for parameter 'InputObject'. Specify a parameter of type 'System.Management.Automation.PSObject' and try again.
+CannotConvertArgument,Microsoft.PowerShell.Commands.WriteOutputCommand
+Cannot convert 'System.String' to the type 'System.Management.Automation.SwitchParameter' required by parameter 'NoEnumerate'. 
+PositionalParameterNotFound,Microsoft.PowerShell.Commands.WriteOutputCommand
+A positional parameter cannot be found that accepts argument 'x'.
+ParameterAlreadyBound,Microsoft.PowerShell.Commands.WriteOutputCommand
+Cannot bind parameter because parameter 'InputObject' is specified more than once. To provide multiple values to parameters that can accept multiple values, use the array syntax. For example, "-parameter value1,value2,value3".
+AmbiguousParameter,Microsoft.PowerShell.Commands.WriteOutputCommand
+Parameter cannot be processed because the parameter name 'Inf' is ambiguous. Possible matches include: -InformationAction -InformationVariable.
+InputObjectNotBound,Microsoft.PowerShell.Commands.WriteOutputCommand
+
+Category   : InvalidArgument
+Activity   : Write-Output
+Reason     : ParameterBindingException
+TargetName : 1
+TargetType : Int32
+
+1
+False 2 2
+False 0
+ParameterAlreadyBound,Microsoft.PowerShell.Commands.WriteOutputCommand
+Cannot bind parameter because parameter 'No' is specified more than once. To provide multiple values to parameters that can accept multiple values, use the array syntax. For example, "-parameter value1,value2,value3".
+PositionalParameterNotFound,Microsoft.PowerShell.Commands.WriteOutputCommand
+A positional parameter cannot be found that accepts argument 'System.Object[]'.
+NamedParameterNotFound,Microsoft.PowerShell.Commands.WriteOutputCommand
+A parameter cannot be found that matches parameter name 'Odd'.
+Hashtable:System.Collections.Hashtable
+String:-No
+Int32:1
+String:-No:
+Int32:0
+ArrayList:first,1,2
+True:4:List`1
+ArrayList:0
+ArrayList:2:1
+ActionPreferenceStopException
+The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: The input object cannot be bound to any parameters for the command either because the command does not take pipeline input or the input and its properties do not match any of the parameters that take pipeline input.
+0
+ParameterArgumentValidationError,Microsoft.PowerShell.Commands.WriteOutputCommand
+Cannot validate argument on parameter 'OutVariable'. Cannot validate argument 'env:INVALID' because it is not a valid variable name.
+ParameterArgumentValidationError,Microsoft.PowerShell.Commands.WriteOutputCommand
+True

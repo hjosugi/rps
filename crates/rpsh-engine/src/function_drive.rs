@@ -5,7 +5,6 @@ use super::{
     errors::record_with_exception, functions,
 };
 use rpsh_runtime::{RuntimeError, Value, ops};
-use std::io::{self, Write as _};
 
 pub(super) fn name(path: &str) -> Option<&str> {
     let (drive, name) = path.split_once(':')?;
@@ -328,7 +327,7 @@ impl Engine {
                     "ParameterBinderStrings/InputObjectNotBound",
                     &[],
                 ));
-                self.provider_result(result, named)?;
+                self.cmdlet_result(result, named)?;
             }
             return Ok(&[]);
         }
@@ -483,35 +482,5 @@ impl Engine {
         } else {
             Ok(Some(Value::array(vec![value])))
         }
-    }
-
-    pub(super) fn provider_result<T>(
-        &mut self,
-        result: Result<T, EngineError>,
-        named: &[(String, Value)],
-    ) -> Result<Option<T>, EngineError> {
-        let error = match result {
-            Ok(value) => return Ok(Some(value)),
-            Err(EngineError::Script(error)) => error,
-            Err(other) => return Err(other),
-        };
-        let action = option(named, &["ErrorAction", "ea"])
-            .or_else(|| self.variables.get("ErrorActionPreference"))
-            .map_or_else(|| "continue".into(), |v| v.to_string().to_ascii_lowercase());
-        self.cmdlet_has_errors = true;
-        match action.as_str() {
-            "stop" => return Err(EngineError::Script(error)),
-            "ignore" => return Ok(None),
-            "silentlycontinue" => {}
-            "continue" => writeln!(io::stderr().lock(), "{error}")?,
-            _ => {
-                return Err(RuntimeError::NotImplemented {
-                    feature: "this ErrorAction for a provider error",
-                }
-                .into());
-            }
-        }
-        self.remember_error(error.record());
-        Ok(None)
     }
 }

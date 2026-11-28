@@ -1790,8 +1790,8 @@ Write-Host	Object	System.Object	*	Msg,Message	linux-x64	todo
 Write-Host	Separator	System.Object	*		linux-x64	todo
 Write-Information	MessageData	System.Object	*	Msg,Message	linux-x64	todo
 Write-Information	Tags	System.String[]	*		linux-x64	todo
-Write-Output	InputObject	System.Management.Automation.PSObject	*		linux-x64	todo
-Write-Output	NoEnumerate	System.Management.Automation.SwitchParameter	*		linux-x64	todo
+Write-Output	InputObject	System.Management.Automation.PSObject	*		linux-x64	done
+Write-Output	NoEnumerate	System.Management.Automation.SwitchParameter	*		linux-x64	done
 Write-Progress	Activity	System.String	*		linux-x64	todo
 Write-Progress	Completed	System.Management.Automation.SwitchParameter	*		linux-x64	todo
 Write-Progress	CurrentOperation	System.String	*		linux-x64	todo
