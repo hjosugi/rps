@@ -1,0 +1,27 @@
+rpsh-golden-v2
+exit=0
+IgnoreCase, CultureInvariant
+System.Management.Automation.WildcardOptions
+6
+7
+=>
+a*?=>a%_
+%_x=>[%][_]x
+`[`]=>[[]]
+[[]=>[[]
+file[0-9].txt=>file[0-9].txt
+[Z-_]=>[Z-_]
+a`=>a`
+`=>
+`*=>*
+[]]=>PSInvalidCastException
+[-]=>PSInvalidCastException
+[^-_]=>PSInvalidCastException
+[=>WildcardPatternException
+[z-a]=>WildcardPatternException
+System.Management.Automation.WildcardPattern
+System.Management.Automation.WildcardPattern
+test
+MethodArgumentConversionInvalidCastArgument
+MethodCountCouldNotFindBest
+PSArgumentNullException

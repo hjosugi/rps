@@ -7,7 +7,8 @@ fn wildcard_character(unit: u16) -> bool {
     matches!(unit, 0x2a | 0x3f | 0x5b | 0x5d)
 }
 
-fn required(pattern: Option<&PsString>) -> Result<&PsString, RuntimeError> {
+/// Direct API calls reject a null pattern.
+pub fn require_pattern(pattern: Option<&PsString>) -> Result<&PsString, RuntimeError> {
     pattern.ok_or_else(|| RuntimeError::Script {
         id: "PSArgumentNullException",
         category: "InvalidArgument: (:) [], PSArgumentNullException".into(),
@@ -19,7 +20,7 @@ fn required(pattern: Option<&PsString>) -> Result<&PsString, RuntimeError> {
 /// Protect unescaped metacharacters, including the escape character itself.
 /// The internal overload allows callers to leave specific characters alone.
 pub fn escape(pattern: Option<&PsString>, except: &[u16]) -> Result<PsString, RuntimeError> {
-    let pattern = required(pattern)?;
+    let pattern = require_pattern(pattern)?;
     let should_escape =
         |unit| (unit == ESCAPE || wildcard_character(unit)) && !except.contains(&unit);
     if !pattern.units().any(should_escape) {
@@ -37,7 +38,7 @@ pub fn escape(pattern: Option<&PsString>, except: &[u16]) -> Result<PsString, Ru
 
 /// A backtick before an ordinary character or at the end stays literal.
 pub fn unescape(pattern: Option<&PsString>) -> Result<PsString, RuntimeError> {
-    let pattern = required(pattern)?;
+    let pattern = require_pattern(pattern)?;
     if !pattern.units().any(|unit| unit == ESCAPE) {
         return Ok(pattern.clone());
     }
@@ -66,6 +67,121 @@ pub fn contains_wildcard_characters(units: impl IntoIterator<Item = u16>) -> boo
         }
     }
     false
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Atom {
+    Any,
+    Star,
+    Literal(u16),
+    Class(Vec<ClassMember>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClassMember {
+    Literal(u16),
+    Range(u16, u16),
+}
+
+fn invalid_pattern(pattern: &PsString) -> RuntimeError {
+    RuntimeError::Script {
+        id: "WildcardPatternException",
+        category: "InvalidArgument: (:) [], WildcardPatternException".into(),
+        exception_type: "System.Management.Automation.WildcardPatternException",
+        message: format!("The specified wildcard character pattern is not valid: {pattern}"),
+    }
+}
+
+fn parse_class(
+    units: &mut impl Iterator<Item = u16>,
+    pattern: &PsString,
+) -> Result<Atom, RuntimeError> {
+    // A right bracket immediately following the opening one is a member.
+    // A quoted dash must survive as a literal even in the middle of a class.
+    let mut contents = Vec::new();
+    loop {
+        let unit = units.next().ok_or_else(|| invalid_pattern(pattern))?;
+        match unit {
+            0x5d if !contents.is_empty() => break,
+            ESCAPE => contents.push((units.next().ok_or_else(|| invalid_pattern(pattern))?, false)),
+            _ => contents.push((unit, unit == 0x2d)),
+        }
+    }
+    let mut rest = contents.as_slice();
+    let mut members = Vec::new();
+    while let Some((&(first, _), tail)) = rest.split_first() {
+        if let [(_, true), (last, _), remaining @ ..] = tail {
+            if first > *last {
+                return Err(invalid_pattern(pattern));
+            }
+            members.push(ClassMember::Range(first, *last));
+            rest = remaining;
+        } else {
+            members.push(ClassMember::Literal(first));
+            rest = tail;
+        }
+    }
+    Ok(Atom::Class(members))
+}
+
+fn parse_atoms(pattern: &PsString) -> Result<Vec<Atom>, RuntimeError> {
+    let mut units = pattern.units();
+    let mut atoms = Vec::new();
+    while let Some(unit) = units.next() {
+        let atom = match unit {
+            0x2a => Atom::Star,
+            0x3f => Atom::Any,
+            0x5b => parse_class(&mut units, pattern)?,
+            ESCAPE => match units.next() {
+                Some(quoted) => Atom::Literal(quoted),
+                None if atoms.is_empty() => break, // Upstream matches a lone backtick to the empty string.
+                None => Atom::Literal(ESCAPE),
+            },
+            literal => Atom::Literal(literal),
+        };
+        atoms.push(atom);
+    }
+    Ok(atoms)
+}
+
+/// Translate PowerShell wildcard tokens to the operand of WQL LIKE.
+/// A class whose exact bounds WQL cannot represent requires client-side filtering.
+pub fn to_wql(pattern: &PsString) -> Result<PsString, RuntimeError> {
+    let unsupported = || RuntimeError::Script {
+        id: "PSInvalidCastException",
+        category: "InvalidArgument: (:) [], PSInvalidCastException".into(),
+        exception_type: "System.Management.Automation.PSInvalidCastException",
+        message: format!(
+            "Cannot convert the \"{pattern}\" value of type \"System.Management.Automation.WildcardPattern\" to type \"WQL\"."
+        ),
+    };
+    let reserved_bound = |unit| matches!(unit, 0x2d | 0x5b..=0x5e);
+    let mut result = Vec::new();
+    for atom in parse_atoms(pattern)? {
+        match atom {
+            Atom::Star => result.push(0x25),
+            Atom::Any => result.push(0x5f),
+            Atom::Literal(unit @ (0x25 | 0x5f | 0x5b)) => result.extend([0x5b, unit, 0x5d]),
+            Atom::Literal(unit) => result.push(unit),
+            Atom::Class(members) => {
+                result.push(0x5b);
+                for member in members {
+                    match member {
+                        ClassMember::Literal(0x2d | 0x5c..=0x5e) => return Err(unsupported()),
+                        ClassMember::Literal(unit) => result.push(unit),
+                        ClassMember::Range(first, last) => {
+                            if reserved_bound(first) || reserved_bound(last) {
+                                return Err(unsupported());
+                            }
+                            result.extend([first, 0x2d, last]);
+                        }
+                    }
+                }
+                result.push(0x5d);
+            }
+        }
+    }
+    Ok(PsString::from_units(result))
 }
 
 // Cases ported from PowerShell v7.7.0 test/xUnit/csharp/test_WildcardPattern.cs,

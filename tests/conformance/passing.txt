@@ -108,6 +108,7 @@ native/unix-command-names
 ops/comparison
 ops/ternary-coalesce
 ops/wildcard-escape
+ops/wildcard-wql
 pipeline/command-aliases
 pipeline/compare-object
 pipeline/csv

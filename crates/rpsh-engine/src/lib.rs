@@ -15,6 +15,7 @@ mod aliases;
 mod encoding;
 mod native;
 mod redirection;
+mod wildcards;
 
 use aliases::Aliases;
 use encoding::Encoding;
@@ -6640,9 +6641,9 @@ fn evaluate(
                     .map(|value| Value::Bool(!matches!(value, Value::Bool(true)))),
                 BinaryOp::Shl => ops::shift(&left, &right, true),
                 BinaryOp::Shr => ops::shift(&left, &right, false),
-                BinaryOp::Band => ops::bitwise(&left, &right, "band"),
-                BinaryOp::Bor => ops::bitwise(&left, &right, "bor"),
-                BinaryOp::Bxor => ops::bitwise(&left, &right, "bxor"),
+                BinaryOp::Band => bitwise_values(&left, &right, "band"),
+                BinaryOp::Bor => bitwise_values(&left, &right, "bor"),
+                BinaryOp::Bxor => bitwise_values(&left, &right, "bxor"),
                 BinaryOp::And => ops::logical(&left, &right, "and"),
                 BinaryOp::Or => ops::logical(&left, &right, "or"),
                 BinaryOp::Xor => ops::logical(&left, &right, "xor"),
@@ -8400,6 +8401,21 @@ fn lookup(name: &str, variables: &HashMap<String, Value>, last_success: bool) ->
     automatic_variable(key)
 }
 
+fn bitwise_values(left: &Value, right: &Value, op: &str) -> Result<Value, RuntimeError> {
+    if let Some(bits) = wildcards::typed_options(left) {
+        let right = wildcards::typed_options(right).map_or_else(|| convert_int32(right), Ok)?;
+        let result = ops::bitwise(&Value::Int32(bits), &Value::Int32(right), op)?;
+        if let Value::Int32(bits) = result {
+            return Ok(wildcards::options_value(bits));
+        }
+        return Ok(result);
+    }
+    if let Some(bits) = wildcards::typed_options(right) {
+        return ops::bitwise(left, &Value::Int32(bits), op);
+    }
+    ops::bitwise(left, right, op)
+}
+
 fn typed_scalar(type_name: &str, text: &str) -> Value {
     Value::object(vec![
         (
@@ -9018,6 +9034,7 @@ fn static_member(
             "System.Management.Automation.Language.NullString",
             "",
         )),
+        ("management.automation.wildcardoptions", name) => wildcards::option_member(name),
         ("console", "outputencoding") => Ok(encoding::console().value()),
         ("text.encoding", name) => {
             Encoding::property(name)
@@ -9061,49 +9078,8 @@ fn invoke_static(type_name: &str, name: &str, arguments: &[Value]) -> Result<Val
     let kind = normalize_type(type_name);
     let name = name.to_ascii_lowercase();
     match (kind.as_str(), name.as_str()) {
-        (
-            "wildcardpattern" | "management.automation.wildcardpattern",
-            method @ ("escape" | "unescape" | "containswildcardcharacters"),
-        ) if arguments.len() == 1 => {
-            let converted = match &arguments[0] {
-                Value::String(text) => Some(text.clone()),
-                value
-                    if hidden_type(value).as_deref()
-                        == Some("System.Management.Automation.Language.NullString") =>
-                {
-                    None
-                }
-                value => Some(PsString::from(value.to_string())),
-            };
-            let pattern = converted.as_ref();
-            let result = match method {
-                "escape" => rpsh_runtime::wildcard::escape(pattern, &[]),
-                "unescape" => rpsh_runtime::wildcard::unescape(pattern),
-                _ => {
-                    return Ok(Value::Bool(pattern.is_some_and(|pattern| {
-                        rpsh_runtime::wildcard::contains_wildcard_characters(pattern.units())
-                    })));
-                }
-            };
-            result.map(Value::String).map_err(|err| {
-                let Some(source) = err.script() else {
-                    return err;
-                };
-                let name = if method == "escape" {
-                    "Escape"
-                } else {
-                    "Unescape"
-                };
-                RuntimeError::Script {
-                    id: "PSArgumentNullException",
-                    category: "NotSpecified: (:) [], MethodInvocationException".into(),
-                    exception_type: "System.Management.Automation.MethodInvocationException",
-                    message: format!(
-                        "Exception calling \"{name}\" with \"1\" argument(s): \"{}\"",
-                        source.message
-                    ),
-                }
-            })
+        ("wildcardpattern" | "management.automation.wildcardpattern", method) => {
+            wildcards::static_method(method, arguments)
         }
         ("text.encoding", "getencoding") if arguments.len() == 1 => {
             Encoding::by_name(&arguments[0]).map(Encoding::value).ok_or(
@@ -10249,6 +10225,9 @@ fn object_method(
     name: &str,
     arguments: &[Value],
 ) -> Result<Value, RuntimeError> {
+    if let Some(result) = wildcards::pattern_method(entries, name, arguments) {
+        return result;
+    }
     if let Some(encoding) = Encoding::from_entries(entries) {
         match (name.to_ascii_lowercase().as_str(), arguments) {
             ("getpreamble", []) => {
