@@ -38,6 +38,16 @@ jobs:
           python3 scripts/ast-diff.py
       - name: Native terminal streams and error prompts match PowerShell
         run: cargo harness conform pty check --filter native-
+      - name: Compare Linux commands with PowerShell
+        run: python3 scripts/native-matrix.py --report native-compatibility.md
+      - name: Publish Linux command results
+        if: ${{ always() && hashFiles('native-compatibility.md') != '' }}
+        run: cat native-compatibility.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ always() && hashFiles('native-compatibility.md') != '' }}
+        with:
+          name: linux-native-compatibility
+          path: native-compatibility.md
       - run: cargo harness bench --filter startup --budget-scale 2 --out startup-result.json | tee -a "$GITHUB_STEP_SUMMARY"
 
   benchmark:

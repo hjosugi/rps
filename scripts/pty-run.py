@@ -124,6 +124,10 @@ class Screen:
         private = body.startswith("?")
         if private:
             body = body[1:]
+        # Device queries, modified-key requests and SGR subparameters do not
+        # change any cursor or screen state modeled here.
+        if any(char not in "0123456789;" for char in body):
+            return
         values = [int(value) if value else 0 for value in body.split(";")] if body else []
         first = values[0] if values else 1
         if final in "Hf":

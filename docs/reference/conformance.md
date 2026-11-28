@@ -39,6 +39,20 @@ $ cargo harness conform check --bless           # add passing cases to the ratch
 `record` runs each case three times and refuses a case whose runs disagree.
 `check` never invokes `pwsh`; it compares against the committed goldens.
 
+## Linux command compatibility
+
+The Performance workflow runs installed Linux programs through both shells and
+publishes a per-scenario table in the job summary and the
+`linux-native-compatibility` artifact. Each row checks the reference result
+and compares stdout, stderr and exit status. Interactive cases also compare the
+final terminal screen. Missing programs appear as skips.
+
+```console
+$ scripts/fetch-pwsh.sh
+$ cargo build --release -p rpsh-cli
+$ python3 scripts/native-matrix.py --report native-compatibility.md
+```
+
 ## Rules
 
 - Output must be deterministic. No clock, `$PID`, temporary absolute paths or
