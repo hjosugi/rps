@@ -1132,6 +1132,18 @@ impl Parser<'_> {
         let open = self.peek().span;
         self.pos += 1;
         let mut block = self.script_contents(open, true)?;
+        let close = self.previous_span();
+        let body = &self.source[open.end as usize..close.start as usize];
+        let definition = if parameters.is_empty() {
+            body.to_owned()
+        } else {
+            let header = parameters
+                .iter()
+                .map(|parameter| parameter.span.text(self.source))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("param({header})\n{body}")
+        };
         if let Some(Statement::Param {
             parameters: inner, ..
         }) = block.statements.first_mut()
@@ -1144,6 +1156,7 @@ impl Parser<'_> {
             name,
             parameters,
             block: Box::new(block),
+            definition,
             filter,
             span,
         })
@@ -1160,6 +1173,7 @@ impl Parser<'_> {
         }
         loop {
             self.skip_newlines();
+            let start = self.peek().span;
             let type_name = if self.peek().kind == TokenKind::LBracket {
                 Some(self.exception_type()?)
             } else {
@@ -1182,6 +1196,7 @@ impl Parser<'_> {
                 None
             };
             parameters.push(Parameter {
+                span: start.to(self.previous_span()),
                 name,
                 type_name,
                 default,

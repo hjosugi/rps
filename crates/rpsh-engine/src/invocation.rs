@@ -125,9 +125,11 @@ impl FunctionDef {
         };
         Self {
             name: String::new(),
-            definition: None,
+            source: "".into(),
+            live_source: Default::default(),
+            private: false,
             parameters,
-            block: std::rc::Rc::new(block),
+            block: std::rc::Rc::new(block.into()),
             filter: false,
         }
     }
@@ -166,7 +168,7 @@ impl Engine {
         let caller = std::mem::replace(&mut self.variables, local);
         let caller_trap = self.trap.take();
         let aliases = child.then(|| {
-            self.functions.enter_scope();
+            self.functions.enter_scope(call.path.is_some());
             self.aliases.clone()
         });
         let flow = self.execute_definition_body(function, input, out);
@@ -202,11 +204,12 @@ impl Engine {
         input: Option<Vec<Value>>,
         out: &mut dyn std::io::Write,
     ) -> Result<Flow, EngineError> {
-        if !function.filter && function.block.named_blocks.is_empty() {
+        let block = function.syntax()?;
+        if !function.filter && block.named_blocks.is_empty() {
             self.bind_input(input.unwrap_or_default());
-            return self.exec_block(&function.block.statements, out);
+            return self.exec_block(&block.statements, out);
         }
-        self.execute_named_blocks(&function.block, function.filter, input.map(Into::into), out)
+        self.execute_named_blocks(block, function.filter, input.map(Into::into), out)
     }
 
     pub(super) fn execute_named_blocks(
@@ -408,8 +411,16 @@ impl Engine {
             Some(super::functions::CMDLET) => {
                 return Ok(CallTarget::Cmdlet(member(&value, "Name")?.to_string()));
             }
-            Some(super::functions::FUNCTION) => {
-                let function = self.function(&member(&value, "Name")?.to_string())?;
+            Some(kind @ (super::functions::FUNCTION | super::functions::FILTER)) => {
+                let name = member(&value, "Name")?.to_string();
+                let mut function =
+                    if let Value::ScriptBlock(source) = member(&value, "ScriptBlock")? {
+                        FunctionDef::from_script_block(parse(&source.to_string_lossy())?)
+                    } else {
+                        self.function(&name)?
+                    };
+                function.name = name;
+                function.filter = kind == super::functions::FILTER;
                 return Ok(CallTarget::Block(Box::new(ScriptCall::new(
                     function, operator,
                 ))));

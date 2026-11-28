@@ -1,0 +1,14 @@
+rpsh-golden-v2
+exit=0
+Read-Header|Function|None|Public
+def=<param([int]$N, $Tag='x')
+ "$N/$Tag" >
+4/x
+new=< param($Label) "new/$Label" >
+new/after removal
+outer
+inner
+Add-Tag/Filter/FilterInfo
+f=a
+f=b
+ "f=$_" 

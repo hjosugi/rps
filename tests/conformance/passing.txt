@@ -74,7 +74,9 @@ lang/fixtures/invocation-file with spaces
 lang/format-operator
 lang/function
 lang/function-basic
+lang/function-info
 lang/function-input
+lang/function-scopes
 lang/get-command
 lang/get-date
 lang/hashtable

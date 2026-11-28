@@ -127,6 +127,7 @@ pub enum Statement {
         name: String,
         parameters: Vec<Parameter>,
         block: Box<ScriptBlockAst>,
+        definition: String,
         filter: bool,
         span: Span,
     },
@@ -395,6 +396,7 @@ pub enum ChainOperator {
 /// A declared parameter. Upstream: `ParameterAst`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parameter {
+    pub span: Span,
     pub name: String,
     pub type_name: Option<String>,
     pub default: Option<Expr>,

@@ -254,9 +254,11 @@ enum ArgumentBinding {
 #[derive(Debug, Clone)]
 struct FunctionDef {
     name: String,
-    definition: Option<&'static str>,
+    source: std::rc::Rc<str>,
+    live_source: std::cell::OnceCell<rpsh_runtime::ArrayList>,
     parameters: Vec<Parameter>,
-    block: std::rc::Rc<ScriptBlockAst>,
+    block: std::rc::Rc<std::cell::OnceCell<ScriptBlockAst>>,
+    private: bool,
     filter: bool,
 }
 
@@ -764,19 +766,19 @@ impl Engine {
                 name,
                 parameters,
                 block,
+                definition,
                 filter,
                 ..
             } => {
-                self.functions.insert(
-                    name.to_ascii_lowercase(),
-                    FunctionDef {
-                        name: name.clone(),
-                        definition: None,
-                        parameters: parameters.clone(),
-                        block: std::rc::Rc::new(block.as_ref().clone()),
-                        filter: *filter,
-                    },
-                );
+                self.functions.insert(FunctionDef {
+                    name: name.clone(),
+                    source: definition.as_str().into(),
+                    live_source: Default::default(),
+                    parameters: parameters.clone(),
+                    block: std::rc::Rc::new(block.as_ref().clone().into()),
+                    filter: *filter,
+                    private: false,
+                });
                 Ok(Flow::Normal)
             }
             Statement::Command {
@@ -4938,7 +4940,7 @@ impl Engine {
                         }
                         for function in functions {
                             if let Some(definition) = self.functions.get(function) {
-                                outputs.push(functions::command_info(&definition.name, "Function"));
+                                outputs.push(definition.info());
                             }
                         }
                     }
@@ -4980,7 +4982,7 @@ impl Engine {
                 let mut names: Vec<(String, &'static str)> = self
                     .functions
                     .values()
-                    .map(|function| (function.name.clone(), "Function"))
+                    .map(|function| (function.name.clone(), function.kind()))
                     .collect();
                 for builtin in BUILTIN_COMMANDS {
                     names.push(((*builtin).to_owned(), "Cmdlet"));
@@ -5024,14 +5026,11 @@ impl Engine {
                             {
                                 outputs.push(aliases::available_export(&name, module));
                             }
-                        } else if let Some(info) = functions::session_info(
-                            &name,
-                            kind,
-                            self.functions
-                                .get(&name.to_ascii_lowercase())
-                                .and_then(|f| f.definition)
-                                .filter(|_| kind == "Function"),
-                        ) {
+                        } else if matches!(kind, "Function" | "Filter")
+                            && let Some(function) = self.functions.info(&name.to_ascii_lowercase())
+                        {
+                            outputs.push(function.info());
+                        } else if let Some(info) = functions::session_info(&name, kind) {
                             outputs.push(info);
                         } else {
                             outputs.push(functions::command_info(&name, kind));
@@ -5684,15 +5683,8 @@ impl Engine {
                     }
                     outputs.push(if names_only {
                         Value::String(function.name.clone().into())
-                    } else if let Some(info) =
-                        functions::session_info(&function.name, "Function", function.definition)
-                    {
-                        info
                     } else {
-                        Value::object(vec![(
-                            "Name".to_owned(),
-                            Value::String(function.name.clone().into()),
-                        )])
+                        function.info()
                     });
                 }
             }
@@ -5743,20 +5735,17 @@ impl Engine {
                 Some(alias) => Ok(alias.value()),
                 None => missing(path),
             }),
-            "function" => Some(match self.functions.get(&name.to_ascii_lowercase()) {
-                Some(function) => {
-                    Ok(
-                        functions::session_info(&function.name, "Function", function.definition)
-                            .unwrap_or_else(|| {
-                                Value::object(vec![(
-                                    "Name".to_owned(),
-                                    Value::String(function.name.clone().into()),
-                                )])
-                            }),
-                    )
-                }
-                None => missing(path),
-            }),
+            "function" => {
+                let key = name.to_ascii_lowercase();
+                Some(if self.functions.contains_key(&key) {
+                    Ok(self
+                        .functions
+                        .info(&key)
+                        .map_or(Value::AutomationNull, FunctionDef::info))
+                } else {
+                    missing(path)
+                })
+            }
             _ => None,
         }
     }
@@ -5814,17 +5803,10 @@ impl Engine {
     }
 
     fn function(&self, name: &str) -> Result<FunctionDef, EngineError> {
-        let mut function = self
-            .functions
+        self.functions
             .get(&name.to_ascii_lowercase())
             .cloned()
-            .ok_or(RuntimeError::NotImplemented {
-                feature: "command invocation other than a defined function",
-            })?;
-        if let Some(source) = function.definition {
-            function.block = std::rc::Rc::new(rpsh_syntax::parse(source)?);
-        }
-        Ok(function)
+            .ok_or_else(|| command_not_found(name).into())
     }
 
     fn eval_pipeline_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
@@ -5840,6 +5822,12 @@ impl Engine {
     }
 
     fn eval_expression(&mut self, expr: &Expr) -> Result<Value, EngineError> {
+        if let ExprKind::Cast { type_name, value } = &expr.kind
+            && contains_group(value)
+        {
+            let value = self.eval_expression(value)?;
+            return Ok(cast_in_scope(type_name, value, &self.variables)?);
+        }
         if let ExprKind::ArrayExpression(statements) = &expr.kind {
             return Ok(Value::array(self.collect_statements(statements)?));
         }
@@ -6378,16 +6366,7 @@ fn evaluate(
                 }
             }
             let value = evaluate(value, variables, last_success)?;
-            if matches!(
-                type_name.to_ascii_lowercase().as_str(),
-                "string" | "system.string"
-            ) && let Some(ofs) = variables.get("OFS").filter(|v| !v.is_null_like())
-            {
-                return Ok(Value::String(
-                    value.to_ps_string_with_separator(&ofs.to_ps_string()),
-                ));
-            }
-            cast_to(type_name, value)
+            cast_in_scope(type_name, value, variables)
         }
         ExprKind::StaticMember { type_name, name } => static_member(type_name, name, variables),
         ExprKind::InvokeStatic {
@@ -7162,6 +7141,7 @@ fn is_command_info(value: &Value) -> bool {
             aliases::TYPE_NAME
                 | native::APPLICATION_TYPE
                 | invocation::EXTERNAL_SCRIPT
+                | functions::FILTER
                 | functions::FUNCTION
                 | functions::CMDLET
         )
@@ -9564,6 +9544,21 @@ fn version_value(text: String) -> Value {
 
 /// `[type]value`, the subset of `LanguagePrimitives.ConvertTo` the skeleton
 /// needs. Failing conversions are refused rather than approximated.
+fn cast_in_scope(
+    type_name: &str,
+    value: Value,
+    variables: &Variables,
+) -> Result<Value, RuntimeError> {
+    if (type_name.eq_ignore_ascii_case("string") || type_name.eq_ignore_ascii_case("system.string"))
+        && let Some(ofs) = variables.get("OFS").filter(|v| !v.is_null_like())
+    {
+        return Ok(Value::String(
+            value.to_ps_string_with_separator(&ofs.to_ps_string()),
+        ));
+    }
+    cast_to(type_name, value)
+}
+
 fn cast_to(type_name: &str, value: Value) -> Result<Value, RuntimeError> {
     if type_name.eq_ignore_ascii_case("string[]")
         || type_name.eq_ignore_ascii_case("system.string[]")
@@ -10472,6 +10467,19 @@ fn member_enumeration(items: &[Value], name: &str) -> Result<Value, RuntimeError
 
 fn member(value: &Value, name: &str) -> Result<Value, RuntimeError> {
     let value = value.base_value();
+    if let Value::Object(entries) = value
+        && (name.eq_ignore_ascii_case("Definition") || name.eq_ignore_ascii_case("ScriptBlock"))
+        && let Some((_, Value::ArrayList(source))) =
+            entries.iter().find(|(k, _)| k == "__FunctionSource")
+        && let Some(Value::ScriptBlock(text)) = source.items().first()
+    {
+        return Ok(if name.eq_ignore_ascii_case("Definition") {
+            Value::String(text.clone())
+        } else {
+            Value::ScriptBlock(text.clone())
+        });
+    }
+
     if let Some(result) = globalization::culture_property(value, name) {
         return result;
     }
